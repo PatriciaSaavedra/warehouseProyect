@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Kardex
+{% endblock %}
+
+{% block content %}
+
+<a
+    href="{% url 'kardex_pdf' material.id %}"
+    class="bg-red-700 text-white px-4 py-2 rounded-lg"
+>
+    Exportar PDF
+</a>
+
+<div class="flex justify-between items-center mb-6">
+
+    <div>
+
+        <h1 class="text-3xl font-bold">
+            Kardex
+        </h1>
+
+        <p class="text-gray-500 mt-1">
+
+            {{ material.nombre }}
+
+        </p>
+
+    </div>
+
+</div>
+
+<!-- RESUMEN -->
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+
+    <div class="bg-white rounded-xl shadow p-6 border-l-4 border-blue-500">
+
+        <p class="text-gray-500 text-sm mb-2">
+            Código
+        </p>
+
+        <h3 class="text-2xl font-bold">
+            {{ material.codigo }}
+        </h3>
+
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
+
+        <p class="text-gray-500 text-sm mb-2">
+            Stock Actual
+        </p>
+
+        <h3 class="text-2xl font-bold">
+            {{ material.stock_actual }}
+        </h3>
+
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-6 border-l-4 border-red-500">
+
+        <p class="text-gray-500 text-sm mb-2">
+            Stock Mínimo
+        </p>
+
+        <h3 class="text-2xl font-bold">
+            {{ material.stock_minimo }}
+        </h3>
+
+    </div>
+
+</div>
+
+<!-- TABLA -->
+
+<div class="bg-white rounded-xl shadow overflow-hidden">
+
+    <table class="w-full">
+
+        <thead class="bg-gray-100">
+
+            <tr>
+
+                <th class="p-4 text-left">
+                    Fecha
+                </th>
+
+                <th class="p-4 text-left">
+                    Tipo
+                </th>
+
+                <th class="p-4 text-left">
+                    Cantidad
+                </th>
+
+                <th class="p-4 text-left">
+                    Referencia
+                </th>
+
+                <th class="p-4 text-left">
+                    Usuario
+                </th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for movimiento in movimientos %}
+
+            <tr class="border-b">
+
+                <td class="p-4">
+                    {{ movimiento.fecha|date:"d/m/Y H:i" }}
+                </td>
+
+                <td class="p-4">
+
+                    {% if movimiento.tipo == 'ENTRADA' %}
+
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+                            Entrada
+                        </span>
+
+                    {% else %}
+
+                        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
+                            Salida
+                        </span>
+
+                    {% endif %}
+
+                </td>
+
+                <td class="p-4">
+                    {{ movimiento.cantidad }}
+                </td>
+
+                <td class="p-4">
+                    {{ movimiento.referencia }}
+                </td>
+
+                <td class="p-4">
+                    {{ movimiento.usuario.username }}
+                </td>
+
+            </tr>
+
+            {% empty %}
+
+            <tr>
+
+                <td colspan="5" class="p-6 text-center text-gray-500">
+
+                    No existen movimientos.
+
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

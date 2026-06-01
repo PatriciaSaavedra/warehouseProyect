@@ -1,0 +1,49 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}SGA{% endblock %}</title>
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+    <style>
+        body {
+            background-color: #f7f9fd;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .sidebar-active {
+            background-color: #8b0000;
+            color: white;
+            border-left: 4px solid #d97706;
+        }
+    </style>
+
+</head>
+
+<body class="text-gray-800">
+
+    {% include 'partials/sidebar.html' %}
+
+    {% include 'partials/navbar.html' %}
+
+    <main class="ml-[260px] pt-20 p-6 min-h-screen">
+
+        {% block content %}
+
+        {% endblock %}
+
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+
+</html>

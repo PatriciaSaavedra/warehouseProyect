@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Detalle Solicitud
+{% endblock %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-6">
+
+    <h1 class="text-3xl font-bold">
+        Detalle de Solicitud
+    </h1>
+
+    <a href="{% url 'solicitudes' %}"
+       class="bg-gray-200 px-4 py-2 rounded-lg">
+        Volver
+    </a>
+
+</div>
+
+<!-- INFORMACION GENERAL -->
+
+<div class="bg-white rounded-xl shadow p-6 mb-6">
+
+    <div class="grid grid-cols-2 gap-6">
+
+        <div>
+
+            <p class="text-gray-500 text-sm">
+                Código
+            </p>
+
+            <h3 class="font-bold text-lg">
+                {{ solicitud.codigo }}
+            </h3>
+
+        </div>
+
+        <div>
+
+            <p class="text-gray-500 text-sm">
+                Estado
+            </p>
+
+            <h3 class="font-bold text-lg">
+                {{ solicitud.estado }}
+            </h3>
+
+        </div>
+
+        <div>
+
+            <p class="text-gray-500 text-sm">
+                Unidad Solicitante
+            </p>
+
+            <h3 class="font-bold">
+                {{ solicitud.unidad_solicitante }}
+            </h3>
+
+        </div>
+
+        <div>
+
+            <p class="text-gray-500 text-sm">
+                Fecha
+            </p>
+
+            <h3 class="font-bold">
+                {{ solicitud.fecha }}
+            </h3>
+
+        </div>
+
+    </div>
+
+    <div class="mt-6">
+
+        <p class="text-gray-500 text-sm mb-2">
+            Justificación
+        </p>
+
+        <div class="bg-gray-100 p-4 rounded-lg">
+
+            {{ solicitud.justificacion }}
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- DETALLE DE MATERIALES -->
+
+<div class="bg-white rounded-xl shadow overflow-hidden">
+
+    <div class="p-6 border-b">
+
+        <h2 class="text-xl font-bold">
+            Materiales Solicitados
+        </h2>
+
+    </div>
+
+    <table class="w-full">
+
+        <thead class="bg-gray-100">
+
+            <tr>
+
+                <th class="text-left p-4">
+                    Material
+                </th>
+
+                <th class="text-left p-4">
+                    Cantidad
+                </th>
+
+                <th class="text-left p-4">
+                    Observación
+                </th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for detalle in solicitud.detalles.all %}
+
+            <tr class="border-b">
+
+                <td class="p-4">
+                    {{ detalle.material.nombre }}
+                </td>
+
+                <td class="p-4">
+                    {{ detalle.cantidad }}
+                </td>
+
+                <td class="p-4">
+                    {{ detalle.observacion }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

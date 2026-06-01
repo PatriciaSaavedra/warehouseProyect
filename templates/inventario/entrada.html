@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Entrada Inventario
+{% endblock %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-6">
+
+    <h1 class="text-3xl font-bold">
+        Registrar Entrada
+    </h1>
+
+</div>
+
+<form method="POST" class="bg-white p-6 rounded-xl shadow">
+
+    {% csrf_token %}
+
+    <!-- MATERIAL -->
+
+    <div class="mb-6">
+
+        <label class="block mb-2 font-semibold">
+            Material
+        </label>
+
+        <select
+            name="material"
+            class="w-full border rounded-lg p-3"
+            required
+        >
+
+            <option value="">
+                Seleccionar material
+            </option>
+
+            {% for material in materiales %}
+
+            <option value="{{ material.id }}">
+
+                {{ material.nombre }}
+
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+    </div>
+
+    <!-- CANTIDAD -->
+
+    <div class="mb-6">
+
+        <label class="block mb-2 font-semibold">
+            Cantidad
+        </label>
+
+        <input
+            type="number"
+            name="cantidad"
+            class="w-full border rounded-lg p-3"
+            placeholder="Ingrese cantidad"
+            required
+        >
+
+    </div>
+
+    <!-- REFERENCIA -->
+
+    <div class="mb-6">
+
+        <label class="block mb-2 font-semibold">
+            Referencia
+        </label>
+
+        <input
+            type="text"
+            name="referencia"
+            class="w-full border rounded-lg p-3"
+            placeholder="Ej: COMPRA-001"
+            required
+        >
+
+    </div>
+
+    <!-- BOTON -->
+
+    <div class="flex justify-end">
+
+        <button
+            type="submit"
+            class="bg-green-600 text-white px-6 py-3 rounded-lg"
+        >
+            Registrar Entrada
+        </button>
+
+    </div>
+
+</form>
+
+{% endblock %}

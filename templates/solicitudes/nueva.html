@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Nueva Solicitud
+{% endblock %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-6">
+
+    <h1 class="text-3xl font-bold">
+        Nueva Solicitud
+    </h1>
+
+</div>
+
+<form method="POST" class="bg-white p-6 rounded-xl shadow">
+
+    {% csrf_token %}
+
+    <div class="grid grid-cols-2 gap-6">
+
+        <!-- FECHA -->
+        <div>
+
+            <label class="block mb-2 font-semibold">
+                Fecha
+            </label>
+
+            <input
+                type="date"
+                name="fecha"
+                class="w-full border rounded-lg p-3"
+                required
+            >
+
+        </div>
+
+    </div>
+
+    <!-- MATERIAL -->
+    <div class="mt-6">
+
+        <label class="block mb-2 font-semibold">
+            Material
+        </label>
+
+        <select
+            name="material"
+            class="w-full border rounded-lg p-3"
+            required
+        >
+
+            <option value="">
+                Seleccionar material
+            </option>
+
+            {% for material in materiales %}
+
+            <option value="{{ material.id }}">
+                {{ material.nombre }}
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+    </div>
+
+    <!-- CANTIDAD -->
+    <div class="mt-6">
+
+        <label class="block mb-2 font-semibold">
+            Cantidad
+        </label>
+
+        <input
+            type="number"
+            name="cantidad"
+            class="w-full border rounded-lg p-3"
+            placeholder="Cantidad"
+            required
+        >
+
+    </div>
+
+    <!-- JUSTIFICACION -->
+    <div class="mt-6">
+
+        <label class="block mb-2 font-semibold">
+            Justificación
+        </label>
+
+        <textarea
+            name="justificacion"
+            class="w-full border rounded-lg p-3"
+            rows="4"
+            required
+        ></textarea>
+
+    </div>
+
+    <!-- BOTON -->
+    <div class="mt-8 flex justify-end">
+
+        <button
+            type="submit"
+            class="bg-red-900 text-white px-6 py-3 rounded-lg"
+        >
+            Enviar Solicitud
+        </button>
+
+    </div>
+
+</form>
+
+{% endblock %}

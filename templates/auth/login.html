@@ -1,0 +1,153 @@
+{% extends 'base_auth.html' %}
+{% load static %}
+
+{% block content %}
+
+<div class="animate-fade w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-10">
+
+    <!-- LOGO -->
+    <div class="flex justify-center mb-8">
+
+        <div class="bg-white/10 backdrop-blur-md p-4 rounded-3xl shadow-2xl border border-white/20">
+
+            <img
+                src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                alt="Logo"
+                class="w-24 h-24 object-contain"
+            />
+
+        </div>
+
+    </div>
+
+    <!-- TITULO -->
+    <h1 class="text-3xl font-extrabold text-center text-gray-800">
+        Almacén Central
+    </h1>
+
+    <p class="text-center text-gray-500 mt-2 mb-8">
+        Sistema de Gestión Gubernamental
+    </p>
+
+    <!-- ERROR -->
+    {% if error %}
+        <div class="mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl flex items-center gap-2 text-sm">
+
+            <span class="material-symbols-outlined">
+                error
+            </span>
+
+            <span>
+                {{ error }}
+            </span>
+
+        </div>
+    {% endif %}
+
+    <!-- FORM -->
+    <form method="POST" class="space-y-5">
+
+        {% csrf_token %}
+
+        <!-- USERNAME -->
+        <div>
+
+            <label class="block mb-2 text-sm font-semibold text-gray-700">
+                Usuario
+            </label>
+
+            <input
+                type="text"
+                name="username"
+                class="w-full rounded-2xl border border-gray-300 bg-white/80 px-4 py-3
+                focus:outline-none focus:ring-2 focus:ring-red-800
+                focus:border-transparent transition-all duration-200"
+                placeholder="Ingrese usuario"
+                required
+            >
+
+        </div>
+
+        <!-- PASSWORD -->
+        <div>
+
+            <label class="block mb-2 text-sm font-semibold text-gray-700">
+                Contraseña
+            </label>
+
+            <div class="relative">
+
+                <input
+                    id="password"
+                    type="password"
+                    name="password"
+                    class="w-full rounded-2xl border border-gray-300 bg-white/80 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800
+                    focus:border-transparent transition-all duration-200"
+                    placeholder="Ingrese contraseña"
+                    required
+                >
+
+                <button
+                    type="button"
+                    onclick="togglePassword()"
+                    class="absolute right-4 top-3 text-gray-500 hover:text-red-900 transition"
+                >
+
+                    <span
+                        id="eyeIcon"
+                        class="material-symbols-outlined text-[22px]"
+                    >
+                        visibility
+                    </span>
+
+                </button>
+
+            </div>
+
+        </div>
+
+        <!-- BUTTON -->
+        <button
+            type="submit"
+            class="w-full bg-red-900 hover:bg-red-800 text-white py-3 rounded-2xl
+            font-semibold shadow-lg hover:shadow-2xl
+            active:scale-[0.98] transition-all duration-200"
+        >
+            Iniciar Sesión
+        </button>
+
+    </form>
+
+    <!-- FOOTER -->
+    <p class="text-center text-sm text-gray-400 mt-8">
+        © 2026 Gobierno Autónomo
+    </p>
+
+</div>
+
+<!-- SCRIPT -->
+<script>
+
+function togglePassword() {
+
+    const password = document.getElementById('password');
+    const eyeIcon = document.getElementById('eyeIcon');
+
+    if (password.type === 'password') {
+
+        password.type = 'text';
+        eyeIcon.innerText = 'visibility_off';
+
+    } else {
+
+        password.type = 'password';
+        eyeIcon.innerText = 'visibility';
+
+    }
+
+}
+
+</script>
+
+{% endblock %}

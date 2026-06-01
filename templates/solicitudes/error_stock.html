@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="bg-red-100 border border-red-400 text-red-700 p-6 rounded-xl">
+
+    <h2 class="text-2xl font-bold mb-4">
+        Stock insuficiente
+    </h2>
+
+    <p>
+        El material:
+        <strong>{{ material.nombre }}</strong>
+        no tiene suficiente stock.
+    </p>
+
+</div>
+
+{% endblock %}

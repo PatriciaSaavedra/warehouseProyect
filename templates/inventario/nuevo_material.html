@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Nuevo Material
+{% endblock %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-6">
+
+    <h1 class="text-3xl font-bold">
+        Nuevo Material
+    </h1>
+
+</div>
+
+<form method="POST" class="bg-white p-6 rounded-xl shadow">
+
+    {% csrf_token %}
+    {% if error %}
+
+    <div class="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
+
+        {{ error }}
+
+    </div>
+
+    {% endif %}
+
+    <div class="grid grid-cols-2 gap-6"></div>
+        <!-- NOMBRE -->
+        <div>
+
+            <label class="block mb-2 font-semibold">
+                Nombre
+            </label>
+
+            <input
+                type="text"
+                name="nombre"
+                class="w-full border rounded-lg p-3"
+                placeholder="Nombre del material"
+                required
+            >
+
+        </div>
+
+        <!-- PARTIDA -->
+        <div>
+
+            <label class="block mb-2 font-semibold">
+                Partida Presupuestaria
+            </label>
+
+            <select
+                name="partida"
+                class="w-full border rounded-lg p-3"
+                required
+            >
+
+                <option value="">
+                    Seleccione una partida
+                </option>
+
+                {% for partida in partidas %}
+
+                <option value="{{ partida.id }}">
+                    {{ partida.codigo }} - {{ partida.nombre }}
+                </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <!-- DESCRIPCION -->
+    <div class="mt-6">
+
+        <label class="block mb-2 font-semibold">
+            Descripción
+        </label>
+
+        <textarea
+            name="descripcion"
+            class="w-full border rounded-lg p-3"
+            rows="4"
+        ></textarea>
+
+    </div>
+
+    <div class="grid grid-cols-3 gap-6 mt-6">
+
+        <!-- UNIDAD -->
+        <div>
+
+            <label class="block mb-2 font-semibold">
+                Unidad Medida
+            </label>
+
+        <select
+            name="unidad_medida_fk"
+            class="w-full border rounded-lg p-3"
+            required
+        >
+
+            <option value="">
+                Seleccione una unidad
+            </option>
+
+            {% for unidad in unidades %}
+
+                <option value="{{ unidad.id }}">
+
+                    {{ unidad.codigo }} - {{ unidad.nombre }}
+
+                </option>
+
+            {% endfor %}    
+
+        </select>
+
+        </div>
+
+        <!-- STOCK -->
+        <div>
+
+            <label class="block mb-2 font-semibold">
+                Stock Inicial
+            </label>
+
+            <input
+                type="number"
+                name="stock_actual"
+                class="w-full border rounded-lg p-3"
+                required
+            >
+
+        </div>
+
+        <!-- STOCK MINIMO -->
+        <div>
+
+            <label class="block mb-2 font-semibold">
+                Stock Mínimo
+            </label>
+
+            <input
+                type="number"
+                name="stock_minimo"
+                class="w-full border rounded-lg p-3"
+                required
+            >
+
+        </div>
+
+    </div>
+
+    <!-- BOTON -->
+    <div class="mt-8 flex justify-end">
+
+        <button
+            type="submit"
+            class="bg-green-600 text-white px-6 py-3 rounded-lg"
+        >
+            Guardar Material
+        </button>
+
+    </div>
+
+</form>
+
+{% endblock %}

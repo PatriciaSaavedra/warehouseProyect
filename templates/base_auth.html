@@ -1,0 +1,47 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}Login{% endblock %}</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet"
+    />
+    <style>
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.5s ease;
+        }
+
+    </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-red-950 via-red-900 to-black flex items-center justify-center overflow-hidden relative">
+    
+    {% block content %}
+    {% endblock %}
+    <div class="absolute top-0 left-0 w-72 h-72 bg-red-700 rounded-full blur-3xl opacity-20"></div>
+
+    <div class="absolute bottom-0 right-0 w-72 h-72 bg-red-500 rounded-full blur-3xl opacity-20"></div>
+</body>
+</html>

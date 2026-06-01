@@ -1,0 +1,189 @@
+<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-white/95 backdrop-blur-md border-r border-gray-200 shadow-sm">
+
+    <!-- LOGO -->
+    <div class="p-6 flex flex-col items-center">
+
+        <h1 class="text-2xl font-bold text-red-900">
+            Almacén Central
+        </h1>
+
+        <p class="text-sm text-gray-500">
+            Gestión Gubernamental
+        </p>
+
+    </div>
+
+    <!-- MENU -->
+    <nav class="flex-1 px-4 mt-4 space-y-2">
+
+        <!-- DASHBOARD -->
+        <a href="/dashboard/"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                dashboard
+            </span>
+
+            Dashboard
+
+        </a>
+
+        <!-- SOLICITUDES -->
+        <a href="/solicitudes/"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                description
+            </span>
+
+            Solicitudes
+
+        </a>
+
+        <!-- INVENTARIO -->
+        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'KARDISTA' %}
+
+        <a href="/inventario/"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                inventory_2
+            </span>
+
+            Inventario
+
+        </a>
+
+        {% endif %}
+
+        <!-- MOVIMIENTOS -->
+        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'KARDISTA' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+
+        <a href="{% url 'movimientos' %}"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                swap_horiz
+            </span>
+
+            Movimientos
+
+        </a>
+
+        {% endif %}
+
+        <!-- PRESUPUESTOS -->
+        {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+
+        <a href="/presupuestos/"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                account_balance
+            </span>
+
+            Presupuestos
+
+        </a>
+
+        {% endif %}
+
+        <!-- COMPRAS -->
+        {% if request.user.perfilusuario.rol == 'BIENES_SERVICIOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+
+        <a href="/compras/"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                shopping_cart
+            </span>
+
+            Compras
+
+        </a>
+
+        {% endif %}
+
+        <!-- USUARIOS -->
+        {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+
+        <a href="/usuarios/"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                group
+            </span>
+
+            Usuarios
+
+        </a>
+
+        {% endif %}
+
+        <!-- AUDITORIA -->
+        {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+
+        <a href="/auditoria/"
+           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                security
+            </span>
+
+            Auditoría
+
+        </a>
+
+        {% endif %}
+
+    </nav>
+
+    <!-- FOOTER -->
+    <div class="p-4 border-t">
+
+        <div class="mb-4">
+
+            <p class="font-semibold">
+                {{ request.user.first_name }}
+                {{ request.user.last_name }}
+            </p>
+
+            <p class="text-sm text-gray-500">
+
+                {{ request.user.perfilusuario.get_rol_display }}
+
+            </p>
+
+        </div>
+<!-- 
+        <a href="{% url 'logout' %}"
+           class="flex items-center px-4 py-3 text-red-700 hover:bg-red-50 rounded-lg">
+
+            <span class="material-symbols-outlined mr-3">
+                logout
+            </span>
+
+            Cerrar Sesión
+
+        </a> -->
+
+        <form method="POST" action="{% url 'logout' %}">
+            {% csrf_token %}
+
+            <button
+                type="submit"
+                class="w-full flex items-center px-4 py-3 text-red-700 hover:bg-red-50 rounded-lg transition"
+            >
+
+                <span class="material-symbols-outlined mr-3">
+                    logout
+                </span>
+
+                Cerrar Sesión
+
+            </button>
+        </form>
+
+    </div>
+
+</aside>

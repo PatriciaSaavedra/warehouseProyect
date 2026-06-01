@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Dashboard
+{% endblock %}
+
+{% block content %}
+
+<h1 class="text-4xl font-bold mb-8 text-gray-800">
+    Dashboard General
+</h1>
+
+<!-- KPI CARDS -->
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+
+    <!-- MATERIALES -->
+
+    <div class="bg-white border-l-4 border-blue-600 rounded-xl shadow p-6">
+
+        <div class="flex justify-between items-center">
+
+            <div>
+
+                <p class="text-gray-500 text-sm uppercase">
+                    Materiales
+                </p>
+
+                <h2 class="text-4xl font-bold mt-2">
+                    {{ total_materiales }}
+                </h2>
+
+            </div>
+
+            <span class="material-symbols-outlined text-5xl text-blue-500">
+                inventory_2
+            </span>
+
+        </div>
+
+    </div>
+
+    <!-- SOLICITUDES -->
+
+    <div class="bg-white border-l-4 border-green-600 rounded-xl shadow p-6">
+
+        <div class="flex justify-between items-center">
+
+            <div>
+
+                <p class="text-gray-500 text-sm uppercase">
+                    Solicitudes
+                </p>
+
+                <h2 class="text-4xl font-bold mt-2">
+                    {{ total_solicitudes }}
+                </h2>
+
+            </div>
+
+            <span class="material-symbols-outlined text-5xl text-green-500">
+                description
+            </span>
+
+        </div>
+
+    </div>
+
+    <!-- PENDIENTES -->
+
+    <div class="bg-white border-l-4 border-yellow-500 rounded-xl shadow p-6">
+
+        <div class="flex justify-between items-center">
+
+            <div>
+
+                <p class="text-gray-500 text-sm uppercase">
+                    Pendientes
+                </p>
+
+                <h2 class="text-4xl font-bold mt-2">
+                    {{ solicitudes_pendientes }}
+                </h2>
+
+            </div>
+
+            <span class="material-symbols-outlined text-5xl text-yellow-500">
+                pending_actions
+            </span>
+
+        </div>
+
+    </div>
+
+    <!-- MOVIMIENTOS -->
+
+    <div class="bg-white border-l-4 border-red-600 rounded-xl shadow p-6">
+
+        <div class="flex justify-between items-center">
+
+            <div>
+
+                <p class="text-gray-500 text-sm uppercase">
+                    Movimientos
+                </p>
+
+                <h2 class="text-4xl font-bold mt-2">
+                    {{ total_movimientos }}
+                </h2>
+
+            </div>
+
+            <span class="material-symbols-outlined text-5xl text-red-500">
+                sync_alt
+            </span>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ALERTAS -->
+
+<div class="bg-white rounded-xl shadow p-6 mb-8">
+
+    <div class="flex items-center mb-6">
+
+        <span class="material-symbols-outlined text-red-600 text-4xl mr-3">
+            warning
+        </span>
+
+        <h2 class="text-2xl font-bold text-red-700">
+            Alertas de Stock
+        </h2>
+
+    </div>
+
+    {% if materiales_bajos %}
+
+        <div class="space-y-4">
+
+            {% for material in materiales_bajos %}
+
+            <div class="border border-red-200 rounded-xl p-4 flex justify-between items-center bg-red-50">
+
+                <div>
+
+                    <h3 class="font-bold text-lg">
+                        {{ material.nombre }}
+                    </h3>
+
+                    <p class="text-gray-600">
+                        Stock actual:
+                        <span class="font-semibold">
+                            {{ material.stock_actual }}
+                        </span>
+                    </p>
+
+                    <p class="text-gray-500 text-sm">
+                        Stock mínimo:
+                        {{ material.stock_minimo }}
+                    </p>
+
+                </div>
+
+                <span class="bg-red-200 text-red-800 px-4 py-2 rounded-full text-sm font-bold">
+                    Bajo Stock
+                </span>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="bg-green-50 border border-green-200 rounded-xl p-4">
+
+            <p class="text-green-700 font-semibold">
+                No existen alertas de stock.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+<!-- GRAFICO Y ACTIVIDAD -->
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- GRAFICO -->
+
+    <div class="bg-white rounded-xl shadow p-6">
+
+        <h2 class="text-2xl font-bold mb-6">
+            Movimientos de Inventario
+        </h2>
+
+        <canvas id="movimientosChart"></canvas>
+
+    </div>
+
+    <!-- ACTIVIDAD -->
+
+    <div class="bg-white rounded-xl shadow p-6">
+
+        <h2 class="text-2xl font-bold mb-6">
+            Actividad Reciente
+        </h2>
+
+        <div class="space-y-4">
+
+            {% for movimiento in movimientos_recientes %}
+
+            <div class="border-b pb-4">
+
+                <div class="flex justify-between items-center">
+
+                    <div>
+
+                        <h3 class="font-bold text-lg">
+                            {{ movimiento.material.nombre }}
+                        </h3>
+
+                        <p class="text-gray-600">
+
+                            {{ movimiento.tipo }}
+                            -
+                            {{ movimiento.cantidad }}
+
+                        </p>
+
+                    </div>
+
+                    <span class="text-xs text-gray-400">
+                        {{ movimiento.fecha }}
+                    </span>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- CHART -->
+
+<script>
+
+const ctx = document.getElementById('movimientosChart');
+
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Entradas', 'Salidas'],
+        datasets: [{
+            label: 'Movimientos',
+            data: [12, 7],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true
+    }
+});
+
+</script>
+
+{% endblock %}

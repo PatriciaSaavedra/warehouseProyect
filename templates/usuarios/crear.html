@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Crear Usuario
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-4xl mx-auto">
+
+    <!-- HEADER -->
+    <div class="mb-8">
+
+        <h1 class="text-3xl font-bold text-gray-800">
+            Crear Usuario
+        </h1>
+
+        <p class="text-gray-500 mt-2">
+            Registro de nuevos usuarios del sistema
+        </p>
+
+    </div>
+
+    <!-- MENSAJES -->
+    {% if messages %}
+
+        <div class="space-y-3 mb-6">
+
+            {% for message in messages %}
+
+                <div class="
+                    px-4 py-3 rounded-2xl border flex items-center gap-3
+
+                    {% if message.tags == 'success' %}
+                        bg-green-50 border-green-200 text-green-700
+                    {% endif %}
+
+                    {% if message.tags == 'error' %}
+                        bg-red-50 border-red-200 text-red-700
+                    {% endif %}
+                ">
+
+                    <span class="material-symbols-outlined">
+
+                        {% if message.tags == 'success' %}
+                            check_circle
+                        {% endif %}
+
+                        {% if message.tags == 'error' %}
+                            error
+                        {% endif %}
+
+                    </span>
+
+                    <span>
+                        {{ message }}
+                    </span>
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% endif %}
+
+    <!-- CARD -->
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+
+        <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {% csrf_token %}
+
+            <!-- NOMBRES -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Nombres
+                </label>
+
+                <input
+                    type="text"
+                    name="first_name"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    placeholder="Ingrese nombres"
+                    required
+                >
+
+            </div>
+
+            <!-- APELLIDOS -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Apellidos
+                </label>
+
+                <input
+                    type="text"
+                    name="last_name"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    placeholder="Ingrese apellidos"
+                    required
+                >
+
+            </div>
+
+            <!-- USERNAME -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Usuario
+                </label>
+
+                <input
+                    type="text"
+                    name="username"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    placeholder="Ingrese usuario"
+                    required
+                >
+
+            </div>
+
+            <!-- EMAIL -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Correo Electrónico
+                </label>
+
+                <input
+                    type="email"
+                    name="email"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    placeholder="correo@institucion.gob.bo"
+                >
+
+            </div>
+
+            <!-- PASSWORD -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Contraseña
+                </label>
+
+                <div class="relative">
+
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                        focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                        placeholder="Ingrese contraseña"
+                        required
+                    >
+
+                    <button
+                        type="button"
+                        onclick="togglePassword()"
+                        class="absolute right-4 top-3 text-gray-500 hover:text-red-900 transition"
+                    >
+
+                        <span
+                            id="eyeIcon"
+                            class="material-symbols-outlined"
+                        >
+                            visibility
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <!-- ROL -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Rol
+                </label>
+
+                <select
+                    name="rol"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    required
+                >
+
+                    <option value="">
+                        Seleccione un rol
+                    </option>
+
+                    {% for value, label in roles %}
+
+                        <option value="{{ value }}">
+                            {{ label }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <!-- UNIDAD -->
+            <div class="md:col-span-2">
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Unidad Organizacional
+                </label>
+
+                <select
+                    name="unidad"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                >
+
+                    <option value="">
+                        Seleccione una unidad
+                    </option>
+
+                    {% for unidad in unidades %}
+
+                        <option value="{{ unidad.id }}">
+                            {{ unidad.nombre }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <!-- BUTTONS -->
+            <div class="md:col-span-2 flex justify-end gap-4 pt-4">
+
+                <a
+                    href="/usuarios/"
+                    class="px-6 py-3 rounded-2xl border border-gray-300
+                    hover:bg-gray-100 transition"
+                >
+                    Cancelar
+                </a>
+
+                <button
+                    type="submit"
+                    class="bg-red-900 hover:bg-red-800 text-white px-6 py-3
+                    rounded-2xl shadow-lg hover:shadow-2xl
+                    active:scale-[0.98] transition-all duration-200"
+                >
+                    Crear Usuario
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- SCRIPT -->
+<script>
+
+function togglePassword() {
+
+    const password = document.getElementById('password');
+    const eyeIcon = document.getElementById('eyeIcon');
+
+    if (password.type === 'password') {
+
+        password.type = 'text';
+        eyeIcon.innerText = 'visibility_off';
+
+    } else {
+
+        password.type = 'password';
+        eyeIcon.innerText = 'visibility';
+
+    }
+
+}
+
+</script>
+
+{% endblock %}

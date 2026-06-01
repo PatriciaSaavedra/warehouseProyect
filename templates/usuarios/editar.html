@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Editar Usuario
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-4xl mx-auto">
+
+    <!-- HEADER -->
+    <div class="mb-8">
+
+        <h1 class="text-3xl font-bold text-gray-800">
+            Editar Usuario
+        </h1>
+
+        <p class="text-gray-500 mt-2">
+            Modificación de información del usuario
+        </p>
+
+    </div>
+
+    <!-- MENSAJES -->
+    {% if messages %}
+
+        <div class="space-y-3 mb-6">
+
+            {% for message in messages %}
+
+                <div class="
+                    px-4 py-3 rounded-2xl border flex items-center gap-3
+
+                    {% if message.tags == 'success' %}
+                        bg-green-50 border-green-200 text-green-700
+                    {% endif %}
+
+                    {% if message.tags == 'error' %}
+                        bg-red-50 border-red-200 text-red-700
+                    {% endif %}
+                ">
+
+                    <span class="material-symbols-outlined">
+
+                        {% if message.tags == 'success' %}
+                            check_circle
+                        {% endif %}
+
+                        {% if message.tags == 'error' %}
+                            error
+                        {% endif %}
+
+                    </span>
+
+                    <span>
+                        {{ message }}
+                    </span>
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% endif %}
+
+    <!-- CARD -->
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+
+        <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {% csrf_token %}
+
+            <!-- NOMBRES -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Nombres
+                </label>
+
+                <input
+                    type="text"
+                    name="first_name"
+                    value="{{ usuario_obj.first_name }}"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    required
+                >
+
+            </div>
+
+            <!-- APELLIDOS -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Apellidos
+                </label>
+
+                <input
+                    type="text"
+                    name="last_name"
+                    value="{{ usuario_obj.last_name }}"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    required
+                >
+
+            </div>
+
+            <!-- USERNAME -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Usuario
+                </label>
+
+                <input
+                    type="text"
+                    name="username"
+                    value="{{ usuario_obj.username }}"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    required
+                >
+
+            </div>
+
+            <!-- EMAIL -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Correo Electrónico
+                </label>
+
+                <input
+                    type="email"
+                    name="email"
+                    value="{{ usuario_obj.email }}"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                >
+
+            </div>
+
+            <!-- ROL -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Rol
+                </label>
+
+                <select
+                    name="rol"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    required
+                >
+
+                    {% for value, label in roles %}
+
+                        <option
+                            value="{{ value }}"
+                            {% if perfil.rol == value %}selected{% endif %}
+                        >
+                            {{ label }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <!-- UNIDAD -->
+            <div>
+
+                <label class="block mb-2 text-sm font-semibold text-gray-700">
+                    Unidad Organizacional
+                </label>
+
+                <select
+                    name="unidad"
+                    class="w-full rounded-2xl border border-gray-300 px-4 py-3
+                    focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                >
+
+                    <option value="">
+                        Seleccione una unidad
+                    </option>
+
+                    {% for unidad in unidades %}
+
+                        <option
+                            value="{{ unidad.id }}"
+                            {% if perfil.unidad.id == unidad.id %}selected{% endif %}
+                        >
+                            {{ unidad.nombre }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <!-- BUTTONS -->
+            <div class="md:col-span-2 flex justify-end gap-4 pt-4">
+
+                <a
+                    href="{% url 'usuarios' %}"
+                    class="px-6 py-3 rounded-2xl border border-gray-300
+                    hover:bg-gray-100 transition"
+                >
+                    Cancelar
+                </a>
+
+                <button
+                    type="submit"
+                    class="bg-red-900 hover:bg-red-800 text-white px-6 py-3
+                    rounded-2xl shadow-lg hover:shadow-2xl
+                    active:scale-[0.98] transition-all duration-200"
+                >
+                    Guardar Cambios
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

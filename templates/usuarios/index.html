@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Usuarios
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-7xl mx-auto">
+
+    <!-- HEADER -->
+    <div class="flex items-center justify-between mb-8">
+
+        <div>
+
+            <h1 class="text-3xl font-bold text-gray-800">
+                Usuarios
+            </h1>
+
+            <p class="text-gray-500 mt-2">
+                Administración de usuarios del sistema
+            </p>
+
+        </div>
+
+        <a
+            href="{% url 'crear_usuario' %}"
+            class="bg-red-900 hover:bg-red-800 text-white px-5 py-3 rounded-2xl
+            shadow-lg hover:shadow-2xl transition-all duration-200
+            flex items-center gap-2"
+        >
+
+            <span class="material-symbols-outlined">
+                person_add
+            </span>
+
+            Nuevo Usuario
+
+        </a>
+
+    </div>
+
+    <!-- MENSAJES -->
+    {% if messages %}
+
+        <div class="space-y-3 mb-6">
+
+            {% for message in messages %}
+
+                <div class="
+                    px-4 py-3 rounded-2xl border flex items-center gap-3
+
+                    {% if message.tags == 'success' %}
+                        bg-green-50 border-green-200 text-green-700
+                    {% endif %}
+
+                    {% if message.tags == 'error' %}
+                        bg-red-50 border-red-200 text-red-700
+                    {% endif %}
+                ">
+
+                    <span class="material-symbols-outlined">
+
+                        {% if message.tags == 'success' %}
+                            check_circle
+                        {% endif %}
+
+                        {% if message.tags == 'error' %}
+                            error
+                        {% endif %}
+
+                    </span>
+
+                    <span>
+                        {{ message }}
+                    </span>
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% endif %}
+
+    <!-- CARD -->
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+
+        <!-- TABLE HEADER -->
+        <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+
+            <h2 class="font-semibold text-gray-700">
+                Lista de Usuarios
+            </h2>
+
+            <form method="GET">
+
+                <div class="relative">
+
+                    <span class="material-symbols-outlined absolute left-3 top-3 text-gray-400">
+                        search
+                    </span>
+
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ query }}"
+                        placeholder="Buscar usuario..."
+                        class="pl-10 pr-4 py-2 rounded-2xl border border-gray-300
+                        focus:outline-none focus:ring-2 focus:ring-red-800 transition"
+                    >
+
+                </div>
+
+            </form>
+        </div>
+
+        <!-- TABLE -->
+        <div class="overflow-x-auto">
+
+            <table class="w-full">
+
+                <thead class="bg-gray-50">
+
+                    <tr class="text-left text-sm text-gray-500">
+
+                        <th class="px-6 py-4 font-semibold">
+                            Usuario
+                        </th>
+                        <th class="px-6 py-4 font-semibold">
+                            Unidad
+                        </th>
+                        <th class="px-6 py-4 font-semibold">
+                            Registro
+                        </th>
+
+                        <th class="px-6 py-4 font-semibold">
+                            Correo
+                        </th>
+
+                        <th class="px-6 py-4 font-semibold">
+                            Rol
+                        </th>
+
+                        <th class="px-6 py-4 font-semibold">
+                            Estado
+                        </th>
+
+                        <th class="px-6 py-4 font-semibold text-right">
+                            Acciones
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for usuario in page_obj %}
+
+                    <tr class="border-t border-gray-100 hover:bg-gray-50 transition">
+
+                        <!-- USER -->
+                        <td class="px-6 py-4">
+
+                            <div class="flex items-center gap-4">
+
+                                <div class="w-12 h-12 rounded-2xl bg-red-100
+                                flex items-center justify-center text-red-900 font-bold">
+
+                                    {{ usuario.first_name|first }}{{ usuario.last_name|first }}
+
+                                </div>
+
+                                <div>
+
+                                    <p class="font-semibold text-gray-800">
+                                        {{ usuario.first_name }}
+                                        {{ usuario.last_name }}
+                                    </p>
+
+                                    <p class="text-sm text-gray-500">
+                                        @{{ usuario.username }}
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                        </td>
+                        <!-- Unidad -->
+
+                        <td class="px-6 py-4 text-gray-600">
+
+                            {{ usuario.perfilusuario.unidad.nombre|default:"Sin unidad" }}
+
+                        </td>
+                        <!-- Registro -->
+
+                        <td class="px-6 py-4 text-gray-500 text-sm">
+
+                            {{ usuario.date_joined|date:"d/m/Y" }}
+
+                        </td>
+
+                        <!-- EMAIL -->
+                        <td class="px-6 py-4 text-gray-600">
+
+                            {{ usuario.email|default:"Sin correo" }}
+
+                        </td>
+
+                        <!-- ROL -->
+                        <td class="px-6 py-4">
+
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold
+                            bg-red-100 text-red-800">
+
+                                {{ usuario.perfilusuario.get_rol_display }}
+
+                            </span>
+
+                        </td>
+
+                        <!-- ESTADO -->
+                        <td class="px-6 py-4">
+
+                            {% if usuario.is_active %}
+
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold
+                                bg-green-100 text-green-700">
+
+                                    Activo
+
+                                </span>
+
+                            {% else %}
+
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold
+                                bg-red-100 text-red-700">
+
+                                    Inactivo
+
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <!-- ACTIONS -->
+                        <td class="px-6 py-4">
+
+                            <div class="flex items-center justify-end gap-2">
+
+                                <!-- EDIT -->
+                                <a
+                                    href="{% url 'editar_usuario' usuario.id %}"
+                                    class="w-10 h-10 rounded-xl border border-gray-200
+                                    hover:bg-blue-50 hover:border-blue-200
+                                    flex items-center justify-center transition"
+                                >
+
+                                    <span class="material-symbols-outlined text-blue-600">
+                                        edit
+                                    </span>
+
+                                </a>
+
+                                <a
+                                    href="{% url 'reset_password' usuario.id %}"
+                                    class="w-10 h-10 rounded-xl border border-gray-200
+                                    hover:bg-yellow-50 hover:border-yellow-200
+                                    flex items-center justify-center transition"
+                                >
+
+                                    <span class="material-symbols-outlined text-yellow-600">
+                                        lock_reset
+                                    </span>
+
+                                </a>
+                                <!-- DELETE -->
+                                <a
+                                    href="{% url 'toggle_usuario' usuario.id %}"
+                                    onclick="return confirm('¿Deseas cambiar el estado del usuario?')"
+                                    class="w-10 h-10 rounded-xl border border-gray-200
+                                    hover:bg-red-50 hover:border-red-200
+                                    flex items-center justify-center transition"
+                                >
+
+                                    <span class="material-symbols-outlined text-red-600">
+
+                                        {% if usuario.is_active %}
+                                            block
+                                        {% else %}
+                                            check_circle
+                                        {% endif %}
+
+                                    </span>
+
+                                </a>
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+
+                            No existen usuarios registrados
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+            <!-- PAGINATION -->
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+
+                <p class="text-sm text-gray-500">
+
+                    Página {{ page_obj.number }}
+                    de {{ page_obj.paginator.num_pages }}
+
+                </p>
+
+                <div class="flex items-center gap-2">
+
+                    {% if page_obj.has_previous %}
+
+                        <a
+                            href="?page={{ page_obj.previous_page_number }}&q={{ query }}"
+                            class="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-100 transition"
+                        >
+                            Anterior
+                        </a>
+
+                    {% endif %}
+
+                    {% if page_obj.has_next %}
+
+                        <a
+                            href="?page={{ page_obj.next_page_number }}&q={{ query }}"
+                            class="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-100 transition"
+                        >
+                            Siguiente
+                        </a>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+        </div>
+
+
+    </div>
+
+</div>
+
+{% endblock %}
