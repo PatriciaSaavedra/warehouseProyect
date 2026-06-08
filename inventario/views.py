@@ -386,25 +386,57 @@ def editar_material(request, id):
 
     if request.method == 'POST':
 
-        material.codigo = request.POST.get('codigo')
+        nombre = request.POST.get('nombre')
+        existe = Material.objects.filter(
+            partida=material.partida,
+            nombre__iexact=nombre
+        ).exclude(
+            id=material.id
+        ).exists()
 
-        material.nombre = request.POST.get('nombre')
+        if existe:
 
+            return render(
+                request,
+                'inventario/editar_material.html',
+                {
+                    'material': material,
+                    'unidades': UnidadMedida.objects.all(),
+                    'error': (
+                        'Ya existe un material con ese nombre '
+                        'en esta partida.'
+                    )
+                }
+            )
+        material.nombre = nombre
         material.descripcion = request.POST.get('descripcion')
 
-        material.unidad_medida = request.POST.get('unidad_medida')
+        unidad_id = request.POST.get(
+            'unidad_medida_fk'
+        )
 
-        material.stock_minimo = request.POST.get('stock_minimo')
+        unidad = UnidadMedida.objects.get(
+            id=unidad_id
+        )
+
+        material.unidad_medida_fk = unidad
+
+        material.unidad_medida = unidad.nombre
+
+        material.stock_minimo = int(
+            request.POST.get('stock_minimo')
+        )
 
         material.save()
 
         return redirect('inventario')
-
+        
     return render(
         request,
         'inventario/editar_material.html',
         {
-            'material': material
+            'material': material,
+            'unidades': UnidadMedida.objects.all()     
         }
     )
 @login_required

@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from .models import PerfilUsuario, ROLES
 from organizacion.models import UnidadOrganizacional
+from auditoria.models import Bitacora
 
 from django.contrib.auth.decorators import login_required
 from usuarios.utils import rol_requerido
@@ -89,6 +90,12 @@ def crear_usuario_view(request):
             rol=rol,
             unidad_id=unidad_id if unidad_id else None
         )
+        Bitacora.objects.create(
+            usuario=request.user,
+            modulo='Usuarios',
+            accion='Crear usuario',
+            descripcion=f'Se creó el usuario {username}'
+        )
 
         messages.success(
             request,
@@ -134,7 +141,12 @@ def editar_usuario_view(request, user_id):
         perfil.unidad_id = request.POST.get('unidad')
 
         perfil.save()
-
+        Bitacora.objects.create(
+            usuario=request.user,
+            modulo='Usuarios',
+            accion='Editar usuario',
+            descripcion=f'Se modificó el usuario {usuario.username}'
+        )
         messages.success(
             request,
             'Usuario actualizado correctamente'
@@ -174,6 +186,12 @@ def toggle_usuario_view(request, user_id):
     usuario.is_active = not usuario.is_active
 
     usuario.save()
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Usuarios',
+        accion='Cambio de estado',
+        descripcion=f'Se cambió el estado de {usuario.username}'
+    )
 
     if usuario.is_active:
 
@@ -206,7 +224,12 @@ def reset_password_view(request, user_id):
         usuario.set_password(nueva_password)
 
         usuario.save()
-
+        Bitacora.objects.create(
+            usuario=request.user,
+            modulo='Usuarios',
+            accion='Reset contraseña',
+            descripcion=f'Se restableció la contraseña de {usuario.username}'
+        )
         messages.success(
             request,
             'Contraseña actualizada correctamente'

@@ -6,144 +6,180 @@ Solicitudes
 
 {% block content %}
 
-<div class="flex justify-between items-center mb-6">
+<div class="max-w-7xl mx-auto">
 
-    <h1 class="text-3xl font-bold">
-        Gestión de Solicitudes
-    </h1>
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+                Gestión de Solicitudes
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">
+                Monitorea, aprueba y despacha los requerimientos de materiales de las unidades
+            </p>
+        </div>
 
-    <a href="{% url 'nueva_solicitud' %}"
-   class="bg-red-900 text-white px-4 py-2 rounded-lg">
-    Nueva Solicitud
-    </a>
-</div>
+        <!-- Nueva Solicitud (Rojo institucional) -->
+        <a 
+            href="{% url 'nueva_solicitud' %}"
+            class="btn-primary px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+        >
+            <span class="material-symbols-outlined text-[18px]">
+                add_circle
+            </span>
+            Nueva Solicitud
+        </a>
+    </div>
 
-<div class="bg-white rounded-xl shadow overflow-hidden">
+    <!-- CARD PRINCIPAL DE LA TABLA -->
+    <div class="card overflow-hidden shadow-sm">
 
-    <table class="w-full">
+        <!-- CONTENEDOR CON SCROLL RESPONSIVO -->
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[900px]">
+                <thead class="bg-gray-50 border-b border-gray-100">
+                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 font-semibold w-32">Código</th>
+                        <th class="px-6 py-4 font-semibold w-64">Unidad Solicitante</th>
+                        <th class="px-6 py-4 font-semibold w-44">Fecha</th>
+                        <th class="px-6 py-4 font-semibold w-40">Estado</th>
+                        <th class="px-6 py-4 font-semibold text-right pr-8">Acciones</th>
+                    </tr>
+                </thead>
 
-        <thead class="bg-gray-100">
+                <tbody class="divide-y divide-gray-100">
+                    {% for solicitud in solicitudes %}
+                    <tr class="hover:bg-gray-50/50 transition duration-150">
 
-            <tr>
+                        <!-- CÓDIGO -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
+                            {{ solicitud.codigo }}
+                        </td>
 
-                <th class="p-4 text-left">Código</th>
-                <th class="p-4 text-left">Unidad</th>
-                <th class="p-4 text-left">Fecha</th>
-                <th class="p-4 text-left">Estado</th>
-                <th class="p-4 text-left">Acciones</th>
+                        <!-- UNIDAD -->
+                        <td class="px-6 py-4 text-sm font-medium text-gray-700">
+                            {{ solicitud.unidad_solicitante }}
+                        </td>
 
-            </tr>
+                        <!-- FECHA -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ solicitud.fecha|date:"d/m/Y"|default:solicitud.fecha }}
+                        </td>
 
-        </thead>
+                        <!-- ESTADO BADGES UNIFICADOS -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {% if solicitud.estado == 'PENDIENTE' or solicitud.estado == 'PENDIENTE_JEFE' or solicitud.estado == 'PENDIENTE_COMPRA' %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-[#d97706] border border-amber-200">
+                                    {{ solicitud.estado }}
+                                </span>
+                            {% elif solicitud.estado == 'APROBADO' or solicitud.estado == 'VALIDADO' or solicitud.estado == 'ENTREGADO' %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                                    {{ solicitud.estado }}
+                                </span>
+                            {% else %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-[#8b0000] border border-red-200">
+                                    {{ solicitud.estado }}
+                                </span>
+                            {% endif %}
+                        </td>
 
-        <tbody>
+                        <!-- ACCIONES (Botones de icono estandarizados) -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
+                            <div class="flex items-center justify-end gap-2">
 
-            {% for solicitud in solicitudes %}
+                                <!-- VER DETALLE (Siempre disponible) -->
+                                <a 
+                                    title="Ver detalle" 
+                                    href="{% url 'detalle_solicitud' solicitud.id %}"
+                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center transition"
+                                >
+                                    <span class="material-symbols-outlined text-blue-600 text-[20px]">
+                                        visibility
+                                    </span>
+                                </a>
 
-            <tr class="border-b hover:bg-gray-50">
+                                <!-- ACCIONES CONDICIONALES SEGÚN ESTADO -->
+                                {% if solicitud.estado == 'PENDIENTE_JEFE' %}
+                                    
+                                    <!-- APROBAR -->
+                                    <a 
+                                        title="Aprobar Solicitud" 
+                                        href="{% url 'aprobar_solicitud' solicitud.id %}"
+                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-green-50 hover:border-green-200 flex items-center justify-center transition"
+                                    >
+                                        <span class="material-symbols-outlined text-green-600 text-[20px]">
+                                            check_circle
+                                        </span>
+                                    </a>
 
-                <td class="p-4">
-                    {{ solicitud.codigo }}
-                </td>
+                                    <!-- RECHAZAR -->
+                                    <a 
+                                        title="Rechazar Solicitud" 
+                                        href="{% url 'rechazar_solicitud' solicitud.id %}"
+                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition"
+                                    >
+                                        <span class="material-symbols-outlined text-[#8b0000] text-[20px]">
+                                            cancel
+                                        </span>
+                                    </a>
 
-                <td class="p-4">
-                    {{ solicitud.unidad_solicitante }}
-                </td>
+                                {% elif solicitud.estado == 'VALIDADO' %}
+                                    
+                                    <!-- ENTREGAR -->
+                                    <a 
+                                        title="Entregar Materiales" 
+                                        href="{% url 'entregar_solicitud' solicitud.id %}"
+                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 flex items-center justify-center transition"
+                                    >
+                                        <span class="material-symbols-outlined text-[#d97706] text-[20px]">
+                                            local_shipping
+                                        </span>
+                                    </a>
 
-                <td class="p-4">
-                    {{ solicitud.fecha }}
-                </td>
+                                {% elif solicitud.estado == 'ENTREGADO' %}
+                                    
+                                    <!-- MARCA ENTREGADO -->
+                                    <span class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200 flex items-center gap-1 select-none">
+                                        <span class="material-symbols-outlined text-[16px] font-bold">
+                                            task_alt
+                                        </span>
+                                        Despachado
+                                    </span>
 
-                <td class="p-4">
+                                {% elif solicitud.estado == 'PENDIENTE_COMPRA' %}
+                                    
+                                    <!-- MARCA PENDIENTE COMPRA -->
+                                    <span class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200 flex items-center gap-1 select-none">
+                                        <span class="material-symbols-outlined text-[16px] font-bold">
+                                            shopping_bag
+                                        </span>
+                                        Falta Stock
+                                    </span>
 
-                    {% if solicitud.estado == 'PENDIENTE' %}
+                                {% endif %}
 
-                    <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">
-                        {{ solicitud.estado }}
-                    </span>
+                            </div>
+                        </td>
 
-                    {% elif solicitud.estado == 'APROBADO' %}
+                    </tr>
+                    {% empty %}
 
-                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                        {{ solicitud.estado }}
-                    </span>
+                    <!-- ESTADO VACÍO -->
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">
+                                assignment_late
+                            </span>
+                            No existen solicitudes registradas en el sistema.
+                        </td>
+                    </tr>
 
-                    {% else %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-                    <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
-                        {{ solicitud.estado }}
-                    </span>
-
-                    {% endif %}
-
-                </td>
-
-                <td class="p-4 flex gap-2">
-
-                    <a href="{% url 'detalle_solicitud' solicitud.id %}"
-                    class="bg-blue-500 text-white px-3 py-2 rounded-lg text-sm">
-
-                        Ver
-
-                    </a>
-
-                    {% if solicitud.estado == 'PENDIENTE_JEFE' %}
-
-                        <a href="{% url 'aprobar_solicitud' solicitud.id %}"
-                        class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm">
-
-                            Aprobar
-
-                        </a>
-
-                        <a href="{% url 'rechazar_solicitud' solicitud.id %}"
-                        class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm">
-
-                            Rechazar
-
-                        </a>
-
-                    {% elif solicitud.estado == 'VALIDADO' %}
-
-                        <a href="{% url 'entregar_solicitud' solicitud.id %}"
-                        class="bg-yellow-500 text-white px-3 py-2 rounded-lg text-sm">
-
-                            Entregar
-
-                        </a>
-
-                    {% elif solicitud.estado == 'ENTREGADO' %}
-
-                        <span class="bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm">
-                            Entregado ✔
-                        </span>
-
-                    {% elif solicitud.estado == 'PENDIENTE_COMPRA' %}
-
-                        <span class="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg text-sm">
-                            Pendiente Compra
-                        </span>
-
-                    {% endif %}
-
-                </td>
-
-            </tr>
-
-            {% empty %}
-
-            <tr>
-
-                <td colspan="5" class="p-6 text-center text-gray-500">
-                    No existen solicitudes registradas
-                </td>
-
-            </tr>
-
-            {% endfor %}
-
-        </tbody>
-    </table>
+    </div>
 
 </div>
 

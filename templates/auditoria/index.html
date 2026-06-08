@@ -1,13 +1,302 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Inventario
+Auditoría
 {% endblock %}
 
 {% block content %}
 
-<h1 class="text-3xl font-bold">
-    auditoria
-</h1>
+<div class="max-w-7xl mx-auto">
+
+    <!-- HEADER -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+            Bitácora del Sistema
+        </h1>
+        <p class="text-gray-500 mt-1 text-sm">
+            Historial de eventos y acciones realizadas en la plataforma
+        </p>
+    </div>
+
+    <!-- TARJETAS DE ESTADÍSTICAS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+        <!-- Eventos -->
+        <div class="card p-6 flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Eventos</p>
+                <h3 class="text-3xl font-extrabold mt-1 text-gray-800 font-['Outfit']">
+                    {{ total_registros|default:0 }}
+                </h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl badge-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px]">
+                    database
+                </span>
+            </div>
+        </div>
+
+        <!-- Usuarios -->
+        <div class="card p-6 flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Usuarios</p>
+                <h3 class="text-3xl font-extrabold mt-1 text-gray-800 font-['Outfit']">
+                    {{ total_usuarios|default:0 }}
+                </h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl badge-info flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px]">
+                    group
+                </span>
+            </div>
+        </div>
+
+        <!-- Módulos -->
+        <div class="card p-6 flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Módulos</p>
+                <h3 class="text-3xl font-extrabold mt-1 text-gray-800 font-['Outfit']">
+                    {{ total_modulos|default:0 }}
+                </h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl badge-gold flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px]">
+                    widgets
+                </span>
+            </div>
+        </div>
+
+        <!-- Hoy -->
+        <div class="card p-6 flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hoy</p>
+                <h3 class="text-3xl font-extrabold mt-1 text-gray-800 font-['Outfit']">
+                    {{ eventos_hoy|default:0 }}
+                </h3>
+            </div>
+            <!-- bg-amber-50 con el texto en el color --secondary (#d97706) -->
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-[#d97706] flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px]">
+                    today
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FILTROS -->
+    <div class="card p-6 mb-8">
+        <form method="GET" action=".">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+
+                <!-- BUSQUEDA Y SELECTOR -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
+                    
+                    <!-- BUSCADOR -->
+                    <div class="relative w-full sm:w-80">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            search
+                        </span>
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ query|default:'' }}"
+                            placeholder="Buscar usuario o acción..."
+                            class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition text-sm"
+                        >
+                    </div>
+
+                    <!-- SELECTOR DE MÓDULO -->
+                    <div class="relative w-full sm:w-64">
+                        <select
+                            name="modulo"
+                            class="w-full px-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition text-sm appearance-none bg-white pr-10"
+                        >
+                            <option value="">Todos los módulos</option>
+                            {% for m in modulos %}
+                                <option 
+                                    value="{{ m }}"
+                                    {% if modulo_actual == m %}selected{% endif %}
+                                >
+                                    {{ m }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                    </div>
+
+                </div>
+
+                <!-- BOTONES -->
+                <div class="flex items-center gap-3 w-full lg:w-auto">
+                    <button
+                        type="submit"
+                        class="flex-1 lg:flex-initial btn-primary px-6 py-2.5 rounded-2xl font-semibold text-sm transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                        <span class="material-symbols-outlined text-[18px]">
+                            filter_alt
+                        </span>
+                        Filtrar
+                    </button>
+
+                    <a
+                        href="{% url 'auditoria' %}"
+                        class="flex-1 lg:flex-initial text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-2xl font-semibold text-sm transition"
+                    >
+                        Limpiar
+                    </a>
+                </div>
+
+            </div>
+        </form>
+    </div>
+
+    <!-- CARD TABLA -->
+    <div class="card overflow-hidden">
+
+        <!-- TABLE WRAPPER CON SCROLL HORIZONTAL RESPONSIVO -->
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[900px]">
+                <thead class="bg-gray-50">
+                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 font-semibold w-36">Fecha</th>
+                        <th class="px-6 py-4 font-semibold w-48">Usuario</th>
+                        <th class="px-6 py-4 font-semibold w-40">Módulo</th>
+                        <th class="px-6 py-4 font-semibold w-56">Acción</th>
+                        <th class="px-6 py-4 font-semibold">Descripción</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-gray-100">
+                    {% for registro in page_obj %}
+                    <tr class="hover:bg-gray-50/50 transition duration-150">
+
+                        <!-- FECHA -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <p class="font-medium text-gray-800">
+                                {{ registro.fecha|date:"d/m/Y" }}
+                            </p>
+                            <p class="text-xs text-gray-400 mt-0.5">
+                                {{ registro.fecha|date:"H:i" }}
+                            </p>
+                        </td>
+
+                        <!-- USUARIO -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">
+                            {{ registro.usuario }}
+                        </td>
+
+                        <!-- MÓDULO CON BADGES TEMATIZADOS -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold 
+                            {% if registro.modulo == 'Usuarios' %}
+                                badge-primary
+                            {% elif registro.modulo == 'Solicitudes' %}
+                                badge-gold
+                            {% elif registro.modulo == 'Inventario' %}
+                                bg-green-50 text-green-700 border border-green-100
+                            {% elif registro.modulo == 'Compras' %}
+                                bg-amber-50 text-amber-700 border border-amber-100
+                            {% else %}
+                                badge-info
+                            {% endif %}">
+                                {{ registro.modulo }}
+                            </span>
+                        </td>
+
+                        <!-- ACCIÓN -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-gray-400 text-[20px]">
+                                    {% if registro.accion == 'Inicio de sesión' %}
+                                        login
+                                    {% elif registro.accion == 'Cierre de sesión' %}
+                                        logout
+                                    {% elif registro.accion == 'Crear usuario' %}
+                                        person_add
+                                    {% elif registro.accion == 'Editar usuario' %}
+                                        edit
+                                    {% elif registro.accion == 'Cambio de estado' %}
+                                        block
+                                    {% elif registro.accion == 'Reset contraseña' %}
+                                        lock_reset
+                                    {% else %}
+                                        history
+                                    {% endif %}
+                                </span>
+                                <span class="font-semibold text-gray-700 text-xs uppercase tracking-wider">
+                                    {{ registro.accion }}
+                                </span>
+                            </div>
+                        </td>
+
+                        <!-- DESCRIPCIÓN -->
+                        <td class="px-6 py-4 text-sm text-gray-600 break-words max-w-sm lg:max-w-none">
+                            {{ registro.descripcion }}
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <!-- ESTADO VACÍO -->
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">
+                                history_toggle_off
+                            </span>
+                            {% if query or modulo_actual %}
+                                No se encontraron registros de auditoría que coincidan con los filtros aplicados.
+                            {% else %}
+                                No existen registros registrados en la bitácora del sistema.
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- PAGINACIÓN -->
+        {% if page_obj.paginator.num_pages > 1 %}
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-white">
+                <p class="text-sm text-gray-500">
+                    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                </p>
+
+                <div class="flex items-center gap-2">
+                    {% if page_obj.has_previous %}
+                        <a
+                            href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if modulo_actual %}&modulo={{ modulo_actual }}{% endif %}"
+                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium"
+                        >
+                            Anterior
+                        </a>
+                    {% else %}
+                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 text-gray-300 cursor-not-allowed">
+                            Anterior
+                        </span>
+                    {% endif %}
+
+                    {% if page_obj.has_next %}
+                        <a
+                            href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if modulo_actual %}&modulo={{ modulo_actual }}{% endif %}"
+                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium"
+                        >
+                            Siguiente
+                        </a>
+                    {% else %}
+                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 text-gray-300 cursor-not-allowed">
+                            Siguiente
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+    </div>
+
+</div>
 
 {% endblock %}

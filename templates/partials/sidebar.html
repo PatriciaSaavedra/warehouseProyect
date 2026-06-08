@@ -1,186 +1,155 @@
-<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-white/95 backdrop-blur-md border-r border-gray-200 shadow-sm">
+<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-white border-r border-gray-100 shadow-sm select-none">
 
     <!-- LOGO -->
-    <div class="p-6 flex flex-col items-center">
-
-        <h1 class="text-2xl font-bold text-red-900">
+    <div class="p-6 flex flex-col items-center border-b border-gray-100 mb-4">
+        <h1 class="text-2xl font-extrabold text-[#8b0000] font-['Outfit'] tracking-wide">
             Almacén Central
         </h1>
-
-        <p class="text-sm text-gray-500">
+        <p class="text-[11px] font-bold text-[#d97706] uppercase tracking-widest mt-1">
             Gestión Gubernamental
         </p>
-
     </div>
 
     <!-- MENU -->
-    <nav class="flex-1 px-4 mt-4 space-y-2">
+    <nav class="flex-1 px-4 space-y-1.5 overflow-y-auto">
 
         <!-- DASHBOARD -->
-        <a href="/dashboard/"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="/dashboard/"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/dashboard/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 dashboard
             </span>
-
             Dashboard
-
         </a>
 
         <!-- SOLICITUDES -->
-        <a href="/solicitudes/"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="/solicitudes/"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/solicitudes/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 description
             </span>
-
             Solicitudes
-
         </a>
 
-        <!-- INVENTARIO -->
+<!-- INVENTARIO -->
         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'KARDISTA' %}
-
-        <a href="/inventario/"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="/inventario/"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/inventario/' in request.path and '/movimientos/' not in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 inventory_2
             </span>
-
             Inventario
-
         </a>
-
         {% endif %}
 
         <!-- MOVIMIENTOS -->
         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'KARDISTA' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-
-        <a href="{% url 'movimientos' %}"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="{% url 'movimientos' %}"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/movimientos/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 swap_horiz
             </span>
-
             Movimientos
-
         </a>
-
         {% endif %}
-
-        <!-- PRESUPUESTOS -->
+        <!-- PRESUPUESTOS (Filtro por Rol) -->
         {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-
-        <a href="/presupuestos/"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="/presupuestos/"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/presupuestos/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 account_balance
             </span>
-
             Presupuestos
-
         </a>
-
         {% endif %}
 
-        <!-- COMPRAS -->
+        <!-- COMPRAS (Filtro por Rol) -->
         {% if request.user.perfilusuario.rol == 'BIENES_SERVICIOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-
-        <a href="/compras/"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="/compras/"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/compras/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 shopping_cart
             </span>
-
             Compras
-
         </a>
-
         {% endif %}
 
-        <!-- USUARIOS -->
+        <!-- USUARIOS (Filtro por Rol) -->
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-
-        <a href="/usuarios/"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="/usuarios/"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/usuarios/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 group
             </span>
-
             Usuarios
-
         </a>
-
         {% endif %}
 
-        <!-- AUDITORIA -->
+        <!-- AUDITORIA (Filtro por Rol) -->
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-
-        <a href="/auditoria/"
-           class="flex items-center px-4 py-3 hover:bg-gray-100 rounded-lg">
-
-            <span class="material-symbols-outlined mr-3">
+        <a 
+            href="/auditoria/"
+            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            {% if '/auditoria/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[22px]">
                 security
             </span>
-
             Auditoría
-
         </a>
-
         {% endif %}
 
     </nav>
 
     <!-- FOOTER -->
-    <div class="p-4 border-t">
+    <div class="p-4 border-t border-gray-100 bg-gray-50/50">
 
-        <div class="mb-4">
-
-            <p class="font-semibold">
-                {{ request.user.first_name }}
-                {{ request.user.last_name }}
+        <!-- Info del Usuario -->
+        <div class="px-4 mb-3">
+            <p class="font-bold text-gray-800 text-sm font-['Outfit'] truncate">
+                {% if request.user.first_name or request.user.last_name %}
+                    {{ request.user.first_name }} {{ request.user.last_name }}
+                {% else %}
+                    {{ request.user.username }}
+                {% endif %}
             </p>
-
-            <p class="text-sm text-gray-500">
-
-                {{ request.user.perfilusuario.get_rol_display }}
-
+            <p class="text-[11px] font-bold text-[#d97706] uppercase tracking-wider mt-0.5">
+                {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
             </p>
-
         </div>
-<!-- 
-        <a href="{% url 'logout' %}"
-           class="flex items-center px-4 py-3 text-red-700 hover:bg-red-50 rounded-lg">
 
-            <span class="material-symbols-outlined mr-3">
-                logout
-            </span>
-
-            Cerrar Sesión
-
-        </a> -->
-
+        <!-- Botón Cerrar Sesión seguro -->
         <form method="POST" action="{% url 'logout' %}">
             {% csrf_token %}
-
             <button
                 type="submit"
-                class="w-full flex items-center px-4 py-3 text-red-700 hover:bg-red-50 rounded-lg transition"
+                class="w-full flex items-center px-4 py-3 text-red-700 hover:bg-red-50 hover:text-red-900 rounded-2xl transition duration-150 font-semibold text-sm cursor-pointer"
             >
-
-                <span class="material-symbols-outlined mr-3">
+                <span class="material-symbols-outlined mr-3 text-[22px]">
                     logout
                 </span>
-
                 Cerrar Sesión
-
             </button>
         </form>
 

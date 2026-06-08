@@ -1,6 +1,10 @@
 from django.urls import path
-from . import views
+from .views import auditoria_view
 
 urlpatterns = [
-    path('', views.auditoria_view, name='auditoria'),
+    path(
+        '',
+        auditoria_view,
+        name='auditoria'
+    ),
 ]

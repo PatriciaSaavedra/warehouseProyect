@@ -11,7 +11,16 @@ Nuevo Material
     <h1 class="text-3xl font-bold">
         Nuevo Material
     </h1>
-
+<!-- Botón Volver -->
+        <a
+            href="{% url 'inventario' %}"
+            class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
+        >
+            <span class="material-symbols-outlined text-[18px]">
+                arrow_back
+            </span>
+            Volver
+        </a>
 </div>
 
 <form method="POST" class="bg-white p-6 rounded-xl shadow">

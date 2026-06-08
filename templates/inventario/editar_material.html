@@ -6,121 +6,167 @@ Editar Material
 
 {% block content %}
 
-<div class="flex justify-between items-center mb-6">
+<div class="max-w-4xl mx-auto">
 
-    <h1 class="text-3xl font-bold">
-        Editar Material
-    </h1>
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+                Editar Material
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">
+                Modifica la información básica y el stock mínimo del material seleccionado
+            </p>
+        </div>
+        
+        <!-- Botón Volver con historial del navegador -->
+        <a
+            href="javascript:history.back()"
+            class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
+        >
+            <span class="material-symbols-outlined text-[18px]">
+                arrow_back
+            </span>
+            Volver
+        </a>
+    </div>
+
+    <!-- MENSAJES DE ERROR -->
+    {% if error %}
+    <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px]">
+            error
+        </span>
+        <span class="text-sm font-medium">
+            {{ error }}
+        </span>
+    </div>
+    {% endif %}
+
+    <!-- FORMULARIO DE EDICIÓN (Usando la clase .card) -->
+    <form method="POST" class="card p-8 shadow-sm">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- CODIGO (Solo lectura) -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Código del Material
+                </label>
+                <input
+                    type="text"
+                    value="{{ material.codigo }}"
+                    class="w-full border border-gray-200 rounded-2xl p-3 bg-gray-50 text-gray-400 cursor-not-allowed select-none font-medium focus:outline-none"
+                    readonly
+                >
+                <p class="text-xs text-gray-400 mt-1.5">
+                    El código del material no se puede modificar.
+                </p>
+            </div>
+
+            <!-- NOMBRE -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Nombre <span class="text-[#8b0000]">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="nombre"
+                    value="{{ material.nombre }}"
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                    placeholder="Ej. Papel Bond A4"
+                    required
+                >
+            </div>
+
+        </div>
+
+        <!-- DESCRIPCION -->
+        <div class="mt-6">
+            <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                Descripción
+            </label>
+            <textarea
+                name="descripcion"
+                class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                rows="4"
+                placeholder="Ingresa los detalles o especificaciones técnicas del material..."
+            >{{ material.descripcion }}</textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+
+            <!-- UNIDAD DE MEDIDA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Unidad de Medida <span class="text-[#8b0000]">*</span>
+                </label>
+                <div class="relative">
+                    <select
+                        name="unidad_medida_fk"
+                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                        required
+                    >
+                        {% for unidad in unidades %}
+                            <option
+                                value="{{ unidad.id }}"
+                                {% if material.unidad_medida_fk.id == unidad.id %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ unidad.codigo }} - {{ unidad.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                        keyboard_arrow_down
+                    </span>
+                </div>
+            </div>
+
+            <!-- STOCK MINIMO -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Stock Mínimo <span class="text-[#8b0000]">*</span>
+                </label>
+                <input
+                    type="number"
+                    name="stock_minimo"
+                    value="{{ material.stock_minimo }}"
+                    min="0"
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                    placeholder="0"
+                    required
+                >
+            </div>
+
+        </div>
+
+        <!-- ACCIONES -->
+        <div class="mt-8 pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            
+            <a
+                href="javascript:history.back()"
+                class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition"
+            >
+                Cancelar
+            </a>
+
+            <button
+                type="submit"
+                class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+                <span class="material-symbols-outlined text-[18px]">
+                    save
+                </span>
+                Actualizar Material
+            </button>
+
+        </div>
+
+    </form>
 
 </div>
-
-<form method="POST" class="bg-white p-6 rounded-xl shadow">
-
-    {% csrf_token %}
-
-    <div class="grid grid-cols-2 gap-6">
-
-        <!-- CODIGO -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Código
-            </label>
-
-            <input
-                type="text"
-                name="codigo"
-                value="{{ material.codigo }}"
-                class="w-full border rounded-lg p-3"
-                required
-            >
-
-        </div>
-
-        <!-- NOMBRE -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Nombre
-            </label>
-
-            <input
-                type="text"
-                name="nombre"
-                value="{{ material.nombre }}"
-                class="w-full border rounded-lg p-3"
-                required
-            >
-
-        </div>
-
-    </div>
-
-    <!-- DESCRIPCION -->
-    <div class="mt-6">
-
-        <label class="block mb-2 font-semibold">
-            Descripción
-        </label>
-
-        <textarea
-            name="descripcion"
-            class="w-full border rounded-lg p-3"
-            rows="4"
-        >{{ material.descripcion }}</textarea>
-
-    </div>
-
-    <div class="grid grid-cols-2 gap-6 mt-6">
-
-        <!-- UNIDAD -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Unidad Medida
-            </label>
-
-            <input
-                type="text"
-                name="unidad_medida"
-                value="{{ material.unidad_medida }}"
-                class="w-full border rounded-lg p-3"
-                required
-            >
-
-        </div>
-
-        <!-- STOCK MINIMO -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Stock Mínimo
-            </label>
-
-            <input
-                type="number"
-                name="stock_minimo"
-                value="{{ material.stock_minimo }}"
-                class="w-full border rounded-lg p-3"
-                required
-            >
-
-        </div>
-
-    </div>
-
-    <!-- BOTON -->
-    <div class="mt-8 flex justify-end">
-
-        <button
-            type="submit"
-            class="bg-yellow-500 text-white px-6 py-3 rounded-lg"
-        >
-            Actualizar Material
-        </button>
-
-    </div>
-
-</form>
 
 {% endblock %}

@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
+from auditoria.models import Bitacora
 
 
 def login_view(request):
@@ -24,6 +25,12 @@ def login_view(request):
         if user is not None:
 
             login(request, user)
+            Bitacora.objects.create(
+                usuario=user,
+                modulo='Autenticación',
+                accion='Inicio de sesión',
+                descripcion='Acceso al sistema'
+            )
 
             return redirect('/dashboard/')
 
@@ -41,6 +48,12 @@ def login_view(request):
 
 @require_POST
 def logout_view(request):
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Autenticación',
+        accion='Cierre de sesión',
+        descripcion='Salida del sistema'
+    )
 
     logout(request)
 

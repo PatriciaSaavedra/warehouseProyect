@@ -1,48 +1,192 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="scroll-smooth">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>{% block title %}SGA{% endblock %}</title>
-
+    <title>{% block title %}SGA{% endblock %} | Gobierno Autónomo</title>
+    
+    <!-- TAILWIND CSS CDN CON PLUGINS -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 
+    <!-- CONFIGURACIÓN GLOBAL DE TAILWIND (Permite usar clases como bg-primary, text-secondary, font-outfit, etc.) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#8b0000',
+                            dark: '#700000',
+                        },
+                        secondary: {
+                            DEFAULT: '#d97706',
+                            dark: '#c06705',
+                        },
+                        gold: '#c5a059',
+                        dark: '#111111',
+                        info: '#007aff',
+                        grayBorder: '#d1d5db',
+                    },
+                    fontFamily: {
+                        outfit: ['Outfit', 'sans-serif'],
+                        inter: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FUENTES DE GOOGLE -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 
+    <!-- MATERIAL SYMBOLS -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
     <style>
+        /* VARIABLES CSS GLOBALES */
+        :root {
+            --primary: #8b0000;
+            --secondary: #d97706;
+            --gold: #c5a059;
+            --dark: #111111;
+            --gray: #9ca3af;
+            --gray-border: #d1d5db;
+            --gray-bg: #e5e7eb;
+            --white: #ffffff;
+            --info: #007aff;
+        }
+
+        /* 1. TIPOGRAFÍA GLOBAL AUTOMÁTICA */
         body {
             background-color: #f7f9fd;
             font-family: 'Inter', sans-serif;
+            color: var(--dark);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
+        /* Todas las cabeceras del sistema usarán automáticamente la fuente 'Outfit' */
+        h1, h2, h3, h4, h5, h6, .font-heading {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* 2. ESTILIZADO DE COMPONENTES GLOBALES */
         .sidebar-active {
-            background-color: #8b0000;
+            background-color: var(--primary);
             color: white;
-            border-left: 4px solid #d97706;
+            border-left: 4px solid var(--secondary);
+        }
+
+        .card {
+            background: white;
+            border: 1px solid var(--gray-border);
+            border-radius: 24px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-primary:hover {
+            background: #700000;
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-secondary:hover {
+            background: #c06705;
+        }
+
+        /* BADGES */
+        .badge-primary {
+            background: rgba(139, 0, 0, 0.08);
+            color: var(--primary);
+        }
+
+        .badge-gold {
+            background: rgba(197, 160, 89, 0.15);
+            color: var(--primary);
+        }
+
+        .badge-info {
+            background: rgba(0, 122, 255, 0.08);
+            color: var(--info);
+        }
+
+        /* 3. ESTILIZADO GLOBAL PARA FORMULARIOS (Inputs, selects y textareas unificados) */
+        input[type="text"], 
+        input[type="number"], 
+        input[type="password"], 
+        input[type="email"], 
+        select, 
+        textarea {
+            border-color: var(--gray-border) !important;
+            border-radius: 1rem !important; /* rounded-2xl (16px) automático en todo el sistema */
+            font-size: 0.875rem !important; /* text-sm */
+            color: #1f2937 !important; /* text-gray-800 */
+            transition: all 0.15s ease-in-out !important;
+        }
+
+        input[type="text"]:focus, 
+        input[type="number"]:focus, 
+        input[type="password"]:focus, 
+        input[type="email"]:focus, 
+        select:focus, 
+        textarea:focus {
+            outline: none !important;
+            border-color: transparent !important;
+            box-shadow: 0 0 0 2px var(--primary) !important; /* Enfoque rojo institucional automático */
+        }
+
+        /* 4. BARRA DE DESPLAZAMIENTO (SCROLLBAR) PREMIUM */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbcbcb;
+            border-radius: 9999px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
         }
     </style>
 
 </head>
 
-<body class="text-gray-800">
+<body class="text-gray-800 antialiased">
 
+    <!-- BARRA LATERAL (SIDEBAR) -->
     {% include 'partials/sidebar.html' %}
 
+    <!-- BARRA SUPERIOR (NAVBAR) -->
     {% include 'partials/navbar.html' %}
 
-    <main class="ml-[260px] pt-20 p-6 min-h-screen">
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="ml-[260px] pt-20 p-8 min-h-screen">
 
         {% block content %}
-
         {% endblock %}
 
     </main>
+
+    <!-- CHART.JS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 
