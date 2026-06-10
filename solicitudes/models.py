@@ -53,6 +53,10 @@ class Solicitud(models.Model):
         blank=True,
         null=True
     )
+    motivo_rechazo = models.TextField(
+        blank=True,
+        null=True
+    )
 
     fecha_registro = models.DateTimeField(
         auto_now_add=True

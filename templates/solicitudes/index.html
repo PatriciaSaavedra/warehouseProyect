@@ -68,19 +68,39 @@ Solicitudes
 
                         <!-- ESTADO BADGES UNIFICADOS -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            {% if solicitud.estado == 'PENDIENTE' or solicitud.estado == 'PENDIENTE_JEFE' or solicitud.estado == 'PENDIENTE_COMPRA' %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-[#d97706] border border-amber-200">
-                                    {{ solicitud.estado }}
+
+                            {% if solicitud.estado == 'PENDIENTE_JEFE' %}
+
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                    Pendiente Jefe
                                 </span>
-                            {% elif solicitud.estado == 'APROBADO' or solicitud.estado == 'VALIDADO' or solicitud.estado == 'ENTREGADO' %}
+
+                            {% elif solicitud.estado == 'VALIDADO' %}
+
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                    Validado
+                                </span>
+
+                            {% elif solicitud.estado == 'PENDIENTE_COMPRA' %}
+
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+                                    Pendiente Compra
+                                </span>
+
+                            {% elif solicitud.estado == 'ENTREGADO' %}
+
                                 <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                                    {{ solicitud.estado }}
+                                    Entregado
                                 </span>
-                            {% else %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-[#8b0000] border border-red-200">
-                                    {{ solicitud.estado }}
+
+                            {% elif solicitud.estado == 'RECHAZADO' %}
+
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                                    Rechazado
                                 </span>
+
                             {% endif %}
+
                         </td>
 
                         <!-- ACCIONES (Botones de icono estandarizados) -->
@@ -117,6 +137,7 @@ Solicitudes
                                         title="Rechazar Solicitud" 
                                         href="{% url 'rechazar_solicitud' solicitud.id %}"
                                         class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition"
+                                        onclick="return confirm('¿Está seguro de rechazar esta solicitud?')"
                                     >
                                         <span class="material-symbols-outlined text-[#8b0000] text-[20px]">
                                             cancel

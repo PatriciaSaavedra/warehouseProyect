@@ -116,6 +116,14 @@ class MovimientoInventario(models.Model):
 
     cantidad = models.IntegerField()
 
+    stock_anterior = models.IntegerField(
+        default=0
+    )
+
+    stock_resultante = models.IntegerField(
+        default=0
+    )
+
     referencia = models.CharField(
         max_length=100
     )
@@ -128,8 +136,3 @@ class MovimientoInventario(models.Model):
         User,
         on_delete=models.CASCADE
     )
-
-    def __str__(self):
-
-        return f"{self.tipo} - {self.material.nombre}"
-

@@ -48,4 +48,10 @@ urlpatterns = [
     views.kardex_pdf,
     name='kardex_pdf'
     ),
+
+    path(
+    'salida/',
+    views.salida_inventario,
+    name='salida_inventario'
+    ),
 ]

@@ -51,13 +51,14 @@ def nueva_solicitud(request):
             codigo=codigo,
 
             unidad_solicitante=perfil.unidad,
+
             solicitante=request.user,
 
             fecha=fecha,
 
             justificacion=justificacion,
 
-            estado='PENDIENTE'
+            estado='PENDIENTE_JEFE'
 
         )
 
@@ -105,16 +106,20 @@ def aprobar_solicitud(request, id):
 
     if not tiene_rol(
         request.user,
-        ['ADMINISTRADOR', 'ALMACENERO']
+        ['JEFE_INMEDIATO', 'ADMINISTRADOR']
     ):
-
         return HttpResponseForbidden(
             "No tiene permisos"
         )
-    solicitud = get_object_or_404(Solicitud, id=id)
+
+    solicitud = get_object_or_404(
+        Solicitud,
+        id=id
+    )
 
     # EVITAR APROBAR DOS VECES
-    if solicitud.estado == 'APROBADO':
+
+    if solicitud.estado != 'PENDIENTE_JEFE':
 
         return redirect('solicitudes')
 
@@ -123,37 +128,17 @@ def aprobar_solicitud(request, id):
     material = detalle.material
 
     # VALIDAR STOCK
+
     if material.stock_actual < detalle.cantidad:
 
-        return render(
-            request,
-            'solicitudes/error_stock.html',
-            {
-                'material': material
-            }
-        )
+        solicitud.estado = 'PENDIENTE_COMPRA'
 
-    # DESCONTAR STOCK
-    material.stock_actual -= detalle.cantidad
+        solicitud.save()
 
-    material.save()
+        return redirect('solicitudes')
 
-    # REGISTRAR MOVIMIENTO
-    MovimientoInventario.objects.create(
+    # SOLO VALIDAR, NO DESCONTAR STOCK
 
-        material=material,
-
-        tipo='SALIDA',
-
-        cantidad=detalle.cantidad,
-
-        referencia=solicitud.codigo,
-
-        usuario=request.user
-
-    )
-
-    # ACTUALIZAR SOLICITUD
     solicitud.estado = 'VALIDADO'
 
     solicitud.aprobado_por = request.user.username
@@ -161,11 +146,27 @@ def aprobar_solicitud(request, id):
     solicitud.save()
 
     return redirect('solicitudes')
-
 @login_required
 def entregar_solicitud(request, id):
 
-    solicitud = get_object_or_404(Solicitud, id=id)
+    if not tiene_rol(
+        request.user,
+        ['ALMACENERO', 'ADMINISTRADOR']
+    ):
+        return HttpResponseForbidden(
+            "No tiene permisos"
+        )
+
+    solicitud = get_object_or_404(
+        Solicitud,
+        id=id
+    )
+
+    # SOLO SE PUEDEN ENTREGAR SOLICITUDES VALIDADAS
+
+    if solicitud.estado != 'VALIDADO':
+
+        return redirect('solicitudes')
 
     detalle = solicitud.detalles.first()
 
@@ -187,7 +188,7 @@ def entregar_solicitud(request, id):
 
     material.save()
 
-    # REGISTRAR MOVIMIENTO
+    # REGISTRAR MOVIMIENTO DE SALIDA
 
     MovimientoInventario.objects.create(
 
@@ -210,13 +211,53 @@ def entregar_solicitud(request, id):
     solicitud.save()
 
     return redirect('solicitudes')
+
 @login_required
 def rechazar_solicitud(request, id):
 
-    solicitud = get_object_or_404(Solicitud, id=id)
+    if not tiene_rol(
+        request.user,
+        ['JEFE_INMEDIATO', 'ADMINISTRADOR']
+    ):
+        return HttpResponseForbidden(
+            "No tiene permisos"
+        )
 
-    solicitud.estado = 'RECHAZADO'
+    solicitud = get_object_or_404(
+        Solicitud,
+        id=id
+    )
 
-    solicitud.save()
+    if request.method == 'POST':
 
-    return redirect('solicitudes')
+        motivo = request.POST.get(
+            'motivo_predefinido'
+        )
+
+        if motivo == 'OTRO':
+
+            motivo = request.POST.get(
+                'motivo_personalizado'
+            )
+
+        solicitud.estado = 'RECHAZADO'
+
+        solicitud.motivo_rechazo = motivo
+
+        solicitud.aprobado_por = (
+            request.user.username
+        )
+
+        solicitud.save()
+
+        return redirect(
+            'solicitudes'
+        )
+
+    return render(
+        request,
+        'solicitudes/rechazar.html',
+        {
+            'solicitud': solicitud
+        }
+    )

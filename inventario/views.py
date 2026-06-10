@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from reportlab.pdfgen import canvas
-
+from .services import registrar_entrada
 from .models import (
     Material,
     MovimientoInventario,
@@ -136,11 +136,12 @@ def kardex_pdf(request, id):
 
     pdf.setFont("Helvetica-Bold", 11)
 
-    pdf.drawString(50, y, "Fecha")
-    pdf.drawString(150, y, "Tipo")
-    pdf.drawString(250, y, "Cantidad")
-    pdf.drawString(350, y, "Referencia")
-
+    pdf.drawString(30, y, "Fecha")
+    pdf.drawString(100, y, "Tipo")
+    pdf.drawString(170, y, "Cantidad")
+    pdf.drawString(250, y, "Antes")
+    pdf.drawString(320, y, "Despues")
+    pdf.drawString(420, y, "Referencia")
     y -= 30
 
     pdf.setFont("Helvetica", 10)
@@ -148,30 +149,42 @@ def kardex_pdf(request, id):
     for movimiento in movimientos:
 
         pdf.drawString(
-            50,
+            30,
             y,
-            str(movimiento.fecha.strftime('%d/%m/%Y'))
+            movimiento.fecha.strftime('%d/%m/%Y')
         )
 
         pdf.drawString(
-            150,
+            100,
             y,
             movimiento.tipo
         )
 
         pdf.drawString(
-            250,
+            170,
             y,
             str(movimiento.cantidad)
         )
 
         pdf.drawString(
-            350,
+            250,
             y,
-            movimiento.referencia
+            str(movimiento.stock_anterior)
         )
 
-        y -= 25
+        pdf.drawString(
+            320,
+            y,
+            str(movimiento.stock_resultante)
+        )
+
+        pdf.drawString(
+            420,
+            y,
+            movimiento.referencia[:20]
+        )
+
+        y -= 20
 
     pdf.save()
 
@@ -238,24 +251,20 @@ def entrada_inventario(request):
 
         # SUMAR STOCK
 
+        stock_anterior = material.stock_actual
+
         material.stock_actual += cantidad
 
         material.save()
 
-        # REGISTRAR MOVIMIENTO
-
         MovimientoInventario.objects.create(
-
             material=material,
-
             tipo='ENTRADA',
-
             cantidad=cantidad,
-
+            stock_anterior=stock_anterior,
+            stock_resultante=material.stock_actual,
             referencia=referencia,
-
             usuario=request.user
-
         )
 
         return redirect('inventario')
@@ -360,6 +369,10 @@ def nuevo_material(request):
 
             cantidad=stock_actual,
 
+            stock_anterior=0,
+
+            stock_resultante=stock_actual,
+
             referencia='STOCK INICIAL',
 
             usuario=request.user
@@ -450,3 +463,75 @@ def eliminar_material(request, id):
     material.delete()
 
     return redirect('inventario')
+
+@login_required
+@rol_requerido([
+    'ALMACENERO',
+    'ADMINISTRADOR'
+])
+def salida_inventario(request):
+    
+    materiales = Material.objects.all()
+    material_preseleccionado = request.GET.get('material')
+    if request.method == 'POST':
+
+        material_id = request.POST.get('material')
+
+        cantidad = int(
+            request.POST.get('cantidad')
+        )
+
+        referencia = request.POST.get(
+            'referencia'
+        )
+
+        material = Material.objects.get(
+            id=material_id
+        )
+
+        if cantidad > material.stock_actual:
+
+            return render(
+                request,
+                'inventario/salida.html',
+                {
+                    'materiales': materiales,
+                    'error': (
+                        'Stock insuficiente'
+                    )
+                }
+            )
+
+        stock_anterior = material.stock_actual
+
+        material.stock_actual -= cantidad
+
+        material.save()
+
+        MovimientoInventario.objects.create(
+
+            material=material,
+
+            tipo='SALIDA',
+
+            cantidad=cantidad,
+
+            stock_anterior=stock_anterior,
+
+            stock_resultante=material.stock_actual,
+
+            referencia=referencia,
+
+            usuario=request.user
+        )
+
+        return redirect('inventario')
+
+    return render(
+        request,
+        'inventario/salida.html',
+        {
+            'materiales': materiales,
+            'material_preseleccionado': material_preseleccionado
+        }
+    )

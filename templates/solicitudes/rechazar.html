@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Rechazar Solicitud
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-3xl mx-auto">
+
+    <div class="card p-8">
+
+        <h1 class="text-2xl font-bold mb-2">
+            Rechazar Solicitud
+        </h1>
+
+        <p class="text-gray-500 mb-6">
+            Solicitud: {{ solicitud.codigo }}
+        </p>
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <div class="mb-6">
+
+                <label class="block mb-2 font-semibold">
+                    Motivo de rechazo
+                </label>
+
+                <select
+                    id="motivo_predefinido"
+                    name="motivo_predefinido"
+                    class="w-full border rounded-xl p-3"
+                    required
+                >
+                    <option value="">
+                        Seleccione un motivo
+                    </option>
+
+                    <option value="No existe disponibilidad presupuestaria">
+                        No existe disponibilidad presupuestaria
+                    </option>
+
+                    <option value="Material no contemplado en el POA">
+                        Material no contemplado en el POA
+                    </option>
+
+                    <option value="Cantidad solicitada excesiva">
+                        Cantidad solicitada excesiva
+                    </option>
+
+                    <option value="Justificación insuficiente">
+                        Justificación insuficiente
+                    </option>
+
+                    <option value="Solicitud duplicada">
+                        Solicitud duplicada
+                    </option>
+
+                    <option value="Error en los datos de la solicitud">
+                        Error en los datos de la solicitud
+                    </option>
+
+                    <option value="OTRO">
+                        Otro
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div
+                id="contenedor_otro"
+                class="mb-6 hidden"
+            >
+
+                <label class="block mb-2 font-semibold">
+                    Especifique el motivo
+                </label>
+
+                <textarea
+                    name="motivo_personalizado"
+                    rows="4"
+                    class="w-full border rounded-xl p-3"
+                ></textarea>
+
+            </div>
+
+            <div class="flex gap-3">
+
+                <button
+                    type="submit"
+                    class="btn-primary px-5 py-2 rounded-xl"
+                >
+                    Confirmar Rechazo
+                </button>
+
+                <a
+                    href="{% url 'solicitudes' %}"
+                    class="border px-5 py-2 rounded-xl"
+                >
+                    Cancelar
+                </a>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script>
+
+document
+.getElementById('motivo_predefinido')
+.addEventListener('change', function() {
+
+    const contenedor =
+        document.getElementById(
+            'contenedor_otro'
+        );
+
+    if (this.value === 'OTRO') {
+
+        contenedor.classList.remove(
+            'hidden'
+        );
+
+    } else {
+
+        contenedor.classList.add(
+            'hidden'
+        );
+
+    }
+
+});
+
+</script>
+
+{% endblock %}

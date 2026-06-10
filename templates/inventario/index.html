@@ -22,8 +22,7 @@ Inventario
     </div>
 
     <!-- GRUPO DE BOTONES DE ACCIÓN MEJORADO (Con protección de ancho mínimo en escritorio) -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[640px]">
-        
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 w-full lg:w-auto lg:min-w-[800px]">    
         <!-- Nuevo Material (Rojo institucional) -->
         <a
             href="{% url 'nuevo_material' %}"
@@ -44,6 +43,16 @@ Inventario
                 archive
             </span>
             <span>Nueva Entrada</span>
+        </a>
+        <!-- Nueva Salida -->
+        <a
+            href="{% url 'salida_inventario' %}"
+            class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+        >
+            <span class="material-symbols-outlined text-[18px]">
+                logout
+            </span>
+            <span>Nueva Salida</span>
         </a>
 
         <!-- Movimientos (Bordeado Gris) -->
@@ -151,6 +160,16 @@ Inventario
                             <div class="flex items-center justify-end gap-2">
                                 
                                 <!-- KARDEX -->
+
+                                <a
+                                    title="Registrar salida"
+                                    href="{% url 'salida_inventario' %}?material={{ material.id }}"
+                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition"
+                                >
+                                    <span class="material-symbols-outlined text-red-600 text-[20px]">
+                                        output
+                                    </span>
+                                </a>
                                 <a
                                     title="Ver Kardex"
                                     href="{% url 'kardex' material.id %}"
