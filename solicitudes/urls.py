@@ -25,5 +25,10 @@ urlpatterns = [
         views.rechazar_solicitud,
         name='rechazar_solicitud'
     ),
+    path(
+        'reabrir/<int:id>/',
+        views.reabrir_solicitud,
+        name='reabrir_solicitud'
+    ),
 
 ]

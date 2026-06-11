@@ -62,6 +62,10 @@ class Solicitud(models.Model):
         auto_now_add=True
     )
 
+    def tiene_detalles(self):
+
+        return self.detalles.exists()
+
     def __str__(self):
 
         return self.codigo

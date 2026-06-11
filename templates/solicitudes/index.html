@@ -98,7 +98,19 @@ Solicitudes
                                 <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
                                     Rechazado
                                 </span>
+                            {% elif solicitud.estado == 'RECHAZADO' %}
 
+                            <a
+                                title="Reabrir Solicitud"
+                                href="{% url 'reabrir_solicitud' solicitud.id %}"
+                                onclick="return confirm('¿Desea reabrir esta solicitud?')"
+                                class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center transition"
+                            >
+                                <span class="material-symbols-outlined text-blue-600 text-[20px]">
+                                    restart_alt
+                                </span>
+                            </a>
+                     
                             {% endif %}
 
                         </td>

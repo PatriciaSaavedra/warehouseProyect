@@ -1,15 +1,17 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.db import transaction, DatabaseError
+from django.contrib import messages
+from django.http import HttpResponseForbidden
+
 from .models import Solicitud, DetalleSolicitud
 from inventario.models import Material, MovimientoInventario
 from usuarios.utils import tiene_rol
-from django.http import HttpResponseForbidden
 
 @login_required
 def solicitudes(request):
-
-    solicitudes = Solicitud.objects.all().order_by('-id')
-
+    # Se optimiza la consulta precargando la relación 'solicitante'
+    solicitudes = Solicitud.objects.all().select_related('solicitante').order_by('-id')
     return render(
         request,
         'solicitudes/index.html',
@@ -21,63 +23,87 @@ def solicitudes(request):
 
 @login_required
 def nueva_solicitud(request):
+    print("POST:", request.POST)
 
+    print(
+        request.POST.getlist('materiales')
+    )
+
+    print(
+        request.POST.getlist('cantidades')
+    )
     if request.method == 'POST':
-
-        unidad = request.POST.get('unidad')
-
         fecha = request.POST.get('fecha')
+        materiales = request.POST.getlist(
+            'materiales'
+        )
 
-        material_id = request.POST.get('material')
+        cantidades = request.POST.getlist(
+            'cantidades'
+        )
 
-        material = Material.objects.get(id=material_id)
+        if not materiales:
 
-        cantidad = int(request.POST.get('cantidad'))
+            messages.error(
+                request,
+                "Debe agregar al menos un material."
+            )
 
+            return redirect(
+                'nueva_solicitud'
+            )
         justificacion = request.POST.get('justificacion')
 
-        # GENERAR CODIGO
-        ultima = Solicitud.objects.last()
 
-        numero = ultima.id + 1 if ultima else 1
 
-        codigo = f'SOL-{numero:03d}'
+        perfil = getattr(request.user, 'perfilusuario', None)
+        unidad_solicitante = perfil.unidad if perfil else None
 
-        perfil = request.user.perfilusuario
+        # 3. Operación atómica para evitar códigos duplicados y asegurar consistencia
+        try:
+            with transaction.atomic():
+                # Bloqueamos el último registro para calcular el correlativo de forma segura
+                ultima = Solicitud.objects.select_for_update().order_by('id').last()
+                numero = (ultima.id + 1) if ultima else 1
+                codigo = f'SOL-{numero:03d}'
 
-        # CREAR SOLICITUD
-        solicitud = Solicitud.objects.create(
+                solicitud = Solicitud.objects.create(
+                    codigo=codigo,
+                    unidad_solicitante=unidad_solicitante,
+                    solicitante=request.user,
+                    fecha=fecha,
+                    justificacion=justificacion,
+                    estado='PENDIENTE_JEFE'
+                )
+                for i in range(len(materiales)):
 
-            codigo=codigo,
+                    material = Material.objects.get(
+                        id=materiales[i]
+                    )
 
-            unidad_solicitante=perfil.unidad,
+                    cantidad = int(
+                        cantidades[i]
+                    )
 
-            solicitante=request.user,
+                    DetalleSolicitud.objects.create(
 
-            fecha=fecha,
+                        solicitud=solicitud,
 
-            justificacion=justificacion,
+                        material=material,
 
-            estado='PENDIENTE_JEFE'
+                        cantidad=cantidad
 
-        )
+                    )
+           
+            messages.success(request, f"Solicitud {codigo} creada correctamente.")
+            return redirect('solicitudes')
 
-        # CREAR DETALLE
-        DetalleSolicitud.objects.create(
-
-            solicitud=solicitud,
-
-            material=material,
-
-            cantidad=cantidad
-
-        )
-
-        return redirect('solicitudes')
+        except DatabaseError:
+            messages.error(request, "Hubo un error al procesar el guardado en la base de datos.")
+            return redirect('nueva_solicitud')
 
     # GET
     materiales = Material.objects.all()
-
     return render(
         request,
         'solicitudes/nueva.html',
@@ -89,170 +115,181 @@ def nueva_solicitud(request):
 
 @login_required
 def detalle_solicitud(request, id):
-
-    solicitud = get_object_or_404(Solicitud, id=id)
+    # Se puede optimizar la carga del detalle y sus materiales relacionados
+    solicitud = get_object_or_404(
+        Solicitud.objects.prefetch_related('detalles__material'), 
+        id=id
+    )
+    rol = request.user.perfilusuario.rol
 
     return render(
         request,
         'solicitudes/detalle.html',
         {
-            'solicitud': solicitud
+            'solicitud': solicitud,
+            'rol': rol
         }
     )
 
-
 @login_required
 def aprobar_solicitud(request, id):
+    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR']):
+        return HttpResponseForbidden("No tiene permisos para aprobar solicitudes.")
 
-    if not tiene_rol(
-        request.user,
-        ['JEFE_INMEDIATO', 'ADMINISTRADOR']
-    ):
-        return HttpResponseForbidden(
-            "No tiene permisos"
-        )
+    try:
+        with transaction.atomic():
+            # Bloquear la fila de la solicitud para que no sea modificada concurrentemente
+            solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    solicitud = get_object_or_404(
-        Solicitud,
-        id=id
-    )
+            if solicitud.estado != 'PENDIENTE_JEFE':
+                return redirect('solicitudes')
 
-    # EVITAR APROBAR DOS VECES
+        detalles = solicitud.detalles.select_related(
+    'material'
+)
 
-    if solicitud.estado != 'PENDIENTE_JEFE':
+        if not detalles.exists():
 
-        return redirect('solicitudes')
+            return HttpResponseForbidden(
+                "La solicitud no tiene materiales asociados."
+            )
 
-    detalle = solicitud.detalles.first()
+        stock_completo = True
 
-    material = detalle.material
+        for detalle in detalles:
 
-    # VALIDAR STOCK
+            material = Material.objects.select_for_update().get(
+                id=detalle.material.id
+            )
 
-    if material.stock_actual < detalle.cantidad:
+            if material.stock_actual < detalle.cantidad:
 
-        solicitud.estado = 'PENDIENTE_COMPRA'
+                stock_completo = False
+
+                break
+        if stock_completo:
+
+            solicitud.estado = 'VALIDADO'
+
+            solicitud.aprobado_por = request.user.username
+
+        else:
+
+            solicitud.estado = 'PENDIENTE_COMPRA'
 
         solicitud.save()
 
+    except DatabaseError:
+        messages.error(request, "No se pudo procesar la aprobación en este momento.")
         return redirect('solicitudes')
 
-    # SOLO VALIDAR, NO DESCONTAR STOCK
-
-    solicitud.estado = 'VALIDADO'
-
-    solicitud.aprobado_por = request.user.username
-
-    solicitud.save()
-
     return redirect('solicitudes')
+
+
 @login_required
 def entregar_solicitud(request, id):
+    if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR']):
+        return HttpResponseForbidden("No tiene permisos para entregar materiales.")
 
-    if not tiene_rol(
-        request.user,
-        ['ALMACENERO', 'ADMINISTRADOR']
-    ):
-        return HttpResponseForbidden(
-            "No tiene permisos"
-        )
+    try:
+        with transaction.atomic():
+            # Bloquear la solicitud para evitar doble entrega
+            solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    solicitud = get_object_or_404(
-        Solicitud,
-        id=id
-    )
+            if solicitud.estado != 'VALIDADO':
+                messages.error(request, "Solo se pueden entregar solicitudes con estado VALIDADO.")
+                return redirect('solicitudes')
 
-    # SOLO SE PUEDEN ENTREGAR SOLICITUDES VALIDADAS
+            if not solicitud.tiene_detalles():
+                return HttpResponseForbidden("La solicitud no tiene materiales asociados.")
 
-    if solicitud.estado != 'VALIDADO':
+            detalles = solicitud.detalles.select_related(
+                'material'
+            )
 
+            if not detalles.exists():
+
+                return HttpResponseForbidden(
+                    "La solicitud no tiene materiales."
+                )
+
+            # Verificar stock de TODOS los materiales
+
+            for detalle in detalles:
+
+                material = Material.objects.select_for_update().get(
+                    id=detalle.material.id
+                )
+
+                if material.stock_actual < detalle.cantidad:
+
+                    solicitud.estado = 'PENDIENTE_COMPRA'
+
+                    solicitud.save()
+
+                    messages.warning(
+                        request,
+                        f"Stock insuficiente para {material.nombre}"
+                    )
+
+                    return redirect('solicitudes')
+
+            for detalle in detalles:
+
+                material = Material.objects.select_for_update().get(
+                    id=detalle.material.id
+                )
+
+                material.stock_actual -= detalle.cantidad
+
+                material.save()
+
+                MovimientoInventario.objects.create(
+
+                    material=material,
+
+                    tipo='SALIDA',
+
+                    cantidad=detalle.cantidad,
+
+                    referencia=solicitud.codigo,
+
+                    usuario=request.user
+
+                )
+            # Cambiar estado
+            solicitud.estado = 'ENTREGADO'
+            solicitud.save()
+
+            messages.success(request, f"Solicitud {solicitud.codigo} entregada con éxito.")
+
+    except DatabaseError:
+        messages.error(request, "Ocurrió un error de base de datos al intentar procesar la entrega.")
         return redirect('solicitudes')
-
-    detalle = solicitud.detalles.first()
-
-    material = detalle.material
-
-    # VALIDAR STOCK
-
-    if material.stock_actual < detalle.cantidad:
-
-        solicitud.estado = 'PENDIENTE_COMPRA'
-
-        solicitud.save()
-
-        return redirect('solicitudes')
-
-    # DESCONTAR STOCK
-
-    material.stock_actual -= detalle.cantidad
-
-    material.save()
-
-    # REGISTRAR MOVIMIENTO DE SALIDA
-
-    MovimientoInventario.objects.create(
-
-        material=material,
-
-        tipo='SALIDA',
-
-        cantidad=detalle.cantidad,
-
-        referencia=solicitud.codigo,
-
-        usuario=request.user
-
-    )
-
-    # CAMBIAR ESTADO
-
-    solicitud.estado = 'ENTREGADO'
-
-    solicitud.save()
 
     return redirect('solicitudes')
+
 
 @login_required
 def rechazar_solicitud(request, id):
+    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR']):
+        return HttpResponseForbidden("No tiene permisos para realizar esta acción.")
 
-    if not tiene_rol(
-        request.user,
-        ['JEFE_INMEDIATO', 'ADMINISTRADOR']
-    ):
-        return HttpResponseForbidden(
-            "No tiene permisos"
-        )
-
-    solicitud = get_object_or_404(
-        Solicitud,
-        id=id
-    )
+    solicitud = get_object_or_404(Solicitud, id=id)
 
     if request.method == 'POST':
-
-        motivo = request.POST.get(
-            'motivo_predefinido'
-        )
-
+        print(request.POST)
+        motivo = request.POST.get('motivo_predefinido')
         if motivo == 'OTRO':
-
-            motivo = request.POST.get(
-                'motivo_personalizado'
-            )
+            motivo = request.POST.get('motivo_personalizado')
 
         solicitud.estado = 'RECHAZADO'
-
         solicitud.motivo_rechazo = motivo
-
-        solicitud.aprobado_por = (
-            request.user.username
-        )
-
+        solicitud.aprobado_por = request.user.username
         solicitud.save()
 
-        return redirect(
-            'solicitudes'
-        )
+        messages.info(request, f"La solicitud {solicitud.codigo} ha sido rechazada.")
+        return redirect('solicitudes')
 
     return render(
         request,
@@ -261,3 +298,20 @@ def rechazar_solicitud(request, id):
             'solicitud': solicitud
         }
     )
+
+
+@login_required
+def reabrir_solicitud(request, id):
+    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR']):
+        return HttpResponseForbidden("No tiene permisos para realizar esta acción.")
+
+    solicitud = get_object_or_404(Solicitud, id=id)
+
+    if solicitud.estado != 'RECHAZADO':
+        return redirect('solicitudes')
+
+    solicitud.estado = 'PENDIENTE_JEFE'
+    solicitud.save()
+
+    messages.info(request, f"La solicitud {solicitud.codigo} ha sido reabierta.")
+    return redirect('solicitudes')
