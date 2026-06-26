@@ -44,14 +44,14 @@ urlpatterns = [
     name='reporte_inventario'
     ),
     path(
-    'kardex/pdf/<int:id>/',
-    views.kardex_pdf,
-    name='kardex_pdf'
+        'kardex/pdf/<int:id>/',
+        views.kardex_pdf,
+        name='kardex_pdf'
     ),
 
     path(
-    'salida/',
-    views.salida_inventario,
-    name='salida_inventario'
+        'salida/',
+        views.salida_inventario,
+        name='salida_inventario'
     ),
 ]

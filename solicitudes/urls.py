@@ -15,11 +15,16 @@ urlpatterns = [
         name='aprobar_solicitud'
     ),
     path(
+        'editar/<int:id>/',
+        views.editar_solicitud,
+        name='editar_solicitud'
+    ),
+    path(
     'entregar/<int:id>/',
     views.entregar_solicitud,
     name='entregar_solicitud'
     ),
-
+    path('buscar-materiales/', views.buscar_materiales, name='buscar_materiales'),
     path(
         'rechazar/<int:id>/',
         views.rechazar_solicitud,
@@ -30,5 +35,7 @@ urlpatterns = [
         views.reabrir_solicitud,
         name='reabrir_solicitud'
     ),
+    path('solicitud/<int:id>/pdf/',
+          views.solicitud_pdf, name='solicitud_pdf'),
 
 ]

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="max-w-5xl mx-auto">
+
+    <h1 class="text-2xl font-bold mb-6">
+        Aprobar Solicitud {{ solicitud.codigo }}
+    </h1>
+
+    <form method="POST" class="card p-6">
+        {% csrf_token %}
+
+        <table class="w-full border">
+
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="p-2">Material</th>
+                    <th class="p-2">Solicitado</th>
+                    <th class="p-2">Aprobado</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for d in detalles %}
+                <tr class="border-t">
+
+                    <td class="p-2">
+                        {{ d.material.nombre }}
+                    </td>
+
+                    <td class="p-2">
+                        {{ d.cantidad_solicitada }}
+                    </td>
+
+                    <td class="p-2">
+
+                        <input
+                            type="number"
+                            name="aprobado_{{ d.id }}"
+                            value="{{ d.cantidad_solicitada }}"
+                            min="0"
+                            max="{{ d.material.stock_actual }}"
+                            class="border p-2 rounded w-24"
+                        >
+
+                    </td>
+
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        <div class="mt-6 flex justify-end gap-3">
+
+            <a href="{% url 'solicitudes' %}" class="px-4 py-2 border rounded">
+                Cancelar
+            </a>
+
+            <button class="px-4 py-2 bg-green-600 text-white rounded">
+                Guardar Aprobación
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

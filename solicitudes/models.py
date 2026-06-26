@@ -87,8 +87,16 @@ class DetalleSolicitud(models.Model):
         Material,
         on_delete=models.CASCADE
     )
-    cantidad = models.IntegerField()
+    cantidad_solicitada = models.IntegerField()
 
+    cantidad_aprobada = models.IntegerField(
+        null=True,
+        blank=True
+    )
+
+    cantidad_entregada = models.IntegerField(
+        default=0
+    )
     observacion = models.TextField(
         blank=True,
         null=True

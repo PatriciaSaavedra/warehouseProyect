@@ -35,6 +35,7 @@ Nueva Solicitud
     <form method="POST" class="card p-8 shadow-sm">
         {% csrf_token %}
 
+        <!-- Grid principal de inputs superiores -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
             <!-- FECHA DE SOLICITUD (Solo lectura y automatizada al día de hoy) -->
@@ -53,47 +54,73 @@ Nueva Solicitud
                 <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
             </div>
 
-            <!-- MATERIALES -->
+<!-- MATERIALES -->
             <div class="md:col-span-2">
 
                 <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
                     Materiales Solicitados
                 </label>
 
-                <div class="grid grid-cols-12 gap-3">
+                <!-- Se ajustó la distribución de columnas a 6 - 3 - 3 -->
+                <div class="grid grid-cols-12 gap-3 items-start">
 
-                    <div class="col-span-7">
+                    <!-- Buscador y Selector -->
+                    <div class="col-span-12 sm:col-span-6">
                         <select
                             id="material_select"
-                            class="w-full border border-gray-300 rounded-2xl p-3"
+                            class="w-full border border-gray-300 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                            onchange="document.getElementById('buscador_material').value = '';"
                         >
                             <option value="">Seleccionar material</option>
 
                             {% for material in materiales %}
-                            <option value="{{ material.id }}">
+                            <option 
+                                value="{{ material.id }}" 
+                                data-stock="{{ material.stock_actual }}"
+                            >
                                 {{ material.nombre }}
                             </option>
                             {% endfor %}
                         </select>
+
+                        <div class="mt-2 relative">
+                            <input
+                                type="text"
+                                id="buscador_material"
+                                placeholder="Buscar material..."
+                                class="w-full border border-gray-300 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                                onkeyup="buscarMateriales()"
+                            >
+
+                            <div id="resultados_busqueda" class="absolute bg-white w-full border rounded-xl mt-1 shadow-lg z-50 hidden"></div>
+                        </div>                        
                     </div>
 
-                    <div class="col-span-3">
+                    <!-- Input de Cantidad -->
+                    <div class="col-span-8 sm:col-span-3">
                         <input
                             type="number"
                             id="cantidad_input"
                             min="1"
                             placeholder="Cantidad"
-                            class="w-full border border-gray-300 rounded-2xl p-3"
+                            class="w-full border border-gray-300 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
                         >
                     </div>
 
-                    <div class="col-span-2">
+                    <!-- NUEVO BOTÓN DE AGREGAR -->
+                    <div class="col-span-4 sm:col-span-3">
                         <button
                             type="button"
                             onclick="agregarMaterial()"
-                            class="btn-secondary w-full h-full rounded-2xl"
+                            class="w-full h-[50px] bg-gray-900 hover:bg-gray-800 text-white rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-md active:scale-95 cursor-pointer"
+                            title="Agregar a la lista"
                         >
-                            +
+                            <span class="material-symbols-outlined text-[20px]">
+                                add_circle
+                            </span>
+                            <span class="text-sm font-bold font-['Outfit']">
+                                Añadir
+                            </span>
                         </button>
                     </div>
 
@@ -101,37 +128,29 @@ Nueva Solicitud
                 <div id="inputs_ocultos"></div>
 
             </div>
-            <div class="mt-6">
+        </div> <!-- Fin del grid de inputs -->
 
-                <table class="w-full border border-gray-200 rounded-2xl overflow-hidden">
-
-                    <thead class="bg-gray-50">
-
-                        <tr>
-
-                            <th class="p-3 text-left">
-                                Material
-                            </th>
-
-                            <th class="p-3 text-center">
-                                Cantidad
-                            </th>
-
-                            <th class="p-3 text-center">
-                                Acción
-                            </th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody id="tabla_materiales">
-
-                    </tbody>
-
-                </table>
-
-            </div>
+        <!-- TABLA DE MATERIALES SELECCIONADOS -->
+        <div class="mt-6 border border-gray-200 rounded-2xl overflow-hidden">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="p-4 font-bold text-gray-700">
+                            Material
+                        </th>
+                        <th class="p-4 font-bold text-gray-700 text-center w-32">
+                            Cantidad
+                        </th>
+                        <th class="p-4 font-bold text-gray-700 text-center w-24">
+                            Acción
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="tabla_materiales" class="divide-y divide-gray-100 bg-white">
+                    <!-- Se renderiza dinámicamente -->
+                </tbody>
+            </table>
+        </div>
 
         <!-- JUSTIFICACION -->
         <div class="mt-6">
@@ -172,82 +191,205 @@ Nueva Solicitud
     </form>
 
 </div>
-<script>
 
-let contador = 0;
+<script>
+let carrito = {};
+
+// Iniciar la vista por defecto
+document.addEventListener('DOMContentLoaded', () => {
+    renderTabla();
+    renderInputs();
+});
 
 function agregarMaterial() {
+    const select = document.getElementById('material_select');
+    const cantidadInput = document.getElementById('cantidad_input');
 
-    const select = document.getElementById(
-        'material_select'
-    );
+    const materialId = select.value;
+    const selectedOption = select.options[select.selectedIndex];
+    const cantidad = parseInt(cantidadInput.value);
 
-    const cantidad = document.getElementById(
-        'cantidad_input'
-    );
-
-    if (!select.value || !cantidad.value) {
-
-        alert(
-            'Seleccione material y cantidad'
-        );
-
+    if (!materialId || !selectedOption || isNaN(cantidad) || cantidad <= 0) {
+        alert("Seleccione un material y defina una cantidad válida mayor a 0.");
         return;
     }
 
-    const tabla = document.getElementById(
-        'tabla_materiales'
-    );
+    const materialNombre = selectedOption.text;
+    const stockActual = parseInt(selectedOption.getAttribute('data-stock')) || 0;
 
-    const fila = document.createElement('tr');
+    // Verificar disponibilidad de stock
+    if (cantidad > stockActual) {
+        alert(`No hay stock suficiente. Stock disponible: ${stockActual}`);
+        return;
+    }
 
-    fila.innerHTML = `
-        <td class="p-3">
-            ${select.options[select.selectedIndex].text}
-        </td>
+    if (carrito[materialId]) {
+        const nuevaCantidad = carrito[materialId].cantidad + cantidad;
+        if (nuevaCantidad > stockActual) {
+            alert(`La cantidad total (${nuevaCantidad}) supera el stock disponible (${stockActual})`);
+            return;
+        }
+        carrito[materialId].cantidad = nuevaCantidad;
+    } else {
+        carrito[materialId] = {
+            nombre: materialNombre,
+            cantidad: cantidad,
+            stock: stockActual
+        };
+    }
 
-        <td class="p-3 text-center">
-            ${cantidad.value}
-        </td>
+    renderTabla();
+    renderInputs();
 
-        <td class="p-3 text-center">
-
-            <button
-                type="button"
-                onclick="this.closest('tr').remove()"
-                class="text-red-600"
-            >
-                Eliminar
-            </button>
-
-        </td>
-    `;
-
-    tabla.appendChild(fila);
-
-    document.getElementById(
-        'inputs_ocultos'
-    ).innerHTML += `
-        <input
-            type="hidden"
-            name="materiales"
-            value="${select.value}"
-        >
-
-        <input
-            type="hidden"
-            name="cantidades"
-            value="${cantidad.value}"
-        >
-    `;
-
-    contador++;
-
+    // Limpiar campos de inserción
     select.value = '';
-
-    cantidad.value = '';
-
+    document.getElementById('buscador_material').value = '';
+    cantidadInput.value = '';
 }
 
+function renderTabla() {
+    const tabla = document.getElementById('tabla_materiales');
+    tabla.innerHTML = '';
+
+    const keys = Object.keys(carrito);
+    if (keys.length === 0) {
+        tabla.innerHTML = `
+            <tr>
+                <td colspan="3" class="p-8 text-center text-gray-400">
+                    No se han añadido materiales a la solicitud todavía.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    keys.forEach(id => {
+        const item = carrito[id];
+
+        tabla.innerHTML += `
+            <tr class="hover:bg-gray-50 transition">
+                <td class="p-4 text-gray-800 font-medium">${item.nombre}</td>
+                <td class="p-4 text-center">
+                    <input 
+                        type="number"
+                        value="${item.cantidad}"
+                        min="1"
+                        max="${item.stock}"
+                        onchange="editarCantidad(${id}, this)"
+                        class="border border-gray-300 rounded-xl p-1.5 w-20 text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    >
+                </td>
+                <td class="p-4 text-center">
+                    <button type="button" onclick="eliminar(${id})" class="text-red-600 hover:text-red-800 font-medium transition">
+                        Eliminar
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function editarCantidad(id, inputElement) {
+    let nuevaCantidad = parseInt(inputElement.value) || 1;
+    if (nuevaCantidad < 1) nuevaCantidad = 1;
+
+    const item = carrito[id];
+    if (item) {
+        if (nuevaCantidad > item.stock) {
+            alert(`No puedes solicitar más de lo disponible (${item.stock}). Se ajustará al máximo.`);
+            nuevaCantidad = item.stock;
+        }
+        item.cantidad = nuevaCantidad;
+        inputElement.value = nuevaCantidad;
+    }
+    renderInputs();
+}
+
+function eliminar(id) {
+    delete carrito[id];
+    renderTabla();
+    renderInputs();
+}
+
+function renderInputs() {
+    const contenedor = document.getElementById('inputs_ocultos');
+
+    const payload = {};
+
+    Object.keys(carrito).forEach(id => {
+        payload[id] = carrito[id].cantidad;
+    });
+
+    contenedor.innerHTML = `
+        <input type="hidden" name="payload" value='${JSON.stringify(payload)}'>
+    `;
+}
+</script>
+
+<script>
+function buscarMateriales() {
+    const query = document.getElementById('buscador_material').value;
+    const resultados = document.getElementById('resultados_busqueda');
+
+    if (query.length < 2) {
+        resultados.innerHTML = '';
+        resultados.classList.add('hidden');
+        return;
+    }
+
+    fetch(`/solicitudes/buscar-materiales/?q=${query}`)
+        .then(response => response.json())
+        .then(data => {
+            resultados.innerHTML = '';
+
+            if (data.length === 0) {
+                resultados.innerHTML = '<div class="p-3 text-gray-500 text-sm text-center">Sin resultados</div>';
+            } else {
+                data.forEach(material => {
+                    resultados.innerHTML += `
+                        <div 
+                            class="p-3 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-100 last:border-none transition duration-100"
+                            onclick="seleccionarMaterial(${material.id}, '${material.nombre}', ${material.stock_actual})"
+                        >
+                            <span class="font-medium text-gray-800">${material.nombre}</span>
+                            <span class="text-xs text-gray-400 block mt-0.5">(Stock actual: ${material.stock_actual})</span>
+                        </div>
+                    `;
+                });
+            }
+
+            resultados.classList.remove('hidden');
+        });
+}
+
+function seleccionarMaterial(id, nombre, stock) {
+    const select = document.getElementById('material_select');
+
+    // Comprobar si la opción ya existe en el selector; de lo contrario, crearla
+    let option = select.querySelector(`option[value="${id}"]`);
+    if (!option) {
+        option = document.createElement('option');
+        option.value = id;
+        option.textContent = nombre;
+        option.setAttribute('data-stock', stock);
+        select.appendChild(option);
+    }
+
+    select.value = id;
+    document.getElementById('cantidad_input').focus();
+    document.getElementById('buscador_material').value = nombre;
+    document.getElementById('resultados_busqueda').classList.add('hidden');
+
+    window.stockSeleccionado = stock;
+}
+
+// Ocultar resultados si se hace clic en cualquier otra parte del documento
+document.addEventListener('click', function(e) {
+    const buscador = document.getElementById('buscador_material');
+    const resultados = document.getElementById('resultados_busqueda');
+    if (buscador && resultados && !buscador.contains(e.target) && !resultados.contains(e.target)) {
+        resultados.classList.add('hidden');
+    }
+});
 </script>
 {% endblock %}

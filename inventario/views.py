@@ -281,6 +281,75 @@ def entrada_inventario(request):
     'ALMACENERO',
     'ADMINISTRADOR'
 ])
+def salida_inventario(request):
+
+    materiales = Material.objects.all()
+
+    if request.method == 'POST':
+
+        material_id = request.POST.get('material')
+
+        cantidad = int(
+            request.POST.get('cantidad')
+        )
+
+        referencia = request.POST.get(
+            'referencia'
+        )
+
+        material = Material.objects.get(
+            id=material_id
+        )
+
+        # VALIDAR STOCK
+
+        if cantidad > material.stock_actual:
+
+            return render(
+                request,
+                'inventario/salida.html',
+                {
+                    'materiales': materiales,
+                    'error': 'Stock insuficiente.'
+                }
+            )
+
+        # DESCONTAR STOCK
+
+        material.stock_actual -= cantidad
+
+        material.save()
+
+        # REGISTRAR MOVIMIENTO
+
+        MovimientoInventario.objects.create(
+
+            material=material,
+
+            tipo='SALIDA',
+
+            cantidad=cantidad,
+
+            referencia=referencia,
+
+            usuario=request.user
+
+        )
+
+        return redirect('inventario')
+
+    return render(
+        request,
+        'inventario/salida.html',
+        {
+            'materiales': materiales
+        }
+    )
+@login_required
+@rol_requerido([
+    'ALMACENERO',
+    'ADMINISTRADOR'
+])
 def nuevo_material(request):
 
     if request.method == 'POST':

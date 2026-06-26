@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Editar Solicitud
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-5xl mx-auto">
+
+    <h1 class="text-2xl font-bold mb-6">
+        Editar Solicitud {{ solicitud.codigo }}
+    </h1>
+
+    <form id="form-editar" class="card p-6">
+        {% csrf_token %}
+
+        <!-- INPUT OCULTO PAYLOAD -->
+        <div id="inputs_ocultos"></div>
+
+        <table class="w-full border">
+
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="p-2">Material</th>
+                    <th class="p-2">Cantidad</th>
+                    <th class="p-2">Acción</th>
+                </tr>
+            </thead>
+
+            <tbody id="tabla_materiales"></tbody>
+
+        </table>
+
+        <div class="mt-6 flex justify-end gap-3">
+
+            <a href="{% url 'solicitudes' %}" class="px-4 py-2 border rounded">
+                Cancelar
+            </a>
+
+            <button type="button" onclick="guardarCambios()">
+                Guardar Cambios
+            </button>
+        </div>
+
+    </form>
+
+</div>
+
+<!-- ===================== JS ===================== -->
+<script>
+
+let carrito = {};
+
+// cargar datos iniciales
+const datos = JSON.parse('{{ detalles_json|escapejs }}');
+
+datos.forEach(d => {
+    carrito[d.id] = {
+        nombre: d.nombre,
+        cantidad: d.cantidad,
+        stock: d.stock
+    };
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderTabla();
+});
+
+// ================= TABLA =================
+function renderTabla() {
+    const tbody = document.getElementById('tabla_materiales');
+    tbody.innerHTML = '';
+
+    Object.keys(carrito).forEach(id => {
+        const item = carrito[id];
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${item.nombre}</td>
+
+                <td>
+                    <input type="number"
+                        value="${item.cantidad}"
+                        min="1"
+                        max="${item.stock}"
+                        onchange="editarCantidad('${id}', this)">
+                </td>
+
+                <td>
+                    <button type="button" onclick="eliminar('${id}')">
+                        Eliminar
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+// ================= EDITAR =================
+function editarCantidad(id, input) {
+    let val = parseInt(input.value);
+
+    if (val < 1) val = 1;
+
+    const stock = carrito[id].stock;
+
+    if (val > stock) {
+        alert(`No puedes superar el stock (${stock})`);
+        val = stock;
+        input.value = stock;
+    }
+
+    carrito[id].cantidad = val;
+}
+// ================= ELIMINAR =================
+function eliminar(id) {
+    delete carrito[id];
+    renderTabla();
+}
+
+// ================= GUARDAR (FETCH) =================
+function guardarCambios() {
+
+    const payload = {};
+
+    Object.keys(carrito).forEach(id => {
+        payload[id] = carrito[id].cantidad;
+    });
+
+    fetch(window.location.href, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRF()
+        },
+        body: JSON.stringify({
+            payload: payload,
+            justificacion: ""
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+
+        if (data.ok) {
+            alert("Guardado correctamente");
+            window.location.href = "/solicitudes/";
+        } else {
+            alert(data.error || "Error");
+        }
+
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Error de red o backend");
+    });
+}
+
+function getCSRF() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+</script>
+{% endblock %}
