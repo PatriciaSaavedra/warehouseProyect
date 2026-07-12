@@ -11,75 +11,94 @@ Inventario
     <!-- CABECERA -->
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6 mb-8">
     
-    <!-- TÍTULO Y DESCRIPCIÓN -->
-    <div class="min-w-0">
-        <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
-            Inventario
-        </h1>
-        <p class="text-sm text-gray-500 mt-1 max-w-xl">
-            Monitoreo, control de stock y catálogo de materiales disponibles en almacén
-        </p>
+        <!-- TÍTULO Y DESCRIPCIÓN -->
+        <div class="min-w-0">
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+                Inventario
+            </h1>
+            <p class="text-sm text-gray-500 mt-1 max-w-xl">
+                Monitoreo, control de stock y catálogo de materiales disponibles en almacén
+            </p>
+        </div>
+
+        <!-- GRUPO DE BOTONES DE ACCIÓN MEJORADO (Con protección de roles) -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 w-full lg:w-auto lg:min-w-[800px]">    
+            
+            {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                <!-- Nuevo Material -->
+                <a
+                    href="{% url 'nuevo_material' %}"
+                    class="btn-primary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+                >
+                    <span class="material-symbols-outlined text-[18px]">
+                        add_box
+                    </span>
+                    <span>Nuevo Material</span>
+                </a>
+
+                <!-- Nueva Entrada -->
+                <a
+                    href="{% url 'entrada_inventario' %}"
+                    class="btn-secondary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+                >
+                    <span class="material-symbols-outlined text-[18px]">
+                        archive
+                    </span>
+                    <span>Nueva Entrada</span>
+                </a>
+
+                <!-- Nueva Salida -->
+                <a
+                    href="{% url 'salida_inventario' %}"
+                    class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+                >
+                    <span class="material-symbols-outlined text-[18px]">
+                        logout
+                    </span>
+                    <span>Nueva Salida</span>
+                </a>
+            {% else %}
+                <!-- Espacio de relleno si el usuario no es administrativo para mantener alineación -->
+                <div class="hidden lg:block lg:col-span-3"></div>
+            {% endif %}
+
+            <!-- Movimientos -->
+            <a
+                href="{% url 'movimientos' %}"
+                class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+            >
+                <span class="material-symbols-outlined text-[18px]">
+                    swap_horiz
+                </span>
+                <span>Movimientos</span>
+            </a>
+
+            <!-- Exportar PDF -->
+            <a
+                href="{% url 'reporte_inventario' %}"
+                class="border border-red-200 bg-red-50 hover:bg-red-100 text-[#8b0000] px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+            >
+                <span class="material-symbols-outlined text-[18px]">
+                    picture_as_pdf
+                </span>
+                <span>Exportar PDF</span>
+            </a>
+
+        </div>
+
     </div>
 
-    <!-- GRUPO DE BOTONES DE ACCIÓN MEJORADO (Con protección de ancho mínimo en escritorio) -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 w-full lg:w-auto lg:min-w-[800px]">    
-        <!-- Nuevo Material (Rojo institucional) -->
-        <a
-            href="{% url 'nuevo_material' %}"
-            class="btn-primary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-        >
-            <span class="material-symbols-outlined text-[18px]">
-                add_box
-            </span>
-            <span>Nuevo Material</span>
-        </a>
+    <!-- MENSAJES DE ALERTA -->
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %} mb-2">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
 
-        <!-- Nueva Entrada (Amarillo/Naranja institucional) -->
-        <a
-            href="{% url 'entrada_inventario' %}"
-            class="btn-secondary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-        >
-            <span class="material-symbols-outlined text-[18px]">
-                archive
-            </span>
-            <span>Nueva Entrada</span>
-        </a>
-        <!-- Nueva Salida -->
-        <a
-            href="{% url 'salida_inventario' %}"
-            class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-        >
-            <span class="material-symbols-outlined text-[18px]">
-                logout
-            </span>
-            <span>Nueva Salida</span>
-        </a>
-
-        <!-- Movimientos (Bordeado Gris) -->
-        <a
-            href="{% url 'movimientos' %}"
-            class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-        >
-            <span class="material-symbols-outlined text-[18px]">
-                swap_horiz
-            </span>
-            <span>Movimientos</span>
-        </a>
-
-        <!-- Exportar PDF (Rojo suave/Bordeado) -->
-        <a
-            href="{% url 'reporte_inventario' %}"
-            class="border border-red-200 bg-red-50 hover:bg-red-100 text-[#8b0000] px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-        >
-            <span class="material-symbols-outlined text-[18px]">
-                picture_as_pdf
-            </span>
-            <span>Exportar PDF</span>
-        </a>
-
-    </div>
-
-</div>
     <!-- CARD PRINCIPAL DE LA TABLA -->
     <div class="card overflow-hidden">
 
@@ -138,7 +157,7 @@ Inventario
                             {{ material.stock_minimo }}
                         </td>
 
-                        <!-- ESTADO (Adaptado a la gama de colores del sistema) -->
+                        <!-- ESTADO -->
                         <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                             {% if material.stock_actual == 0 %}
                                 <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
@@ -159,17 +178,35 @@ Inventario
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
                             <div class="flex items-center justify-end gap-2">
                                 
-                                <!-- KARDEX -->
+                                <!-- ESTABLECER SALDO INICIAL (Condicional para Almacenero/Admin y si no posee movimientos) -->
+                                {% if not material.tiene_movimientos %}
+                                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                                        <a
+                                            title="Establecer Saldo Inicial"
+                                            href="{% url 'establecer_saldo_inicial' material.id %}"
+                                            class="w-9 h-9 rounded-xl border border-green-200 bg-green-50 hover:bg-green-100 flex items-center justify-center transition"
+                                        >
+                                            <span class="material-symbols-outlined text-green-700 text-[20px]">
+                                                input
+                                            </span>
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
 
-                                <a
-                                    title="Registrar salida"
-                                    href="{% url 'salida_inventario' %}?material={{ material.id }}"
-                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition"
-                                >
-                                    <span class="material-symbols-outlined text-red-600 text-[20px]">
-                                        output
-                                    </span>
-                                </a>
+                                <!-- SALIDA RÁPIDA -->
+                                {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                                    <a
+                                        title="Registrar salida"
+                                        href="{% url 'salida_inventario' %}?material={{ material.id }}"
+                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition"
+                                    >
+                                        <span class="material-symbols-outlined text-red-600 text-[20px]">
+                                            output
+                                        </span>
+                                    </a>
+                                {% endif %}
+
+                                <!-- KARDEX -->
                                 <a
                                     title="Ver Kardex"
                                     href="{% url 'kardex' material.id %}"
@@ -180,28 +217,32 @@ Inventario
                                     </span>
                                 </a>
 
-                                <!-- EDITAR -->
-                                <a
-                                    title="Editar material"
-                                    href="{% url 'editar_material' material.id %}"
-                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 flex items-center justify-center transition"
-                                >
-                                    <span class="material-symbols-outlined text-[#d97706] text-[20px]">
-                                        edit
-                                    </span>
-                                </a>
+                                <!-- EDITAR (Solo Almacenero y Admin) -->
+                                {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                                    <a
+                                        title="Editar material"
+                                        href="{% url 'editar_material' material.id %}"
+                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 flex items-center justify-center transition"
+                                    >
+                                        <span class="material-symbols-outlined text-[#d97706] text-[20px]">
+                                            edit
+                                        </span>
+                                    </a>
+                                {% endif %}
 
-                                <!-- ELIMINAR -->
-                                <a
-                                    title="Eliminar material"
-                                    href="{% url 'eliminar_material' material.id %}"
-                                    onclick="return confirm('¿Está seguro de eliminar este material?')"
-                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition cursor-pointer"
-                                >
-                                    <span class="material-symbols-outlined text-red-600 text-[20px]">
-                                        delete
-                                    </span>
-                                </a>
+                                <!-- ELIMINAR (Solo Administrador) -->
+                                {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                                    <a
+                                        title="Eliminar material"
+                                        href="{% url 'eliminar_material' material.id %}"
+                                        onclick="return confirm('¿Está seguro de eliminar este material?')"
+                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition cursor-pointer"
+                                    >
+                                        <span class="material-symbols-outlined text-red-600 text-[20px]">
+                                            delete
+                                        </span>
+                                    </a>
+                                {% endif %}
 
                             </div>
                         </td>

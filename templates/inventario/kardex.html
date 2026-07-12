@@ -1,171 +1,187 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Kardex
+Kardex de Existencias
 {% endblock %}
 
 {% block content %}
 
-<a
-    href="{% url 'kardex_pdf' material.id %}"
-    class="bg-red-700 text-white px-4 py-2 rounded-lg"
->
-    Exportar PDF
-</a>
+<div class="max-w-7xl mx-auto">
 
-<div class="flex justify-between items-center mb-6">
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+                Kardex de Existencias Valorado
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">
+                Trazabilidad física y valoración financiera de movimientos para el subartículo seleccionado [28].
+            </p>
+        </div>
+        
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+            <a
+                href="{% url 'kardex_pdf' material.id %}"
+                class="flex items-center justify-center gap-2 border border-red-200 bg-red-50 hover:bg-red-100 text-[#8b0000] px-4 py-2.5 rounded-2xl text-sm font-semibold transition w-full sm:w-auto"
+            >
+                <span class="material-symbols-outlined text-[18px]">
+                    picture_as_pdf
+                </span>
+                Exportar PDF
+            </a>
+            <a
+                href="{% url 'inventario' %}"
+                class="flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition w-full sm:w-auto"
+            >
+                <span class="material-symbols-outlined text-[18px]">
+                    arrow_back
+                </span>
+                Volver
+            </a>
+        </div>
+    </div>
 
-    <div>
+    <!-- TARJETAS DE RESUMEN FÍSICO-VALORADO -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
 
-        <h1 class="text-3xl font-bold">
-            Kardex
-        </h1>
+        <!-- CÓDIGO -->
+        <div class="card p-6 bg-white border-l-4 border-blue-500 rounded-2xl">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider font-['Outfit'] mb-1">
+                Código del Material
+            </p>
+            <h3 class="text-xl font-bold text-gray-800">
+                <code>{{ material.codigo }}</code>
+            </h3>
+            <p class="text-[11px] text-gray-400 mt-1">Partida: {{ material.partida.codigo }}</p>
+        </div>
 
-        <p class="text-gray-500 mt-1">
+        <!-- DETALLE MATERIAL -->
+        <div class="card p-6 bg-white border-l-4 border-purple-500 rounded-2xl">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider font-['Outfit'] mb-1">
+                Descripción / Nombre
+            </p>
+            <h3 class="text-sm font-bold text-gray-700 truncate" title="{{ material.nombre }}">
+                {{ material.nombre }}
+            </h3>
+            <p class="text-[11px] text-gray-400 mt-1">Unidad: {{ material.unidad_medida }}</p>
+        </div>
 
-            {{ material.nombre }}
+        <!-- STOCK FISICO -->
+        <div class="card p-6 bg-white border-l-4 border-green-500 rounded-2xl">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider font-['Outfit'] mb-1">
+                Existencia Física Actual
+            </p>
+            <h3 class="text-2xl font-black text-gray-800">
+                {{ material.stock_actual }} <span class="text-xs text-gray-400 font-medium">{{ material.unidad_medida_fk.codigo }}</span>
+            </h3>
+            <p class="text-[11px] text-gray-400 mt-1">Mínimo requerido: {{ material.stock_minimo }}</p>
+        </div>
 
-        </p>
+        <!-- VALOR TOTAL DEL ALMACÉN -->
+        <div class="card p-6 bg-white border-l-4 border-amber-500 rounded-2xl">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider font-['Outfit'] mb-1">
+                Valor Total del Almacén
+            </p>
+            <h3 class="text-2xl font-black text-gray-800" id="lbl-valor-inventario">
+                <!-- Se calcula dinámicamente o se saca del último saldo del bucle -->
+                {% if movimientos %}
+                    {{ movimientos.0.saldo_importe|floatformat:2 }}
+                {% else %}
+                    0.00
+                {% endif %}
+                <span class="text-xs text-gray-400 font-medium">Bs.</span>
+            </h3>
+            <p class="text-[11px] text-gray-400 mt-1">Inventario Físico Valorado</p>
+        </div>
 
     </div>
 
-</div>
+    <!-- TABLA KARDEX DE EXISTENCIAS VALORADO -->
+    <div class="card overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1100px] text-sm text-gray-700 border-collapse">
+                
+                <!-- DOBLE ENCABEZADO -->
+                <thead class="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider font-semibold">
+                    <tr class="border-b border-gray-100">
+                        <th rowspan="2" class="px-4 py-4 text-left align-middle border-r border-gray-100 w-36">Fecha / Hora</th>
+                        <th rowspan="2" class="px-6 py-4 text-left align-middle border-r border-gray-100">Detalle / Referencia</th>
+                        <th colspan="3" class="px-4 py-2 text-center border-r border-gray-100 bg-gray-100/50">Cantidades (Físico)</th>
+                        <th rowspan="2" class="px-4 py-4 text-right align-middle border-r border-gray-100 w-28">P. Unitario (Bs.)</th>
+                        <th colspan="3" class="px-4 py-2 text-center border-r border-gray-100 bg-gray-100/50">Importes (Valorado)</th>
+                        <th rowspan="2" class="px-4 py-4 text-center align-middle w-24">Usuario</th>
+                    </tr>
+                    <tr class="border-b border-gray-100 text-[10px]">
+                        <th class="px-4 py-2 text-center w-24 border-r border-gray-100">Entrada</th>
+                        <th class="px-4 py-2 text-center w-24 border-r border-gray-100">Salida</th>
+                        <th class="px-4 py-2 text-center w-24 border-r border-gray-100">Saldo</th>
+                        <th class="px-4 py-2 text-right w-28 border-r border-gray-100">Entrada</th>
+                        <th class="px-4 py-2 text-right w-28 border-r border-gray-100">Salida</th>
+                        <th class="px-4 py-2 text-right w-28 border-r border-gray-100">Saldo</th>
+                    </tr>
+                </thead>
 
-<!-- RESUMEN -->
+                <tbody class="divide-y divide-gray-100">
+                    {% for mov in movimientos %}
+                    <tr class="hover:bg-gray-50/50 transition duration-150">
+                        <!-- FECHA -->
+                        <td class="px-4 py-3 whitespace-nowrap text-xs border-r border-gray-50">
+                            <span class="font-semibold text-gray-800">{{ mov.fecha|date:"d/m/Y" }}</span>
+                            <span class="text-gray-400 block mt-0.5 text-[10px]">{{ mov.fecha|date:"H:i" }}</span>
+                        </td>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <!-- DETALLE / REFERENCIA -->
+                        <td class="px-6 py-3 border-r border-gray-50 text-xs font-mono text-gray-600">
+                            {{ mov.detalle }}
+                        </td>
 
-    <div class="bg-white rounded-xl shadow p-6 border-l-4 border-blue-500">
+                        <!-- CANTIDADES -->
+                        <td class="px-4 py-3 text-center border-r border-gray-50 text-green-700 font-semibold {% if mov.entrada_cant == 0 %}text-gray-300 font-normal{% endif %}">
+                            {{ mov.entrada_cant|default:"—" }}
+                        </td>
+                        <td class="px-4 py-3 text-center border-r border-gray-50 text-red-600 font-semibold {% if mov.salida_cant == 0 %}text-gray-300 font-normal{% endif %}">
+                            {{ mov.salida_cant|default:"—" }}
+                        </td>
+                        <td class="px-4 py-3 text-center border-r border-gray-50 font-black text-gray-800">
+                            {{ mov.saldo_cant }}
+                        </td>
 
-        <p class="text-gray-500 text-sm mb-2">
-            Código
-        </p>
+                        <!-- PRECIO UNITARIO -->
+                        <td class="px-4 py-3 text-right border-r border-gray-50 font-semibold text-gray-600">
+                            {{ mov.precio_unitario|floatformat:2 }}
+                        </td>
 
-        <h3 class="text-2xl font-bold">
-            {{ material.codigo }}
-        </h3>
+                        <!-- IMPORTES -->
+                        <td class="px-4 py-3 text-right border-r border-gray-50 text-green-700 font-semibold {% if mov.entrada_importe == 0 %}text-gray-300 font-normal{% endif %}">
+                            {{ mov.entrada_importe|floatformat:2 }}
+                        </td>
+                        <td class="px-4 py-3 text-right border-r border-gray-50 text-red-600 font-semibold {% if mov.salida_importe == 0 %}text-gray-300 font-normal{% endif %}">
+                            {{ mov.salida_importe|floatformat:2 }}
+                        </td>
+                        <td class="px-4 py-3 text-right border-r border-gray-50 font-black text-gray-800">
+                            {{ mov.saldo_importe|floatformat:2 }}
+                        </td>
 
+                        <!-- USUARIO -->
+                        <td class="px-4 py-3 text-center text-xs font-semibold text-gray-500">
+                            @{{ mov.usuario }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="px-6 py-12 text-center text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">
+                                assignment_late
+                            </span>
+                            Este subartículo no cuenta con movimientos registrados en su Kardex de Existencias.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
     </div>
-
-    <div class="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
-
-        <p class="text-gray-500 text-sm mb-2">
-            Stock Actual
-        </p>
-
-        <h3 class="text-2xl font-bold">
-            {{ material.stock_actual }}
-        </h3>
-
-    </div>
-
-    <div class="bg-white rounded-xl shadow p-6 border-l-4 border-red-500">
-
-        <p class="text-gray-500 text-sm mb-2">
-            Stock Mínimo
-        </p>
-
-        <h3 class="text-2xl font-bold">
-            {{ material.stock_minimo }}
-        </h3>
-
-    </div>
-
-</div>
-
-<!-- TABLA -->
-
-<div class="bg-white rounded-xl shadow overflow-hidden">
-
-    <table class="w-full">
-
-        <thead class="bg-gray-100">
-
-            <tr>
-
-                <th class="p-4 text-left">
-                    Fecha
-                </th>
-
-                <th class="p-4 text-left">
-                    Tipo
-                </th>
-
-                <th class="p-4 text-left">
-                    Cantidad
-                </th>
-
-                <th class="p-4 text-left">
-                    Referencia
-                </th>
-
-                <th class="p-4 text-left">
-                    Usuario
-                </th>
-
-            </tr>
-
-        </thead>
-
-        <tbody>
-
-            {% for movimiento in movimientos %}
-
-            <tr class="border-b">
-
-                <td class="p-4">
-                    {{ movimiento.fecha|date:"d/m/Y H:i" }}
-                </td>
-
-                <td class="p-4">
-
-                    {% if movimiento.tipo == 'ENTRADA' %}
-
-                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                            Entrada
-                        </span>
-
-                    {% else %}
-
-                        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
-                            Salida
-                        </span>
-
-                    {% endif %}
-
-                </td>
-
-                <td class="p-4">
-                    {{ movimiento.cantidad }}
-                </td>
-
-                <td class="p-4">
-                    {{ movimiento.referencia }}
-                </td>
-
-                <td class="p-4">
-                    {{ movimiento.usuario.username }}
-                </td>
-
-            </tr>
-
-            {% empty %}
-
-            <tr>
-
-                <td colspan="5" class="p-6 text-center text-gray-500">
-
-                    No existen movimientos.
-
-                </td>
-
-            </tr>
-
-            {% endfor %}
-
-        </tbody>
-
-    </table>
 
 </div>
 

@@ -6,12 +6,20 @@ Nuevo Material
 
 {% block content %}
 
-<div class="flex justify-between items-center mb-6">
+<div class="max-w-4xl mx-auto">
 
-    <h1 class="text-3xl font-bold">
-        Nuevo Material
-    </h1>
-<!-- Botón Volver -->
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+                Nuevo Material
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">
+                Registre un nuevo subartículo. El material se guardará en limpio para establecer su saldo inicial después.
+            </p>
+        </div>
+        
+        <!-- Botón Volver -->
         <a
             href="{% url 'inventario' %}"
             class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
@@ -21,164 +29,142 @@ Nuevo Material
             </span>
             Volver
         </a>
-</div>
-
-<form method="POST" class="bg-white p-6 rounded-xl shadow">
-
-    {% csrf_token %}
-    {% if error %}
-
-    <div class="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
-
-        {{ error }}
-
     </div>
 
+    <!-- MENSAJES DE ERROR -->
+    {% if error %}
+    <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px]">
+            error
+        </span>
+        <span class="text-sm font-medium">
+            {{ error }}
+        </span>
+    </div>
     {% endif %}
 
-    <div class="grid grid-cols-2 gap-6"></div>
-        <!-- NOMBRE -->
-        <div>
+    <!-- FORMULARIO DE CREACIÓN -->
+    <form method="POST" class="card p-8 shadow-sm">
+        {% csrf_token %}
 
-            <label class="block mb-2 font-semibold">
-                Nombre
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- NOMBRE -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Nombre <span class="text-[#8b0000]">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="nombre"
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                    placeholder="Ej. Bolígrafo negro"
+                    required
+                >
+            </div>
+
+            <!-- PARTIDA PRESUPUESTARIA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Partida Presupuestaria <span class="text-[#8b0000]">*</span>
+                </label>
+                <div class="relative">
+                    <select
+                        name="partida"
+                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                        required
+                    >
+                        <option value="">Seleccione una partida</option>
+                        {% for partida in partidas %}
+                            <option value="{{ partida.id }}">
+                                {{ partida.codigo }} - {{ partida.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- DESCRIPCION -->
+        <div class="mt-6">
+            <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                Descripción
             </label>
+            <textarea
+                name="descripcion"
+                class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                rows="4"
+                placeholder="Escriba los detalles o especificaciones técnicas del subartículo..."
+            ></textarea>
+        </div>
 
-            <input
-                type="text"
-                name="nombre"
-                class="w-full border rounded-lg p-3"
-                placeholder="Nombre del material"
-                required
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+
+            <!-- UNIDAD DE MEDIDA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Unidad de Medida <span class="text-[#8b0000]">*</span>
+                </label>
+                <div class="relative">
+                    <select
+                        name="unidad_medida_fk"
+                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                        required
+                    >
+                        <option value="">Seleccione una unidad</option>
+                        {% for unidad in unidades %}
+                            <option value="{{ unidad.id }}">
+                                {{ unidad.codigo }} - {{ unidad.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                </div>
+            </div>
+
+            <!-- STOCK MINIMO -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Stock Mínimo <span class="text-[#8b0000]">*</span>
+                </label>
+                <input
+                    type="number"
+                    name="stock_minimo"
+                    min="0"
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                    placeholder="0"
+                    required
+                >
+            </div>
+
+        </div>
+
+        <!-- ACCIONES -->
+        <div class="mt-8 pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            
+            <a
+                href="{% url 'inventario' %}"
+                class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition"
             >
+                Cancelar
+            </a>
 
-        </div>
-
-        <!-- PARTIDA -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Partida Presupuestaria
-            </label>
-
-            <select
-                name="partida"
-                class="w-full border rounded-lg p-3"
-                required
+            <button
+                type="submit"
+                class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
             >
-
-                <option value="">
-                    Seleccione una partida
-                </option>
-
-                {% for partida in partidas %}
-
-                <option value="{{ partida.id }}">
-                    {{ partida.codigo }} - {{ partida.nombre }}
-                </option>
-
-                {% endfor %}
-
-            </select>
+                <span class="material-symbols-outlined text-[18px]">
+                    save
+                </span>
+                Guardar Material
+            </button>
 
         </div>
 
-    </div>
+    </form>
 
-    <!-- DESCRIPCION -->
-    <div class="mt-6">
-
-        <label class="block mb-2 font-semibold">
-            Descripción
-        </label>
-
-        <textarea
-            name="descripcion"
-            class="w-full border rounded-lg p-3"
-            rows="4"
-        ></textarea>
-
-    </div>
-
-    <div class="grid grid-cols-3 gap-6 mt-6">
-
-        <!-- UNIDAD -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Unidad Medida
-            </label>
-
-        <select
-            name="unidad_medida_fk"
-            class="w-full border rounded-lg p-3"
-            required
-        >
-
-            <option value="">
-                Seleccione una unidad
-            </option>
-
-            {% for unidad in unidades %}
-
-                <option value="{{ unidad.id }}">
-
-                    {{ unidad.codigo }} - {{ unidad.nombre }}
-
-                </option>
-
-            {% endfor %}    
-
-        </select>
-
-        </div>
-
-        <!-- STOCK -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Stock Inicial
-            </label>
-
-            <input
-                type="number"
-                name="stock_actual"
-                class="w-full border rounded-lg p-3"
-                required
-            >
-
-        </div>
-
-        <!-- STOCK MINIMO -->
-        <div>
-
-            <label class="block mb-2 font-semibold">
-                Stock Mínimo
-            </label>
-
-            <input
-                type="number"
-                name="stock_minimo"
-                class="w-full border rounded-lg p-3"
-                required
-            >
-
-        </div>
-
-    </div>
-
-    <!-- BOTON -->
-    <div class="mt-8 flex justify-end">
-
-        <button
-            type="submit"
-            class="bg-green-600 text-white px-6 py-3 rounded-lg"
-        >
-            Guardar Material
-        </button>
-
-    </div>
-
-</form>
+</div>
 
 {% endblock %}

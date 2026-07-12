@@ -11,7 +11,7 @@ from reportlab.pdfgen import canvas
 
 from .models import Solicitud, DetalleSolicitud
 from inventario.models import Material, MovimientoInventario
-from usuarios.utils import tiene_rol
+from usuarios.decorators import tiene_rol
 from presupuestos.models import POA
 
 
