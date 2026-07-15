@@ -1,7 +1,8 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html lang="es" class="scroll-smooth">
+<!-- El servidor Django inyectará aquí 'dark' o 'light' previniendo el parpadeo en blanco -->
+<html lang="es" class="scroll-smooth {{ theme }}">
 
 <head>
     <meta charset="UTF-8">
@@ -12,9 +13,11 @@
     <!-- TAILWIND CSS CDN CON PLUGINS -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 
-    <!-- CONFIGURACIÓN GLOBAL DE TAILWIND (Permite usar clases como bg-primary, text-secondary, font-outfit, etc.) -->
+    <!-- CONFIGURACIÓN GLOBAL DE TAILWIND -->
     <script>
         tailwind.config = {
+            // Activamos el modo oscuro basado en clases para Tailwind
+            darkMode: 'class', 
             theme: {
                 extend: {
                     colors: {
@@ -26,7 +29,7 @@
                             DEFAULT: '#d97706',
                             dark: '#c06705',
                         },
-                        gold: '#c5a059',
+                        gold: '#dfb26c',
                         dark: '#111111',
                         info: '#007aff',
                         grayBorder: '#d1d5db',
@@ -47,44 +50,158 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
     <style>
-        /* VARIABLES CSS GLOBALES */
+        /* ==========================================
+           VARIABLES CSS GLOBALES (Tema Claro)
+           ========================================== */
         :root {
             --primary: #8b0000;
             --secondary: #d97706;
             --gold: #c5a059;
-            --dark: #111111;
-            --gray: #9ca3af;
-            --gray-border: #d1d5db;
-            --gray-bg: #e5e7eb;
-            --white: #ffffff;
             --info: #007aff;
+
+            /* Colores de Fondo y Texto */
+            --bg-body: #f7f9fd;
+            --card-bg: #ffffff;
+            --sidebar-bg: #ffffff;
+            --text-main: #1f2937;       /* text-gray-800 */
+            --text-heading: #111111;    /* Títulos oscuros */
+            --text-muted: #6b7280;      /* text-gray-500 */
+            --border-color: #d1d5db;    /* Gris de borde */
+
+            /* Componentes */
+            --input-bg: #ffffff;
+            --input-text: #1f2937;
+            --table-header-bg: #f9fafb;
+
+            /* Desplazamiento */
+            --scrollbar-track: #f1f1f1;
+            --scrollbar-thumb: #cbcbcb;
+            --scrollbar-thumb-hover: #a8a8a8;
         }
 
-        /* 1. TIPOGRAFÍA GLOBAL AUTOMÁTICA */
+        /* ==========================================
+           VARIABLES PARA EL MODO OSCURO PREMIUM (Warm Dark)
+           ========================================== */
+        .dark {
+            --primary: #8b0000;         /* Conservamos tu rojo institucional */
+            --secondary: #d97706;       /* Ámbar institucional */
+            --gold: #dfb26c;            /* Oro suave (de tu imagen de referencia) */
+            --info: #60a5fa;
+
+            /* Fondos cálidos ultra oscuros */
+            --bg-body: #0d0909;         /* Fondo general chocolate/carbón */
+            --card-bg: #151010;         /* Tarjetas, navbar y dropdowns */
+            --sidebar-bg: #120d0d;      /* Sidebar ligeramente más oscuro */
+            
+            /* Textos refinados */
+            --text-main: #dfd8d0;       /* Texto común en crema suave */
+            --text-heading: #dec396;    /* Títulos e indicadores en oro suave */
+            --text-muted: #8c7e7a;      /* Subtítulos y secundarios */
+            --border-color: #241919;    /* Bordes discretos con matiz rojizo */
+
+            /* Componentes */
+            --input-bg: #1a1212;
+            --input-text: #dfd8d0;
+            --table-header-bg: #181212;
+            
+            /* Desplazamiento */
+            --scrollbar-track: #0d0909;
+            --scrollbar-thumb: #2c1d1d;
+            --scrollbar-thumb-hover: #3d2b2b;
+        }
+
+        /* ==========================================
+           APLICACIÓN AUTOMÁTICA EN TODO EL SISTEMA 
+           ========================================== */
+
+        /* 1. Fondo y Textos del Cuerpo */
         body {
-            background-color: #f7f9fd;
+            background-color: var(--bg-body) !important;
+            color: var(--text-main) !important;
             font-family: 'Inter', sans-serif;
-            color: var(--dark);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
 
-        /* Todas las cabeceras del sistema usarán automáticamente la fuente 'Outfit' */
+        /* 2. Cabeceras */
         h1, h2, h3, h4, h5, h6, .font-heading {
             font-family: 'Outfit', sans-serif;
+            color: var(--text-heading) !important;
+            transition: color 0.2s ease;
         }
 
-        /* 2. ESTILIZADO DE COMPONENTES GLOBALES */
-        .sidebar-active {
-            background-color: var(--primary);
-            color: white;
-            border-left: 4px solid var(--secondary);
+        /* 3. Textos secundarios */
+        p, .text-muted, .text-secondary {
+            color: var(--text-muted);
         }
 
+        /* 4. Tablas Globales (Sin bordes blancos) */
+        table {
+            background-color: var(--card-bg) !important;
+            color: var(--text-main) !important;
+            border-color: var(--border-color) !important;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        thead, tr.table-header {
+            background-color: var(--table-header-bg) !important;
+        }
+
+        th {
+            color: var(--text-heading) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            background-color: var(--table-header-bg) !important;
+            text-transform: uppercase;
+            font-size: 0.75rem !important; /* text-xs */
+            letter-spacing: 0.05em;
+            font-weight: 700 !important;
+        }
+
+        td {
+            color: var(--text-main) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        /* 5. Tarjetas (Cards) */
         .card {
-            background: white;
-            border: 1px solid var(--gray-border);
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color) !important;
             border-radius: 24px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        /* 6. Layouts principales (Sidebar y Navbar) */
+        .sidebar-custom {
+            background-color: var(--sidebar-bg, var(--card-bg)) !important;
+            border-right: 1px solid var(--border-color) !important;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .navbar-custom {
+            background-color: var(--card-bg) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        /* 7. Botón dorado premium ("New Asset") */
+        .btn-gold {
+            background-color: var(--gold) !important;
+            color: #0d0909 !important;
+            font-weight: 700 !important;
+            border-radius: 12px !important;
+            transition: background-color 0.15s ease;
+        }
+
+        .btn-gold:hover {
+            background-color: #c9a05e !important;
+        }
+
+        /* 8. Componentes del Sidebar */
+        .sidebar-active {
+            background-color: var(--primary) !important;
+            color: white !important;
+            border-left: 4px solid var(--secondary);
         }
 
         .btn-primary {
@@ -107,7 +224,7 @@
             background: #c06705;
         }
 
-        /* BADGES */
+        /* Badges de estado */
         .badge-primary {
             background: rgba(139, 0, 0, 0.08);
             color: var(--primary);
@@ -123,17 +240,18 @@
             color: var(--info);
         }
 
-        /* 3. ESTILIZADO GLOBAL PARA FORMULARIOS (Inputs, selects y textareas unificados) */
+        /* 9. Estilizado de Formularios */
         input[type="text"], 
         input[type="number"], 
         input[type="password"], 
         input[type="email"], 
         select, 
         textarea {
-            border-color: var(--gray-border) !important;
-            border-radius: 1rem !important; /* rounded-2xl (16px) automático en todo el sistema */
-            font-size: 0.875rem !important; /* text-sm */
-            color: #1f2937 !important; /* text-gray-800 */
+            background-color: var(--input-bg) !important;
+            border-color: var(--border-color) !important;
+            border-radius: 1rem !important; 
+            font-size: 0.875rem !important; 
+            color: var(--input-text) !important; 
             transition: all 0.15s ease-in-out !important;
         }
 
@@ -145,32 +263,32 @@
         textarea:focus {
             outline: none !important;
             border-color: transparent !important;
-            box-shadow: 0 0 0 2px var(--primary) !important; /* Enfoque rojo institucional automático */
+            box-shadow: 0 0 0 2px var(--primary) !important; 
         }
 
-        /* 4. BARRA DE DESPLAZAMIENTO (SCROLLBAR) PREMIUM */
+        /* 10. Barra de desplazamiento */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #f1f1f1;
+            background: var(--scrollbar-track);
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #cbcbcb;
+            background: var(--scrollbar-thumb);
             border-radius: 9999px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
+            background: var(--scrollbar-thumb-hover);
         }
     </style>
 
 </head>
 
-<body class="text-gray-800 antialiased">
+<body class="antialiased transition-colors duration-200">
 
     <!-- BARRA LATERAL (SIDEBAR) -->
     {% include 'partials/sidebar.html' %}
@@ -179,7 +297,7 @@
     {% include 'partials/navbar.html' %}
 
     <!-- CONTENEDOR PRINCIPAL -->
-    <main class="ml-[260px] pt-20 p-8 min-h-screen">
+    <main class="ml-[260px] pt-20 p-8 min-h-screen transition-colors duration-200">
 
         {% block content %}
         {% endblock %}
@@ -188,6 +306,39 @@
 
     <!-- CHART.JS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- SCRIPT DE ACTUALIZACIÓN DEL TEMA -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            
+            if (themeToggleBtn) {
+                themeToggleBtn.addEventListener('click', () => {
+                    const htmlElement = document.documentElement;
+                    const isDark = htmlElement.classList.contains('dark');
+                    const newTheme = isDark ? 'light' : 'dark';
+
+                    // Alternamos las clases correspondientes en la raíz
+                    if (newTheme === 'dark') {
+                        htmlElement.classList.add('dark');
+                        htmlElement.classList.remove('light');
+                    } else {
+                        htmlElement.classList.remove('dark');
+                        htmlElement.classList.add('light');
+                    }
+
+                    // Escribimos la cookie de preferencia con duración de 1 año
+                    document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+                    
+                    // Actualizamos el icono del botón en tiempo real (Material Symbols)
+                    const icon = themeToggleBtn.querySelector('.material-symbols-outlined');
+                    if (icon) {
+                        icon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

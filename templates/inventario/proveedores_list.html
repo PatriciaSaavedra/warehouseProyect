@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %} Proveedores {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Proveedores</h1>
+            <p class="text-sm text-gray-500 mt-1">Directorio y catálogo de empresas proveedoras registradas en el sistema.</p>
+        </div>
+        <div class="flex gap-2 w-full sm:w-auto">
+            <a href="{% url 'crear_proveedor' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">add</span> Registrar Proveedor
+            </a>
+            <a href="{% url 'inventario' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-green-50 text-green-700 border-green-200 mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[800px]">
+                <thead class="bg-gray-50 border-b border-gray-100">
+                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 font-semibold w-40">NIT</th>
+                        <th class="px-6 py-4 font-semibold">Razón Social</th>
+                        <th class="px-6 py-4 font-semibold w-48">Teléfono</th>
+                        <th class="px-6 py-4 font-semibold w-64">Dirección</th>
+                        <th class="px-6 py-4 font-semibold text-right pr-8 w-24">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for prov in proveedores %}
+                    <tr class="hover:bg-gray-50/50 transition duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{{ prov.nit }}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-700">{{ prov.razon_social }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">{{ prov.telefono|default:"—" }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500 truncate max-w-[200px]" title="{{ prov.direccion }}">{{ prov.direccion|default:"—" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
+                            <a href="{% url 'editar_proveedor' prov.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 inline-flex items-center justify-center transition">
+                                <span class="material-symbols-outlined text-[#d97706] text-[20px]">edit</span>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">local_shipping</span>
+                            No existen proveedores registrados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

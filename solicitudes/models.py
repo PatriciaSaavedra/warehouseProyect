@@ -1,23 +1,19 @@
 from django.db import models
 from django.contrib.auth.models import User
 from inventario.models import Material
-
+from organizacion.models import UnidadOrganizacional 
 
 # =========================================
-# SOLICITUD
+# FLUJO DE ESTADOS OFICIAL (RE-SABS / GAD POTOSÍ)
 # =========================================
 ESTADOS_SOLICITUD = [
-
-    ('PENDIENTE_JEFE', 'Pendiente Jefe'),
-
-    ('VALIDADO', 'Validado'),
-
-    ('RECHAZADO', 'Rechazado'),
-
-    ('PENDIENTE_COMPRA', 'Pendiente Compra'),
-
-    ('ENTREGADO', 'Entregado'),
-
+    ('REGISTRADA', 'Registrada'),       # Creada por el Funcionario Solicitante
+    ('REVISADA', 'Revisada'),           # Validada por el Jefe Inmediato Superior
+    ('APROBADA', 'Aprobada'),           # Aprobada por Presupuestos (POA) / Jefe de Almacenes
+    ('PREPARADA', 'Preparada'),         # Alistada físicamente por el Almacenero
+    ('ENTREGADA', 'Entregada'),         # Retirada físicamente (Descuenta Stock y POA)
+    ('CERRADA', 'Cerrada'),             # Conclusión del trámite administrativo de almacén
+    ('RECHAZADA', 'Rechazada'),         # Estado terminal en caso de observación presupuestaria o física
 ]
 
 
@@ -27,7 +23,7 @@ class Solicitud(models.Model):
         max_length=20,
         unique=True
     )
-    from organizacion.models import UnidadOrganizacional
+
     unidad_solicitante = models.ForeignKey(
         UnidadOrganizacional,
         on_delete=models.CASCADE
@@ -45,7 +41,7 @@ class Solicitud(models.Model):
     estado = models.CharField(
         max_length=20,
         choices=ESTADOS_SOLICITUD,
-        default='PENDIENTE_JEFE'
+        default='REGISTRADA'  # <-- NUEVO ESTADO INICIAL
     )
 
     aprobado_por = models.CharField(
@@ -53,6 +49,7 @@ class Solicitud(models.Model):
         blank=True,
         null=True
     )
+    
     motivo_rechazo = models.TextField(
         blank=True,
         null=True
@@ -63,11 +60,9 @@ class Solicitud(models.Model):
     )
 
     def tiene_detalles(self):
-
         return self.detalles.exists()
 
     def __str__(self):
-
         return self.codigo
 
 
@@ -87,6 +82,7 @@ class DetalleSolicitud(models.Model):
         Material,
         on_delete=models.CASCADE
     )
+    
     cantidad_solicitada = models.IntegerField()
 
     cantidad_aprobada = models.IntegerField(
@@ -97,11 +93,11 @@ class DetalleSolicitud(models.Model):
     cantidad_entregada = models.IntegerField(
         default=0
     )
+    
     observacion = models.TextField(
         blank=True,
         null=True
     )
 
     def __str__(self):
-
         return f"{self.solicitud.codigo} - {self.material}"

@@ -11,10 +11,10 @@ Nueva Solicitud
     <!-- CABECERA -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                 Nueva Solicitud
             </h1>
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Completa el formulario para requerir materiales del almacén central
             </p>
         </div>
@@ -22,7 +22,7 @@ Nueva Solicitud
         <!-- Botón Volver -->
         <a
             href="{% url 'solicitudes' %}"
-            class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
+            class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
         >
             <span class="material-symbols-outlined text-[18px]">
                 arrow_back
@@ -38,44 +38,42 @@ Nueva Solicitud
         <!-- Grid principal de inputs superiores -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            <!-- FECHA DE SOLICITUD (Solo lectura y automatizada al día de hoy) -->
+            <!-- FECHA DE SOLICITUD -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                     Fecha de Solicitud
                 </label>
-                <!-- Visual para el usuario -->
                 <input
                     type="text"
                     value="{% now 'd/m/Y' %}"
-                    class="w-full border border-gray-200 rounded-2xl p-3 bg-gray-50 text-gray-400 cursor-not-allowed select-none font-medium focus:outline-none"
+                    class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none font-medium focus:outline-none"
                     readonly
                 >
-                <!-- Campo oculto para enviar al backend en formato AAAA-MM-DD -->
                 <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
             </div>
 
-<!-- MATERIALES -->
+            <!-- MATERIALES -->
             <div class="md:col-span-2">
 
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                     Materiales Solicitados
                 </label>
 
-                <!-- Se ajustó la distribución de columnas a 6 - 3 - 3 -->
                 <div class="grid grid-cols-12 gap-3 items-start">
 
                     <!-- Buscador y Selector -->
                     <div class="col-span-12 sm:col-span-6">
                         <select
                             id="material_select"
-                            class="w-full border border-gray-300 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
                             onchange="document.getElementById('buscador_material').value = '';"
                         >
-                            <option value="">Seleccionar material</option>
+                            <option value="" class="dark:bg-[#151010]">Seleccionar material</option>
 
                             {% for material in materiales %}
                             <option 
                                 value="{{ material.id }}" 
+                                class="dark:bg-[#151010]"
                                 data-stock="{{ material.stock_actual }}"
                             >
                                 {{ material.nombre }}
@@ -88,11 +86,11 @@ Nueva Solicitud
                                 type="text"
                                 id="buscador_material"
                                 placeholder="Buscar material..."
-                                class="w-full border border-gray-300 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
                                 onkeyup="buscarMateriales()"
                             >
 
-                            <div id="resultados_busqueda" class="absolute bg-white w-full border rounded-xl mt-1 shadow-lg z-50 hidden"></div>
+                            <div id="resultados_busqueda" class="absolute bg-white dark:bg-[#151010] w-full border border-gray-100 dark:border-gray-800 rounded-xl mt-1 shadow-lg z-50 hidden"></div>
                         </div>                        
                     </div>
 
@@ -103,7 +101,7 @@ Nueva Solicitud
                             id="cantidad_input"
                             min="1"
                             placeholder="Cantidad"
-                            class="w-full border border-gray-300 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
                         >
                     </div>
 
@@ -112,7 +110,7 @@ Nueva Solicitud
                         <button
                             type="button"
                             onclick="agregarMaterial()"
-                            class="w-full h-[50px] bg-gray-900 hover:bg-gray-800 text-white rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-md active:scale-95 cursor-pointer"
+                            class="w-full h-[50px] bg-gray-900 dark:bg-slate-800 hover:bg-gray-800 dark:hover:bg-slate-700 text-white rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-md active:scale-95 cursor-pointer"
                             title="Agregar a la lista"
                         >
                             <span class="material-symbols-outlined text-[20px]">
@@ -128,25 +126,25 @@ Nueva Solicitud
                 <div id="inputs_ocultos"></div>
 
             </div>
-        </div> <!-- Fin del grid de inputs -->
+        </div>
 
         <!-- TABLA DE MATERIALES SELECCIONADOS -->
-        <div class="mt-6 border border-gray-200 rounded-2xl overflow-hidden">
+        <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 border-b border-gray-200">
+                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-850">
                     <tr>
-                        <th class="p-4 font-bold text-gray-700">
+                        <th class="p-4 font-bold text-gray-700 dark:text-gray-200">
                             Material
                         </th>
-                        <th class="p-4 font-bold text-gray-700 text-center w-32">
+                        <th class="p-4 font-bold text-gray-700 dark:text-gray-200 text-center w-32">
                             Cantidad
                         </th>
-                        <th class="p-4 font-bold text-gray-700 text-center w-24">
+                        <th class="p-4 font-bold text-gray-700 dark:text-gray-200 text-center w-24">
                             Acción
                         </th>
                     </tr>
                 </thead>
-                <tbody id="tabla_materiales" class="divide-y divide-gray-100 bg-white">
+                <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
                     <!-- Se renderiza dinámicamente -->
                 </tbody>
             </table>
@@ -154,24 +152,24 @@ Nueva Solicitud
 
         <!-- JUSTIFICACION -->
         <div class="mt-6">
-            <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                 Justificación <span class="text-[#8b0000]">*</span>
             </label>
             <textarea
                 name="justificacion"
-                class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                 rows="4"
                 placeholder="Describa el motivo o justificación institucional de este requerimiento..."
                 required
             ></textarea>
         </div>
 
-        <!-- BOTONES DE ACCIÓN (Alineados a la derecha) -->
-        <div class="mt-8 pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+        <!-- BOTONES DE ACCIÓN -->
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
             
             <a
                 href="{% url 'solicitudes' %}"
-                class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition"
+                class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition"
             >
                 Cancelar
             </a>
@@ -217,7 +215,6 @@ function agregarMaterial() {
     const materialNombre = selectedOption.text;
     const stockActual = parseInt(selectedOption.getAttribute('data-stock')) || 0;
 
-    // Verificar disponibilidad de stock
     if (cantidad > stockActual) {
         alert(`No hay stock suficiente. Stock disponible: ${stockActual}`);
         return;
@@ -241,7 +238,6 @@ function agregarMaterial() {
     renderTabla();
     renderInputs();
 
-    // Limpiar campos de inserción
     select.value = '';
     document.getElementById('buscador_material').value = '';
     cantidadInput.value = '';
@@ -255,7 +251,7 @@ function renderTabla() {
     if (keys.length === 0) {
         tabla.innerHTML = `
             <tr>
-                <td colspan="3" class="p-8 text-center text-gray-400">
+                <td colspan="3" class="p-8 text-center text-gray-400 dark:text-gray-500 bg-transparent">
                     No se han añadido materiales a la solicitud todavía.
                 </td>
             </tr>
@@ -267,8 +263,8 @@ function renderTabla() {
         const item = carrito[id];
 
         tabla.innerHTML += `
-            <tr class="hover:bg-gray-50 transition">
-                <td class="p-4 text-gray-800 font-medium">${item.nombre}</td>
+            <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
+                <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">${item.nombre}</td>
                 <td class="p-4 text-center">
                     <input 
                         type="number"
@@ -276,11 +272,11 @@ function renderTabla() {
                         min="1"
                         max="${item.stock}"
                         onchange="editarCantidad(${id}, this)"
-                        class="border border-gray-300 rounded-xl p-1.5 w-20 text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-20 text-center focus:ring-1 focus:ring-red-500 focus:outline-none"
                     >
                 </td>
                 <td class="p-4 text-center">
-                    <button type="button" onclick="eliminar(${id})" class="text-red-600 hover:text-red-800 font-medium transition">
+                    <button type="button" onclick="eliminar(${id})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium transition">
                         Eliminar
                     </button>
                 </td>
@@ -343,16 +339,16 @@ function buscarMateriales() {
             resultados.innerHTML = '';
 
             if (data.length === 0) {
-                resultados.innerHTML = '<div class="p-3 text-gray-500 text-sm text-center">Sin resultados</div>';
+                resultados.innerHTML = '<div class="p-3 text-gray-500 dark:text-gray-400 text-sm text-center">Sin resultados</div>';
             } else {
                 data.forEach(material => {
                     resultados.innerHTML += `
                         <div 
-                            class="p-3 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-100 last:border-none transition duration-100"
+                            class="p-3 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-sm border-b border-gray-100 dark:border-gray-800 last:border-none transition duration-100"
                             onclick="seleccionarMaterial(${material.id}, '${material.nombre}', ${material.stock_actual})"
                         >
-                            <span class="font-medium text-gray-800">${material.nombre}</span>
-                            <span class="text-xs text-gray-400 block mt-0.5">(Stock actual: ${material.stock_actual})</span>
+                            <span class="font-medium text-gray-800 dark:text-gray-200">${material.nombre}</span>
+                            <span class="text-xs text-gray-400 dark:text-gray-500 block mt-0.5">(Stock actual: ${material.stock_actual})</span>
                         </div>
                     `;
                 });
@@ -365,7 +361,6 @@ function buscarMateriales() {
 function seleccionarMaterial(id, nombre, stock) {
     const select = document.getElementById('material_select');
 
-    // Comprobar si la opción ya existe en el selector; de lo contrario, crearla
     let option = select.querySelector(`option[value="${id}"]`);
     if (!option) {
         option = document.createElement('option');
@@ -383,7 +378,6 @@ function seleccionarMaterial(id, nombre, stock) {
     window.stockSeleccionado = stock;
 }
 
-// Ocultar resultados si se hace clic en cualquier otra parte del documento
 document.addEventListener('click', function(e) {
     const buscador = document.getElementById('buscador_material');
     const resultados = document.getElementById('resultados_busqueda');

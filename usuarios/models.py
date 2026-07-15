@@ -16,8 +16,6 @@ ROLES = [
 
     ('BIENES_SERVICIOS', 'Unidad de Bienes y Servicios'),
 
-    ('PROVEEDOR', 'Proveedor'),
-
     ('ADMINISTRADOR', 'Administrador del Sistema'),
 
 ]

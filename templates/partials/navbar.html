@@ -1,4 +1,5 @@
-<header class="fixed top-0 right-0 w-full lg:w-[calc(100%-260px)] h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm transition-all duration-300">
+<!-- HEADER: Se agregó la clase 'navbar-custom' al final para anular el fondo blanco y bordes en modo oscuro -->
+<header class="fixed top-0 right-0 w-full lg:w-[calc(100%-260px)] h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm transition-all duration-300 navbar-custom">
 
     <!-- LADO IZQUIERDO: ACCESOS Y TÍTULO -->
     <div class="flex items-center gap-2 min-w-0">
@@ -6,7 +7,7 @@
         <!-- Botón Hamburguesa de Menú para pantallas táctiles/móviles -->
         <button 
             type="button"
-            class="lg:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-50 flex items-center justify-center transition duration-150 cursor-pointer"
+            class="lg:hidden p-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 flex items-center justify-center transition duration-150 cursor-pointer"
             aria-label="Abrir menú"
         >
             <span class="material-symbols-outlined text-[24px]">
@@ -15,8 +16,8 @@
         </button>
         
         <!-- Título SGA -->
-        <h2 class="text-lg sm:text-xl font-extrabold text-[#8b0000] font-['Outfit'] tracking-wide truncate">
-            SGA <span class="text-gray-300 font-light mx-1">|</span> <span class="text-gray-500 text-xs sm:text-sm font-medium">Sistema de Almacén</span>
+        <h2 class="text-lg sm:text-xl font-extrabold text-[#8b0000] dark:text-red-500 font-['Outfit'] tracking-wide truncate">
+            SGA <span class="text-gray-300 dark:text-gray-700 font-light mx-1">|</span> <span class="text-gray-500 dark:text-gray-450 text-xs sm:text-sm font-medium">Sistema de Almacén</span>
         </h2>
 
     </div>
@@ -26,7 +27,7 @@
 
         <!-- BUSCADOR CON FORMULARIO ACTIVO (Oculto en móviles) -->
         <form method="GET" action="." class="relative hidden md:block">
-            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px] pointer-events-none">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[20px] pointer-events-none">
                 search
             </span>
             <input
@@ -34,7 +35,7 @@
                 name="q"
                 value="{{ query|default:'' }}"
                 placeholder="Buscar..."
-                class="w-60 lg:w-72 pl-10 pr-4 py-2 border border-gray-300 rounded-2xl text-sm bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                class="w-60 lg:w-72 pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-2xl text-sm bg-gray-50/50 dark:bg-slate-900/40 text-gray-800 dark:text-gray-200 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
             >
         </form>
 
@@ -42,31 +43,42 @@
         <button 
             type="button"
             title="Notificaciones"
-            class="relative w-10 h-10 rounded-xl hover:bg-gray-50 text-gray-600 flex items-center justify-center transition duration-150 cursor-pointer"
+            class="relative w-10 h-10 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-600 dark:text-gray-400 flex items-center justify-center transition duration-150 cursor-pointer"
         >
             <span class="material-symbols-outlined text-[24px]">
                 notifications
             </span>
             <!-- Indicador activo utilizando tu color secundario #d97706 -->
-            <span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#d97706] border-2 border-white"></span>
+            <span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#d97706] dark:bg-amber-500 border-2 border-white dark:border-slate-950"></span>
+        </button>
+
+        <!-- Dentro de templates/partials/navbar.html -->
+        <button id="theme-toggle" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors duration-150 flex items-center justify-center text-gray-600 dark:text-gray-400 cursor-pointer" title="Cambiar tema">
+            <span class="material-symbols-outlined text-[24px]">
+                {% if theme == 'dark' %}
+                    light_mode
+                {% else %}
+                    dark_mode
+                {% endif %}
+            </span>
         </button>
 
         <!-- SEPARADOR -->
-        <div class="h-8 w-px bg-gray-150 hidden sm:block"></div>
+        <div class="h-8 w-px bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
 
         <!-- PERFIL CON MENÚ DESPLEGABLE (Menú Hover integrado de forma nativa) -->
         <div class="relative flex items-center gap-3 group py-3 cursor-pointer">
 
             <!-- Datos de Usuario -->
             <div class="text-right hidden sm:block select-none">
-                <p class="font-bold text-gray-800 text-sm font-['Outfit'] truncate max-w-[150px]">
+                <p class="font-bold text-gray-800 dark:text-gray-200 text-sm font-['Outfit'] truncate max-w-[150px]">
                     {% if request.user.first_name or request.user.last_name %}
                         {{ request.user.first_name }} {{ request.user.last_name }}
                     {% else %}
                         {{ request.user.username }}
                     {% endif %}
                 </p>
-                <p class="text-[11px] font-bold text-[#d97706] uppercase tracking-wider mt-0.5">
+                <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-wider mt-0.5">
                     {% if request.user.perfilusuario %}
                         {{ request.user.perfilusuario.get_rol_display }}
                     {% else %}
@@ -76,7 +88,7 @@
             </div>
 
             <!-- Avatar del Usuario (Diseño squircle moderno) -->
-            <div class="w-10 h-10 rounded-2xl bg-[#8b0000] text-white flex items-center justify-center font-bold text-xs tracking-wider shadow-sm select-none transition duration-150 group-hover:scale-105">
+            <div class="w-10 h-10 rounded-2xl bg-[#8b0000] dark:bg-red-700 text-white flex items-center justify-center font-bold text-xs tracking-wider shadow-sm select-none transition duration-150 group-hover:scale-105">
                 {% if request.user.first_name or request.user.last_name %}
                     {{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
                 {% else %}
@@ -85,26 +97,26 @@
             </div>
 
             <!-- MENÚ DESPLEGABLE (Se activa automáticamente al posicionar el cursor sobre el Perfil) -->
-            <div class="absolute right-0 top-14 w-48 bg-white border border-gray-100 rounded-2xl shadow-lg py-2 hidden group-hover:block hover:block transition duration-150 z-50">
+            <div class="absolute right-0 top-14 w-48 bg-white dark:bg-[#151010] border border-gray-100 dark:border-gray-800 rounded-2xl shadow-lg py-2 hidden group-hover:block hover:block transition duration-150 z-50">
                 
                 <a 
                     href="/perfil/" 
-                    class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
+                    class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
                 >
-                    <span class="material-symbols-outlined text-[18px] text-gray-400">
+                    <span class="material-symbols-outlined text-[18px] text-gray-400 dark:text-gray-500">
                         person
                     </span> 
                     Mi Perfil
                 </a>
 
-                <hr class="border-gray-100 my-1">
+                <hr class="border-gray-100 dark:border-gray-800 my-1">
 
                 <!-- Botón Cerrar Sesión seguro -->
                 <form method="POST" action="{% url 'logout' %}">
                     {% csrf_token %}
                     <button 
                         type="submit" 
-                        class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold transition cursor-pointer"
+                        class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold transition cursor-pointer"
                     >
                         <span class="material-symbols-outlined text-[18px]">
                             logout

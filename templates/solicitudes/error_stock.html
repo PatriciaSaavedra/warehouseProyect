@@ -2,15 +2,15 @@
 
 {% block content %}
 
-<div class="bg-red-100 border border-red-400 text-red-700 p-6 rounded-xl">
+<div class="bg-red-100 dark:bg-red-950/20 border border-red-400 dark:border-red-900/30 text-red-700 dark:text-red-400 p-6 rounded-xl">
 
     <h2 class="text-2xl font-bold mb-4">
         Stock insuficiente
     </h2>
 
-    <p>
+    <p class="text-sm">
         El material:
-        <strong>{{ material.nombre }}</strong>
+        <strong class="dark:text-white">{{ material.nombre }}</strong>
         no tiene suficiente stock.
     </p>
 

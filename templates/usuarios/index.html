@@ -8,17 +8,17 @@ Usuarios
 
 <div class="max-w-7xl mx-auto">
 
-    <!-- HEADER -->
+    <!-- HEADER (Textos adaptables) -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
 
         <div>
-            <h1 class="text-3xl font-bold text-gray-800">
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100">
                 Usuarios
             </h1>
-            <p class="text-gray-500 mt-1">
+            <p class="text-gray-500 dark:text-gray-400 mt-1">
                 Administración de usuarios del sistema
             </p>
-            <p class="text-sm text-gray-400 mt-1">
+            <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">
                 Total registrados: {{ page_obj.paginator.count }}
             </p>
         </div>
@@ -27,8 +27,6 @@ Usuarios
             <a
                 href="{% url 'crear_usuario' %}"
                 class="btn-primary px-5 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 w-full sm:w-auto"
-                shadow-md hover:shadow-lg transition-all duration-200
-                flex items-center justify-center gap-2 w-full sm:w-auto"
             >
                 <span class="material-symbols-outlined">
                     person_add
@@ -39,15 +37,15 @@ Usuarios
 
     </div>
 
-    <!-- MENSAJES -->
+    <!-- MENSAJES (Alertas adaptadas para que no deslumbren en modo oscuro) -->
     {% if messages %}
         <div class="space-y-3 mb-6">
             {% for message in messages %}
                 <div class="px-4 py-3 rounded-2xl border flex items-center gap-3
                     {% if message.tags == 'success' %}
-                        bg-green-50 border-green-200 text-green-700
+                        bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30 text-green-700 dark:text-green-400
                     {% else %}
-                        bg-red-50 border-red-200 text-red-700
+                        bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400
                     {% endif %}
                 ">
                     <span class="material-symbols-outlined">
@@ -65,22 +63,22 @@ Usuarios
         </div>
     {% endif %}
 
-    <!-- CARD -->
-    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+    <!-- CARD (Reemplazada por nuestra clase dinámica .card) -->
+    <div class="card overflow-hidden">
 
-        <!-- TABLE HEADER -->
-        <div class="px-6 py-5 border-b border-gray-100">
+        <!-- TABLE HEADER (Bordes adaptables) -->
+        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
-                    <h2 class="font-semibold text-gray-800 text-lg">
+                    <h2 class="font-semibold text-gray-800 dark:text-gray-100 text-lg">
                         Lista de Usuarios
                     </h2>
-                    <p class="text-sm text-gray-500 mt-0.5">
+                    <p class="text-sm text-gray-500 dark:text-gray-450 mt-0.5">
                         {{ page_obj.paginator.count }} usuarios encontrados
                     </p>
                 </div>
 
-                <!-- FORMULARIO DE BÚSQUEDA OPTIMIZADO -->
+                <!-- FORMULARIO DE BÚSQUEDA OPTIMIZADO (Inputs y botones legibles) -->
                 <form method="GET" action="." class="w-full lg:w-auto">
                     <div class="relative flex items-center">
                         
@@ -88,7 +86,7 @@ Usuarios
                         <button 
                             type="submit" 
                             title="Buscar"
-                            class="absolute left-3 text-gray-400 hover:text-red-900 transition flex items-center justify-center cursor-pointer"
+                            class="absolute left-3 text-gray-400 hover:text-red-900 dark:hover:text-red-400 transition flex items-center justify-center cursor-pointer"
                         >
                             <span class="material-symbols-outlined text-[22px]">
                                 search
@@ -100,7 +98,7 @@ Usuarios
                             name="q"
                             value="{{ query|default:'' }}"
                             placeholder="Buscar usuario..."
-                            class="w-full lg:w-80 pl-10 pr-10 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 transition text-sm"
+                            class="w-full lg:w-80 pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-700 rounded-2xl bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 transition text-sm"
                             style="--tw-ring-color: var(--primary);">
 
                         <!-- Botón para limpiar los parámetros de búsqueda y ver toda la lista -->
@@ -108,7 +106,7 @@ Usuarios
                             <a 
                                 href="?" 
                                 title="Limpiar búsqueda"
-                                class="absolute right-3 text-gray-400 hover:text-red-800 transition flex items-center justify-center"
+                                class="absolute right-3 text-gray-400 hover:text-red-800 dark:hover:text-red-400 transition flex items-center justify-center"
                             >
                                 <span class="material-symbols-outlined text-[20px]">
                                     close
@@ -124,8 +122,8 @@ Usuarios
         <!-- TABLE -->
         <div class="overflow-x-auto">
             <table class="w-full min-w-[800px]">
-                <thead class="bg-gray-50">
-                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                <thead class="bg-gray-50 dark:bg-slate-900/50">
+                    <tr class="text-left text-xs text-gray-505 dark:text-gray-400 uppercase tracking-wider">
                         <th class="px-6 py-4 font-semibold">Usuario</th>
                         <th class="px-6 py-4 font-semibold">Unidad</th>
                         <th class="px-6 py-4 font-semibold">Registro</th>
@@ -136,15 +134,16 @@ Usuarios
                     </tr>
                 </thead>
 
-                <tbody class="divide-y divide-gray-100">
+                <!-- Filas adaptables con hover sutil para evitar destellos -->
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     {% for usuario in page_obj %}
-                    <tr class="hover:bg-gray-50/50 transition duration-150">
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
 
                         <!-- USER -->
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center gap-4">
                                 <div class="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm tracking-wider"
-                                style="background-color: rgba(197,160,89,.20); color: var(--primary);">
+                                style="background-color: rgba(197,160,89,.20); color: var(--gold);">
                                     {% if usuario.first_name or usuario.last_name %}
                                         {{ usuario.first_name|slice:":1"|upper }}{{ usuario.last_name|slice:":1"|upper }}
                                     {% else %}
@@ -152,21 +151,21 @@ Usuarios
                                     {% endif %}
                                 </div>
                                 <div>
-                                    <p class="font-semibold text-gray-800">
+                                    <p class="font-semibold text-gray-800 dark:text-gray-200">
                                         {% if usuario.first_name or usuario.last_name %}
                                             {{ usuario.first_name }} {{ usuario.last_name }}
                                         {% else %}
                                             {{ usuario.username }}
                                         {% endif %}
                                     </p>
-                                    <p class="text-xs text-gray-500">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
                                         @{{ usuario.username }}
                                     </p>
                                 </div>
                             </div>
                         </td>
 
-                        <!-- UNIDAD -->
+                        <!-- UNIDAD (Badge de oro dinámico) -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <span class="badge-gold px-3 py-1 rounded-full text-xs font-medium">
                                 {% if usuario.perfilusuario and usuario.perfilusuario.unidad %}
@@ -179,20 +178,20 @@ Usuarios
 
                         <!-- REGISTRO -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <p class="font-medium text-gray-800">
+                            <p class="font-medium text-gray-800 dark:text-gray-200">
                                 {{ usuario.date_joined|date:"d/m/Y" }}
                             </p>
-                            <p class="text-xs text-gray-400">
+                            <p class="text-xs text-gray-400 dark:text-gray-500">
                                 {{ usuario.date_joined|date:"H:i" }}
                             </p>
                         </td>
 
                         <!-- EMAIL -->
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                             {% if usuario.email %}
                                 {{ usuario.email }}
                             {% else %}
-                                <span class="text-gray-400 italic text-xs">Sin correo</span>
+                                <span class="text-gray-400 dark:text-gray-500 italic text-xs">Sin correo</span>
                             {% endif %}
                         </td>
 
@@ -207,30 +206,29 @@ Usuarios
                             </span>
                         </td>
 
-                        <!-- ESTADO -->
+                        <!-- ESTADO (Indicadores activo/inactivo traslúcidos) -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             {% if usuario.is_active %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400">
                                     Activo
                                 </span>
                             {% else %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700">
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400">
                                     Inactivo
                                 </span>
                             {% endif %}
                         </td>
 
-                        <!-- ACTIONS -->
+                        <!-- ACTIONS (Bordes y hovers de botones de acción optimizados) -->
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
                             <div class="flex items-center justify-end gap-2">
                                 <!-- EDIT -->
                                 <a
                                     title="Editar usuario"
                                     href="{% url 'editar_usuario' usuario.id %}"
-                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center transition"
+                                    class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-blue-50 dark:hover:bg-blue-950/25 hover:border-blue-200 dark:hover:border-blue-900/40 flex items-center justify-center transition"
                                 >
-                                    <span class="material-symbols-outlined text-[20px]"
-                                    style="color: var(--info);" hover:bg-blue-50>
+                                    <span class="material-symbols-outlined text-[20px]" style="color: var(--info);">
                                         edit
                                     </span>
                                 </a>
@@ -239,10 +237,9 @@ Usuarios
                                 <a
                                     title="Restablecer contraseña"
                                     href="{% url 'reset_password' usuario.id %}"
-                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-yellow-50 hover:border-yellow-200 flex items-center justify-center transition"
+                                    class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-yellow-50 dark:hover:bg-amber-950/25 hover:border-yellow-200 dark:hover:border-amber-900/40 flex items-center justify-center transition"
                                 >
-                                    <span class="material-symbols-outlined text-[20px]"
-                                    style="color: var(--gold);">
+                                    <span class="material-symbols-outlined text-[20px]" style="color: var(--gold);">
                                         lock_reset
                                     </span>
                                 </a>
@@ -252,10 +249,9 @@ Usuarios
                                     title="Cambiar estado"
                                     href="{% url 'toggle_usuario' usuario.id %}"
                                     onclick="return confirm('¿Deseas cambiar el estado del usuario {{ usuario.username }}?')"
-                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition"
+                                    class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-red-50 dark:hover:bg-red-950/25 hover:border-red-200 dark:hover:border-red-900/40 flex items-center justify-center transition"
                                 >
-                                    <span class="material-symbols-outlined text-[20px]"
-                                    style="color: var(--primary);">
+                                    <span class="material-symbols-outlined text-[20px]" style="color: var(--primary);">
                                         {% if usuario.is_active %}
                                             block
                                         {% else %}
@@ -272,7 +268,7 @@ Usuarios
 
                     <tr>
                         <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2 block">
                                 group_off
                             </span>
                             {% if query %}
@@ -288,10 +284,10 @@ Usuarios
             </table>
         </div>
 
-        <!-- PAGINATION (Ubicada de manera segura fuera de la sección scrollable) -->
+        <!-- PAGINATION (Adaptada para coincidir con la base oscura de la tarjeta) -->
         {% if page_obj.paginator.num_pages > 1 %}
-            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-white">
-                <p class="text-sm text-gray-500">
+            <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-slate-900/20">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
                     Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
                 </p>
 
@@ -299,12 +295,12 @@ Usuarios
                     {% if page_obj.has_previous %}
                         <a
                             href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}"
-                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium"
+                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition font-medium"
                         >
                             Anterior
                         </a>
                     {% else %}
-                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 text-gray-300 cursor-not-allowed">
+                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 dark:border-gray-800 text-gray-300 dark:text-gray-600 cursor-not-allowed">
                             Anterior
                         </span>
                     {% endif %}
@@ -312,12 +308,12 @@ Usuarios
                     {% if page_obj.has_next %}
                         <a
                             href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}"
-                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium"
+                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition font-medium"
                         >
                             Siguiente
                         </a>
                     {% else %}
-                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 text-gray-300 cursor-not-allowed">
+                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 dark:border-gray-800 text-gray-300 dark:text-gray-600 cursor-not-allowed">
                             Siguiente
                         </span>
                     {% endif %}

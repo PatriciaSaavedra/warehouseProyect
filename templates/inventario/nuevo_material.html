@@ -8,13 +8,13 @@ Nuevo Material
 
 <div class="max-w-4xl mx-auto">
 
-    <!-- CABECERA -->
+    <!-- CABECERA (Textos adaptables) -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                 Nuevo Material
             </h1>
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Registre un nuevo subartículo. El material se guardará en limpio para establecer su saldo inicial después.
             </p>
         </div>
@@ -22,7 +22,7 @@ Nuevo Material
         <!-- Botón Volver -->
         <a
             href="{% url 'inventario' %}"
-            class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
+            class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
         >
             <span class="material-symbols-outlined text-[18px]">
                 arrow_back
@@ -31,9 +31,9 @@ Nuevo Material
         </a>
     </div>
 
-    <!-- MENSAJES DE ERROR -->
+    <!-- MENSAJES DE ERROR (Alerta adaptable) -->
     {% if error %}
-    <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-center gap-3">
+    <div class="mb-6 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400 px-5 py-4 rounded-2xl flex items-center gap-3">
         <span class="material-symbols-outlined text-[22px]">
             error
         </span>
@@ -43,7 +43,7 @@ Nuevo Material
     </div>
     {% endif %}
 
-    <!-- FORMULARIO DE CREACIÓN -->
+    <!-- FORMULARIO DE CREACIÓN (Usa la clase .card dinámica) -->
     <form method="POST" class="card p-8 shadow-sm">
         {% csrf_token %}
 
@@ -51,13 +51,13 @@ Nuevo Material
 
             <!-- NOMBRE -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                     Nombre <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
                     type="text"
                     name="nombre"
-                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                     placeholder="Ej. Bolígrafo negro"
                     required
                 >
@@ -65,18 +65,18 @@ Nuevo Material
 
             <!-- PARTIDA PRESUPUESTARIA -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                     Partida Presupuestaria <span class="text-[#8b0000]">*</span>
                 </label>
                 <div class="relative">
                     <select
                         name="partida"
-                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                        class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150 appearance-none pr-10"
                         required
                     >
-                        <option value="">Seleccione una partida</option>
+                        <option value="" class="dark:bg-[#151010]">Seleccione una partida</option>
                         {% for partida in partidas %}
-                            <option value="{{ partida.id }}">
+                            <option value="{{ partida.id }}" class="dark:bg-[#151010]">
                                 {{ partida.codigo }} - {{ partida.nombre }}
                             </option>
                         {% endfor %}
@@ -89,12 +89,12 @@ Nuevo Material
 
         <!-- DESCRIPCION -->
         <div class="mt-6">
-            <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                 Descripción
             </label>
             <textarea
                 name="descripcion"
-                class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                 rows="4"
                 placeholder="Escriba los detalles o especificaciones técnicas del subartículo..."
             ></textarea>
@@ -104,18 +104,18 @@ Nuevo Material
 
             <!-- UNIDAD DE MEDIDA -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                     Unidad de Medida <span class="text-[#8b0000]">*</span>
                 </label>
                 <div class="relative">
                     <select
                         name="unidad_medida_fk"
-                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                        class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150 appearance-none pr-10"
                         required
                     >
-                        <option value="">Seleccione una unidad</option>
+                        <option value="" class="dark:bg-[#151010]">Seleccione una unidad</option>
                         {% for unidad in unidades %}
-                            <option value="{{ unidad.id }}">
+                            <option value="{{ unidad.id }}" class="dark:bg-[#151010]">
                                 {{ unidad.codigo }} - {{ unidad.nombre }}
                             </option>
                         {% endfor %}
@@ -126,14 +126,14 @@ Nuevo Material
 
             <!-- STOCK MINIMO -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                     Stock Mínimo <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
                     type="number"
                     name="stock_minimo"
                     min="0"
-                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                     placeholder="0"
                     required
                 >
@@ -141,12 +141,12 @@ Nuevo Material
 
         </div>
 
-        <!-- ACCIONES -->
-        <div class="mt-8 pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+        <!-- ACCIONES (Botones e interfaz con bordes dinámicos) -->
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
             
             <a
                 href="{% url 'inventario' %}"
-                class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition"
+                class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition"
             >
                 Cancelar
             </a>

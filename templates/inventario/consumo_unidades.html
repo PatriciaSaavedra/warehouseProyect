@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %} Consumo por Unidades {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Consumo por Unidad Organizacional</h1>
+            <p class="text-sm text-gray-500 mt-1">Informe histórico de materiales retirados y presupuesto ejecutado por unidad [28].</p>
+        </div>
+        <a href="{% url 'inventario' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+        </a>
+    </div>
+
+    <div class="card overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[800px]">
+                <thead class="bg-gray-50 border-b border-gray-100">
+                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 font-semibold">Unidad Organizacional Destinataria</th>
+                        <th class="px-6 py-4 font-semibold text-center w-48">Cantidad de Materiales Solicitados</th>
+                        <th class="px-6 py-4 font-semibold text-right pr-12 w-64">Presupuesto Ejecutado (Bs.)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for item in datos_consumo %}
+                    <tr class="hover:bg-gray-50/50 transition duration-150">
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-700">
+                            {{ item.unidad.nombre }}
+                            {% if item.unidad.codigo_sigep %}
+                                <span class="text-xs text-gray-400 font-normal ml-2">({{ item.unidad.codigo_sigep }})</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-center text-sm font-bold text-gray-800">{{ item.total_items }} u.</td>
+                        <td class="px-6 py-4 text-right pr-12 text-sm font-black text-gray-800">{{ item.total_monto|floatformat:2 }} Bs.</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="px-6 py-12 text-center text-gray-500">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">bar_chart</span>
+                            No se han registrado despachos ni consumos de materiales a las unidades organizacionales aún.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

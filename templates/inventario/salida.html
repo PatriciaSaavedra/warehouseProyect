@@ -78,7 +78,28 @@ Salida de Inventario
                     {% endfor %}
                 </select>
             </div>
-
+            <!-- UNIDAD DESTINO -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2" for="unidad-destino-select">
+                    Unidad Organizacional Destinataria <span class="text-[#8b0000]">*</span>
+                </label>
+                <div class="relative">
+                    <select
+                        id="unidad-destino-select"
+                        name="unidad_destino"
+                        required
+                        class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300 transition-all duration-200 appearance-none bg-white pr-10"
+                    >
+                        <option value="">Seleccione la unidad o secretaría solicitante</option>
+                        {% for uni in unidades %}
+                            <option value="{{ uni.id }}">{{ uni.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                        keyboard_arrow_down
+                    </span>
+                </div>
+            </div>
             <!-- CANTIDAD -->
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-gray-700 mb-2" for="cantidad-input">

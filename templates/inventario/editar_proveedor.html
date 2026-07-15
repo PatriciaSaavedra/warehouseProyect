@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %} Editar Proveedor {% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Editar Proveedor</h1>
+            <p class="text-sm text-gray-500 mt-1">Modifique los datos informativos del proveedor seleccionado.</p>
+        </div>
+        <a href="{% url 'proveedores_list' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-red-50 text-red-700 border-red-200 mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="card p-8 shadow-sm space-y-6">
+        {% csrf_token %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">NIT <span class="text-[#8b0000]">*</span></label>
+                <input type="text" name="nit" value="{{ proveedor.nit }}" class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition" required>
+            </div>
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">Razón Social <span class="text-[#8b0000]">*</span></label>
+                <input type="text" name="razon_social" value="{{ proveedor.razon_social }}" class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition" required>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">Teléfono</label>
+                <input type="text" name="telefono" value="{{ proveedor.telefono|default:'' }}" class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+            </div>
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">Dirección</label>
+                <input type="text" name="direccion" value="{{ proveedor.direccion|default:'' }}" class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+            </div>
+        </div>
+        <div class="pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'proveedores_list' %}" class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer"><span class="material-symbols-outlined text-[18px]">save</span> Guardar Cambios</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

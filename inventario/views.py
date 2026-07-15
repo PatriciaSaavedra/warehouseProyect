@@ -4,6 +4,12 @@ from django.contrib import messages
 from django.db import transaction
 from django.http import HttpResponse
 from decimal import Decimal
+from django.db.models import Sum
+from django.utils.dateparse import parse_date
+import datetime
+
+from auditoria.models import Bitacora
+from organizacion.models import UnidadOrganizacional
 
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
@@ -11,7 +17,8 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, landscape
 
 from usuarios.decorators import rol_requerido
-from auditoria.models import Bitacora
+from .services import registrar_salida_valorada_peps
+
 from .models import (
     Material,
     MovimientoInventario,
@@ -39,6 +46,7 @@ def inventario_view(request):
             'materiales': materiales
         }
     )
+
 @login_required
 @rol_requerido([
     'ALMACENERO',
@@ -46,46 +54,153 @@ def inventario_view(request):
     'ADMINISTRADOR'
 ])
 def reporte_inventario(request):
+    """
+    Genera el reporte de Inventario Físico Valorado tabular (Inciso e / Pág. 10 del Manual) [28].
+    Permite filtrar por rango de fechas mediante parámetros GET.
+    """
+    # 1. Obtener rango de fechas (Por defecto, gestión actual: 2026)
+    desde_str = request.GET.get('desde')
+    hasta_str = request.GET.get('hasta')
 
+    # Convertir o usar valores por defecto para la gestión de almacén
+    if desde_str:
+        desde = parse_date(desde_str)
+    else:
+        desde = datetime.date(2026, 1, 1)
+
+    if hasta_str:
+        hasta = parse_date(hasta_str)
+    else:
+        hasta = datetime.date(2026, 12, 31)
+
+    # 2. Consultar catálogo ordenado por código correlativo
+    materiales = Material.objects.all().order_by('codigo')
+
+    # Encabezados de doble nivel reglamentarios
+    headers_1 = ['Código', 'Descripción del Material', 'Unid.', 'Saldo Inicial / Apertura', '', 'Entradas del Periodo', '', 'Salidas del Periodo', '', 'Saldos de Cierre', '']
+    headers_2 = ['', '', '', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)']
+
+    data = [headers_1, headers_2]
+
+    # 3. Procesar matemáticamente los saldos físicos y monetarios por período
+    for mat in materiales:
+        # A. SALDOS ANTES de la fecha de inicio (Saldo Inicial acumulado)
+        mov_previos = MovimientoInventario.objects.filter(material=mat, fecha__date__lt=desde)
+        ini_cant = 0
+        ini_val = Decimal('0.00')
+        for m in mov_previos:
+            if m.tipo == 'ENTRADA':
+                ini_cant += m.cantidad
+                ini_val += m.costo_total
+            else:
+                ini_cant -= m.cantidad
+                ini_val -= m.costo_total
+
+        # B. MOVIMIENTOS DENTRO del rango de fechas
+        mov_periodo = MovimientoInventario.objects.filter(material=mat, fecha__date__range=[desde, hasta])
+        ent_cant = 0
+        ent_val = Decimal('0.00')
+        sal_cant = 0
+        sal_val = Decimal('0.00')
+        for m in mov_periodo:
+            if m.tipo == 'ENTRADA':
+                ent_cant += m.cantidad
+                ent_val += m.costo_total
+            else:
+                sal_cant += m.cantidad
+                sal_val += m.costo_total
+
+        # C. CÁLCULO DE SALDOS DE CIERRE
+        fin_cant = ini_cant + ent_cant - sal_cant
+        fin_val = ini_val + ent_val - sal_val
+
+        # Añadir fila al reporte tabular
+        data.append([
+            mat.codigo,
+            mat.nombre[:35], # Truncado preventivo para evitar desbordes en celdas
+            mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
+            str(ini_cant),
+            f"{ini_val:.2f}",
+            str(ent_cant),
+            f"{ent_val:.2f}",
+            str(sal_cant),
+            f"{sal_val:.2f}",
+            str(fin_cant),
+            f"{fin_val:.2f}"
+        ])
+
+    # 4. Configurar el flujo de salida en PDF
     response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="inventario_fisico_valorado_{desde}_{hasta}.pdf"'
 
-    response['Content-Disposition'] = (
-        'attachment; filename="inventario.pdf"'
-    )
+    # Tamaño carta en orientación apaisada (Landscape): 792 x 612 pt
+    pdf = canvas.Canvas(response, pagesize=landscape(letter))
+    width, height = landscape(letter)
 
-    pdf = canvas.Canvas(response)
-
-    # TITULO
-
+    # 5. Dibujar títulos y metadatos de cabecera
     pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(50, height - 50, "INVENTARIO FÍSICO VALORADO DE ALMACENES")
+    
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(50, height - 75, f"Gobierno Autónomo Departamental de Potosí")
+    pdf.drawString(50, height - 90, f"Período de Evaluación: Desde {desde.strftime('%d/%m/%Y')} hasta {hasta.strftime('%d/%m/%Y')}")
 
-    pdf.drawString(
-        200,
-        800,
-        "REPORTE DE INVENTARIO"
-    )
+    # 6. Configurar la Tabla con ReportLab
+    # Ajuste de anchos para sumar 692pt en total (Dejando 50pt de margen lateral izquierdo y derecho)
+    col_widths = [65, 142, 35, 45, 60, 45, 60, 45, 60, 45, 65]
+    t = Table(data, colWidths=col_widths)
 
-    # DATOS
+    # Estilos tabulares de ReportLab conformes al manual institucional de AGETIC (Pág 10)
+    t_style = TableStyle([
+        # Unión de cabeceras de doble nivel
+        ('SPAN', (0, 0), (0, 1)),  # Código
+        ('SPAN', (1, 0), (1, 1)),  # Descripción
+        ('SPAN', (2, 0), (2, 1)),  # Unidad
+        ('SPAN', (3, 0), (4, 0)),  # Saldo Inicial
+        ('SPAN', (5, 0), (6, 0)),  # Entradas
+        ('SPAN', (7, 0), (8, 0)),  # Salidas
+        ('SPAN', (9, 0), (10, 0)), # Saldo Cierre
 
-    materiales = Material.objects.all()
+        # Alineación y estilos de texto
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 2), (1, -1), 'LEFT'),  # Nombres de materiales a la izquierda
+        ('ALIGN', (4, 2), (4, -1), 'RIGHT'), # Importes alineados a la derecha
+        ('ALIGN', (6, 2), (6, -1), 'RIGHT'),
+        ('ALIGN', (8, 2), (8, -1), 'RIGHT'),
+        ('ALIGN', (10, 2), (10, -1), 'RIGHT'),
 
-    y = 750
+        # Fuentes y colores de cabecera
+        ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 1), 8),
+        ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
 
-    pdf.setFont("Helvetica", 12)
+        # Bordes y cuadrícula suave de auditoría
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
+        ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
 
-    for material in materiales:
+        # Fuentes del contenido
+        ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 2), (-1, -1), 7.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+    ])
 
-        texto = (
-            f"{material.codigo} | "
-            f"{material.nombre} | "
-            f"Stock: {material.stock_actual}"
-        )
+    t.setStyle(t_style)
 
-        pdf.drawString(50, y, texto)
-
-        y -= 25
+    # Calcular y pintar la tabla en el canvas
+    table_height = len(data) * 16  # Aproximadamente 16pt por fila
+    t.wrapOn(pdf, 50, height - 120 - table_height)
+    t.drawOn(pdf, 50, height - 120 - table_height)
 
     pdf.save()
+
+    # Registrar en bitácora
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Inventario',
+        accion='Exportar Inventario Valorado',
+        descripcion=f'Se exportó el reporte de Inventario Físico Valorado desde {desde} hasta {hasta}.'
+    )
 
     return response
 @login_required
@@ -393,6 +508,7 @@ def entrada_inventario(request):
                         material=material,
                         tipo='ENTRADA',
                         cantidad=cant,
+                        saldo_disponible_lote=cant,
                         costo_unitario=p_uni,
                         costo_total=p_tot,
                         stock_anterior=stock_anterior,
@@ -426,74 +542,131 @@ def entrada_inventario(request):
     )
 
 @login_required
-@rol_requerido([
-    'ALMACENERO',
-    'ADMINISTRADOR'
-])
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def salida_inventario(request):
-
-    materiales = Material.objects.all()
-
+    materiales = Material.objects.filter(stock_actual__gt=0)
+    unidades = UnidadOrganizacional.objects.all().order_by('nombre')  # <-- OBTENER UNIDADES
+    material_preseleccionado = request.GET.get('material')
+    
     if request.method == 'POST':
-
         material_id = request.POST.get('material')
+        cantidad = int(request.POST.get('cantidad', 0))
+        referencia = request.POST.get('referencia', '').strip()
+        unidad_destino_id = request.POST.get('unidad_destino')  # <-- CAPTURAR UNIDAD
 
-        cantidad = int(
-            request.POST.get('cantidad')
-        )
+        if not material_id or not unidad_destino_id or cantidad <= 0:
+            messages.error(request, 'Debe completar todos los campos obligatorios.')
+            return redirect('salida_inventario')
 
-        referencia = request.POST.get(
-            'referencia'
-        )
-
-        material = Material.objects.get(
-            id=material_id
-        )
-
-        # VALIDAR STOCK
+        material = get_object_or_404(Material, id=material_id)
+        unidad_destino = get_object_or_404(UnidadOrganizacional, id=unidad_destino_id)
 
         if cantidad > material.stock_actual:
+            messages.error(request, 'No existe stock suficiente disponible para este despacho.')
+            return redirect('salida_inventario')
 
-            return render(
-                request,
-                'inventario/salida.html',
-                {
-                    'materiales': materiales,
-                    'error': 'Stock insuficiente.'
-                }
+        try:
+            # Procesar el egreso valorado PEPS asociándolo a la unidad destino
+            registrar_salida_valorada_peps(
+                material=material,
+                cantidad_salida=cantidad,
+                tipo_movimiento='SALIDA',
+                referencia=referencia,
+                usuario=request.user,
+                unidad_destino=unidad_destino  # <-- ENVIAR AL SERVICIO
             )
 
-        # DESCONTAR STOCK
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Inventario',
+                accion='Registrar Salida de Material',
+                descripcion=f'Despacho de {cantidad} u. de {material.nombre} a la unidad: {unidad_destino.nombre}. Ref: {referencia}'
+            )
 
-        material.stock_actual -= cantidad
+            messages.success(request, f'Salida de {cantidad} unidades a {unidad_destino.nombre} procesada correctamente.')
+            return redirect('inventario')
 
-        material.save()
-
-        # REGISTRAR MOVIMIENTO
-
-        MovimientoInventario.objects.create(
-
-            material=material,
-
-            tipo='SALIDA',
-
-            cantidad=cantidad,
-
-            referencia=referencia,
-
-            usuario=request.user
-
-        )
-
-        return redirect('inventario')
+        except Exception as e:
+            messages.error(request, f'Error al procesar la salida PEPS: {str(e)}')
+            return redirect('salida_inventario')
 
     return render(
         request,
         'inventario/salida.html',
         {
-            'materiales': materiales
+            'materiales': materiales,
+            'unidades': unidades,  # <-- ENVIAR A LA PLANTILLA
+            'material_preseleccionado': material_preseleccionado
         }
     )
+
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def registrar_baja(request):
+    """
+    Registra pérdidas, mermas o vencimientos de stock respaldados por informe técnico (Inciso m del RE-SABS) [28].
+    Aplica el algoritmo de costeo PEPS para registrar financieramente la baja en el Kardex [28].
+    """
+    # Filtramos para mostrar únicamente materiales que posean existencias físicas en el almacén
+    materiales = Material.objects.filter(stock_actual__gt=0).order_by('codigo')
+    material_preseleccionado = request.GET.get('material')
+
+    if request.method == 'POST':
+        material_id = request.POST.get('material')
+        cantidad = int(request.POST.get('cantidad', 0))
+        motivo = request.POST.get('motivo', '').strip()  # Ej: Vencimiento / Caducidad, Rotura / Daño Físico...
+        referencia = request.POST.get('referencia', '').strip()  # Ej: Informe Técnico o Resolución
+
+        # Validación de campos obligatorios
+        if not material_id or not motivo or not referencia:
+            messages.error(request, 'Todos los campos son obligatorios.')
+            return redirect('registrar_baja')
+
+        material = get_object_or_404(Material, id=material_id)
+
+        # Validación de límites de stock físico
+        if cantidad <= 0:
+            messages.error(request, 'La cantidad de baja debe ser mayor a cero.')
+            return redirect('registrar_baja')
+
+        if cantidad > material.stock_actual:
+            messages.error(request, 'No puede dar de baja una cantidad superior al stock actual disponible en almacén.')
+            return redirect('registrar_baja')
+
+        try:
+            # Procesar el egreso valorado mediante el algoritmo PEPS (FIFO)
+            registrar_salida_valorada_peps(
+                material=material,
+                cantidad_salida=cantidad,
+                tipo_movimiento='BAJA',
+                referencia=f"BAJA: {motivo} ({referencia})",
+                usuario=request.user
+            )
+
+            # Registrar la auditoría transaccional correspondiente en la Bitácora
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Inventario',
+                accion='Registrar Baja de Almacén',
+                descripcion=f'Baja de {cantidad} u. de {material.nombre} por motivo de {motivo}. Ref: {referencia}'
+            )
+
+            messages.success(request, f'Baja de {cantidad} unidades de {material.nombre} procesada correctamente.')
+            return redirect('inventario')
+
+        except Exception as e:
+            messages.error(request, f'Ocurrió un error al procesar la baja de material: {str(e)}')
+            return redirect('registrar_baja')
+
+    return render(
+        request,
+        'inventario/baja.html',
+        {
+            'materiales': materiales,
+            'material_preseleccionado': material_preseleccionado
+        }
+    )
+
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def nuevo_material(request):
@@ -611,6 +784,7 @@ def establecer_saldo_inicial(request, id):
                     material=material,
                     tipo='ENTRADA',
                     cantidad=cantidad,
+                    saldo_disponible_lote=cantidad,
                     costo_unitario=costo_unitario,
                     costo_total=costo_total,
                     stock_anterior=stock_anterior,
@@ -717,67 +891,49 @@ def eliminar_material(request, id):
     return redirect('inventario')
 
 @login_required
-@rol_requerido([
-    'ALMACENERO',
-    'ADMINISTRADOR'
-])
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def salida_inventario(request):
-    
     materiales = Material.objects.all()
     material_preseleccionado = request.GET.get('material')
+    
     if request.method == 'POST':
-
         material_id = request.POST.get('material')
+        cantidad = int(request.POST.get('cantidad', 0))
+        referencia = request.POST.get('referencia', '').strip()
 
-        cantidad = int(
-            request.POST.get('cantidad')
-        )
+        material = get_object_or_404(Material, id=material_id)
 
-        referencia = request.POST.get(
-            'referencia'
-        )
-
-        material = Material.objects.get(
-            id=material_id
-        )
+        if cantidad <= 0:
+            messages.error(request, 'La cantidad de salida debe ser mayor a cero.')
+            return redirect('salida_inventario')
 
         if cantidad > material.stock_actual:
+            messages.error(request, 'Stock insuficiente disponible.')
+            return redirect('salida_inventario')
 
-            return render(
-                request,
-                'inventario/salida.html',
-                {
-                    'materiales': materiales,
-                    'error': (
-                        'Stock insuficiente'
-                    )
-                }
+        try:
+            # Consumir lotes de manera cronológica usando PEPS (FIFO)
+            registrar_salida_valorada_peps(
+                material=material,
+                cantidad_salida=cantidad,
+                tipo_movimiento='SALIDA',
+                referencia=referencia,
+                usuario=request.user
             )
 
-        stock_anterior = material.stock_actual
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Inventario',
+                accion='Registrar Salida de Material',
+                descripcion=f'Despacho de {cantidad} u. de {material.nombre}. Ref: {referencia}'
+            )
 
-        material.stock_actual -= cantidad
+            messages.success(request, f'Salida de {cantidad} unidades registrada correctamente.')
+            return redirect('inventario')
 
-        material.save()
-
-        MovimientoInventario.objects.create(
-
-            material=material,
-
-            tipo='SALIDA',
-
-            cantidad=cantidad,
-
-            stock_anterior=stock_anterior,
-
-            stock_resultante=material.stock_actual,
-
-            referencia=referencia,
-
-            usuario=request.user
-        )
-
-        return redirect('inventario')
+        except Exception as e:
+            messages.error(request, f'Error al procesar la salida PEPS: {str(e)}')
+            return redirect('salida_inventario')
 
     return render(
         request,
@@ -785,5 +941,140 @@ def salida_inventario(request):
         {
             'materiales': materiales,
             'material_preseleccionado': material_preseleccionado
+        }
+    )
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def proveedores_list(request):
+    """
+    Lista todos los proveedores registrados en el sistema.
+    """
+    proveedores = Proveedor.objects.all().order_by('razon_social')
+    return render(
+        request, 
+        'inventario/proveedores_list.html', 
+        {'proveedores': proveedores}
+    )
+
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def crear_proveedor(request):
+    """
+    Registra un nuevo proveedor en la base de datos.
+    """
+    if request.method == 'POST':
+        nit = request.POST.get('nit', '').strip()
+        razon_social = request.POST.get('razon_social', '').strip()
+        telefono = request.POST.get('telefono', '').strip()
+        direccion = request.POST.get('direccion', '').strip()
+
+        if not nit or not razon_social:
+            messages.error(request, 'El NIT y la Razón Social son campos obligatorios.')
+            return redirect('crear_proveedor')
+
+        if Proveedor.objects.filter(nit=nit).exists():
+            messages.error(request, 'Ya existe un proveedor registrado con este NIT.')
+            return redirect('crear_proveedor')
+
+        try:
+            with transaction.atomic():
+                Proveedor.objects.create(
+                    nit=nit,
+                    razon_social=razon_social,
+                    telefono=telefono if telefono else None,
+                    direccion=direccion if direccion else None
+                )
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Registrar Proveedor',
+                    descripcion=f'Se registró al proveedor: {razon_social} (NIT: {nit})'
+                )
+
+            messages.success(request, 'Proveedor registrado correctamente.')
+            return redirect('proveedores_list')
+
+        except Exception as e:
+            messages.error(request, f'Error al registrar el proveedor: {str(e)}')
+            return redirect('crear_proveedor')
+
+    return render(request, 'inventario/crear_proveedor.html')
+
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def editar_proveedor(request, id):
+    """
+    Modifica la información de un proveedor.
+    """
+    proveedor = get_object_or_404(Proveedor, id=id)
+
+    if request.method == 'POST':
+        nit = request.POST.get('nit', '').strip()
+        razon_social = request.POST.get('razon_social', '').strip()
+
+        if not nit or not razon_social:
+            messages.error(request, 'El NIT y la Razón Social son campos obligatorios.')
+            return redirect('editar_proveedor', id=id)
+
+        # Validar NIT duplicado excluyendo al proveedor actual
+        if Proveedor.objects.filter(nit=nit).exclude(id=id).exists():
+            messages.error(request, 'El NIT ingresado ya pertenece a otro proveedor.')
+            return redirect('editar_proveedor', id=id)
+
+        try:
+            with transaction.atomic():
+                proveedor.nit = nit
+                proveedor.razon_social = razon_social
+                proveedor.telefono = request.POST.get('telefono', '').strip() or None
+                proveedor.direccion = request.POST.get('direccion', '').strip() or None
+                proveedor.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Editar Proveedor',
+                    descripcion=f'Se modificaron los datos del proveedor: {razon_social}'
+                )
+
+            messages.success(request, 'Proveedor actualizado correctamente.')
+            return redirect('proveedores_list')
+
+        except Exception as e:
+            messages.error(request, f'Error al actualizar el proveedor: {str(e)}')
+            return redirect('editar_proveedor', id=id)
+
+    return render(request, 'inventario/editar_proveedor.html', {'proveedor': proveedor})
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+def reporte_consumo_unidades(request):
+    """
+    Muestra la lista de consumos y costos acumulados clasificados por Unidad Organizacional (Inciso g) [28].
+    """
+    unidades = UnidadOrganizacional.objects.all().order_by('nombre')
+    datos_consumo = []
+
+    for unidad in unidades:
+        # Filtrar solo salidas valoradas asociadas a esta unidad
+        movimientos_unidad = MovimientoInventario.objects.filter(
+            unidad_destino=unidad,
+            tipo='SALIDA'
+        )
+
+        total_items = movimientos_unidad.aggregate(Sum('cantidad'))['cantidad__sum'] or 0
+        total_monto = movimientos_unidad.aggregate(Sum('costo_total'))['costo_total__sum'] or Decimal('0.00')
+
+        if total_items > 0:  # Mostrar únicamente unidades con consumos registrados
+            datos_consumo.append({
+                'unidad': unidad,
+                'total_items': total_items,
+                'total_monto': total_monto
+            })
+
+    return render(
+        request,
+        'inventario/consumo_unidades.html',
+        {
+            'datos_consumo': datos_consumo
         }
     )

@@ -8,20 +8,20 @@ Registrar Entrada
 
 <div class="max-w-6xl mx-auto">
 
-    <!-- CABECERA -->
+    <!-- CABECERA (Textos adaptables) -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                 Nueva Nota de Ingreso
             </h1>
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Registre la adquisición y entrada formal de múltiples materiales al almacén.
             </p>
         </div>
         
         <a
             href="{% url 'inventario' %}"
-            class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
+            class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
         >
             <span class="material-symbols-outlined text-[18px]">
                 arrow_back
@@ -30,11 +30,11 @@ Registrar Entrada
         </a>
     </div>
 
-    <!-- MENSAJES DE ERROR -->
+    <!-- MENSAJES DE ERROR (Alerta adaptable) -->
     {% if messages %}
         <div class="mb-6">
             {% for message in messages %}
-                <div class="p-4 rounded-2xl text-sm border bg-red-50 text-red-700 border-red-200 mb-2">
+                <div class="p-4 rounded-2xl text-sm border bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/30 mb-2">
                     {{ message }}
                 </div>
             {% endfor %}
@@ -47,30 +47,30 @@ Registrar Entrada
 
         <!-- SECCIÓN 1: METADATOS DE CABECERA -->
         <div class="card p-8 shadow-sm">
-            <h2 class="text-lg font-bold text-gray-800 font-['Outfit'] mb-6 flex items-center gap-2">
-                <span class="material-symbols-outlined text-gray-500 text-[22px]">description</span>
+            <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-6 flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[22px]">description</span>
                 Datos de Respaldo e Ingreso
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                <!-- PROVEEDOR -->
+                <!-- PROVEEDOR (Selector adaptable) -->
                 <div>
-                    <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Proveedor <span class="text-[#8b0000]">*</span>
                     </label>
                     <div class="relative">
                         <select
                             name="proveedor"
-                            class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150 appearance-none pr-10"
                             required
                         >
-                            <option value="">Seleccione un proveedor</option>
+                            <option value="" class="dark:bg-[#151010]">Seleccione un proveedor</option>
                             {% for prov in proveedores %}
-                                <option value="{{ prov.id }}">{{ prov.razon_social }} (NIT: {{ prov.nit }})</option>
+                                <option value="{{ prov.id }}" class="dark:bg-[#151010]">{{ prov.razon_social }} (NIT: {{ prov.nit }})</option>
                             {% endfor %}
                         </select>
-                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
                             keyboard_arrow_down
                         </span>
                     </div>
@@ -78,52 +78,52 @@ Registrar Entrada
 
                 <!-- FECHA DE INGRESO -->
                 <div>
-                    <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Fecha de Recepción <span class="text-[#8b0000]">*</span>
                     </label>
                     <input
                         type="date"
                         name="fecha"
-                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                        class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                         required
                     >
                 </div>
 
                 <!-- COMPROBANTE C-31 SIGEP -->
                 <div>
-                    <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Nro. de C-31 (SIGEP)
                     </label>
                     <input
                         type="text"
                         name="c31"
-                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                        class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                         placeholder="Ej. 104-A"
                     >
                 </div>
 
                 <!-- NRO DE FACTURA -->
                 <div>
-                    <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Nro. de Factura
                     </label>
                     <input
                         type="text"
                         name="factura"
-                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                        class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                         placeholder="Ej. 5566"
                     >
                 </div>
 
                 <!-- NOTA DE ENTREGA -->
                 <div>
-                    <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Nota de Entrega / Remisión
                     </label>
                     <input
                         type="text"
                         name="nota_entrega"
-                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                        class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
                         placeholder="Ej. NE-2200"
                     >
                 </div>
@@ -136,7 +136,7 @@ Registrar Entrada
                         name="reingreso"
                         class="w-5 h-5 accent-[#8b0000] rounded-xl focus:ring-0 cursor-pointer"
                     >
-                    <label for="reingreso" class="text-sm font-bold text-gray-700 font-['Outfit'] cursor-pointer select-none">
+                    <label for="reingreso" class="text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit'] cursor-pointer select-none">
                         ¿Es un Reingreso por Devolución?
                     </label>
                 </div>
@@ -146,15 +146,16 @@ Registrar Entrada
 
         <!-- SECCIÓN 2: DETALLE MULTI-ÍTEM DE MATERIALES -->
         <div class="card overflow-hidden shadow-sm">
-            <div class="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h2 class="text-lg font-bold text-gray-800 font-['Outfit'] flex items-center gap-2">
-                    <span class="material-symbols-outlined text-gray-500 text-[22px]">inventory</span>
+            <div class="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/40">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
+                    <span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[22px]">inventory</span>
                     Materiales a Adquirir
                 </h2>
+                <!-- Botón de adición con colores adaptados -->
                 <button
                     type="button"
                     id="btn-agregar-fila"
-                    class="border border-green-200 bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    class="border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                 >
                     <span class="material-symbols-outlined text-[16px]">add</span>
                     Agregar Fila
@@ -163,8 +164,8 @@ Registrar Entrada
 
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[800px]" id="tabla-materiales">
-                    <thead class="bg-gray-100 border-b border-gray-200">
-                        <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                    <thead class="bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800">
+                        <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             <th class="px-6 py-4 font-semibold">Material / Subartículo</th>
                             <th class="px-6 py-4 font-semibold text-center w-36">Cantidad</th>
                             <th class="px-6 py-4 font-semibold text-right w-44">P. Unitario (Bs.)</th>
@@ -172,16 +173,16 @@ Registrar Entrada
                             <th class="px-6 py-4 font-semibold text-center w-20"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100" id="tbody-materiales">
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800" id="tbody-materiales">
                         <!-- Las filas dinámicas se insertarán aquí por JavaScript -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- TOTALIZADOR GENERAL -->
-            <div class="p-6 bg-gray-50/50 border-t border-gray-100 flex justify-end items-center gap-4 pr-12">
-                <span class="text-sm font-bold text-gray-500 uppercase tracking-wider font-['Outfit']">Total Nota:</span>
-                <span class="text-2xl font-black text-gray-800"><span id="lbl-total-general">0.00</span> Bs.</span>
+            <!-- TOTALIZADOR GENERAL (Bordes e indicador adaptable) -->
+            <div class="p-6 bg-gray-50/50 dark:bg-slate-900/30 border-t border-gray-100 dark:border-gray-800 flex justify-end items-center gap-4 pr-12">
+                <span class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider font-['Outfit']">Total Nota:</span>
+                <span class="text-2xl font-black text-gray-800 dark:text-gray-100"><span id="lbl-total-general">0.00</span> Bs.</span>
             </div>
         </div>
 
@@ -189,7 +190,7 @@ Registrar Entrada
         <div class="flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
             <a
                 href="{% url 'inventario' %}"
-                class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition"
+                class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition"
             >
                 Cancelar
             </a>
@@ -208,25 +209,25 @@ Registrar Entrada
 
 </div>
 
-<!-- TEMPLATE FILA (Se clona mediante JS) -->
+<!-- TEMPLATE FILA (Adaptado con las clases dinámicas 'dark:' para que JavaScript lo clone con los estilos Warm Dark) -->
 <template id="fila-template">
-    <tr class="fila-material hover:bg-gray-50/50 transition duration-150">
+    <tr class="fila-material hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
         <!-- MATERIAL SELECT -->
         <td class="px-6 py-3">
             <div class="relative">
                 <select
                     name="material_id[]"
-                    class="select-material w-full border border-gray-300 rounded-2xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none bg-white pr-10"
+                    class="select-material w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10"
                     required
                 >
-                    <option value="">Seleccione un material</option>
+                    <option value="" class="dark:bg-[#151010]">Seleccione un material</option>
                     {% for mat in materiales %}
-                        <option value="{{ mat.id }}">
+                        <option value="{{ mat.id }}" class="dark:bg-[#151010]">
                             {{ mat.codigo }} - {{ mat.nombre }} (Stock: {{ mat.stock_actual }})
                         </option>
                     {% endfor %}
                 </select>
-                <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-lg">
+                <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none text-lg">
                     keyboard_arrow_down
                 </span>
             </div>
@@ -239,7 +240,7 @@ Registrar Entrada
                 name="cantidad[]"
                 min="1"
                 value="1"
-                class="input-cantidad w-full border border-gray-300 rounded-2xl p-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                class="input-cantidad w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
                 required
             >
         </td>
@@ -252,13 +253,13 @@ Registrar Entrada
                 min="0"
                 step="0.01"
                 value="0.00"
-                class="input-precio w-full border border-gray-300 rounded-2xl p-2.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                class="input-precio w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-2.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
                 required
             >
         </td>
 
         <!-- TOTAL POR FILA -->
-        <td class="px-6 py-3 text-right text-sm font-bold text-gray-700">
+        <td class="px-6 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-200">
             <span class="lbl-subtotal">0.00</span> Bs.
         </td>
 
@@ -266,7 +267,7 @@ Registrar Entrada
         <td class="px-6 py-3 text-center">
             <button
                 type="button"
-                class="btn-quitar-fila text-red-500 hover:text-red-700 transition"
+                class="btn-quitar-fila text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition"
                 title="Quitar material"
             >
                 <span class="material-symbols-outlined">delete</span>
@@ -303,11 +304,9 @@ Registrar Entrada
             const clon = template.content.cloneNode(true);
             const nuevaFila = clon.querySelector('.fila-material');
 
-            // Asignar escuchas de eventos a los inputs de la nueva fila
             nuevaFila.querySelector('.input-cantidad').addEventListener('input', calcularTotales);
             nuevaFila.querySelector('.input-precio').addEventListener('input', calcularTotales);
 
-            // Botón de eliminar
             nuevaFila.querySelector('.btn-quitar-fila').addEventListener('click', function() {
                 nuevaFila.remove();
                 calcularTotales();
@@ -319,7 +318,6 @@ Registrar Entrada
 
         btnAgregar.addEventListener('click', agregarNuevaFila);
 
-        // Insertar la primera fila vacía al cargar la página para guiar al usuario
         agregarNuevaFila();
     });
 </script>

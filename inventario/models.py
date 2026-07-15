@@ -73,7 +73,18 @@ class MovimientoInventario(models.Model):
     referencia = models.CharField(max_length=100)
     fecha = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-
+    saldo_disponible_lote = models.IntegerField(
+        default=0, 
+        help_text="Solo para ENTRADAS: Cantidad remanente de este lote para el costeo PEPS"
+    )
+    unidad_destino = models.ForeignKey(
+        'organizacion.UnidadOrganizacional',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='consumos',
+        help_text="Unidad organizacional de la Gobernación que consumió el material"
+    )
     def __str__(self):
         return f"{self.tipo} - {self.material.nombre} ({self.cantidad})"
 

@@ -8,12 +8,12 @@ Dashboard
 
 <div class="max-w-7xl mx-auto">
 
-    <!-- CABECERA -->
+    <!-- CABECERA (Textos adaptables) -->
     <div class="mb-8">
-        <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+        <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
             Dashboard General
         </h1>
-        <p class="text-sm text-gray-500 mt-1">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Resumen estadístico, alertas de stock e historial de transacciones de almacén
         </p>
     </div>
@@ -24,10 +24,10 @@ Dashboard
         <!-- MATERIALES -->
         <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                     Materiales
                 </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 font-['Outfit']">
+                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
                     {{ total_materiales|default:0 }}
                 </h2>
             </div>
@@ -38,17 +38,17 @@ Dashboard
             </div>
         </div>
 
-        <!-- SOLICITUDES -->
+        <!-- SOLICITUDES (Badge verde adaptable) -->
         <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                     Solicitudes
                 </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 font-['Outfit']">
+                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
                     {{ total_solicitudes|default:0 }}
                 </h2>
             </div>
-            <div class="w-14 h-14 rounded-2xl bg-green-50 text-green-700 flex items-center justify-center shadow-inner">
+            <div class="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 flex items-center justify-center shadow-inner">
                 <span class="material-symbols-outlined text-[28px]">
                     description
                 </span>
@@ -58,10 +58,10 @@ Dashboard
         <!-- PENDIENTES -->
         <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                     Pendientes
                 </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 font-['Outfit']">
+                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
                     {{ solicitudes_pendientes|default:0 }}
                 </h2>
             </div>
@@ -75,10 +75,10 @@ Dashboard
         <!-- MOVIMIENTOS -->
         <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                     Movimientos
                 </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 font-['Outfit']">
+                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
                     {{ total_movimientos|default:0 }}
                 </h2>
             </div>
@@ -91,14 +91,14 @@ Dashboard
 
     </div>
 
-    <!-- ALERTAS DE STOCK -->
+    <!-- ALERTAS DE STOCK (Indicadores y advertencias adaptadas) -->
     <div class="card p-6 mb-8 shadow-sm">
         
         <div class="flex items-center gap-3 mb-6">
-            <span class="material-symbols-outlined text-[#8b0000] text-3xl">
+            <span class="material-symbols-outlined text-[#8b0000] dark:text-red-500 text-3xl">
                 warning
             </span>
-            <h2 class="text-2xl font-extrabold text-gray-800 font-['Outfit']">
+            <h2 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                 Alertas de Stock Mínimo
             </h2>
         </div>
@@ -106,26 +106,26 @@ Dashboard
         {% if materiales_bajos %}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {% for material in materiales_bajos %}
-                <div class="border border-red-200 rounded-2xl p-4 flex justify-between items-center bg-red-50/50">
+                <div class="border border-red-200 dark:border-red-900/30 rounded-2xl p-4 flex justify-between items-center bg-red-50/50 dark:bg-red-950/20">
                     <div>
-                        <h3 class="font-bold text-gray-800 text-base">
+                        <h3 class="font-bold text-gray-800 dark:text-gray-100 text-base">
                             {{ material.nombre }}
                         </h3>
-                        <p class="text-sm text-gray-600 mt-1">
-                            Stock actual: <span class="font-bold text-red-700">{{ material.stock_actual }}</span>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                            Stock actual: <span class="font-bold text-red-700 dark:text-red-400">{{ material.stock_actual }}</span>
                         </p>
-                        <p class="text-xs text-gray-400 mt-0.5">
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                             Stock mínimo: {{ material.stock_minimo }}
                         </p>
                     </div>
-                    <span class="bg-red-100 text-[#8b0000] border border-red-200 px-3 py-1.5 rounded-full text-xs font-bold">
+                    <span class="bg-red-100 dark:bg-red-950/30 text-[#8b0000] dark:text-red-400 border border-red-200 dark:border-red-900/30 px-3 py-1.5 rounded-full text-xs font-bold">
                         Bajo Stock
                     </span>
                 </div>
                 {% endfor %}
             </div>
         {% else %}
-            <div class="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3 text-green-700">
+            <div class="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30 rounded-2xl p-4 flex items-center gap-3 text-green-700 dark:text-green-400">
                 <span class="material-symbols-outlined">
                     check_circle
                 </span>
@@ -140,13 +140,13 @@ Dashboard
     <!-- GRÁFICO DE BARRAS Y ACTIVIDAD RECIENTE -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <!-- PANEL DEL GRÁFICO (Chart.js) -->
+        <!-- PANEL DEL GRÁFICO -->
         <div class="card p-6 shadow-sm flex flex-col">
             <div class="mb-6">
-                <h2 class="text-2xl font-extrabold text-gray-800 font-['Outfit']">
+                <h2 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                     Movimientos de Inventario
                 </h2>
-                <p class="text-xs text-gray-400 mt-0.5">
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                     Relación de flujo entre entradas y salidas registradas
                 </p>
             </div>
@@ -156,28 +156,28 @@ Dashboard
             </div>
         </div>
 
-        <!-- PANEL DE ACTIVIDAD RECIENTE -->
+        <!-- PANEL DE ACTIVIDAD RECIENTE (Flujos con bordes y hovers sutiles) -->
         <div class="card p-6 shadow-sm flex flex-col">
             <div class="mb-6">
-                <h2 class="text-2xl font-extrabold text-gray-800 font-['Outfit']">
+                <h2 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                     Actividad Reciente
                 </h2>
-                <p class="text-xs text-gray-400 mt-0.5">
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                     Últimas operaciones realizadas en el inventario
                 </p>
             </div>
 
             <div class="space-y-1 overflow-y-auto max-h-[320px] pr-2">
                 {% for movimiento in movimientos_recientes %}
-                <div class="flex justify-between items-center py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition px-2 rounded-xl">
+                <div class="flex justify-between items-center py-3.5 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition px-2 rounded-xl">
                     <div class="flex items-center gap-3">
                         
                         <!-- Icono e indicador de dirección del flujo de material -->
                         <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner
                             {% if movimiento.tipo == 'Entrada' %}
-                                bg-green-50 text-green-700
+                                bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400
                             {% else %}
-                                bg-red-50 text-red-700
+                                bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400
                             {% endif %}">
                             <span class="material-symbols-outlined text-[20px] font-bold">
                                 {% if movimiento.tipo == 'Entrada' %}
@@ -189,22 +189,22 @@ Dashboard
                         </div>
                         
                         <div>
-                            <h3 class="font-bold text-gray-800 text-sm">
+                            <h3 class="font-bold text-gray-800 dark:text-gray-100 text-sm">
                                 {{ movimiento.material.nombre }}
                             </h3>
-                            <p class="text-xs text-gray-500 mt-0.5">
-                                {{ movimiento.tipo }} — <span class="font-bold text-gray-700">{{ movimiento.cantidad }}</span> unidades
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {{ movimiento.tipo }} — <span class="font-bold text-gray-700 dark:text-gray-300">{{ movimiento.cantidad }}</span> unidades
                             </p>
                         </div>
                     </div>
 
-                    <span class="text-[11px] text-gray-400 font-semibold uppercase">
+                    <span class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase">
                         {{ movimiento.fecha|date:"d/m H:i"|default:movimiento.fecha }}
                     </span>
                 </div>
                 {% empty %}
-                <div class="text-center py-12 text-gray-400 text-sm">
-                    <span class="material-symbols-outlined text-4xl text-gray-300 block mb-2">
+                <div class="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">
+                    <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 block mb-2">
                         history
                     </span>
                     No se han registrado movimientos recientemente.
@@ -217,25 +217,34 @@ Dashboard
 
 </div>
 
-<!-- CONFIGURACIÓN GRÁFICA DE CHART.JS -->
+<!-- CONFIGURACIÓN GRÁFICA INTELIGENTE DE CHART.JS -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const ctx = document.getElementById('movimientosChart');
     if (ctx) {
+        // Detectar si el modo oscuro está activo para optimizar los colores del gráfico
+        const isDark = document.documentElement.classList.contains('dark');
+        const gridColor = isDark ? '#241919' : '#f3f4f6';
+        const labelColor = isDark ? '#dec396' : '#4b5563'; 
+        const tickColor = isDark ? '#8c7e7a' : '#9ca3af'; 
+
         new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: ['Entradas', 'Salidas'],
                 datasets: [{
                     label: 'Cantidad de Movimientos',
-                    data: [12, 7], // Puedes usar etiquetas de Django si las variables están listas (ej: [{{ total_entradas }}, {{ total_salidas }}])
-                    backgroundColor: [
-                        'rgba(139, 0, 0, 0.85)',   // Rojo institucional (#8b0000)
-                        'rgba(217, 119, 6, 0.85)'   // Naranja/Ámbar institucional (#d97706)
+                    data: [12, 7], // Django context data (ej: [{{ total_entradas }}, {{ total_salidas }}])
+                    backgroundColor: isDark ? [
+                        'rgba(139, 0, 0, 0.65)',   // Rojo institucional translúcido
+                        'rgba(217, 119, 6, 0.65)'   // Ámbar institucional translúcido
+                    ] : [
+                        'rgba(139, 0, 0, 0.85)',
+                        'rgba(217, 119, 6, 0.85)'
                     ],
                     borderColor: [
-                        '#700000',
-                        '#c06705'
+                        '#8b0000',
+                        '#d97706'
                     ],
                     borderWidth: 1,
                     borderRadius: 12, // Esquinas curvas modernas en las barras
@@ -247,17 +256,17 @@ document.addEventListener("DOMContentLoaded", function() {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: false // Oculta la leyenda al ser sólo dos columnas claras
+                        display: false 
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
                         grid: {
-                            color: '#f3f4f6' // Líneas de grilla muy sutiles
+                            color: gridColor // Línea de grilla adaptada
                         },
                         ticks: {
-                            color: '#9ca3af',
+                            color: tickColor,
                             font: {
                                 family: 'Inter',
                                 size: 11
@@ -266,10 +275,10 @@ document.addEventListener("DOMContentLoaded", function() {
                     },
                     x: {
                         grid: {
-                            display: false // Sin grilla vertical para un diseño más limpio
+                            display: false 
                         },
                         ticks: {
-                            color: '#4b5563',
+                            color: labelColor,
                             font: {
                                 family: 'Outfit',
                                 weight: 'bold',

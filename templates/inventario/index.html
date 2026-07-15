@@ -8,21 +8,21 @@ Inventario
 
 <div class="max-w-7xl mx-auto">
 
-    <!-- CABECERA -->
+    <!-- CABECERA (Textos adaptados) -->
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6 mb-8">
     
         <!-- TÍTULO Y DESCRIPCIÓN -->
         <div class="min-w-0">
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                 Inventario
             </h1>
-            <p class="text-sm text-gray-500 mt-1 max-w-xl">
+            <p class="text-sm text-gray-505 dark:text-gray-400 mt-1 max-w-xl">
                 Monitoreo, control de stock y catálogo de materiales disponibles en almacén
             </p>
         </div>
 
-        <!-- GRUPO DE BOTONES DE ACCIÓN MEJORADO (Con protección de roles) -->
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 w-full lg:w-auto lg:min-w-[800px]">    
+        <!-- GRUPO DE BOTONES DE ACCIÓN (Bordes, fondos y textos adaptables) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[640px]">    
             
             {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                 <!-- Nuevo Material -->
@@ -47,10 +47,10 @@ Inventario
                     <span>Nueva Entrada</span>
                 </a>
 
-                <!-- Nueva Salida -->
+                <!-- Nueva Salida (Adaptación roja de salida) -->
                 <a
                     href="{% url 'salida_inventario' %}"
-                    class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+                    class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
                 >
                     <span class="material-symbols-outlined text-[18px]">
                         logout
@@ -58,14 +58,13 @@ Inventario
                     <span>Nueva Salida</span>
                 </a>
             {% else %}
-                <!-- Espacio de relleno si el usuario no es administrativo para mantener alineación -->
-                <div class="hidden lg:block lg:col-span-3"></div>
+                <div class="hidden lg:block lg:col-span-2"></div>
             {% endif %}
 
             <!-- Movimientos -->
             <a
                 href="{% url 'movimientos' %}"
-                class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+                class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
             >
                 <span class="material-symbols-outlined text-[18px]">
                     swap_horiz
@@ -73,26 +72,73 @@ Inventario
                 <span>Movimientos</span>
             </a>
 
-            <!-- Exportar PDF -->
-            <a
-                href="{% url 'reporte_inventario' %}"
-                class="border border-red-200 bg-red-50 hover:bg-red-100 text-[#8b0000] px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-            >
-                <span class="material-symbols-outlined text-[18px]">
-                    picture_as_pdf
-                </span>
-                <span>Exportar PDF</span>
-            </a>
+            {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                <!-- Proveedores -->
+                <a
+                    href="{% url 'proveedores_list' %}"
+                    class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
+                >
+                    <span class="material-symbols-outlined text-[18px]">
+                        local_shipping
+                    </span>
+                    <span>Proveedores</span>
+                </a>
+            {% endif %}
 
         </div>
 
+    </div>
+
+    <!-- SECCIÓN DE FILTRADO Y EXPORTACIÓN (Simplificado para usar tu clase .card adaptable) -->
+    <div class="card p-6 mb-8 rounded-2xl">
+        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit'] mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-gray-500 dark:text-gray-450">date_range</span>
+            Exportación de Inventario Físico Valorado
+        </h3>
+        
+        <form method="GET" action="{% url 'reporte_inventario' %}" target="_blank" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <!-- Fecha de Inicio (Adaptación de inputs nativos) -->
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha de Inicio</label>
+                <input 
+                    type="date" 
+                    name="desde" 
+                    value="2026-01-01" 
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                    required
+                >
+            </div>
+
+            <!-- Fecha de Cierre -->
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha de Fin</label>
+                <input 
+                    type="date" 
+                    name="hasta" 
+                    value="2026-12-31" 
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                    required
+                >
+            </div>
+
+            <!-- Botón de Envío PDF (Adaptación roja traslúcida) -->
+            <div>
+                <button 
+                    type="submit" 
+                    class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-[#8b0000] dark:text-red-400 px-6 py-3 rounded-2xl text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full h-[48px]"
+                >
+                    <span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                    <span>Generar Inventario Valorado</span>
+                </button>
+            </div>
+        </form>
     </div>
 
     <!-- MENSAJES DE ALERTA -->
     {% if messages %}
         <div class="mb-6">
             {% for message in messages %}
-                <div class="p-4 rounded-2xl text-sm border {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %} mb-2">
+                <div class="p-4 rounded-2xl text-sm border {% if message.tags == 'error' %}bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/30{% else %}bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30{% endif %} mb-2">
                     {{ message }}
                 </div>
             {% endfor %}
@@ -101,12 +147,10 @@ Inventario
 
     <!-- CARD PRINCIPAL DE LA TABLA -->
     <div class="card overflow-hidden">
-
-        <!-- CONTENEDOR CON SCROLL RESPONSIVO -->
         <div class="overflow-x-auto">
             <table class="w-full min-w-[950px]">
-                <thead class="bg-gray-50 border-b border-gray-100">
-                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                <thead class="bg-gray-50 dark:bg-slate-900/50 border-b border-gray-100 dark:border-gray-800">
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         <th class="px-6 py-4 font-semibold">Código</th>
                         <th class="px-6 py-4 font-semibold">Partida Presupuestaria</th>
                         <th class="px-6 py-4 font-semibold">Material</th>
@@ -117,154 +161,72 @@ Inventario
                         <th class="px-6 py-4 font-semibold text-right pr-8">Acciones</th>
                     </tr>
                 </thead>
-
-                <tbody class="divide-y divide-gray-100">
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     {% for material in materiales %}
-                    <tr class="hover:bg-gray-50/50 transition duration-150">
-
-                        <!-- CÓDIGO -->
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
-                            {{ material.codigo }}
-                        </td>
-
-                        <!-- PARTIDA PRESUPUESTARIA -->
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800 dark:text-gray-200">{{ material.codigo }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold badge-info">
-                                {{ material.partida.codigo }}
-                            </span>
-                            <div class="text-[11px] text-gray-400 mt-1 font-medium max-w-[200px] truncate" title="{{ material.partida.nombre }}">
-                                {{ material.partida.nombre }}
-                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold badge-info">{{ material.partida.codigo }}</span>
+                            <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-1 font-medium max-w-[200px] truncate" title="{{ material.partida.nombre }}">{{ material.partida.nombre }}</div>
                         </td>
-
-                        <!-- NOMBRE MATERIAL -->
-                        <td class="px-6 py-4 text-sm font-medium text-gray-700">
-                            {{ material.nombre }}
-                        </td>
-
-                        <!-- UNIDAD DE MEDIDA -->
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {{ material.unidad_medida_fk.codigo }}
-                        </td>
-
-                        <!-- STOCK ACTUAL -->
-                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-gray-800">
-                            {{ material.stock_actual }}
-                        </td>
-
-                        <!-- STOCK MÍNIMO -->
-                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
-                            {{ material.stock_minimo }}
-                        </td>
-
-                        <!-- ESTADO -->
+                        <td class="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-200">{{ material.nombre }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{{ material.unidad_medida_fk.codigo }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-gray-800 dark:text-gray-155">{{ material.stock_actual }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500 dark:text-gray-400">{{ material.stock_minimo }}</td>
+                        
+                        <!-- ESTADOS DE STOCK (Adaptación estética de badges) -->
                         <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                             {% if material.stock_actual == 0 %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
-                                    Agotado
-                                </span>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30">Agotado</span>
                             {% elif material.stock_actual <= material.stock_minimo %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-[#d97706] border border-amber-200">
-                                    Bajo Stock
-                                </span>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-[#d97706] dark:text-amber-500 border border-amber-200 dark:border-amber-900/30">Bajo Stock</span>
                             {% else %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                                    Disponible
-                                </span>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30">Disponible</span>
                             {% endif %}
                         </td>
-
-                        <!-- ACCIONES -->
+                        
+                        <!-- BOTONES DE ACCIÓN (Bordes, fondos y colores de hover adaptados) -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
                             <div class="flex items-center justify-end gap-2">
-                                
-                                <!-- ESTABLECER SALDO INICIAL (Condicional para Almacenero/Admin y si no posee movimientos) -->
                                 {% if not material.tiene_movimientos %}
                                     {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                        <a
-                                            title="Establecer Saldo Inicial"
-                                            href="{% url 'establecer_saldo_inicial' material.id %}"
-                                            class="w-9 h-9 rounded-xl border border-green-200 bg-green-50 hover:bg-green-100 flex items-center justify-center transition"
-                                        >
-                                            <span class="material-symbols-outlined text-green-700 text-[20px]">
-                                                input
-                                            </span>
+                                        <a title="Establecer Saldo Inicial" href="{% url 'establecer_saldo_inicial' material.id %}" class="w-9 h-9 rounded-xl border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition">
+                                            <span class="material-symbols-outlined text-green-700 dark:text-green-450 text-[20px]">input</span>
                                         </a>
                                     {% endif %}
                                 {% endif %}
-
-                                <!-- SALIDA RÁPIDA -->
                                 {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                    <a
-                                        title="Registrar salida"
-                                        href="{% url 'salida_inventario' %}?material={{ material.id }}"
-                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition"
-                                    >
-                                        <span class="material-symbols-outlined text-red-600 text-[20px]">
-                                            output
-                                        </span>
+                                    <a title="Registrar salida" href="{% url 'salida_inventario' %}?material={{ material.id }}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-red-50 dark:hover:bg-red-950/25 hover:border-red-200 dark:hover:border-red-900/40 flex items-center justify-center transition">
+                                        <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-[20px]">output</span>
                                     </a>
                                 {% endif %}
-
-                                <!-- KARDEX -->
-                                <a
-                                    title="Ver Kardex"
-                                    href="{% url 'kardex' material.id %}"
-                                    class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center transition"
-                                >
-                                    <span class="material-symbols-outlined text-blue-600 text-[20px]">
-                                        assignment
-                                    </span>
+                                <a title="Ver Kardex" href="{% url 'kardex' material.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-blue-50 dark:hover:bg-blue-950/25 hover:border-blue-200 dark:hover:border-blue-900/40 flex items-center justify-center transition">
+                                    <span class="material-symbols-outlined text-blue-600 dark:text-blue-450 text-[20px]">assignment</span>
                                 </a>
-
-                                <!-- EDITAR (Solo Almacenero y Admin) -->
                                 {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                    <a
-                                        title="Editar material"
-                                        href="{% url 'editar_material' material.id %}"
-                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 flex items-center justify-center transition"
-                                    >
-                                        <span class="material-symbols-outlined text-[#d97706] text-[20px]">
-                                            edit
-                                        </span>
+                                    <a title="Editar material" href="{% url 'editar_material' material.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-amber-50 dark:hover:bg-amber-950/25 hover:border-amber-200 dark:hover:border-amber-900/40 flex items-center justify-center transition">
+                                        <span class="material-symbols-outlined text-[#d97706] dark:text-amber-500 text-[20px]">edit</span>
                                     </a>
                                 {% endif %}
-
-                                <!-- ELIMINAR (Solo Administrador) -->
                                 {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                    <a
-                                        title="Eliminar material"
-                                        href="{% url 'eliminar_material' material.id %}"
-                                        onclick="return confirm('¿Está seguro de eliminar este material?')"
-                                        class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center transition cursor-pointer"
-                                    >
-                                        <span class="material-symbols-outlined text-red-600 text-[20px]">
-                                            delete
-                                        </span>
+                                    <a title="Eliminar material" href="{% url 'eliminar_material' material.id %}" onclick="return confirm('¿Está seguro de eliminar este material?')" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-red-50 dark:hover:bg-red-950/25 hover:border-red-200 dark:hover:border-red-900/40 flex items-center justify-center transition cursor-pointer">
+                                        <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-[20px]">delete</span>
                                     </a>
                                 {% endif %}
-
                             </div>
                         </td>
-
                     </tr>
                     {% empty %}
-
-                    <!-- ESTADO VACÍO -->
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
-                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">
-                                inventory_2
-                            </span>
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-655 mb-2 block">inventory_2</span>
                             No existen materiales registrados en el inventario.
                         </td>
                     </tr>
-
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-
     </div>
 
 </div>

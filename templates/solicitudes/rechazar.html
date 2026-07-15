@@ -10,11 +10,11 @@ Rechazar Solicitud
 
     <div class="card p-8">
 
-        <h1 class="text-2xl font-bold mb-2">
+        <h1 class="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-100">
             Rechazar Solicitud
         </h1>
 
-        <p class="text-gray-500 mb-6">
+        <p class="text-gray-505 dark:text-gray-400 mb-6">
             Solicitud: {{ solicitud.codigo }}
         </p>
 
@@ -24,45 +24,45 @@ Rechazar Solicitud
 
             <div class="mb-6">
 
-                <label class="block mb-2 font-semibold">
+                <label class="block mb-2 font-semibold text-gray-700 dark:text-gray-200">
                     Motivo de rechazo
                 </label>
 
                 <select
                     id="motivo_predefinido"
                     name="motivo_predefinido"
-                    class="w-full border rounded-xl p-3"
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-855 dark:text-gray-200 rounded-xl p-3"
                     required
                 >
-                    <option value="">
+                    <option value="" class="dark:bg-[#151010]">
                         Seleccione un motivo
                     </option>
 
-                    <option value="No existe disponibilidad presupuestaria">
+                    <option value="No existe disponibilidad presupuestaria" class="dark:bg-[#151010]">
                         No existe disponibilidad presupuestaria
                     </option>
 
-                    <option value="Material no contemplado en el POA">
+                    <option value="Material no contemplado en el POA" class="dark:bg-[#151010]">
                         Material no contemplado en el POA
                     </option>
 
-                    <option value="Cantidad solicitada excesiva">
+                    <option value="Cantidad solicitada excesiva" class="dark:bg-[#151010]">
                         Cantidad solicitada excesiva
                     </option>
 
-                    <option value="Justificación insuficiente">
+                    <option value="Justificación insuficiente" class="dark:bg-[#151010]">
                         Justificación insuficiente
                     </option>
 
-                    <option value="Solicitud duplicada">
+                    <option value="Solicitud duplicada" class="dark:bg-[#151010]">
                         Solicitud duplicada
                     </option>
 
-                    <option value="Error en los datos de la solicitud">
+                    <option value="Error en los datos de la solicitud" class="dark:bg-[#151010]">
                         Error en los datos de la solicitud
                     </option>
 
-                    <option value="OTRO">
+                    <option value="OTRO" class="dark:bg-[#151010]">
                         Otro
                     </option>
 
@@ -75,14 +75,14 @@ Rechazar Solicitud
                 class="mb-6 hidden"
             >
 
-                <label class="block mb-2 font-semibold">
+                <label class="block mb-2 font-semibold text-gray-700 dark:text-gray-200">
                     Especifique el motivo
                 </label>
 
                 <textarea
                     name="motivo_personalizado"
                     rows="4"
-                    class="w-full border rounded-xl p-3"
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3"
                 ></textarea>
 
             </div>
@@ -98,7 +98,7 @@ Rechazar Solicitud
 
                 <a
                     href="{% url 'solicitudes' %}"
-                    class="border px-5 py-2 rounded-xl"
+                    class="border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 px-5 py-2 rounded-xl transition font-medium"
                 >
                     Cancelar
                 </a>

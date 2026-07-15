@@ -1,11 +1,11 @@
-<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-white border-r border-gray-100 shadow-sm select-none">
+<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-white dark:bg-slate-950 border-r border-gray-100 dark:border-gray-800 shadow-sm select-none sidebar-custom transition-colors duration-200">
 
-    <!-- LOGO -->
-    <div class="p-6 flex flex-col items-center border-b border-gray-100 mb-4">
-        <h1 class="text-2xl font-extrabold text-[#8b0000] font-['Outfit'] tracking-wide">
+    <!-- LOGO (Borde dinámico para separar) -->
+    <div class="p-6 flex flex-col items-center border-b border-gray-100 dark:border-gray-800 mb-4">
+        <h1 class="text-2xl font-extrabold text-[#8b0000] dark:text-red-500 font-['Outfit'] tracking-wide">
             Almacén Central
         </h1>
-        <p class="text-[11px] font-bold text-[#d97706] uppercase tracking-widest mt-1">
+        <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-widest mt-1">
             Gestión Gubernamental
         </p>
     </div>
@@ -13,11 +13,11 @@
     <!-- MENU -->
     <nav class="flex-1 px-4 space-y-1.5 overflow-y-auto">
 
-        <!-- DASHBOARD -->
+        <!-- DASHBOARD (Efectos hover dinámicos y textos legibles en ambos modos) -->
         <a 
             href="/dashboard/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/dashboard/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/dashboard/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 dashboard
@@ -29,7 +29,7 @@
         <a 
             href="/solicitudes/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/solicitudes/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/solicitudes/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 description
@@ -37,12 +37,12 @@
             Solicitudes
         </a>
 
-<!-- INVENTARIO -->
+        <!-- INVENTARIO -->
         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'KARDISTA' %}
         <a 
             href="/inventario/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/inventario/' in request.path and '/movimientos/' not in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/inventario/' in request.path and '/movimientos/' not in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 inventory_2
@@ -56,7 +56,7 @@
         <a 
             href="{% url 'movimientos' %}"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/movimientos/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/movimientos/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 swap_horiz
@@ -64,12 +64,13 @@
             Movimientos
         </a>
         {% endif %}
+
         <!-- PRESUPUESTOS (Filtro por Rol) -->
         {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <a 
             href="/presupuestos/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/presupuestos/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/presupuestos/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 account_balance
@@ -83,7 +84,7 @@
         <a 
             href="/compras/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/compras/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/compras/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 shopping_cart
@@ -97,7 +98,7 @@
         <a 
             href="/usuarios/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/usuarios/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/usuarios/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 group
@@ -111,7 +112,7 @@
         <a 
             href="/auditoria/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/auditoria/' in request.path %}sidebar-active{% else %}text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}"
+            {% if '/auditoria/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 security
@@ -122,29 +123,29 @@
 
     </nav>
 
-    <!-- FOOTER -->
-    <div class="p-4 border-t border-gray-100 bg-gray-50/50">
+    <!-- FOOTER: Fondo y bordes oscurecidos en modo oscuro -->
+    <div class="p-4 border-t border-gray-100 dark:border-gray-850 bg-gray-50/50 dark:bg-slate-900/40">
 
-        <!-- Info del Usuario -->
+        <!-- Info del Usuario (Textos adaptables) -->
         <div class="px-4 mb-3">
-            <p class="font-bold text-gray-800 text-sm font-['Outfit'] truncate">
+            <p class="font-bold text-gray-800 dark:text-gray-100 text-sm font-['Outfit'] truncate">
                 {% if request.user.first_name or request.user.last_name %}
                     {{ request.user.first_name }} {{ request.user.last_name }}
                 {% else %}
                     {{ request.user.username }}
                 {% endif %}
             </p>
-            <p class="text-[11px] font-bold text-[#d97706] uppercase tracking-wider mt-0.5">
+            <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-wider mt-0.5">
                 {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
             </p>
         </div>
 
-        <!-- Botón Cerrar Sesión seguro -->
+        <!-- Botón Cerrar Sesión seguro (Colores de advertencia adaptables para el hover) -->
         <form method="POST" action="{% url 'logout' %}">
             {% csrf_token %}
             <button
                 type="submit"
-                class="w-full flex items-center px-4 py-3 text-red-700 hover:bg-red-50 hover:text-red-900 rounded-2xl transition duration-150 font-semibold text-sm cursor-pointer"
+                class="w-full flex items-center px-4 py-3 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-900 dark:hover:text-red-300 rounded-2xl transition duration-150 font-semibold text-sm cursor-pointer"
             >
                 <span class="material-symbols-outlined mr-3 text-[22px]">
                     logout
