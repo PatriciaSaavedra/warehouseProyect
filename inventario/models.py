@@ -139,3 +139,4 @@ class NotaIngresoDetalle(models.Model):
 
     def __str__(self):
         return f"{self.material.nombre} - Cantidad: {self.cantidad}"
+

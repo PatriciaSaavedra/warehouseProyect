@@ -1,0 +1,67 @@
+{% extends 'base.html' %} <!-- Ajusta según tu plantilla base -->
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Mi Perfil</h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="POST" action="{% url 'perfil' %}">
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre de Usuario</label>
+                                <input type="text" class="form-control" value="{{ usuario_obj.username }}" disabled>
+                                <small class="text-muted">El nombre de usuario no se puede modificar.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rol asignado</label>
+                                <input type="text" class="form-control" value="{{ perfil.rol }}" disabled>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="first_name" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ usuario_obj.first_name }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="last_name" class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ usuario_obj.last_name }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Correo Electrónico</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ usuario_obj.email }}">
+                        </div>
+
+                        {% if perfil.unidad %}
+                        <div class="mb-3">
+                            <label class="form-label">Unidad Organizacional</label>
+                            <input type="text" class="form-control" value="{{ perfil.unidad.nombre }}" disabled>
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-success">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

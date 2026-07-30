@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
+from usuarios.views import perfil_usuario_view
 
 urlpatterns = [
 
@@ -15,7 +16,6 @@ urlpatterns = [
     #     ),
     #     name='logout'
     # ),
-
     path('dashboard/', include('dashboard.urls')),
 
     path('inventario/', include('inventario.urls')),
@@ -25,7 +25,7 @@ urlpatterns = [
     path('compras/', include('compras.urls')),
 
     path('presupuestos/', include('presupuestos.urls')),
-
+    path('perfil/', perfil_usuario_view, name='perfil'),
     path('usuarios/', include('usuarios.urls')),
 
     path('auditoria/', include('auditoria.urls')),

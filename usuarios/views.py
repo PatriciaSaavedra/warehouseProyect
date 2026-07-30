@@ -230,3 +230,49 @@ def reset_password_view(request, user_id):
             'usuario_obj': usuario
         }
     )
+@login_required
+def perfil_usuario_view(request):
+    usuario = request.user
+    # Obtenemos el perfil asociado de forma segura
+    perfil = getattr(usuario, 'perfilusuario', None)
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+
+        # Validación simple de correo duplicado
+        if email and User.objects.filter(email__iexact=email).exclude(id=usuario.id).exists():
+            messages.error(request, 'El correo electrónico ya está registrado por otra cuenta.')
+            return redirect('perfil')
+
+        try:
+            with transaction.atomic():
+                usuario.first_name = first_name
+                usuario.last_name = last_name
+                usuario.email = email
+                usuario.save()
+
+                # Guardamos registro en la bitácora
+                Bitacora.objects.create(
+                    usuario=usuario,
+                    modulo='Usuarios',
+                    accion='Editar perfil propio',
+                    descripcion=f'El usuario {usuario.username} actualizó sus datos de perfil.'
+                )
+
+            messages.success(request, 'Perfil actualizado correctamente.')
+            return redirect('perfil')
+
+        except Exception:
+            messages.error(request, 'Ocurrió un error al intentar actualizar el perfil.')
+            return redirect('perfil')
+
+    return render(
+        request,
+        'usuarios/perfil.html',
+        {
+            'usuario_obj': usuario,
+            'perfil': perfil
+        }
+    )

@@ -4,6 +4,8 @@ from .views import crear_usuario_view
 from .views import editar_usuario_view
 from .views import toggle_usuario_view
 from .views import reset_password_view
+from .views import perfil_usuario_view
+
 urlpatterns = [
 
     path(
@@ -11,6 +13,8 @@ urlpatterns = [
         usuarios_view,
         name='usuarios'
     ),
+
+    path('perfil/', perfil_usuario_view, name='perfil'),
 
     path(
         'crear/',

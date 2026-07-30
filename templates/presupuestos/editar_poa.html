@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %} Editar Presupuesto POA {% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Modificar Montos POA</h1>
+            <p class="text-sm text-gray-500 mt-1">Ajuste la asignación presupuestaria o modifique el saldo disponible [28].</p>
+        </div>
+        <a href="{% url 'poa_list' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-red-50 text-red-700 border-red-200 mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- TARJETA INFORMATIVA -->
+    <div class="p-6 mb-6 bg-amber-50/50 border border-amber-100 rounded-2xl">
+        <h2 class="text-sm font-bold text-amber-800 font-['Outfit'] mb-3 flex items-center gap-2">
+            <span class="material-symbols-outlined text-amber-700 text-[20px]">info</span>
+            Asignación Actual
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+                <span class="text-gray-400 block font-semibold uppercase text-[9px] tracking-wider">Unidad Organizacional</span>
+                <span class="font-bold text-gray-700">{{ poa.unidad.nombre }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 block font-semibold uppercase text-[9px] tracking-wider">Partida Presupuestaria</span>
+                <span class="font-bold text-gray-700">{{ poa.partida.codigo }} - {{ poa.partida.nombre }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 block font-semibold uppercase text-[9px] tracking-wider">Gestión Fiscal</span>
+                <span class="font-bold text-gray-700">{{ poa.gestion }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- FORMULARIO -->
+    <form method="POST" class="card p-8 shadow-sm space-y-6">
+        {% csrf_token %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- MONTO INICIAL -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">Presupuesto de Apertura (Bs.) <span class="text-[#8b0000]">*</span></label>
+                <input type="number" name="monto_inicial" value="{{ poa.monto_inicial }}" step="0.01" min="0" class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition" required>
+            </div>
+
+            <!-- MONTO DISPONIBLE -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">Saldo Disponible (Bs.) <span class="text-[#8b0000]">*</span></label>
+                <input type="number" name="monto_disponible" value="{{ poa.monto_disponible }}" step="0.01" min="0" class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition" required>
+            </div>
+        </div>
+        <div class="pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'poa_list' %}" class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer"><span class="material-symbols-outlined text-[18px]">save</span> Guardar Cambios</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %} Techos Presupuestarios POA {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Asignación Presupuestaria POA</h1>
+            <p class="text-sm text-gray-500 mt-1">Control de techos financieros por Unidad Organizacional y Partidas de la gestión actual [28].</p>
+        </div>
+        <div class="flex gap-2 w-full sm:w-auto">
+            <a href="{% url 'crear_poa' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">add_box</span> Registrar Techo POA
+            </a>
+            <a href="{% url 'inventario' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- BUSCADOR -->
+    <form method="GET" class="mb-6 flex gap-3 max-w-lg">
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Buscar por unidad o partida..." class="w-full border border-gray-300 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+        <button type="submit" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-5 rounded-2xl text-sm font-semibold transition flex items-center justify-center">
+            <span class="material-symbols-outlined text-[20px]">search</span>
+        </button>
+    </form>
+
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-green-50 text-green-700 border-green-200 mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- TABLA DE CONTROL DEL POA -->
+    <div class="card overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[900px]">
+                <thead class="bg-gray-50 border-b border-gray-100">
+                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider font-semibold">
+                        <th class="px-6 py-4 w-28">Gestión</th>
+                        <th class="px-6 py-4">Unidad Organizacional</th>
+                        <th class="px-6 py-4 w-48 text-center">Partida</th>
+                        <th class="px-6 py-4 text-right w-44">Monto Inicial (Bs.)</th>
+                        <th class="px-6 py-4 text-right w-44">Monto Disponible (Bs.)</th>
+                        <th class="px-6 py-4 text-right pr-8 w-24">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for poa in page_obj %}
+                    <tr class="hover:bg-gray-50/50 transition duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{{ poa.gestion }}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-700">{{ poa.unidad.nombre }}</td>
+                        <td class="px-6 py-4 text-center text-sm">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold badge-info">{{ poa.partida.codigo }}</span>
+                            <div class="text-[10px] text-gray-400 mt-1 truncate max-w-[120px] mx-auto" title="{{ poa.partida.nombre }}">{{ poa.partida.nombre }}</div>
+                        </td>
+                        <td class="px-6 py-4 text-right text-sm font-bold text-gray-500">{{ poa.monto_inicial|floatformat:2 }}</td>
+                        <td class="px-6 py-4 text-right text-sm font-black text-gray-800">
+                            {% if poa.monto_disponible <= 0 %}
+                                <span class="text-red-700">{{ poa.monto_disponible|floatformat:2 }}</span>
+                            {% else %}
+                                {{ poa.monto_disponible|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
+                            <a href="{% url 'editar_poa' poa.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 inline-flex items-center justify-center transition" title="Editar Montos">
+                                <span class="material-symbols-outlined text-[#d97706] text-[20px]">edit</span>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">bar_chart</span>
+                            No se registran techos presupuestarios para el POA.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

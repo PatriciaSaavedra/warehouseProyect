@@ -15,7 +15,7 @@ Nueva Solicitud
                 Nueva Solicitud
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Completa el formulario para requerir materiales del almacén central
+                Completa el formulario para requerir materiales del almacén central [11]
             </p>
         </div>
         
@@ -32,7 +32,7 @@ Nueva Solicitud
     </div>
 
     <!-- FORMULARIO (Usando la clase .card) -->
-    <form method="POST" class="card p-8 shadow-sm">
+    <form method="POST" id="form-solicitud" class="card p-8 shadow-sm">
         {% csrf_token %}
 
         <!-- Grid principal de inputs superiores -->
@@ -65,11 +65,10 @@ Nueva Solicitud
                     <div class="col-span-12 sm:col-span-6">
                         <select
                             id="material_select"
-                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none bg-white pr-10"
                             onchange="document.getElementById('buscador_material').value = '';"
                         >
                             <option value="" class="dark:bg-[#151010]">Seleccionar material</option>
-
                             {% for material in materiales %}
                             <option 
                                 value="{{ material.id }}" 
@@ -82,14 +81,14 @@ Nueva Solicitud
                         </select>
 
                         <div class="mt-2 relative">
+                            <!-- Input buscador dinámico -->
                             <input
                                 type="text"
                                 id="buscador_material"
-                                placeholder="Buscar material..."
+                                placeholder="Buscar material o escribir nueva adquisición..."
                                 class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
                                 onkeyup="buscarMateriales()"
                             >
-
                             <div id="resultados_busqueda" class="absolute bg-white dark:bg-[#151010] w-full border border-gray-100 dark:border-gray-800 rounded-xl mt-1 shadow-lg z-50 hidden"></div>
                         </div>                        
                     </div>
@@ -105,7 +104,7 @@ Nueva Solicitud
                         >
                     </div>
 
-                    <!-- NUEVO BOTÓN DE AGREGAR -->
+                    <!-- BOTÓN DE AGREGAR -->
                     <div class="col-span-4 sm:col-span-3">
                         <button
                             type="button"
@@ -190,6 +189,7 @@ Nueva Solicitud
 
 </div>
 
+<!-- CONTROL JAVASCRIPT UNIFICADO (Sin duplicados y libre de advertencias) [28] -->
 <script>
 let carrito = {};
 
@@ -202,13 +202,39 @@ document.addEventListener('DOMContentLoaded', () => {
 function agregarMaterial() {
     const select = document.getElementById('material_select');
     const cantidadInput = document.getElementById('cantidad_input');
+    const buscador = document.getElementById('buscador_material');
 
     const materialId = select.value;
     const selectedOption = select.options[select.selectedIndex];
     const cantidad = parseInt(cantidadInput.value);
 
-    if (!materialId || !selectedOption || isNaN(cantidad) || cantidad <= 0) {
-        alert("Seleccione un material y defina una cantidad válida mayor a 0.");
+    if (isNaN(cantidad) || cantidad <= 0) {
+        alert("Defina una cantidad válida mayor a 0.");
+        return;
+    }
+
+    // --- ESCENARIO A: EL MATERIAL NO EXISTE (NUEVA ADQUISICIÓN) [28] ---
+    if (!materialId && buscador.value.trim() !== "") {
+        const nombreNoCatalogado = buscador.value.trim();
+        const tempId = "temp_" + Date.now(); // ID temporal único en milisegundos
+
+        carrito[tempId] = {
+            nombre: nombreNoCatalogado,
+            cantidad: cantidad,
+            stock: 99999, // Stock temporal ficticio alto para pasar validación de frontend
+            es_nuevo: true
+        };
+
+        renderTabla();
+        renderInputs();
+        buscador.value = '';
+        cantidadInput.value = '';
+        return;
+    }
+
+    // --- ESCENARIO B: EL MATERIAL EXISTE EN ALMACÉN ---
+    if (!materialId || !selectedOption) {
+        alert("Seleccione un material o escriba un nombre para registrar una nueva adquisición.");
         return;
     }
 
@@ -216,14 +242,14 @@ function agregarMaterial() {
     const stockActual = parseInt(selectedOption.getAttribute('data-stock')) || 0;
 
     if (cantidad > stockActual) {
-        alert(`No hay stock suficiente. Stock disponible: ${stockActual}`);
+        alert(`No hay stock suficiente para este material. Stock disponible: ${stockActual}`);
         return;
     }
 
     if (carrito[materialId]) {
         const nuevaCantidad = carrito[materialId].cantidad + cantidad;
         if (nuevaCantidad > stockActual) {
-            alert(`La cantidad total (${nuevaCantidad}) supera el stock disponible (${stockActual})`);
+            alert(`La cantidad total acumulada (${nuevaCantidad}) supera el stock disponible (${stockActual})`);
             return;
         }
         carrito[materialId].cantidad = nuevaCantidad;
@@ -231,7 +257,8 @@ function agregarMaterial() {
         carrito[materialId] = {
             nombre: materialNombre,
             cantidad: cantidad,
-            stock: stockActual
+            stock: stockActual,
+            es_nuevo: false
         };
     }
 
@@ -239,7 +266,7 @@ function agregarMaterial() {
     renderInputs();
 
     select.value = '';
-    document.getElementById('buscador_material').value = '';
+    buscador.value = '';
     cantidadInput.value = '';
 }
 
@@ -252,7 +279,7 @@ function renderTabla() {
         tabla.innerHTML = `
             <tr>
                 <td colspan="3" class="p-8 text-center text-gray-400 dark:text-gray-500 bg-transparent">
-                    No se han añadido materiales a la solicitud todavía.
+                    No se han añadido materiales a la solicitud todavía [11].
                 </td>
             </tr>
         `;
@@ -264,19 +291,22 @@ function renderTabla() {
 
         tabla.innerHTML += `
             <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
-                <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">${item.nombre}</td>
+                <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">
+                    ${item.nombre}
+                    ${item.es_nuevo ? '<span class="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30 py-0.5 px-2 rounded-full font-bold ml-2">Nueva Adquisición</span>' : ''}
+                </td>
                 <td class="p-4 text-center">
                     <input 
                         type="number"
                         value="${item.cantidad}"
                         min="1"
                         max="${item.stock}"
-                        onchange="editarCantidad(${id}, this)"
+                        onchange="editarCantidad('${id}', this)"
                         class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-20 text-center focus:ring-1 focus:ring-red-500 focus:outline-none"
                     >
                 </td>
                 <td class="p-4 text-center">
-                    <button type="button" onclick="eliminar(${id})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium transition">
+                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium transition">
                         Eliminar
                     </button>
                 </td>
@@ -292,7 +322,7 @@ function editarCantidad(id, inputElement) {
     const item = carrito[id];
     if (item) {
         if (nuevaCantidad > item.stock) {
-            alert(`No puedes solicitar más de lo disponible (${item.stock}). Se ajustará al máximo.`);
+            alert(`No puedes solicitar más de lo disponible (${item.stock}). Se ajustará al límite.`);
             nuevaCantidad = item.stock;
         }
         item.cantidad = nuevaCantidad;
@@ -309,11 +339,15 @@ function eliminar(id) {
 
 function renderInputs() {
     const contenedor = document.getElementById('inputs_ocultos');
-
     const payload = {};
 
     Object.keys(carrito).forEach(id => {
-        payload[id] = carrito[id].cantidad;
+        // Formato de payload enriquecido compatible con tu backend views.py [28]
+        payload[id] = {
+            cantidad: carrito[id].cantidad,
+            es_nuevo: carrito[id].es_nuevo,
+            nombre: carrito[id].nombre
+        };
     });
 
     contenedor.innerHTML = `
@@ -342,15 +376,20 @@ function buscarMateriales() {
                 resultados.innerHTML = '<div class="p-3 text-gray-500 dark:text-gray-400 text-sm text-center">Sin resultados</div>';
             } else {
                 data.forEach(material => {
-                    resultados.innerHTML += `
-                        <div 
-                            class="p-3 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-sm border-b border-gray-100 dark:border-gray-800 last:border-none transition duration-100"
-                            onclick="seleccionarMaterial(${material.id}, '${material.nombre}', ${material.stock_actual})"
-                        >
-                            <span class="font-medium text-gray-800 dark:text-gray-200">${material.nombre}</span>
-                            <span class="text-xs text-gray-400 dark:text-gray-500 block mt-0.5">(Stock actual: ${material.stock_actual})</span>
-                        </div>
+                    // Crear elemento div programáticamente para evitar errores de sintaxis con las comillas del linter [28]
+                    const div = document.createElement('div');
+                    div.className = "p-3 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-sm border-b border-gray-100 dark:border-gray-800 last:border-none transition duration-100";
+                    div.innerHTML = `
+                        <span class="font-medium text-gray-800 dark:text-gray-200">${material.nombre}</span>
+                        <span class="text-xs text-gray-400 dark:text-gray-500 block mt-0.5">(Stock actual: ${material.stock})</span>
                     `;
+                    
+                    // Evento clic asignado limpiamente desde Javascript nativo [28]
+                    div.addEventListener('click', function() {
+                        seleccionarMaterial(material.id, material.nombre, material.stock);
+                    });
+
+                    resultados.appendChild(div);
                 });
             }
 

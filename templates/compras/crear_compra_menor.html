@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %} Registrar Orden {% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Registrar Orden de Compra</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Genere una nueva Orden de Adquisición bajo la modalidad de Compra Menor [28].</p>
+        </div>
+        <a href="{% url 'compras_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+        </a>
+    </div>
+
+    <!-- MENSAJES DE ERROR -->
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/30 mb-2">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- ALERTA DE COMPRA ASOCIADA POR INSUFICIENCIA DE STOCK -->
+    {% if solicitud_origen %}
+        <div class="p-6 mb-6 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl">
+            <h2 class="text-sm font-bold text-amber-800 dark:text-amber-400 font-['Outfit'] mb-3 flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-700 dark:text-amber-500 text-[20px]">warning</span>
+                Adquisición por Stock Insuficiente (RPA) [28]
+            </h2>
+            <div class="text-xs text-gray-600 dark:text-gray-450 space-y-1 font-['Outfit']">
+                <p>Esta compra se origina para resolver el folio de solicitud: <strong class="text-gray-700 dark:text-gray-250">{{ solicitud_origen.codigo }}</strong></p>
+                <p>Unidad Solicitante destinataria: <strong>{{ solicitud_origen.unidad_solicitante.nombre }}</strong></p>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- FORMULARIO -->
+    <form method="POST" class="card p-8 shadow-sm space-y-6">
+        {% csrf_token %}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- PROVEEDOR -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Proveedor Adjudicado <span class="text-[#8b0000] dark:text-red-400">*</span></label>
+                <div class="relative">
+                    <select name="proveedor" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10" required>
+                        <option value="" class="dark:bg-[#151010]">Seleccione un proveedor</option>
+                        {% for prov in proveedores %}
+                            <option value="{{ prov.id }}" class="dark:bg-[#151010]">{{ prov.razon_social }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <!-- PARTIDA PRESUPUESTARIA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Partida de Gasto <span class="text-[#8b0000] dark:text-red-400">*</span></label>
+                <div class="relative">
+                    <select name="partida" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10" required>
+                        <option value="" class="dark:bg-[#151010]">Seleccione una partida</option>
+                        {% for part in partidas %}
+                            <option value="{{ part.id }}" class="dark:bg-[#151010]" {% if partida_defecto and partida_defecto.id == part.id %}selected{% endif %}>
+                                {{ part.codigo }} - {{ part.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- GESTIÓN -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Gestión Fiscal <span class="text-[#8b0000] dark:text-red-400">*</span></label>
+                <input type="number" name="gestion" value="{{ gestion_default }}" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-400 dark:text-gray-500 font-medium cursor-not-allowed select-none focus:outline-none" required readonly>
+            </div>
+
+            <!-- MONTO ADJUDICADO (Con validación dinámica para el RPA de 50.000 Bs.) -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Monto Total Adjudicado (Bs.) <span class="text-[#8b0000] dark:text-red-400">*</span></label>
+                <input type="number" name="monto_total" id="input_monto_total" step="0.01" min="0.01" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition" placeholder="0.00" required>
+                
+                <!-- Alerta dinámica SABS -->
+                <p id="alerta_limite_sabs" class="text-[10px] text-gray-400 dark:text-gray-500 mt-2 font-['Outfit'] flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">info</span>
+                    Límite máximo permitido para Contratación Menor por el RPA: <strong>50,000.00 Bs.</strong>
+                </p>
+            </div>
+        </div>
+
+        <div class="pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'compras_list' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer"><span class="material-symbols-outlined text-[18px]">save</span> Registrar Orden de Compra</button>
+        </div>
+    </form>
+</div>
+
+<!-- SCRIPT DE VALIDACIÓN DE LÍMITES SABS / RPA -->
+<script>
+    document.getElementById('input_monto_total').addEventListener('input', function() {
+        const monto = parseFloat(this.value) || 0;
+        const alerta = document.getElementById('alerta_limite_sabs');
+        
+        if (monto > 50000) {
+            this.setCustomValidity('El monto no puede superar los 50,000.00 Bs. correspondientes a la modalidad de Compra Menor.');
+            alerta.classList.remove('text-gray-400', 'dark:text-gray-500');
+            alerta.classList.add('text-red-700', 'dark:text-red-400', 'font-bold');
+            alerta.innerHTML = `<span class="material-symbols-outlined text-xs">warning</span> ¡Atención! El monto supera los 50,000 Bs. Se requiere derivación a proceso ANPE o Licitación.`;
+        } else {
+            this.setCustomValidity('');
+            alerta.classList.remove('text-red-700', 'dark:text-red-400', 'font-bold');
+            alerta.classList.add('text-gray-400', 'dark:text-gray-500');
+            alerta.innerHTML = `<span class="material-symbols-outlined text-xs">info</span> Límite máximo permitido para Contratación Menor por el RPA: <strong>50,000.00 Bs.</strong>`;
+        }
+    });
+</script>
+{% endblock %}

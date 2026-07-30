@@ -18,6 +18,7 @@ urlpatterns = [
     path('cerrar/<int:id>/', views.cerrar_solicitud, name='cerrar_solicitud'),
     path('rechazar/<int:id>/', views.rechazar_solicitud, name='rechazar_solicitud'),
     path('reabrir/<int:id>/', views.reabrir_solicitud, name='reabrir_solicitud'),
+    path('catalogar-item/<int:detalle_id>/', views.catalogar_item_pendiente, name='catalogar_item_pendiente'),
     
     # --- EXPORTACIÓN ---
     path('pdf/<int:id>/', views.solicitud_pdf, name='solicitud_pdf'),

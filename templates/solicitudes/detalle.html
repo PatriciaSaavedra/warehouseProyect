@@ -1,235 +1,348 @@
+<!-- FILE: templates/solicitudes/detalle.html (Estructura Corregida y Dinámica) -->
+
 {% extends 'base.html' %}
 
-{% block title %} Detalle de Solicitud {% endblock %}
+{% block title %} Detalle Folio {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto space-y-8">
 
     <!-- CABECERA -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
             <div class="flex items-center gap-3">
-                <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Solicitud {{ solicitud.codigo }}</h1>
-                <!-- BADGES DE ESTADO ADAPTADOS -->
+                <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Folio: {{ solicitud.codigo }}</h1>
+                <!-- BADGES DE ESTADO -->
                 {% if solicitud.estado == 'REGISTRADA' %}
-                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30">Registrada</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30 font-['Outfit']">Registrada</span>
                 {% elif solicitud.estado == 'REVISADA' %}
-                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/30">Revisada</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/30 font-['Outfit']">Revisada</span>
                 {% elif solicitud.estado == 'APROBADA' %}
-                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">Aprobada</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30 font-['Outfit']">Aprobada</span>
                 {% elif solicitud.estado == 'PREPARADA' %}
-                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30">Preparada</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30 font-['Outfit']">Preparada</span>
                 {% elif solicitud.estado == 'ENTREGADA' %}
-                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30">Entregada</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30 font-['Outfit']">Entregada</span>
                 {% elif solicitud.estado == 'CERRADA' %}
-                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">Cerrada</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 font-['Outfit']">Cerrada</span>
                 {% else %}
-                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30">Rechazada</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30 font-['Outfit']">Rechazada</span>
                 {% endif %}
             </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Consola de seguimiento, control de firmas y despacho físico-presupuestario.</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Fecha de Registro: {{ solicitud.fecha_registro|date:"d \d\e F, Y | H:i" }} AM</p>
         </div>
-        <a href="{% url 'solicitudes' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver al Listado
-        </a>
+        
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <a href="{% url 'solicitud_pdf' solicitud.id %}" class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
+                <span class="material-symbols-outlined text-[16px]">print</span> Imprimir Documento
+            </a>
+            <a href="{% url 'solicitud_pdf' solicitud.id %}" class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
+                <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> Descargar PDF
+            </a>
+
+            <!-- ACCIONES DEL ENCABEZADO -->
+            {% if solicitud.estado == 'REGISTRADA' %}
+                {% if request.user.perfilusuario.rol == 'JEFE_INMEDIATO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                    <a href="{% url 'revisar_solicitud' solicitud.id %}" class="bg-[#ffa726] hover:bg-[#fb8c00] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md">
+                        <span class="material-symbols-outlined text-[16px]">rate_review</span> Autorizar Pedido
+                    </a>
+                {% endif %}
+            {% elif solicitud.estado == 'REVISADA' %}
+                {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                    <form method="POST" action="{% url 'aprobar_solicitud' solicitud.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span> Validar POA
+                        </button>
+                    </form>
+                {% endif %}
+            {% elif solicitud.estado == 'APROBADA' %}
+                {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                    <form method="POST" action="{% url 'preparar_solicitud' solicitud.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">inventory_2</span> Preparar Pedido
+                        </button>
+                    </form>
+                {% endif %}
+            {% elif solicitud.estado == 'PREPARADA' %}
+                {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                    <form method="POST" action="{% url 'entregar_solicitud' solicitud.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">local_shipping</span> Confirmar Entrega
+                        </button>
+                    </form>
+                {% endif %}
+            {% endif %}
+        </div>
     </div>
 
-    <!-- REJILLA PRINCIPAL (Detalle vs Panel de Acciones) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- ALERTA LOCAL DE LA CONSOLA (Para ver el error del POA al presionar el botón) [28] -->
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border font-['Outfit'] {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- STEPPER SUPERIOR -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <div class="flex justify-between items-center relative py-2">
+            <div class="absolute h-0.5 bg-gray-200 dark:bg-gray-800 left-[5%] right-[5%] top-1/2 -translate-y-1/2 z-0"></div>
+            <div class="absolute h-0.5 bg-[#580000] left-[5%] top-1/2 -translate-y-1/2 z-0 transition-all duration-300 w-[{{ solicitud.progreso_porcentaje }}%]"></div>
+
+            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
+                <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
+                    <span class="material-symbols-outlined text-[16px]">done</span>
+                </span>
+                <span class="text-[#580000] dark:text-red-400">Registrada</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
+                {% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
+                        <span class="material-symbols-outlined text-[16px]">done</span>
+                    </span>
+                    <span class="text-[#580000] dark:text-red-400">Revisada</span>
+                {% elif solicitud.estado == 'REGISTRADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 animate-spin">
+                        <span class="material-symbols-outlined text-[16px]">sync</span>
+                    </span>
+                    <span class="text-amber-700">Revisada</span>
+                {% else %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
+                        <span class="material-symbols-outlined text-[16px]">rate_review</span>
+                    </span>
+                    <span class="text-gray-400">Revisada</span>
+                {% endif %}
+            </div>
+
+            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
+                {% if solicitud.estado in 'APROBADA,PREPARADA,ENTREGADA,CERRADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
+                        <span class="material-symbols-outlined text-[16px]">done</span>
+                    </span>
+                    <span class="text-[#580000] dark:text-red-400">Aprobada</span>
+                {% elif solicitud.estado == 'REVISADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 animate-spin">
+                        <span class="material-symbols-outlined text-[16px]">sync</span>
+                    </span>
+                    <span class="text-amber-700">Aprobada</span>
+                {% else %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
+                        <span class="material-symbols-outlined text-[16px]">shield</span>
+                    </span>
+                    <span class="text-gray-400">Aprobada</span>
+                {% endif %}
+            </div>
+
+            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
+                {% if solicitud.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
+                        <span class="material-symbols-outlined text-[16px]">done</span>
+                    </span>
+                    <span class="text-[#580000] dark:text-red-400">Preparada</span>
+                {% elif solicitud.estado == 'APROBADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-indigo-500 bg-indigo-50 text-indigo-600 animate-spin">
+                        <span class="material-symbols-outlined text-[16px]">sync</span>
+                    </span>
+                    <span class="text-indigo-600 dark:text-indigo-400">Preparada</span>
+                {% else %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
+                        <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                    </span>
+                    <span class="text-gray-400 font-['Outfit']">Preparada</span>
+                {% endif %}
+            </div>
+
+            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
+                {% if solicitud.estado in 'ENTREGADA,CERRADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
+                        <span class="material-symbols-outlined text-[16px]">done</span>
+                    </span>
+                    <span class="text-[#580000] dark:text-red-400">Entregada</span>
+                {% elif solicitud.estado == 'PREPARADA' %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-green-600 bg-green-50 text-green-700 animate-spin">
+                        <span class="material-symbols-outlined text-[16px]">sync</span>
+                    </span>
+                    <span class="text-green-700 font-bold">Entregada</span>
+                {% else %}
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
+                        <span class="material-symbols-outlined text-[16px]">local_shipping</span>
+                    </span>
+                    <span class="text-gray-400">Entregada</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- DATOS Y TABLA -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <!-- COLUMNA IZQUIERDA: INFORMACIÓN DE LA SOLICITUD -->
-        <div class="lg:col-span-2 space-y-8">
-            
-            <!-- DATOS GENERALES -->
-            <div class="card p-8 shadow-sm">
-                <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-6 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">assignment_ind</span>
-                    Datos de Identificación del Trámite
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+        <!-- Info General -->
+        <div class="lg:col-span-5 space-y-6">
+            <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+                <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">info</span> Información General
+                </h3>
+                
+                <div class="grid grid-cols-2 gap-y-6 gap-x-4 text-xs font-['Outfit']">
                     <div>
-                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Unidad Solicitante</span>
-                        <span class="font-semibold text-gray-700 dark:text-gray-200">{{ solicitud.unidad_solicitante.nombre }}</span>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Solicitante</span>
+                        <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username }}</span>
                     </div>
                     <div>
-                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Funcionario Solicitante</span>
-                        <span class="font-semibold text-gray-700 dark:text-gray-200">{{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username }} (@{{ solicitud.solicitante.username }})</span>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Unidad</span>
+                        <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ solicitud.unidad_solicitante.nombre }}</span>
                     </div>
                     <div>
-                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Fecha de Registro</span>
-                        <span class="font-semibold text-gray-700 dark:text-gray-200">{{ solicitud.fecha|date:"d \d\e F, Y" }}</span>
-                    </div>
-                    <div>
-                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Última Modificación</span>
-                        <span class="font-semibold text-gray-700 dark:text-gray-200">{{ solicitud.fecha_registro|date:"d/m/Y H:i" }}</span>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Prioridad</span>
+                        <span class="text-red-700 font-bold text-xs flex items-center gap-1 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 py-1 px-2.5 rounded-full w-fit">
+                            <span class="material-symbols-outlined text-[12px]">warning</span> Alta
+                        </span>
                     </div>
                 </div>
 
                 <div class="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
-                    <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider mb-2">Justificación del Requerimiento</span>
-                    <p class="text-sm text-gray-600 dark:text-gray-350 bg-gray-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 leading-relaxed italic">
+                    <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider mb-2">Justificación Institucional</span>
+                    <p class="text-sm text-gray-600 dark:text-gray-350 bg-gray-50 dark:bg-slate-900/60 p-4 rounded-xl border border-gray-100 dark:border-gray-800 italic">
                         "{{ solicitud.justificacion }}"
                     </p>
                 </div>
             </div>
+        </div>
 
-            <!-- TABLA DE MATERIALES -->
-            <div class="card overflow-hidden shadow-sm">
-                <div class="p-8 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/40">
-                    <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
-                        <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">list_alt</span>
-                        Detalle de Ítems Solicitados
-                    </h2>
+        <!-- Artículos -->
+        <div class="lg:col-span-7">
+            <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+                <div class="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/40">
+                    <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
+                        <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">list_alt</span> Artículos Solicitados
+                    </h3>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-black bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30">{{ solicitud.detalles.count }} Ítems</span>
                 </div>
-                <table class="w-full">
-                    <thead class="bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800">
-                        <tr class="text-left text-xs text-gray-500 dark:text-gray-450 uppercase tracking-wider font-semibold">
-                            <th class="px-6 py-4">Código</th>
-                            <th class="px-6 py-4">Descripción del Material</th>
-                            <th class="px-6 py-4 text-center">Cant. Pedida</th>
-                            <th class="px-6 py-4 text-center">Cant. Autorizada</th>
-                            <th class="px-6 py-4 text-center">Cant. Entregada</th>
+                
+                <table class="w-full text-xs text-gray-700 dark:text-gray-300 border-collapse">
+                    <thead class="bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-gray-500 uppercase font-semibold">
+                        <tr>
+                            <th class="px-6 py-3 text-left">Descripción del Artículo</th>
+                            <th class="px-6 py-3 text-center">Cant. Solicitada</th>
+                            <th class="px-6 py-3 text-center">Cant. Despachar</th>
+                            <th class="px-6 py-3 text-center">Estado</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         {% for d in solicitud.detalles.all %}
                         <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-200">
-                                {{ d.material.codigo }}
+                            <td class="px-6 py-4 font-semibold text-gray-800 dark:text-gray-200">
+                                {% if d.es_nueva_adquisicion %}
+                                    <span class="text-gray-800 dark:text-gray-200 font-bold block">{{ d.descripcion_material_no_catalogado }}</span>
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 dark:bg-amber-950/20 text-[#d97706] border border-amber-200 dark:border-amber-900/30 uppercase tracking-wider mt-1 inline-block">No Catalogado</span>
+                                {% else %}
+                                    {{ d.material.nombre }}<br>
+                                    <span class="text-[9px] text-gray-400 block font-mono">Cód: {{ d.material.codigo }}</span>
+                                {% endif %}
                             </td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                {{ d.material.nombre }}
+                            <td class="px-6 py-4 text-center font-bold text-gray-600 dark:text-gray-400">{{ d.cantidad_solicitada }} Units</td>
+                            <td class="px-6 py-4 text-center">
+                                <input type="number" value="{{ d.cantidad_aprobada|default:d.cantidad_solicitada }}" class="border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-200 rounded-xl p-1 w-16 text-center font-semibold focus:outline-none" readonly>
                             </td>
-                            <td class="px-6 py-4 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">
-                                {{ d.cantidad_solicitada }}
-                            </td>
-                            <td class="px-6 py-4 text-center text-sm font-bold text-purple-700 dark:text-purple-400 bg-purple-50/30 dark:bg-purple-950/20">
-                                {{ d.cantidad_aprobada|default:"—" }}
-                            </td>
-                            <td class="px-6 py-4 text-center text-sm font-black text-green-700 dark:text-green-400 bg-green-50/30 dark:bg-green-950/20">
-                                {{ d.cantidad_entregada }}
+                            <td class="px-6 py-4 text-center">
+                                {% if d.es_nueva_adquisicion %}
+                                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                                        <a href="{% url 'catalogar_item_pendiente' d.id %}" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold shadow-sm transition flex items-center gap-1 cursor-pointer">
+                                            <span class="material-symbols-outlined text-xs">app_registration</span> Catalogar Ítem
+                                        </a>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="w-5 h-5 rounded-full border-2 border-green-500 bg-green-50 dark:bg-green-950/20 text-green-600 inline-flex items-center justify-center">
+                                        <span class="material-symbols-outlined text-[12px]">done</span>
+                                    </span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-
         </div>
 
-        <!-- COLUMNA DERECHA: CONSOLA DE ACCIONES DEL FLUJO (Se quitaron bg-white y bordes fijos) -->
-        <div class="space-y-6">
-            <div class="card p-6 shadow-sm">
-                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4 font-['Outfit']">Acciones del Flujo</h3>
-                
-                <div class="flex flex-col gap-3">
+    </div>
 
-                    <!-- 1. REGISTRADA -> REVISADA (Acción para JEFE INMEDIATO) -->
-                    {% if solicitud.estado == 'REGISTRADA' %}
-                        {% if request.user.perfilusuario.rol == 'JEFE_INMEDIATO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <a href="{% url 'revisar_solicitud' solicitud.id %}" class="btn-primary py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2">
-                                <span class="material-symbols-outlined">rate_review</span>
-                                Revisar y Autorizar Cantidades
-                            </a>
-                            <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2">
-                                <span class="material-symbols-outlined">cancel</span>
-                                Rechazar Solicitud
-                            </a>
+    <!-- HISTORIAL / AUDITORÍA DINÁMICO (Maqueta 2) [28] -->
+    <div class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-8 flex items-center gap-2">
+            <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">history</span> Historial de Acciones / Auditoría
+        </h3>
+        
+        <div class="flex flex-col md:flex-row justify-between items-start relative gap-8 py-2">
+            <!-- Línea de tiempo -->
+            <div class="absolute h-0.5 bg-gray-200 dark:bg-gray-800 left-[10%] right-[10%] top-[25px] z-0 hidden md:block"></div>
+
+            <!-- Acción 1: Validación POA (Jefe de Unidad) [11] -->
+            <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs font-['Outfit']">
+                <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-400 dark:border-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow">
+                    <span class="material-symbols-outlined text-lg">person</span>
+                </div>
+                <div>
+                    <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">Validación Unidad</span>
+                    <span class="text-gray-500 dark:text-gray-400 block">Jefe: {{ solicitud.revisado_por.get_full_name|default:solicitud.aprobado_por|default:"Pendiente" }}</span>
+                    {% if solicitud.fecha_revision %}
+                        <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_revision|date:"d/m/Y | H:i" }}</span>
+                    {% else %}
+                        <span class="text-gray-400 block text-[10px] mt-0.5">Pendiente</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Acción 2: Autorización Presupuestal (Presupuestos - POA) [28] -->
+            <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs font-['Outfit']">
+                <div class="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-950/20 border-2 border-purple-400 dark:border-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow">
+                    <span class="material-symbols-outlined text-lg">shield</span>
+                </div>
+                <div>
+                    <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">Autorización Presupuestal</span>
+                    <span class="text-gray-500 dark:text-gray-400 block">
+                        {% if solicitud.presupuestado_por %}
+                            POA: {{ solicitud.presupuestado_por.get_full_name|default:solicitud.presupuestado_por.username }}
                         {% else %}
-                            <p class="text-xs text-gray-400 dark:text-gray-500 italic text-center p-4 bg-gray-50 dark:bg-slate-900 rounded-xl">Pendiente de revisión por el Jefe Inmediato Superior.</p>
+                            Pendiente
                         {% endif %}
+                    </span>
+                    {% if solicitud.fecha_presupuesto %}
+                        <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_presupuesto|date:"d/m/Y | H:i" }}</span>
+                    {% else %}
+                        <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
                     {% endif %}
+                </div>
+            </div>
 
-                    <!-- 2. REVISADA -> APROBADA (Acción para PRESUPUESTOS) -->
-                    {% if solicitud.estado == 'REVISADA' %}
-                        {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'aprobar_solicitud' solicitud.id %}">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-amber-500 dark:bg-amber-600 hover:bg-amber-600 dark:hover:bg-amber-700 text-white py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2 shadow transition cursor-pointer">
-                                    <span class="material-symbols-outlined">account_balance_wallet</span>
-                                    Aprobación Presupuestaria (POA)
-                                </button>
-                            </form>
-                            <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2 mt-2">
-                                <span class="material-symbols-outlined">cancel</span>
-                                Rechazar Solicitud
-                            </a>
+            <!-- Acción 3: Asignación de Almacén (Almacenero - Despacho) [11] -->
+            <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs font-['Outfit']">
+                <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow">
+                    <span class="material-symbols-outlined text-lg">warehouse</span>
+                </div>
+                <div>
+                    <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">Asignación de Almacén</span>
+                    <span class="text-gray-500 dark:text-gray-400 block">
+                        {% if solicitud.entregado_por %}
+                            Despacho: {{ solicitud.entregado_por.get_full_name|default:solicitud.entregado_por.username }}
                         {% else %}
-                            <p class="text-xs text-gray-400 dark:text-gray-500 italic text-center p-4 bg-gray-50 dark:bg-slate-900 rounded-xl">Pendiente de validación presupuestaria (POA).</p>
+                            Pendiente
                         {% endif %}
+                    </span>
+                    {% if solicitud.fecha_entrega %}
+                        <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_entrega|date:"d/m/Y | H:i" }}</span>
+                    {% else %}
+                        <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
                     {% endif %}
-
-                    <!-- 3. APROBADA -> PREPARADA (Acción para ALMACENERO) -->
-                    {% if solicitud.estado == 'APROBADA' %}
-                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'preparar_solicitud' solicitud.id %}">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-800 text-white py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2 shadow transition cursor-pointer">
-                                    <span class="material-symbols-outlined">inventory_2</span>
-                                    Preparar Pedido en Almacén
-                                </button>
-                            </form>
-                        {% else %}
-                            <p class="text-xs text-gray-400 dark:text-gray-500 italic text-center p-4 bg-gray-50 dark:bg-slate-900 rounded-xl">Pendiente de preparación física de los materiales en almacén.</p>
-                        {% endif %}
-                    {% endif %}
-
-                    <!-- 4. PREPARADA -> ENTREGADA (Acción para ALMACENERO - PEPS/POA) -->
-                    {% if solicitud.estado == 'PREPARADA' %}
-                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'entregar_solicitud' solicitud.id %}" onsubmit="return confirm('¿Confirma la entrega física? Esto afectará el stock (PEPS) y el POA de la unidad.')">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-green-600 dark:bg-green-700 hover:bg-green-700 dark:hover:bg-green-800 text-white py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2 shadow transition cursor-pointer">
-                                    <span class="material-symbols-outlined">local_shipping</span>
-                                    Registrar Entrega Física (Despacho)
-                                </button>
-                            </form>
-                        {% else %}
-                            <p class="text-xs text-gray-400 dark:text-gray-500 italic text-center p-4 bg-gray-50 dark:bg-slate-900 rounded-xl">El pedido está listo y empaquetado en depósito.</p>
-                        {% endif %}
-                    {% endif %}
-
-                    <!-- 5. ENTREGADA -> CERRADA (Acción para ALMACENERO) -->
-                    {% if solicitud.estado == 'ENTREGADA' %}
-                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'cerrar_solicitud' solicitud.id %}">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-gray-700 dark:bg-gray-800 hover:bg-gray-800 dark:hover:bg-gray-900 text-white py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2 shadow transition cursor-pointer">
-                                    <span class="material-symbols-outlined">task</span>
-                                    Concluir y Cerrar Trámite
-                                </button>
-                            </form>
-                        {% else %}
-                            <p class="text-xs text-gray-400 dark:text-gray-500 italic text-center p-4 bg-gray-50 dark:bg-slate-900 rounded-xl">Los materiales han sido entregados con éxito.</p>
-                        {% endif %}
-                    {% endif %}
-
-                    <!-- 6. RECHAZADA -> REGISTRADA (Acción para JEFE / ADMIN) -->
-                    {% if solicitud.estado == 'RECHAZADA' %}
-                        {% if request.user.perfilusuario.rol == 'JEFE_INMEDIATO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'reabrir_solicitud' solicitud.id %}">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800 text-white py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2 shadow transition cursor-pointer">
-                                    <span class="material-symbols-outlined">settings_backup_restore</span>
-                                    Reabrir y Corregir Solicitud
-                                </button>
-                            </form>
-                        {% endif %}
-                        <div class="p-4 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 rounded-2xl text-xs border border-red-200 dark:border-red-900/30 mt-2">
-                            <strong class="block mb-1">Motivo de Rechazo:</strong> {{ solicitud.motivo_rechazo }}
-                        </div>
-                    {% endif %}
-
-                    <!-- Exportar a PDF (Disponible siempre) -->
-                    <a href="{% url 'solicitud_pdf' solicitud.id %}" class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 py-3 rounded-xl text-center text-sm font-semibold flex items-center justify-center gap-2 mt-2">
-                        <span class="material-symbols-outlined">picture_as_pdf</span>
-                        Descargar Comprobante PDF
-                    </a>
-
                 </div>
             </div>
         </div>
-
     </div>
 
 </div>

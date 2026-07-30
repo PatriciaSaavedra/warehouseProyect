@@ -1,6 +1,6 @@
 import json
 import html
-import datetime
+from django.utils import timezone 
 from decimal import Decimal
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
@@ -12,12 +12,11 @@ from reportlab.pdfgen import canvas
 
 from .models import Solicitud, DetalleSolicitud
 from inventario.models import Material, MovimientoInventario
+from inventario.models import PartidaPresupuestaria, UnidadMedida
 from inventario.services import registrar_salida_valorada_peps  # Importamos nuestro servicio PEPS (FIFO)
-from usuarios.decorators import tiene_rol
+from usuarios.decorators import tiene_rol, rol_requerido
 from presupuestos.models import POA
 from auditoria.models import Bitacora
-
-# Gestión fiscal actual
 GESTION_ACTUAL = 2026
 
 @login_required
@@ -32,19 +31,31 @@ def solicitudes(request):
 
     # Filtrar solicitudes según el rol (RE-SABS)
     if rol == 'ADMINISTRADOR':
-        solicitudes = Solicitud.objects.all()
+        solicitudes_query = Solicitud.objects.all()
     elif rol in ['JEFE_INMEDIATO', 'PRESUPUESTOS']:
-        solicitudes = Solicitud.objects.filter(unidad_solicitante=unidad)
+        solicitudes_query = Solicitud.objects.filter(unidad_solicitante=unidad)
     else:
-        solicitudes = Solicitud.objects.filter(solicitante=request.user)
+        solicitudes_query = Solicitud.objects.filter(solicitante=request.user)
 
-    solicitudes = solicitudes.select_related('solicitante', 'unidad_solicitante').order_by('-id')
+    solicitudes_query = solicitudes_query.select_related('solicitante', 'unidad_solicitante').order_by('-id')
+
+    hoy = timezone.now().date()        # Obtiene la fecha de hoy como objeto datetime.date
+    primer_dia_mes = hoy.replace(day=1) # Obtiene el primer día del mes actual (seguro y sin errores)
+    
+    pendientes_count = Solicitud.objects.filter(estado='REGISTRADA').count()
+    preparacion_count = Solicitud.objects.filter(estado__in=['APROBADA', 'PREPARADA']).count()
+    entregas_hoy_count = Solicitud.objects.filter(estado='ENTREGADA', fecha=hoy).count()
+    total_folios_count = Solicitud.objects.filter(fecha__gte=primer_dia_mes).count()
 
     return render(request, 'solicitudes/index.html', {
-        'solicitudes': solicitudes,
-        'rol': rol
+        'solicitudes': solicitudes_query,
+        'rol': rol,
+        # Métricas enviadas al HTML
+        'kpi_pendientes': pendientes_count,
+        'kpi_preparacion': preparacion_count,
+        'kpi_entregas_hoy': entregas_hoy_count,
+        'kpi_total_folios': total_folios_count,
     })
-
 
 @login_required
 def buscar_materiales(request):
@@ -64,6 +75,9 @@ def buscar_materiales(request):
 
 @login_required
 def nueva_solicitud(request):
+    """
+    Registra solicitudes soportando materiales existentes y nuevas adquisiciones no catalogadas [11, 28].
+    """
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
@@ -98,7 +112,6 @@ def nueva_solicitud(request):
                 numero = (ultima.id + 1) if ultima else 1
                 codigo = f'SOL-{numero:05d}'
 
-                # Se crea inicialmente en estado 'REGISTRADA'
                 solicitud = Solicitud.objects.create(
                     codigo=codigo,
                     unidad_solicitante=unidad_solicitante,
@@ -108,24 +121,35 @@ def nueva_solicitud(request):
                     estado='REGISTRADA'
                 )
 
-                for material_id, cantidad in payload.items():
-                    material = Material.objects.get(id=material_id)
-                    cantidad = int(cantidad)
+                for item_key, item_data in payload.items():
+                    cantidad = int(item_data.get('cantidad', 1))
+                    es_nuevo = item_data.get('es_nuevo', False)
 
                     if cantidad <= 0:
                         raise ValueError("La cantidad solicitada debe ser mayor a cero.")
 
-                    DetalleSolicitud.objects.create(
-                        solicitud=solicitud,
-                        material=material,
-                        cantidad_solicitada=cantidad
-                    )
+                    if es_nuevo:
+                        # Si es un ítem no catalogado, se guarda sin material_id
+                        DetalleSolicitud.objects.create(
+                            solicitud=solicitud,
+                            material=None,
+                            es_nueva_adquisicion=True,
+                            descripcion_material_no_catalogado=item_data.get('nombre'),
+                            cantidad_solicitada=cantidad
+                        )
+                    else:
+                        material = Material.objects.get(id=item_key)
+                        DetalleSolicitud.objects.create(
+                            solicitud=solicitud,
+                            material=material,
+                            cantidad_solicitada=cantidad
+                        )
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Solicitudes',
                     accion='Registrar Solicitud',
-                    descripcion=f'Se registró la Solicitud de Materiales {codigo} para la unidad {unidad_solicitante.nombre}'
+                    descripcion=f'Se registró la Solicitud {codigo} con ítems personalizados para la unidad {unidad_solicitante.nombre}'
                 )
 
             messages.success(request, f"Solicitud {codigo} registrada correctamente.")
@@ -143,6 +167,87 @@ def nueva_solicitud(request):
         'materiales': materiales
     })
 
+
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def catalogar_item_pendiente(request, detalle_id):
+    """
+    Permite al Almacenero codificar oficialmente un material no catalogado solicitado (Inciso b) [28].
+    """
+    detalle = get_object_or_404(DetalleSolicitud, id=detalle_id)
+    partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
+    unidades = UnidadMedida.objects.all().order_by('nombre')
+
+    if not detalle.es_nueva_adquisicion:
+        messages.error(request, "Este material ya se encuentra codificado y catalogado.")
+        return redirect('detalle_solicitud', id=detalle.solicitud.id)
+
+    if request.method == 'POST':
+        partida_id = request.POST.get('partida')
+        unidad_id = request.POST.get('unidad_medida_fk')
+        stock_minimo = int(request.POST.get('stock_minimo', 5))
+
+        partida = get_object_or_404(PartidaPresupuestaria, id=partida_id)
+        unidad = get_object_or_404(UnidadMedida, id=unidad_id)
+
+        nombre = detalle.descripcion_material_no_catalogado
+
+        # Autogenerar código correlativo de manera automática para el nuevo material
+        materiales_partida = Material.objects.filter(partida=partida).order_by('codigo')
+        if materiales_partida.exists():
+            ultimo_codigo = materiales_partida.last().codigo
+            try:
+                correlativo = int(ultimo_codigo.split('-')[1]) + 1
+            except (ValueError, IndexError):
+                correlativo = 1
+        else:
+            correlativo = 1
+
+        codigo = f"{partida.codigo}-{str(correlativo).zfill(4)}"
+
+        try:
+            with transaction.atomic():
+                # 1. Crear el material oficial con stock en 0 para habilitar su posterior compra
+                material = Material.objects.create(
+                    partida=partida,
+                    codigo=codigo,
+                    nombre=nombre,
+                    descripcion="Registrado y codificado desde Solicitud de Adquisición",
+                    unidad_medida=unidad.nombre,
+                    unidad_medida_fk=unidad,
+                    stock_actual=0,
+                    stock_minimo=stock_minimo
+                )
+
+                # 2. Asociar el material al detalle de la solicitud y desactivar bandera
+                detalle.material = material
+                detalle.es_nueva_adquisicion = False
+                detalle.descripcion_material_no_catalogado = None
+                detalle.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Catalogar Item Pendiente',
+                    descripcion=f'Se codificó el material {nombre} como {codigo} desde la solicitud {detalle.solicitud.codigo}'
+                )
+
+            messages.success(request, f'El material {nombre} ha sido catalogado y codificado exitosamente con el código {codigo}.')
+            return redirect('detalle_solicitud', id=detalle.solicitud.id)
+
+        except Exception as e:
+            messages.error(request, f'Error al catalogar el material: {str(e)}')
+            return redirect('catalogar_item_pendiente', detalle_id=detalle_id)
+
+    return render(
+        request, 
+        'inventario/catalogar_pendiente.html', 
+        {
+            'detalle': detalle,
+            'partidas': partidas,
+            'unidades': unidades
+        }
+    )
 
 @login_required
 def detalle_solicitud(request, id):
@@ -193,6 +298,8 @@ def revisar_solicitud(request, id):
 
                 solicitud.estado = 'REVISADA'
                 solicitud.aprobado_por = request.user.get_full_name() or request.user.username
+                solicitud.revisado_por = request.user            # <-- NUEVO: Guarda el usuario
+                solicitud.fecha_revision = timezone.now()         # <-- NUEVO: Guarda fecha/hora
                 solicitud.save()
 
                 Bitacora.objects.create(
@@ -259,6 +366,8 @@ def aprobar_solicitud(request, id):
 
             # Si pasa la validación presupuestaria, cambia a 'APROBADA'
             solicitud.estado = 'APROBADA'
+            solicitud.presupuestado_por = request.user            # <-- NUEVO: Guarda el usuario
+            solicitud.fecha_presupuesto = timezone.now()           # <-- NUEVO: Guarda fecha/hora
             solicitud.save()
 
             Bitacora.objects.create(
@@ -291,6 +400,8 @@ def preparar_solicitud(request, id):
         return redirect('solicitudes')
 
     solicitud.estado = 'PREPARADA'
+    solicitud.preparado_por = request.user                        # <-- NUEVO: Guarda el usuario
+    solicitud.fecha_preparado = timezone.now()                     # <-- NUEVO: Guarda fecha/hora
     solicitud.save()
 
     Bitacora.objects.create(
@@ -364,6 +475,8 @@ def entregar_solicitud(request, id):
 
             # C. Cambiar estado a 'ENTREGADA'
             solicitud.estado = 'ENTREGADA'
+            solicitud.entregado_por = request.user                # <-- NUEVO: Guarda el usuario
+            solicitud.fecha_entrega = timezone.now()               # <-- NUEVO: Guarda fecha/hora
             solicitud.save()
 
             Bitacora.objects.create(
@@ -396,6 +509,8 @@ def cerrar_solicitud(request, id):
         return redirect('solicitudes')
 
     solicitud.estado = 'CERRADA'
+    solicitud.cerrado_por = request.user                          # <-- NUEVO: Guarda el usuario
+    solicitud.fecha_cierre = timezone.now()                        # <-- NUEVO: Guarda fecha/hora
     solicitud.save()
 
     Bitacora.objects.create(

@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %} Órdenes de Compra {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Compras Menores</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Historial y control de Órdenes de Adquisición emitidas por la Unidad de Bienes y Servicios [28].</p>
+        </div>
+        <div class="flex gap-2 w-full sm:w-auto">
+            <a href="{% url 'crear_compra_menor' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">add_box</span> Registrar Orden
+            </a>
+            <a href="{% url 'inventario' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver al Almacén
+            </a>
+        </div>
+    </div>
+
+    <!-- MENSAJES DE ALERTA -->
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30 mb-2">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- TABLA DE ORDENES -->
+    <div class="card overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[900px]">
+                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-100 dark:border-gray-800">
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-450 uppercase tracking-wider font-semibold">
+                        <th class="px-6 py-4 w-40">Nro. de Orden</th>
+                        <th class="px-6 py-4">Proveedor</th>
+                        <th class="px-6 py-4 w-32 text-center">Partida</th>
+                        <th class="px-6 py-4 w-44">Solicitud Origen</th>
+                        <th class="px-6 py-4 text-right w-44">Monto Adjudicado</th>
+                        <th class="px-6 py-4 text-center w-32">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
+                    {% for compra in compras %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-100">
+                            {{ compra.nro_orden }}
+                        </td>
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            {{ compra.proveedor.razon_social }}
+                        </td>
+                        <td class="px-6 py-4 text-center text-sm">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold badge-info">
+                                {{ compra.partida.codigo }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 font-semibold font-mono">
+                            {{ compra.solicitud_origen.codigo|default:"Adquisición Libre" }}
+                        </td>
+                        <td class="px-6 py-4 text-right text-sm font-black text-gray-800 dark:text-gray-200">
+                            {{ compra.monto_total|floatformat:2 }} Bs.
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
+                            {% if compra.completada %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30">
+                                    Ingresado
+                                </span>
+                            {% else %}
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">
+                                    En Tránsito
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2 block">
+                                shopping_cart
+                            </span>
+                            No se registran órdenes de compra en el sistema.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
