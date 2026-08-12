@@ -7,103 +7,76 @@ from organizacion.models import UnidadOrganizacional
 # FLUJO DE ESTADOS OFICIAL (RE-SABS / GAD POTOSÍ)
 # =========================================
 ESTADOS_SOLICITUD = [
-    ('REGISTRADA', 'Registrada'),       # Creada por el Funcionario Solicitante
-    ('REVISADA', 'Revisada'),           # Validada por el Jefe Inmediato Superior
-    ('APROBADA', 'Aprobada'),           # Aprobada por Presupuestos (POA) / Jefe de Almacenes
-    ('PREPARADA', 'Preparada'),         # Alistada físicamente por el Almacenero
-    ('ENTREGADA', 'Entregada'),         # Retirada físicamente (Descuenta Stock y POA)
-    ('CERRADA', 'Cerrada'),             # Conclusión del trámite administrativo de almacén
-    ('RECHAZADA', 'Rechazada'),         # Estado terminal en caso de observación presupuestaria o física
+    ('REGISTRADA', 'Creada'),
+    ('VALIDADA_SAF', 'Validada por SAF'),
+    ('VALIDADA_PRESUPUESTOS', 'Validada por Presupuestos'),
+    ('VALIDADA_RPA', 'Validada por RPA'),
+    ('VALIDADA_JEFATURA', 'Validada por Jefatura Administrativa'),
+    ('PREPARADA', 'Preparada'),
+    ('ENTREGADA', 'Entregada'),
+    ('CERRADA', 'Cerrada'),
+    ('RECHAZADA', 'Rechazada'),
 ]
-
-
 class Solicitud(models.Model):
-
-    codigo = models.CharField(
-        max_length=20,
-        unique=True
-    )
-
-    unidad_solicitante = models.ForeignKey(
-        UnidadOrganizacional,
-        on_delete=models.CASCADE
-    )
-
-    solicitante = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE
-    )
-
+    codigo = models.CharField(max_length=20, unique=True)
+    unidad_solicitante = models.ForeignKey('organizacion.UnidadOrganizacional', on_delete=models.CASCADE)
+    solicitante = models.ForeignKey(User, on_delete=models.CASCADE)
     fecha = models.DateField()
-
     justificacion = models.TextField()
+    estado = models.CharField(max_length=30, choices=ESTADOS_SOLICITUD, default='REGISTRADA')
+    aprobado_por = models.CharField(max_length=200, blank=True, null=True)
+    motivo_rechazo = models.TextField(blank=True, null=True)
+    fecha_registro = models.DateTimeField(auto_now_add=True)
 
-    estado = models.CharField(
-        max_length=20,
-        choices=ESTADOS_SOLICITUD,
-        default='REGISTRADA'  # <-- NUEVO ESTADO INICIAL
-    )
+    # --- NUEVOS CAMPOS DE TRAZABILIDAD Y AUDITORÍA DE LA CADENA SABS ---
+    revisado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_revisadas')
+    fecha_revision = models.DateTimeField(null=True, blank=True)
 
-    aprobado_por = models.CharField(
-        max_length=200,
-        blank=True,
-        null=True
-    )
-    
-    motivo_rechazo = models.TextField(
-        blank=True,
-        null=True
-    )
+    saf_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='saf_validados')
+    fecha_saf = models.DateTimeField(null=True, blank=True)
 
-    fecha_registro = models.DateTimeField(
-        auto_now_add=True
-    )
+    presupuestado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='presupuestos_validados')
+    fecha_presupuesto = models.DateTimeField(null=True, blank=True)
+
+    rpa_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='rpa_validados')
+    fecha_rpa = models.DateTimeField(null=True, blank=True)
+
+    jefatura_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='jefatura_validados')
+    fecha_jefatura = models.DateTimeField(null=True, blank=True)
+
+    preparado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_preparadas')
+    fecha_preparado = models.DateTimeField(null=True, blank=True)
+
+    entregado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_entregadas')
+    fecha_entrega = models.DateTimeField(null=True, blank=True)
+
+    cerrado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_cerradas')
+    fecha_cierre = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def progreso_porcentaje(self):
+        """
+        Retorna la anchura matemática exacta para el Stepper de 5 círculos en la interfaz [28].
+        """
+        map_estados = {
+            'REGISTRADA': 0,              
+            'REVISADA': 25,                
+            'VALIDADA_SAF': 25,           
+            'VALIDADA_RPA': 50,            
+            'VALIDADA_PRESUPUESTOS': 50,   
+            'VALIDADA_JEFATURA': 75,       
+            'PREPARADA': 75,              
+            'ENTREGADA': 100,             
+            'CERRADA': 100,                
+            'RECHAZADA': 0,
+        }
+        return map_estados.get(self.estado, 0)
 
     def tiene_detalles(self):
         return self.detalles.exists()
 
     def __str__(self):
         return self.codigo
-    @property
-    def progreso_porcentaje(self):
-        """
-        Retorna el porcentaje numérico de avance del trámite para pintar el stepper en HTML sin ensuciar el CSS [28].
-        """
-        map_estados = {
-            'REGISTRADA': 0,
-            'REVISADA': 20,
-            'APROBADA': 40,
-            'PREPARADA': 60,
-            'ENTREGADA': 80,
-            'CERRADA': 100,
-            'RECHAZADA': 0,
-        }
-        return map_estados.get(self.estado, 0)
-    revisado_por = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_revisadas'
-    )
-    fecha_revision = models.DateTimeField(null=True, blank=True)
-    
-    presupuestado_por = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_presupuestadas'
-    )
-    fecha_presupuesto = models.DateTimeField(null=True, blank=True)
-    
-    preparado_por = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_preparadas'
-    )
-    fecha_preparado = models.DateTimeField(null=True, blank=True)
-    
-    entregado_por = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_entregadas'
-    )
-    fecha_entrega = models.DateTimeField(null=True, blank=True)
-    
-    cerrado_por = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_cerradas'
-    )
-    fecha_cierre = models.DateTimeField(null=True, blank=True)
-
 
 # =========================================
 # DETALLE SOLICITUD

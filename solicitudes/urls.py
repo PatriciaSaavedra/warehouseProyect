@@ -19,7 +19,11 @@ urlpatterns = [
     path('rechazar/<int:id>/', views.rechazar_solicitud, name='rechazar_solicitud'),
     path('reabrir/<int:id>/', views.reabrir_solicitud, name='reabrir_solicitud'),
     path('catalogar-item/<int:detalle_id>/', views.catalogar_item_pendiente, name='catalogar_item_pendiente'),
+    path('validar-saf/<int:id>/', views.validar_saf, name='validar_saf'),
+    path('validar-rpa/<int:id>/', views.validar_rpa, name='validar_rpa'),
+    path('validar-jefatura/<int:id>/', views.validar_jefatura, name='validar_jefatura'),
     
+    path('retroceder/<int:id>/', views.retroceder_estado_solicitud, name='retroceder_solicitud'),
     # --- EXPORTACIÓN ---
     path('pdf/<int:id>/', views.solicitud_pdf, name='solicitud_pdf'),
 ]

@@ -1,65 +1,135 @@
-{% extends 'base.html' %} <!-- Ajusta según tu plantilla base -->
+{% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Mi Perfil</h4>
+<style>
+    /* Contenedor y tarjeta principal */
+    .profile-container {
+        max-width: 850px;
+        margin: 2rem auto;
+        padding: 0 15px;
+    }
+    .profile-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+    .profile-card-header {
+        background-color: #800000; /* Tono guinda institucional */
+        color: #ffffff;
+        padding: 1.25rem 1.5rem;
+        border-bottom: none;
+    }
+    .profile-card-header h4 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    .profile-card-body {
+        padding: 2rem;
+    }
+
+    /* Nota informativa de solo lectura */
+    .profile-info-note {
+        background-color: #f7fafc;
+        border-left: 4px solid #800000;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        border-radius: 0 8px 8px 0;
+        font-size: 0.9rem;
+        color: #4a5568;
+    }
+
+    /* Grilla interna para asegurar la alineación */
+    .profile-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    .profile-full-width {
+        grid-column: span 2;
+    }
+
+    /* Etiquetas e Inputs */
+    .profile-form-label {
+        display: block;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .profile-form-control {
+        display: block;
+        width: 100%;
+        padding: 0.6rem 1rem;
+        font-size: 0.95rem;
+        color: #718096; /* Color de texto ligeramente atenuado para lectura */
+        background-color: #f8f9fa; /* Fondo gris claro que indica solo lectura */
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-sizing: border-box;
+        cursor: not-allowed;
+    }
+
+    /* Adaptabilidad a móviles */
+    @media (max-width: 768px) {
+        .profile-grid {
+            grid-template-columns: 1fr;
+        }
+        .profile-full-width {
+            grid-column: span 1;
+        }
+    }
+</style>
+
+<div class="profile-container">
+    <div class="profile-card">
+        <div class="profile-card-header">
+            <h4>Mi Perfil</h4>
+        </div>
+        
+        <div class="profile-card-body">
+            <!-- Nota informativa para el usuario -->
+            <div class="profile-info-note">
+                <strong>Información del perfil:</strong> Por motivos de seguridad y control administrativo, los datos de su cuenta no se pueden modificar directamente desde esta sección.
+            </div>
+
+            <div class="profile-grid">
+                <!-- Datos de cuenta -->
+                <div>
+                    <label class="profile-form-label">Nombre de Usuario</label>
+                    <input type="text" class="profile-form-control" value="{{ usuario_obj.username }}" disabled>
                 </div>
-                <div class="card-body">
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-
-                    <form method="POST" action="{% url 'perfil' %}">
-                        {% csrf_token %}
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Nombre de Usuario</label>
-                                <input type="text" class="form-control" value="{{ usuario_obj.username }}" disabled>
-                                <small class="text-muted">El nombre de usuario no se puede modificar.</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Rol asignado</label>
-                                <input type="text" class="form-control" value="{{ perfil.rol }}" disabled>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="first_name" class="form-label">Nombre</label>
-                                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ usuario_obj.first_name }}">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="last_name" class="form-label">Apellido</label>
-                                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ usuario_obj.last_name }}">
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Correo Electrónico</label>
-                            <input type="email" class="form-control" id="email" name="email" value="{{ usuario_obj.email }}">
-                        </div>
-
-                        {% if perfil.unidad %}
-                        <div class="mb-3">
-                            <label class="form-label">Unidad Organizacional</label>
-                            <input type="text" class="form-control" value="{{ perfil.unidad.nombre }}" disabled>
-                        </div>
-                        {% endif %}
-
-                        <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-success">Guardar Cambios</button>
-                        </div>
-                    </form>
+                
+                <div>
+                    <label class="profile-form-label">Rol asignado</label>
+                    <input type="text" class="profile-form-control" value="{{ perfil.rol }}" disabled>
                 </div>
+
+                <!-- Información Personal -->
+                <div>
+                    <label class="profile-form-label">Nombre</label>
+                    <input type="text" class="profile-form-control" value="{{ usuario_obj.first_name }}" disabled>
+                </div>
+                
+                <div>
+                    <label class="profile-form-label">Apellido</label>
+                    <input type="text" class="profile-form-control" value="{{ usuario_obj.last_name }}" disabled>
+                </div>
+
+                <!-- Correo y Unidad Organizacional -->
+                <div class="{% if not perfil.unidad %}profile-full-width{% endif %}">
+                    <label class="profile-form-label">Correo Electrónico</label>
+                    <input type="text" class="profile-form-control" value="{{ usuario_obj.email }}" disabled>
+                </div>
+
+                {% if perfil.unidad %}
+                <div>
+                    <label class="profile-form-label">Unidad Organizacional</label>
+                    <input type="text" class="profile-form-control" value="{{ perfil.unidad.nombre }}" disabled>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

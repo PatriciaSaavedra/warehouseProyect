@@ -87,14 +87,22 @@
             <!-- MONTO ADJUDICADO (Con validación dinámica para el RPA de 50.000 Bs.) -->
             <div>
                 <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Monto Total Adjudicado (Bs.) <span class="text-[#8b0000] dark:text-red-400">*</span></label>
-                <input type="number" name="monto_total" id="input_monto_total" step="0.01" min="0.01" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition" placeholder="0.00" required>
-                
-                <!-- Alerta dinámica SABS -->
+                <input 
+                    type="number" 
+                    name="monto_total" 
+                    id="input_monto_total" 
+                    step="0.01" 
+                    min="0.01" 
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition" 
+                    value="{% if monto_estimado and monto_estimado > 0 %}{{ monto_estimado|stringformat:'.2f' }}{% else %}0.00{% endif %}"
+                    required
+                >
                 <p id="alerta_limite_sabs" class="text-[10px] text-gray-400 dark:text-gray-500 mt-2 font-['Outfit'] flex items-center gap-1">
                     <span class="material-symbols-outlined text-xs">info</span>
                     Límite máximo permitido para Contratación Menor por el RPA: <strong>50,000.00 Bs.</strong>
                 </p>
             </div>
+    </div>
         </div>
 
         <div class="pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">

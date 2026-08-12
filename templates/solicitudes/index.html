@@ -73,9 +73,77 @@ Gestión de Solicitudes
         </div>
     </div>
 
+    <!-- PANEL DE BÚSQUEDA Y FILTRADO AVANZADO (GAD Potosí) [28] -->
+    <div class="card p-6 mb-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 font-['Outfit'] mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">filter_alt</span>
+            Buscador y Filtros de Búsqueda
+        </h3>
+        
+        <form method="GET" action="{% url 'solicitudes' %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <!-- Búsqueda General -->
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Buscar por Folio / Unidad</label>
+                <input 
+                    type="text" 
+                    name="q" 
+                    value="{{ query|default:'' }}" 
+                    placeholder="Ej. SOL-00020 o Recursos..." 
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                >
+            </div>
+
+            <!-- Filtrar por Estado -->
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Filtrar por Estado</label>
+                <div class="relative">
+                    <select 
+                        name="estado" 
+                        class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10"
+                    >
+                        <option value="">-- Todos los Estados --</option>
+                        {% for valor, etiqueta in estados %}
+                            <option value="{{ valor }}" {% if filtro_estado == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <!-- Fecha Desde -->
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha Desde</label>
+                <input 
+                    type="date" 
+                    name="desde" 
+                    value="{{ desde|default:'' }}" 
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                >
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="flex gap-2">
+                <button 
+                    type="submit" 
+                    class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 flex-1 h-[48px] cursor-pointer"
+                >
+                    <span class="material-symbols-outlined text-[18px]">search</span>
+                    <span>Buscar</span>
+                </button>
+                <a 
+                    href="{% url 'solicitudes' %}" 
+                    class="border border-gray-300 hover:bg-gray-50 text-gray-700 dark:text-gray-300 px-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition h-[48px]"
+                    title="Limpiar filtros"
+                >
+                    <span class="material-symbols-outlined text-[18px]">restart_alt</span>
+                </a>
+            </div>
+        </form>
+    </div>
+
     <!-- LISTADO DE SOLICITUDES ACTIVAS -->
     <div class="card p-8 shadow-sm space-y-6">
-        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] border-b border-gray-100 dark:border-gray-800 pb-4">Listado de Solicitudes Activas</h2>
+        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] border-b border-gray-100 pb-4">Listado de Solicitudes Activas</h2>
         
         <div class="space-y-4">
             {% for sol in solicitudes %}
@@ -83,22 +151,21 @@ Gestión de Solicitudes
                 
                 <!-- Datos básicos -->
                 <div class="min-w-[240px] space-y-1">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-black bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-wider font-['Outfit']">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-black bg-amber-50 text-amber-700 border border-amber-100 dark:border-amber-900/30 uppercase tracking-wider font-['Outfit']">
                         Folio: {{ sol.codigo }}
                     </span>
                     <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] pt-1">{{ sol.unidad_solicitante.nombre }}</h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Solicitante: {{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</p>
-                    <p class="text-xs text-gray-400 dark:text-gray-500">Fecha: {{ sol.fecha|date:"d M Y" }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-['Outfit']">Solicitante: {{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 font-['Outfit']">Fecha: {{ sol.fecha|date:"d M Y" }}</p>
                 </div>
 
                 <!-- Línea de tiempo visual (Stepper) de la fila -->
-                <!-- Línea de tiempo visual (Stepper) de la fila - Corregido y Unificado -->
                 <div class="flex-1 max-w-xl hidden md:flex items-center relative py-4">
                     <!-- Línea gris de fondo -->
                     <div class="absolute h-0.5 w-[85%] bg-gray-200 dark:bg-gray-800 left-[7%] top-1/2 -translate-y-1/2 z-0"></div>
-                    <!-- Línea activa color vino -->
-                    <!-- Línea activa color vino (Optimizada con clase dinámica de Tailwind para evitar avisos) -->
-                    <div class="absolute h-0.5 bg-[#580000] left-[7%] top-1/2 -translate-y-1/2 z-0 transition-all duration-300 w-[{{ sol.progreso_porcentaje }}%]"></div>
+                    <!-- Línea activa color vino (Optimizada con clase dinámica de Tailwind para evitar avisos) [28] -->
+                    <div class="absolute h-0.5 bg-[#580000] left-[7%] top-1/2 -translate-y-1/2 z-0 transition-all duration-300 progress-bar-line"
+                         data-width="{{ sol.progreso_porcentaje }}"></div>
                     
                     <!-- Pasos -->
                     <div class="flex justify-between w-full z-10 text-center text-[9px] font-bold uppercase tracking-wider font-['Outfit']">
@@ -115,11 +182,11 @@ Gestión de Solicitudes
                             {% if sol.estado != 'REGISTRADA' and sol.estado != 'RECHAZADA' %}
                                 <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white">
                                     <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span> <!-- ERROR DE TIPEO CORREGIDO AQUÍ (Se quitó el 'end') -->
+                                </span>
                                 <span class="text-[#580000] dark:text-red-400">Revisada</span>
                             {% elif sol.estado == 'REGISTRADA' %}
-                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600">
-                                    <span class="material-symbols-outlined text-[12px] animate-spin">sync</span> <!-- Animación en el icono -->
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 animate-spin">
+                                    <span class="material-symbols-outlined text-[12px]">sync</span>
                                 </span>
                                 <span class="text-amber-700">Revisada</span>
                             {% else %}
@@ -132,14 +199,14 @@ Gestión de Solicitudes
 
                         <!-- Aprobada -->
                         <div class="flex flex-col items-center gap-1 w-16">
-                            {% if sol.estado in 'APROBADA,PREPARADA,ENTREGADA,CERRADA' %}
+                            {% if sol.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
                                 <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white">
                                     <span class="material-symbols-outlined text-[12px]">done</span>
                                 </span>
                                 <span class="text-[#580000] dark:text-red-400">Aprobada</span>
-                            {% elif sol.estado == 'REVISADA' %}
-                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600">
-                                    <span class="material-symbols-outlined text-[12px] animate-spin">sync</span> <!-- Animación en el icono -->
+                            {% elif sol.estado == 'VALIDADA_SAF' %}
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 animate-spin">
+                                    <span class="material-symbols-outlined text-[12px]">sync</span>
                                 </span>
                                 <span class="text-amber-700">Aprobada</span>
                             {% else %}
@@ -157,9 +224,9 @@ Gestión de Solicitudes
                                     <span class="material-symbols-outlined text-[12px]">done</span>
                                 </span>
                                 <span class="text-[#580000] dark:text-red-400">Preparada</span>
-                            {% elif sol.estado == 'APROBADA' %}
-                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-indigo-500 bg-indigo-50 text-indigo-600">
-                                    <span class="material-symbols-outlined text-[12px] animate-spin">sync</span> <!-- Animación en el icono -->
+                            {% elif sol.estado == 'VALIDADA_JEFATURA' %}
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-indigo-500 bg-indigo-50 text-indigo-600 animate-spin">
+                                    <span class="material-symbols-outlined text-[12px]">sync</span>
                                 </span>
                                 <span class="text-indigo-600 dark:text-indigo-400">Preparada</span>
                             {% else %}
@@ -178,8 +245,8 @@ Gestión de Solicitudes
                                 </span>
                                 <span class="text-[#580000] dark:text-red-400">Entregada</span>
                             {% elif sol.estado == 'PREPARADA' %}
-                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-green-600 bg-green-50 text-green-700">
-                                    <span class="material-symbols-outlined text-[12px] animate-spin">sync</span> <!-- Animación en el icono -->
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center border-2 border-green-600 bg-green-50 text-green-700 animate-spin">
+                                    <span class="material-symbols-outlined text-[12px]">sync</span>
                                 </span>
                                 <span class="text-green-700 font-bold">Entregada</span>
                             {% else %}
@@ -192,15 +259,27 @@ Gestión de Solicitudes
                     </div>
                 </div>
 
-                <!-- Botones contextuales según el estado apilados verticalmente (Bypass Administrador integrado) -->
+                <!-- Botones contextuales alineados a la Maqueta 1 (Corregido con el flujo de 8 estados unificado) [11, 28] -->
                 <div class="flex flex-row lg:flex-col gap-2 min-w-[160px] justify-center">
                     {% if sol.estado == 'REGISTRADA' %}
+                        <!-- Paso 2: Jefe de Unidad [11] -->
                         {% if request.user.perfilusuario.rol == 'JEFE_INMEDIATO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <a href="{% url 'revisar_solicitud' sol.id %}" class="bg-[#ffa726] hover:bg-[#fb8c00] text-white text-center py-2.5 px-4 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 font-['Outfit']">
                                 <span class="material-symbols-outlined text-sm">rate_review</span> Autorizar
                             </a>
                         {% endif %}
                     {% elif sol.estado == 'REVISADA' %}
+                        <!-- Paso 3: Secretario SAF [28] -->
+                        {% if request.user.perfilusuario.rol == 'SECRETARIO_SAF' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                            <form method="POST" action="{% url 'validar_saf' sol.id %}" class="w-full">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2.5 px-4 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                    <span class="material-symbols-outlined text-sm">assignment_turned_in</span> Validar por SAF
+                                </button>
+                            </form>
+                        {% endif %}
+                    {% elif sol.estado == 'VALIDADA_SAF' %}
+                        <!-- Paso 4: Presupuestos (POA) [28] -->
                         {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'aprobar_solicitud' sol.id %}" class="w-full">
                                 {% csrf_token %}
@@ -209,7 +288,28 @@ Gestión de Solicitudes
                                 </button>
                             </form>
                         {% endif %}
-                    {% elif sol.estado == 'APROBADA' %}
+                    {% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}
+                        <!-- Paso 5: RPA [28] -->
+                        {% if request.user.perfilusuario.rol == 'RPA' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                            <form method="POST" action="{% url 'validar_rpa' sol.id %}" class="w-full">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2.5 px-4 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                    <span class="material-symbols-outlined text-sm">how_to_reg</span> Validar por RPA
+                                </button>
+                            </form>
+                        {% endif %}
+                    {% elif sol.estado == 'VALIDADA_RPA' %}
+                        <!-- Paso 6: Jefatura Administrativa [28] -->
+                        {% if request.user.perfilusuario.rol == 'JEFE_ADMINISTRATIVO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                            <form method="POST" action="{% url 'validar_jefatura' sol.id %}" class="w-full">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-center py-2.5 px-4 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                    <span class="material-symbols-outlined text-sm">gavel</span> Validar Jefatura
+                                </button>
+                            </form>
+                        {% endif %}
+                    {% elif sol.estado == 'VALIDADA_JEFATURA' %}
+                        <!-- Paso 7: Almacenero (Preparar) [28] -->
                         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'preparar_solicitud' sol.id %}" class="w-full">
                                 {% csrf_token %}
@@ -219,6 +319,7 @@ Gestión de Solicitudes
                             </form>
                         {% endif %}
                     {% elif sol.estado == 'PREPARADA' %}
+                        <!-- Paso 8: Almacenero (Entregar) [28] -->
                         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'entregar_solicitud' sol.id %}" class="w-full">
                                 {% csrf_token %}
@@ -229,7 +330,7 @@ Gestión de Solicitudes
                         {% endif %}
                     {% endif %}
 
-                    <!-- Botón de Ver Detalles (Fijo) -->
+                    <!-- Botón estándar de ver detalles (Bajo el botón de color) -->
                     <a href="{% url 'detalle_solicitud' sol.id %}" class="border border-gray-300 bg-white dark:bg-slate-900/60 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 text-center py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition font-['Outfit']">
                         <span class="material-symbols-outlined text-sm">visibility</span> Detalles
                     </a>
@@ -237,9 +338,14 @@ Gestión de Solicitudes
 
             </div>
             {% empty %}
-            <div class="p-8 text-center text-gray-400 dark:text-gray-500">No se registran solicitudes activas en el sistema.</div>
+            <div class="p-8 text-center text-gray-400 dark:text-gray-500 font-['Outfit']">No se registran solicitudes activas en el sistema.</div>
             {% endfor %}
         </div>
     </div>
 </div>
+
+<script>
+    // Aplica el ancho dinámico a las barras de progreso del listado sin activar el validador de CSS de VS Code [28]
+    document.querySelectorAll('.progress-bar-line').forEach(el => el.style.width = el.getAttribute('data-width') + '%');
+</script>
 {% endblock %}

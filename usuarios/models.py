@@ -18,6 +18,10 @@ ROLES = [
 
     ('ADMINISTRADOR', 'Administrador del Sistema'),
 
+     ('SECRETARIO_SAF', 'Secretario de la SAF'),
+    ('RPA', 'Responsable del Proceso de Contratación (RPA)'),
+    ('JEFE_ADMINISTRATIVO', 'Jefe Administrativo'),
+
 ]
 
 

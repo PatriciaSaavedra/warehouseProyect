@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from usuarios.decorators import rol_requerido
 from auditoria.models import Bitacora
-from inventario.models import Proveedor, PartidaPresupuestaria
+from inventario.models import Proveedor, PartidaPresupuestaria, MovimientoInventario  # <-- IMPORTACIÓN AGREGADA
 from solicitudes.models import Solicitud
 from .models import CompraMenor, ActaConformidad
 
@@ -25,10 +25,11 @@ def compras_list(request):
     )
 
 @login_required
-@rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR']) # <-- EXCLUSIVO BIENES Y SERVICIOS
+@rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
 def crear_compra_menor(request):
     """
-    Registra una Orden de Compra Menor por Bienes y Servicios (Máx: 50,000.00 Bs.) [28].
+    Registra una Orden de Compra Menor arrastrando automáticamente la partida 
+    y pre-calculando el monto estimado de la solicitud origen [28].
     """
     proveedores = Proveedor.objects.all().order_by('razon_social')
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
@@ -36,12 +37,27 @@ def crear_compra_menor(request):
     solicitud_id = request.GET.get('solicitud')
     solicitud_origen = None
     partida_defecto = None
+    monto_estimado = Decimal('0.00') # <-- NUEVO: Monto pre-calculado
 
     if solicitud_id:
         solicitud_origen = get_object_or_404(Solicitud, id=solicitud_id)
+        
+        # 1. Identificar la partida presupuestaria de los materiales sin stock
         primer_detalle = solicitud_origen.detalles.first()
         if primer_detalle:
             partida_defecto = primer_detalle.material.partida
+
+        # 2. Arrastrar y pre-calcular el costo total estimado de la compra [28]
+        for detalle in solicitud_origen.detalles.all():
+            # Buscamos el último costo de ingreso de cada material para estimar el total
+            last_entrada = MovimientoInventario.objects.filter(
+                material=detalle.material, 
+                tipo='ENTRADA'
+            ).order_by('-fecha').first()
+            
+            costo_u = last_entrada.costo_unitario if last_entrada else Decimal('0.00')
+            cantidad = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
+            monto_estimado += cantidad * costo_u
 
     if request.method == 'POST':
         proveedor_id = request.POST.get('proveedor')
@@ -109,6 +125,7 @@ def crear_compra_menor(request):
             'partidas': partidas,
             'solicitud_origen': solicitud_origen,
             'partida_defecto': partida_defecto,
+            'monto_estimado': monto_estimado,  # <-- ENVIAMOS EL MONTO PRE-CALCULADO
             'gestion_default': 2026
         }
     )
