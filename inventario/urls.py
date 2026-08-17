@@ -15,8 +15,8 @@ urlpatterns = [
     path('saldo-inicial/<int:id>/', views.establecer_saldo_inicial, name='establecer_saldo_inicial'),
     path('baja/', views.registrar_baja, name='registrar_baja'),
 
-    path('proveedores/', views.proveedores_list, name='proveedores_list'),
-    path('proveedores/crear/', views.crear_proveedor, name='crear_proveedor'),
-    path('proveedores/editar/<int:id>/', views.editar_proveedor, name='editar_proveedor'),
+    
     path('reporte/consumo/', views.reporte_consumo_unidades, name='reporte_consumo_unidades'),
+    path('entrada/obtener-items-compra/', views.obtener_items_compra_view, name='obtener_items_compra'),
+
 ]

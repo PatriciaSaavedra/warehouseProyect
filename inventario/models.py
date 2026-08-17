@@ -118,7 +118,14 @@ class NotaIngreso(models.Model):
     fecha = models.DateField(help_text="Fecha de recepción física de los bienes")
     usuario = models.ForeignKey(User, on_delete=models.PROTECT, help_text="Almacenero que registra el ingreso")
     fecha_registro = models.DateTimeField(auto_now_add=True)
-
+    compra_menor_origen = models.ForeignKey(
+        'compras.CompraMenor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notas_ingreso_asociadas',
+        help_text="Orden de Compra origen emitida por Bienes y Servicios"
+    )
     def __str__(self):
         return f"Nota de Ingreso Nro: {self.nro_nota} - {self.proveedor.razon_social}"
 

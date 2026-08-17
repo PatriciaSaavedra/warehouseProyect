@@ -8,36 +8,49 @@ Usuarios
 
 <div class="max-w-7xl mx-auto">
 
-    <!-- HEADER (Textos adaptables) -->
+    <!-- HEADER (Botones de administración unificados) -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
 
         <div>
-            <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100">
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 font-['Outfit']">
                 Usuarios
             </h1>
             <p class="text-gray-500 dark:text-gray-400 mt-1">
-                Administración de usuarios del sistema
+                Administración de cuentas y asignación de roles en la Gobernación .
             </p>
             <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">
                 Total registrados: {{ page_obj.paginator.count }}
             </p>
         </div>
 
-        <div>
+        <!-- Grupo de acciones unificado en cabecera superior derecha (Evita duplicidad) -->
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <!-- GESTIONAR UNIDADES (Bordeado Gris) -->
+            <a
+                href="{% url 'unidades_list' %}"
+                class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+            >
+                <span class="material-symbols-outlined text-[18px]">
+                    domain
+                </span>
+                <span>Gestionar Unidades</span>
+            </a>
+            
+            <!-- NUEVO USUARIO (Rojo Institucional) -->
             <a
                 href="{% url 'crear_usuario' %}"
-                class="btn-primary px-5 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 w-full sm:w-auto"
+                class="btn-primary px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
             >
-                <span class="material-symbols-outlined">
+                <span class="material-symbols-outlined text-[18px]">
                     person_add
                 </span>
-                Nuevo Usuario
+                <span>Nuevo Usuario</span>
             </a>
         </div>
 
     </div>
 
-    <!-- MENSAJES (Alertas adaptadas para que no deslumbren en modo oscuro) -->
+    <!-- MENSAJES DE ALERTA -->
     {% if messages %}
         <div class="space-y-3 mb-6">
             {% for message in messages %}
@@ -63,26 +76,24 @@ Usuarios
         </div>
     {% endif %}
 
-    <!-- CARD (Reemplazada por nuestra clase dinámica .card) -->
-    <div class="card overflow-hidden">
+    <!-- CARD PRINCIPAL -->
+    <div class="card overflow-hidden shadow-sm">
 
-        <!-- TABLE HEADER (Bordes adaptables) -->
-        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+        <!-- TABLE HEADER (Dedicado netamente a la búsqueda) -->
+        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/40">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
-                    <h2 class="font-semibold text-gray-800 dark:text-gray-100 text-lg">
-                        Lista de Usuarios
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100 text-lg font-['Outfit']">
+                        Lista de Usuarios Registrados
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-450 mt-0.5">
-                        {{ page_obj.paginator.count }} usuarios encontrados
+                        {{ page_obj.paginator.count }} cuentas de usuario encontradas
                     </p>
                 </div>
-
-                <!-- FORMULARIO DE BÚSQUEDA OPTIMIZADO (Inputs y botones legibles) -->
+                
+                <!-- Buscador de Usuarios -->
                 <form method="GET" action="." class="w-full lg:w-auto">
                     <div class="relative flex items-center">
-                        
-                        <!-- Icono de lupa que actúa como botón de submit -->
                         <button 
                             type="submit" 
                             title="Buscar"
@@ -99,9 +110,9 @@ Usuarios
                             value="{{ query|default:'' }}"
                             placeholder="Buscar usuario..."
                             class="w-full lg:w-80 pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-700 rounded-2xl bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 transition text-sm"
-                            style="--tw-ring-color: var(--primary);">
+                            style="--tw-ring-color: var(--primary);"
+                        >
 
-                        <!-- Botón para limpiar los parámetros de búsqueda y ver toda la lista -->
                         {% if query %}
                             <a 
                                 href="?" 
@@ -113,36 +124,34 @@ Usuarios
                                 </span>
                             </a>
                         {% endif %}
-
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- TABLE -->
+        <!-- TABLA -->
         <div class="overflow-x-auto">
             <table class="w-full min-w-[800px]">
                 <thead class="bg-gray-50 dark:bg-slate-900/50">
-                    <tr class="text-left text-xs text-gray-505 dark:text-gray-400 uppercase tracking-wider">
-                        <th class="px-6 py-4 font-semibold">Usuario</th>
-                        <th class="px-6 py-4 font-semibold">Unidad</th>
-                        <th class="px-6 py-4 font-semibold">Registro</th>
-                        <th class="px-6 py-4 font-semibold">Correo</th>
-                        <th class="px-6 py-4 font-semibold">Rol</th>
-                        <th class="px-6 py-4 font-semibold">Estado</th>
-                        <th class="px-6 py-4 font-semibold text-right">Acciones</th>
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">
+                        <th class="px-6 py-4">Usuario</th>
+                        <th class="px-6 py-4">Unidad Organizacional</th>
+                        <th class="px-6 py-4 w-36">Registro</th>
+                        <th class="px-6 py-4">Correo</th>
+                        <th class="px-6 py-4 w-52">Rol del Sistema</th>
+                        <th class="px-6 py-4 text-center w-28">Estado</th>
+                        <th class="px-6 py-4 text-right pr-8 w-32">Acciones</th>
                     </tr>
                 </thead>
 
-                <!-- Filas adaptables con hover sutil para evitar destellos -->
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
                     {% for usuario in page_obj %}
                     <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
 
-                        <!-- USER -->
+                        <!-- USUARIO -->
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center gap-4">
-                                <div class="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm tracking-wider"
+                                <div class="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm tracking-wider font-['Outfit']"
                                 style="background-color: rgba(197,160,89,.20); color: var(--gold);">
                                     {% if usuario.first_name or usuario.last_name %}
                                         {{ usuario.first_name|slice:":1"|upper }}{{ usuario.last_name|slice:":1"|upper }}
@@ -165,15 +174,13 @@ Usuarios
                             </div>
                         </td>
 
-                        <!-- UNIDAD (Badge de oro dinámico) -->
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="badge-gold px-3 py-1 rounded-full text-xs font-medium">
-                                {% if usuario.perfilusuario and usuario.perfilusuario.unidad %}
-                                    {{ usuario.perfilusuario.unidad.nombre }}
-                                {% else %}
-                                    Sin unidad
-                                {% endif %}
-                            </span>
+                        <!-- UNIDAD ORGANIZACIONAL -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            {% if usuario.perfilusuario and usuario.perfilusuario.unidad %}
+                                {{ usuario.perfilusuario.unidad.nombre }}
+                            {% else %}
+                                <span class="text-gray-400 dark:text-gray-500 italic text-xs">Sin unidad asignada</span>
+                            {% endif %}
                         </td>
 
                         <!-- REGISTRO -->
@@ -186,7 +193,7 @@ Usuarios
                             </p>
                         </td>
 
-                        <!-- EMAIL -->
+                        <!-- CORREO -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                             {% if usuario.email %}
                                 {{ usuario.email }}
@@ -196,33 +203,31 @@ Usuarios
                         </td>
 
                         <!-- ROL -->
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="badge-primary px-3 py-1 rounded-full text-xs font-semibold">
-                                {% if usuario.perfilusuario %}
-                                    {{ usuario.perfilusuario.get_rol_display }}
-                                {% else %}
-                                    Sin rol
-                                {% endif %}
-                            </span>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            {% if usuario.perfilusuario %}
+                                {{ usuario.perfilusuario.get_rol_display }}
+                            {% else %}
+                                <span class="text-gray-400 dark:text-gray-500 italic text-xs">Sin rol</span>
+                            {% endif %}
                         </td>
 
-                        <!-- ESTADO (Indicadores activo/inactivo traslúcidos) -->
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <!-- ESTADO -->
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                             {% if usuario.is_active %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400">
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30">
                                     Activo
                                 </span>
                             {% else %}
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400">
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30">
                                     Inactivo
                                 </span>
                             {% endif %}
                         </td>
 
-                        <!-- ACTIONS (Bordes y hovers de botones de acción optimizados) -->
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <!-- ACCIONES -->
+                        <td class="px-6 py-4 whitespace-nowrap text-right pr-8">
                             <div class="flex items-center justify-end gap-2">
-                                <!-- EDIT -->
+                                <!-- Editar -->
                                 <a
                                     title="Editar usuario"
                                     href="{% url 'editar_usuario' usuario.id %}"
@@ -233,7 +238,7 @@ Usuarios
                                     </span>
                                 </a>
 
-                                <!-- RESET PASSWORD -->
+                                <!-- Reset Password -->
                                 <a
                                     title="Restablecer contraseña"
                                     href="{% url 'reset_password' usuario.id %}"
@@ -244,7 +249,7 @@ Usuarios
                                     </span>
                                 </a>
 
-                                <!-- TOGGLE STATUS -->
+                                <!-- Toggle Estado -->
                                 <a
                                     title="Cambiar estado"
                                     href="{% url 'toggle_usuario' usuario.id %}"
@@ -267,7 +272,7 @@ Usuarios
                     {% empty %}
 
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-['Outfit']">
                             <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2 block">
                                 group_off
                             </span>
@@ -284,41 +289,52 @@ Usuarios
             </table>
         </div>
 
-        <!-- PAGINATION (Adaptada para coincidir con la base oscura de la tarjeta) -->
-        {% if page_obj.paginator.num_pages > 1 %}
-            <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-slate-900/20">
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-                </p>
-
-                <div class="flex items-center gap-2">
-                    {% if page_obj.has_previous %}
-                        <a
-                            href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}"
-                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition font-medium"
-                        >
-                            Anterior
-                        </a>
-                    {% else %}
-                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 dark:border-gray-800 text-gray-300 dark:text-gray-600 cursor-not-allowed">
-                            Anterior
-                        </span>
-                    {% endif %}
-
-                    {% if page_obj.has_next %}
-                        <a
-                            href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}"
-                            class="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition font-medium"
-                        >
-                            Siguiente
-                        </a>
-                    {% else %}
-                        <span class="px-4 py-2 text-sm rounded-xl border border-gray-150 dark:border-gray-800 text-gray-300 dark:text-gray-600 cursor-not-allowed">
-                            Siguiente
-                        </span>
-                    {% endif %}
-                </div>
+        <!-- PAGINACIÓN NUMÉRICA PREMIUM (GAD Potosí - Arrastrando el filtro 'q') [28] -->
+        {% if page_obj.has_other_pages %}
+        <div class="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 font-['Outfit']">
+            <!-- Izquierda: Cantidad mostrada -->
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Mostrando del <strong>{{ page_obj.start_index }}</strong> al <strong>{{ page_obj.end_index }}</strong> de <strong>{{ page_obj.paginator.count }}</strong> usuarios totales [28].
             </div>
+            
+            <!-- Derecha: Índices de navegación (Manteniendo el buscador 'q') [28] -->
+            <div class="flex items-center gap-1 text-xs">
+                
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
+                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+                    </a>
+                {% else %}
+                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
+                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+                    </span>
+                {% endif %}
+                
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="w-8 h-8 rounded-xl bg-[#580000] text-white flex items-center justify-center font-bold shadow-sm select-none">
+                            {{ num }}
+                        </span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 font-semibold transition">
+                            {{ num }}
+                        </a>
+                    {% endif %}
+                {% endfor %}
+                
+              
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
+                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </a>
+                {% else %}
+                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
+                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </span>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
     </div>

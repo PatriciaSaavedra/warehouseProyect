@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Registrar Entrada
+Nueva Nota de Ingreso
 {% endblock %}
 
 {% block content %}
 
 <div class="max-w-6xl mx-auto">
 
-    <!-- CABECERA (Textos adaptables) -->
+    <!-- CABECERA -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
             <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
@@ -30,7 +30,7 @@ Registrar Entrada
         </a>
     </div>
 
-    <!-- MENSAJES DE ERROR (Alerta adaptable) -->
+    <!-- MENSAJES DE ERROR -->
     {% if messages %}
         <div class="mb-6">
             {% for message in messages %}
@@ -45,7 +45,7 @@ Registrar Entrada
     <form method="POST" id="form-ingreso" class="space-y-8">
         {% csrf_token %}
 
-        <!-- SECCIÓN 1: METADATOS DE CABECERA -->
+        <!-- SECCIÓN 1: METADATOS DE CABECERA (Estructura de grilla limpia de 3 columnas) -->
         <div class="card p-8 shadow-sm">
             <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-6 flex items-center gap-2">
                 <span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[22px]">description</span>
@@ -53,30 +53,47 @@ Registrar Entrada
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                <!-- PROVEEDOR (Selector adaptable) -->
+                
+                <!-- 1. VINCULAR A ORDEN DE COMPRA (Opcional) -->
                 <div>
-                    <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
-                        Proveedor <span class="text-[#8b0000]">*</span>
-                    </label>
+                    <label class="block mb-2 text-sm font-bold text-gray-400 dark:text-gray-500 font-['Outfit'] uppercase">Vincular a Orden de Compra (Opcional)</label>
                     <div class="relative">
                         <select
-                            name="proveedor"
-                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150 appearance-none pr-10"
-                            required
+                            id="select-compra-origen"
+                            name="compra_origen"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10"
                         >
-                            <option value="" class="dark:bg-[#151010]">Seleccione un proveedor</option>
-                            {% for prov in proveedores %}
-                                <option value="{{ prov.id }}" class="dark:bg-[#151010]">{{ prov.razon_social }} (NIT: {{ prov.nit }})</option>
+                            <option value="" data-proveedor="">-- Entrada Libre (Sin Orden) --</option>
+                            {% for comp in compras_pendientes %}
+                                <option value="{{ comp.id }}" data-proveedor="{{ comp.proveedor.id }}" data-monto="{{ comp.monto_total }}">
+                                    {{ comp.nro_orden }} - {{ comp.proveedor.razon_social }} (Monto: {{ comp.monto_total }} Bs. | Partida: {{ comp.partida.codigo }})
+                                </option>
                             {% endfor %}
                         </select>
-                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
-                            keyboard_arrow_down
-                        </span>
+                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
                     </div>
                 </div>
 
-                <!-- FECHA DE INGRESO -->
+                <!-- 2. PROVEEDOR (Unificado y compatible con JS de auto-rellenado) [28] -->
+                <div>
+                    <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Proveedor <span class="text-[#8b0000]">*</span></label>
+                    <div class="relative">
+                        <select
+                            id="select-proveedor"
+                            name="proveedor"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10"
+                            required
+                        >
+                            <option value="">Seleccione un proveedor</option>
+                            {% for prov in proveedores %}
+                                <option value="{{ prov.id }}">{{ prov.razon_social }} (NIT: {{ prov.nit }})</option>
+                            {% endfor %}
+                        </select>
+                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                    </div>
+                </div>
+
+                <!-- 3. FECHA DE INGRESO -->
                 <div>
                     <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Fecha de Recepción <span class="text-[#8b0000]">*</span>
@@ -89,7 +106,7 @@ Registrar Entrada
                     >
                 </div>
 
-                <!-- COMPROBANTE C-31 SIGEP -->
+                <!-- 4. COMPROBANTE C-31 SIGEP -->
                 <div>
                     <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Nro. de C-31 (SIGEP)
@@ -102,7 +119,7 @@ Registrar Entrada
                     >
                 </div>
 
-                <!-- NRO DE FACTURA -->
+                <!-- 5. NRO DE FACTURA -->
                 <div>
                     <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Nro. de Factura
@@ -115,7 +132,7 @@ Registrar Entrada
                     >
                 </div>
 
-                <!-- NOTA DE ENTREGA -->
+                <!-- 6. NOTA DE ENTREGA -->
                 <div>
                     <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
                         Nota de Entrega / Remisión
@@ -128,8 +145,8 @@ Registrar Entrada
                     >
                 </div>
 
-                <!-- REINGRESO -->
-                <div class="flex items-center gap-3 pt-8">
+                <!-- 7. REINGRESO (Ocupa ancho de columna completo) -->
+                <div class="flex items-center gap-3 pt-4 sm:pt-8 md:col-span-3">
                     <input
                         type="checkbox"
                         id="reingreso"
@@ -151,7 +168,6 @@ Registrar Entrada
                     <span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[22px]">inventory</span>
                     Materiales a Adquirir
                 </h2>
-                <!-- Botón de adición con colores adaptados -->
                 <button
                     type="button"
                     id="btn-agregar-fila"
@@ -179,7 +195,6 @@ Registrar Entrada
                 </table>
             </div>
 
-            <!-- TOTALIZADOR GENERAL (Bordes e indicador adaptable) -->
             <div class="p-6 bg-gray-50/50 dark:bg-slate-900/30 border-t border-gray-100 dark:border-gray-800 flex justify-end items-center gap-4 pr-12">
                 <span class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider font-['Outfit']">Total Nota:</span>
                 <span class="text-2xl font-black text-gray-800 dark:text-gray-100"><span id="lbl-total-general">0.00</span> Bs.</span>
@@ -209,7 +224,7 @@ Registrar Entrada
 
 </div>
 
-<!-- TEMPLATE FILA (Adaptado con las clases dinámicas 'dark:' para que JavaScript lo clone con los estilos Warm Dark) -->
+<!-- TEMPLATE FILA -->
 <template id="fila-template">
     <tr class="fila-material hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
         <!-- MATERIAL SELECT -->
@@ -276,7 +291,7 @@ Registrar Entrada
     </tr>
 </template>
 
-<!-- JAVASCRIPT DINÁMICO -->
+<!-- JAVASCRIPT DINÁMICO (Cálculos de totales) -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const btnAgregar = document.getElementById('btn-agregar-fila');
@@ -319,6 +334,115 @@ Registrar Entrada
         btnAgregar.addEventListener('click', agregarNuevaFila);
 
         agregarNuevaFila();
+    });
+</script>
+
+<!-- JAVASCRIPT AUTO-RELLENADO DESDE ORDEN DE COMPRA (PEPS SABS) [28] -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectCompra = document.getElementById('select-compra-origen');
+        const selectProveedor = document.getElementById('select-proveedor');
+        const tbody = document.getElementById('tbody-materiales');
+        const template = document.getElementById('fila-template');
+        const lblTotalGeneral = document.getElementById('lbl-total-general');
+
+        // Función reutilizable para calcular totales de la tabla
+        function calcularTotales() {
+            let totalGeneral = 0;
+            const filas = tbody.querySelectorAll('.fila-material');
+
+            filas.forEach(fila => {
+                const cantidad = parseInt(fila.querySelector('.input-cantidad').value) || 0;
+                const precio = parseFloat(fila.querySelector('.input-precio').value) || 0;
+                const subtotal = cantidad * precio;
+
+                fila.querySelector('.lbl-subtotal').textContent = subtotal.toFixed(2);
+                totalGeneral += subtotal;
+            });
+
+            lblTotalGeneral.textContent = totalGeneral.toFixed(2);
+        }
+
+        // Listener de cambio en el selector de Órdenes de Compra
+        selectCompra.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const compraId = this.value;
+            const proveedorId = selectedOption.getAttribute('data-proveedor');
+
+            if (proveedorId) {
+                // 1. Auto-rellenar y bloquear el selector de proveedor
+                selectProveedor.value = proveedorId;
+                selectProveedor.style.pointerEvents = 'none';
+                selectProveedor.style.backgroundColor = 'rgba(125, 125, 125, 0.1)';
+
+                // 2. Consulta asíncrona (Fetch) para traer los materiales de la orden de compra [28]
+                fetch(`/inventario/entrada/obtener-items-compra/?compra_id=${compraId}`)
+                    .then(response => response.json())
+                    .then(materiales => {
+                        tbody.innerHTML = ''; // Limpiamos la tabla de filas vacías
+                        
+                        if (materiales.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-400">Esta orden de compra no tiene materiales asociados.</td></tr>';
+                        } else {
+                            // 3. Dibujar automáticamente cada fila en la tabla dinámica [28]
+                            materiales.forEach(item => {
+                                const clon = template.content.cloneNode(true);
+                                const nuevaFila = clon.querySelector('.fila-material');
+
+                                // Sincronizar selector de materiales y deshabilitar para evitar alteración
+                                const selMaterial = nuevaFila.querySelector('.select-material');
+                                selMaterial.value = item.material_id;
+                                selMaterial.style.pointerEvents = 'none';
+                                selMaterial.style.backgroundColor = 'rgba(125, 125, 125, 0.1)';
+
+                                // Sincronizar cantidad pre-aprobada
+                                const inputCant = nuevaFila.querySelector('.input-cantidad');
+                                inputCant.value = item.cantidad;
+
+                                // Sincronizar precio unitario de referencia
+                                const inputPrecio = nuevaFila.querySelector('.input-precio');
+                                inputPrecio.value = item.costo_unitario.toFixed(2);
+
+                                // Escuchadores de eventos para recalcular si el operador altera montos
+                                inputCant.addEventListener('input', calcularTotales);
+                                inputPrecio.addEventListener('input', calcularTotales);
+
+                                // Botón de quitar fila
+                                nuevaFila.querySelector('.btn-quitar-fila').addEventListener('click', function() {
+                                    nuevaFila.remove();
+                                    calcularTotales();
+                                });
+
+                                tbody.appendChild(nuevaFila);
+                            });
+                        }
+                        calcularTotales();
+                    });
+
+            } else {
+                // Si limpia el selector, desbloquear campos y limpiar tabla
+                selectProveedor.value = "";
+                selectProveedor.style.pointerEvents = 'auto';
+                selectProveedor.style.backgroundColor = '';
+                tbody.innerHTML = '';
+                
+                // Insertar una fila vacía por defecto
+                const btnAgregar = document.getElementById('btn-agregar-fila');
+                if (btnAgregar) {
+                    // Llamamos a la función de agregar fila por defecto que ya tienes en tu otro script de la plantilla
+                    const clon = template.content.cloneNode(true);
+                    const nuevaFila = clon.querySelector('.fila-material');
+                    nuevaFila.querySelector('.input-cantidad').addEventListener('input', calcularTotales);
+                    nuevaFila.querySelector('.input-precio').addEventListener('input', calcularTotales);
+                    nuevaFila.querySelector('.btn-quitar-fila').addEventListener('click', function() {
+                        nuevaFila.remove();
+                        calcularTotales();
+                    });
+                    tbody.appendChild(nuevaFila);
+                }
+                calcularTotales();
+            }
+        });
     });
 </script>
 

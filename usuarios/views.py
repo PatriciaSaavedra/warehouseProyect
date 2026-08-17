@@ -276,3 +276,116 @@ def perfil_usuario_view(request):
             'perfil': perfil
         }
     )
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def unidades_list_view(request):
+    """
+    Lista y filtra las Unidades Organizacionales de la Gobernación [28].
+    """
+    query = request.GET.get('q', '').strip()
+    unidades = UnidadOrganizacional.objects.all()
+
+    if query:
+        unidades = unidades.filter(
+            Q(nombre__icontains=query) |
+            Q(codigo_sigep__icontains=query)
+        )
+
+    unidades = unidades.order_by('nombre')
+
+    paginator = Paginator(unidades, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        'usuarios/unidades_list.html',
+        {
+            'page_obj': page_obj,
+            'query': query
+        }
+    )
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def crear_unidad_view(request):
+    """
+    Registra una nueva Unidad Organizacional de forma atómica en el sistema [11, 28].
+    """
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        codigo_sigep = request.POST.get('codigo_sigep', '').strip()
+
+        if not nombre:
+            messages.error(request, 'El nombre de la unidad es obligatorio.')
+            return redirect('crear_unidad')
+
+        # Validar duplicación
+        if UnidadOrganizacional.objects.filter(nombre__iexact=nombre).exists():
+            messages.error(request, 'Ya existe una Unidad Organizacional registrada con este nombre.')
+            return redirect('crear_unidad')
+
+        try:
+            with transaction.atomic():
+                UnidadOrganizacional.objects.create(
+                    nombre=nombre,
+                    codigo_sigep=codigo_sigep if codigo_sigep else None
+                )
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Organización',
+                    accion='Crear Unidad',
+                    descripcion=f'Se creó la Unidad Organizacional: {nombre} (SIGEP: {codigo_sigep})'
+                )
+
+            messages.success(request, 'Unidad Organizacional creada correctamente.')
+            return redirect('unidades_list')
+
+        except Exception as e:
+            messages.error(request, f'Error al registrar la unidad: {str(e)}')
+            return redirect('crear_unidad')
+
+    return render(request, 'usuarios/crear_unidad.html')
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def editar_unidad_view(request, id):
+    """
+    Modifica los datos de una Unidad Organizacional existente [11, 28].
+    """
+    unidad = get_object_or_404(UnidadOrganizacional, id=id)
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        codigo_sigep = request.POST.get('codigo_sigep', '').strip()
+
+        if not nombre:
+            messages.error(request, 'El nombre de la unidad es un campo obligatorio.')
+            return redirect('editar_unidad', id=id)
+
+        # Validar duplicados excluyendo a la unidad actual
+        if UnidadOrganizacional.objects.filter(nombre__iexact=nombre).exclude(id=id).exists():
+            messages.error(request, 'Ya existe otra Unidad Organizacional con ese nombre en el sistema.')
+            return redirect('editar_unidad', id=id)
+
+        try:
+            with transaction.atomic():
+                unidad.nombre = nombre
+                unidad.codigo_sigep = codigo_sigep if codigo_sigep else None
+                unidad.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Organización',
+                    accion='Editar Unidad',
+                    descripcion=f'Se actualizaron los datos de la unidad: {nombre}'
+                )
+
+            messages.success(request, 'Unidad Organizacional actualizada correctamente.')
+            return redirect('unidades_list')
+
+        except Exception as e:
+            messages.error(request, f'Error al actualizar la unidad: {str(e)}')
+            return redirect('editar_unidad', id=id)
+
+    return render(request, 'usuarios/editar_unidad.html', {'unidad': unidad})

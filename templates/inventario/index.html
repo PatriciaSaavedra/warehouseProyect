@@ -72,18 +72,6 @@ Inventario
                 <span>Movimientos</span>
             </a>
 
-            {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                <!-- Proveedores -->
-                <a
-                    href="{% url 'proveedores_list' %}"
-                    class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-                >
-                    <span class="material-symbols-outlined text-[18px]">
-                        local_shipping
-                    </span>
-                    <span>Proveedores</span>
-                </a>
-            {% endif %}
 
         </div>
 

@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse 
 from decimal import Decimal
 from django.db.models import Sum
 from django.utils.dateparse import parse_date
@@ -53,218 +53,69 @@ def inventario_view(request):
     'KARDISTA',
     'ADMINISTRADOR'
 ])
-def reporte_inventario(request):
-    """
-    Genera el reporte de Inventario Físico Valorado tabular (Inciso e / Pág. 10 del Manual) [28].
-    Permite filtrar por rango de fechas mediante parámetros GET.
-    """
-    # 1. Obtener rango de fechas (Por defecto, gestión actual: 2026)
-    desde_str = request.GET.get('desde')
-    hasta_str = request.GET.get('hasta')
-
-    # Convertir o usar valores por defecto para la gestión de almacén
-    if desde_str:
-        desde = parse_date(desde_str)
-    else:
-        desde = datetime.date(2026, 1, 1)
-
-    if hasta_str:
-        hasta = parse_date(hasta_str)
-    else:
-        hasta = datetime.date(2026, 12, 31)
-
-    # 2. Consultar catálogo ordenado por código correlativo
-    materiales = Material.objects.all().order_by('codigo')
-
-    # Encabezados de doble nivel reglamentarios
-    headers_1 = ['Código', 'Descripción del Material', 'Unid.', 'Saldo Inicial / Apertura', '', 'Entradas del Periodo', '', 'Salidas del Periodo', '', 'Saldos de Cierre', '']
-    headers_2 = ['', '', '', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)']
-
-    data = [headers_1, headers_2]
-
-    # 3. Procesar matemáticamente los saldos físicos y monetarios por período
-    for mat in materiales:
-        # A. SALDOS ANTES de la fecha de inicio (Saldo Inicial acumulado)
-        mov_previos = MovimientoInventario.objects.filter(material=mat, fecha__date__lt=desde)
-        ini_cant = 0
-        ini_val = Decimal('0.00')
-        for m in mov_previos:
-            if m.tipo == 'ENTRADA':
-                ini_cant += m.cantidad
-                ini_val += m.costo_total
-            else:
-                ini_cant -= m.cantidad
-                ini_val -= m.costo_total
-
-        # B. MOVIMIENTOS DENTRO del rango de fechas
-        mov_periodo = MovimientoInventario.objects.filter(material=mat, fecha__date__range=[desde, hasta])
-        ent_cant = 0
-        ent_val = Decimal('0.00')
-        sal_cant = 0
-        sal_val = Decimal('0.00')
-        for m in mov_periodo:
-            if m.tipo == 'ENTRADA':
-                ent_cant += m.cantidad
-                ent_val += m.costo_total
-            else:
-                sal_cant += m.cantidad
-                sal_val += m.costo_total
-
-        # C. CÁLCULO DE SALDOS DE CIERRE
-        fin_cant = ini_cant + ent_cant - sal_cant
-        fin_val = ini_val + ent_val - sal_val
-
-        # Añadir fila al reporte tabular
-        data.append([
-            mat.codigo,
-            mat.nombre[:35], # Truncado preventivo para evitar desbordes en celdas
-            mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
-            str(ini_cant),
-            f"{ini_val:.2f}",
-            str(ent_cant),
-            f"{ent_val:.2f}",
-            str(sal_cant),
-            f"{sal_val:.2f}",
-            str(fin_cant),
-            f"{fin_val:.2f}"
-        ])
-
-    # 4. Configurar el flujo de salida en PDF
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="inventario_fisico_valorado_{desde}_{hasta}.pdf"'
-
-    # Tamaño carta en orientación apaisada (Landscape): 792 x 612 pt
-    pdf = canvas.Canvas(response, pagesize=landscape(letter))
-    width, height = landscape(letter)
-
-    # 5. Dibujar títulos y metadatos de cabecera
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(50, height - 50, "INVENTARIO FÍSICO VALORADO DE ALMACENES")
-    
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(50, height - 75, f"Gobierno Autónomo Departamental de Potosí")
-    pdf.drawString(50, height - 90, f"Período de Evaluación: Desde {desde.strftime('%d/%m/%Y')} hasta {hasta.strftime('%d/%m/%Y')}")
-
-    # 6. Configurar la Tabla con ReportLab
-    # Ajuste de anchos para sumar 692pt en total (Dejando 50pt de margen lateral izquierdo y derecho)
-    col_widths = [65, 142, 35, 45, 60, 45, 60, 45, 60, 45, 65]
-    t = Table(data, colWidths=col_widths)
-
-    # Estilos tabulares de ReportLab conformes al manual institucional de AGETIC (Pág 10)
-    t_style = TableStyle([
-        # Unión de cabeceras de doble nivel
-        ('SPAN', (0, 0), (0, 1)),  # Código
-        ('SPAN', (1, 0), (1, 1)),  # Descripción
-        ('SPAN', (2, 0), (2, 1)),  # Unidad
-        ('SPAN', (3, 0), (4, 0)),  # Saldo Inicial
-        ('SPAN', (5, 0), (6, 0)),  # Entradas
-        ('SPAN', (7, 0), (8, 0)),  # Salidas
-        ('SPAN', (9, 0), (10, 0)), # Saldo Cierre
-
-        # Alineación y estilos de texto
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 2), (1, -1), 'LEFT'),  # Nombres de materiales a la izquierda
-        ('ALIGN', (4, 2), (4, -1), 'RIGHT'), # Importes alineados a la derecha
-        ('ALIGN', (6, 2), (6, -1), 'RIGHT'),
-        ('ALIGN', (8, 2), (8, -1), 'RIGHT'),
-        ('ALIGN', (10, 2), (10, -1), 'RIGHT'),
-
-        # Fuentes y colores de cabecera
-        ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 1), 8),
-        ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
-
-        # Bordes y cuadrícula suave de auditoría
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
-        ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
-
-        # Fuentes del contenido
-        ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 2), (-1, -1), 7.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-    ])
-
-    t.setStyle(t_style)
-
-    # Calcular y pintar la tabla en el canvas
-    table_height = len(data) * 16  # Aproximadamente 16pt por fila
-    t.wrapOn(pdf, 50, height - 120 - table_height)
-    t.drawOn(pdf, 50, height - 120 - table_height)
-
-    pdf.save()
-
-    # Registrar en bitácora
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Inventario',
-        accion='Exportar Inventario Valorado',
-        descripcion=f'Se exportó el reporte de Inventario Físico Valorado desde {desde} hasta {hasta}.'
-    )
-
-    return response
-@login_required
-@rol_requerido([
-    'ALMACENERO',
-    'KARDISTA',
-    'ADMINISTRADOR'
-])
 def kardex_pdf(request, id):
     """
-    Genera el reporte PDF oficial del Kardex de Existencias Valorado (Pág. 12) [28].
+    Genera el reporte PDF oficial del Kardex de Existencias Valorado en Vista Previa (Pág. 12) [28].
+    Versión blindada con coordenadas absolutas de grilla para evitar KeyErrors en ReportLab [28].
     """
     material = get_object_or_404(Material, id=id)
 
     # Consultar movimientos en orden cronológico para calcular los saldos acumulados
     movimientos_db = MovimientoInventario.objects.filter(material=material).order_by('fecha')
 
-    # 1. Definir los encabezados de doble nivel para la cuadrícula
-    headers_nivel_1 = ['Fecha', 'Detalle / Referencia', 'Cantidades (Físico)', '', '', 'P. Unitario\n(Bs.)', 'Importes (Valorado)', '', '']
-    headers_nivel_2 = ['', '', 'Entrada', 'Salida', 'Saldo', '', 'Entrada', 'Salida', 'Saldo']
-
-    # Unir encabezados con el contenido procesado
-    data = [headers_nivel_1, headers_nivel_2]
+    # 1. Definir los encabezados de doble nivel para la cuadrícula (9 Columnas exactas) [28]
+    data = [
+        ['Fecha', 'Detalle / Referencia', 'Cantidades (Físico)', '', '', 'P. Unitario\n(Bs.)', 'Importes (Valorado)', '', ''],
+        ['', '', 'Entrada', 'Salida', 'Saldo', '', 'Entrada', 'Salida', 'Saldo']
+    ]
 
     saldo_fisico = 0
     saldo_valorado = Decimal('0.00')
 
+    # 2. Procesar los movimientos convirtiendo preventivamente todas las celdas a strings [28]
     for mov in movimientos_db:
         if mov.tipo == 'ENTRADA':
             saldo_fisico += mov.cantidad
-            saldo_valorado += mov.costo_total
-            entrada_cant = str(mov.cantidad)
-            salida_cant = ""
-            entrada_imp = f"{mov.costo_total:.2f}"
-            salida_imp = ""
-        else:  # SALIDA
+            saldo_valorado += (mov.costo_total or Decimal('0.00'))
+            ent_cant = str(mov.cantidad)
+            sal_cant = ""
+            ent_imp = f"{(mov.costo_total or Decimal('0.00')):.2f}"
+            sal_imp = ""
+        else:  # SALIDA o BAJA
             saldo_fisico -= mov.cantidad
-            saldo_valorado -= mov.costo_total
-            entrada_cant = ""
-            salida_cant = str(mov.cantidad)
-            entrada_imp = ""
-            salida_imp = f"{mov.costo_total:.2f}"
+            saldo_valorado -= (mov.costo_total or Decimal('0.00'))
+            ent_cant = ""
+            sal_cant = str(mov.cantidad)
+            ent_imp = ""
+            sal_imp = f"{(mov.costo_total or Decimal('0.00')):.2f}"
 
+        # Añadir fila con 9 elementos exactos
         data.append([
-            mov.fecha.strftime('%d/%m/%Y'),
-            mov.referencia,
-            entrada_cant,
-            salida_cant,
+            str(mov.fecha.strftime('%d/%m/%Y')),
+            str(mov.referencia or ''),
+            str(ent_cant),
+            str(sal_cant),
             str(saldo_fisico),
-            f"{mov.costo_unitario:.2f}",
-            entrada_imp,
-            salida_imp,
+            f"{(mov.costo_unitario or Decimal('0.00')):.2f}",
+            str(ent_imp),
+            str(sal_imp),
             f"{saldo_valorado:.2f}"
         ])
 
-    # 2. Configurar la respuesta HTTP en formato PDF
+    # 3. Configurar respuesta PDF (Inline para Vista Previa)
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="kardex_{material.codigo}.pdf"'
+    response['Content-Disposition'] = f'inline; filename="kardex_{material.codigo}.pdf"'
 
-    # Usamos tamaño carta en formato apaisado (Landscape): 792 pt de ancho x 612 pt de alto
+    # Formato horizontal Landscape
     pdf = canvas.Canvas(response, pagesize=landscape(letter))
     width, height = landscape(letter)
 
-    # 3. Dibujar cabecera institucional del GAD Potosí
+    # Configurar metadatos para la pestaña del navegador [28]
+    pdf.setTitle(f"Kardex Valorado - {material.codigo}")
+    pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
+    pdf.setAuthor("Sistema de Gestión de Almacenes")
+
+    # Dibujar cabecera del documento
     pdf.setFont("Helvetica-Bold", 16)
     pdf.drawString(50, height - 50, "KARDEX DE EXISTENCIAS VALORADO")
 
@@ -288,59 +139,216 @@ def kardex_pdf(request, id):
     pdf.setFont("Helvetica", 10)
     pdf.drawString(480, height - 90, material.unidad_medida)
 
-    # 4. Configurar la Tabla con ReportLab
-    # Suma de anchos de columna: 70 + 182 + (3 * 50) + 60 + (3 * 60) = 642pt (Dejando 50pt de margen a los lados)
+    # FILE: inventario/views.py (Sección final de la función kardex_pdf corregida)
+
+    # 4. Construir la Tabla con ReportLab (Usando límites absolutos) [28]
     col_widths = [70, 182, 50, 50, 50, 60, 60, 60, 60]
-    
     t = Table(data, colWidths=col_widths)
 
-    # Estilos profesionales de la tabla (Sujeto a normas gubernamentales de almacén)
+    # Calculamos la última fila absoluta para evitar el bug del '-1' de ReportLab [28]
+    last_row = len(data) - 1
+
     t_style = TableStyle([
-        # Uniones de celdas (SPAN) para los encabezados de doble nivel
+        # SPAN para encabezados de doble nivel
         ('SPAN', (0, 0), (0, 1)),  # Fecha
         ('SPAN', (1, 0), (1, 1)),  # Detalle
         ('SPAN', (2, 0), (4, 0)),  # Cantidades (Físico)
         ('SPAN', (5, 0), (5, 1)),  # P. Unitario
         ('SPAN', (6, 0), (8, 0)),  # Importes (Valorado)
 
-        # Alineaciones de contenido
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 2), (1, -1), 'LEFT'),      # Detalle a la izquierda
-        ('ALIGN', (5, 2), (-1, -1), 'RIGHT'),    # Importes numéricos a la derecha
+        # Alineaciones de datos
+        ('ALIGN', (0, 0), (8, last_row), 'CENTER'),
+        ('ALIGN', (1, 2), (1, last_row), 'LEFT'),      # Detalle a la izquierda
+        ('ALIGN', (5, 2), (8, last_row), 'RIGHT'),     # Números a la derecha
 
-        # Fuentes de encabezado
-        ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 1), 9),
-        ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')), # Gris de fondo de cabecera
+        # Fuentes y colores de cabecera
+        ('FONTNAME', (0, 0), (8, 1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (8, 1), 9),
+        ('BACKGROUND', (0, 0), (8, 1), colors.HexColor('#F3F4F6')), 
 
-        # Bordes y grillas
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')), # Grilla general del Kardex
-        ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')), # Línea gruesa de separación
+        # Grillas y bordes
+        ('GRID', (0, 0), (8, last_row), 0.5, colors.HexColor('#D1D5DB')), 
 
         # Fuentes de contenido
-        ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 2), (-1, -1), 8),
+        ('FONTNAME', (0, 2), (8, last_row), 'Helvetica'),
+        ('FONTSIZE', (0, 2), (8, last_row), 8),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
     ])
-
     t.setStyle(t_style)
 
-    # Calcular la altura necesaria para dibujar la tabla
-    table_height = len(data) * 18  # Aproximadamente 18pt de altura por cada fila procesada
-    
-    # Dibujar la tabla estructurada en las coordenadas del canvas
-    t.wrapOn(pdf, 50, height - 120 - table_height)
-    t.drawOn(pdf, 50, height - 120 - table_height)
+    # =========================================================================
+    # --- CORRECCIÓN DEFINITIVA: RENDERIZADO PRECIOSO SIN TRUNCADO [28] ---
+    # =========================================================================
+    avail_width = width - 100
+    avail_height = height - 150
+
+    # 1. Recuperamos el alto real exacto compilado por ReportLab (h_actual) [28]
+    w_actual, h_actual = t.wrapOn(pdf, avail_width, avail_height)
+
+    # 2. Posicionamos el tope de la tabla a una distancia fija y segura del encabezado (height - 125) [28]
+    # Calculamos la coordenada Y de la base restando la altura real compilada (h_actual) [28]
+    pdf_y = height - 125 - h_actual
+    t.drawOn(pdf, 50, pdf_y)
+    # =========================================================================
 
     pdf.save()
 
-    # Registrar bitácora de auditoría
+    # Registrar en bitácora de auditoría
     Bitacora.objects.create(
         usuario=request.user,
         modulo='Inventario',
         accion='Exportar PDF Kardex',
         descripcion=f'Se descargó el PDF del Kardex de existencias para {material.nombre} ({material.codigo})'
+    )
+
+    return response
+
+@login_required
+@rol_requerido([
+    'ALMACENERO',
+    'KARDISTA',
+    'ADMINISTRADOR'
+])
+def reporte_inventario(request):
+    """
+    Genera el reporte de Inventario Físico Valorado tabular en Vista Previa (Inciso e / Pág. 10 del Manual) [28].
+    """
+    desde_str = request.GET.get('desde')
+    hasta_str = request.GET.get('hasta')
+
+    # Convertir o usar valores por defecto para la gestión de almacén (2026)
+    if desde_str:
+        desde = parse_date(desde_str)
+    else:
+        desde = datetime.date(2026, 1, 1)
+
+    if hasta_str:
+        hasta = parse_date(hasta_str)
+    else:
+        hasta = datetime.date(2026, 12, 31)
+
+    # Consultar catálogo ordenado por código correlativo
+    materiales = Material.objects.all().order_by('codigo')
+
+    # Encabezados de doble nivel reglamentarios
+    headers_1 = ['Código', 'Descripción del Material', 'Unid.', 'Saldo Inicial / Apertura', '', 'Entradas del Periodo', '', 'Salidas del Periodo', '', 'Saldos de Cierre', '']
+    headers_2 = ['', '', '', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)']
+
+    data = [headers_1, headers_2]
+
+    # Procesar matemáticamente los saldos físicos y monetarios por período
+    for mat in materiales:
+        mov_previos = MovimientoInventario.objects.filter(material=mat, fecha__date__lt=desde)
+        ini_cant = 0
+        ini_val = Decimal('0.00')
+        for m in mov_previos:
+            if m.tipo == 'ENTRADA':
+                ini_cant += m.cantidad
+                ini_val += m.costo_total
+            else:
+                ini_cant -= m.cantidad
+                ini_val -= m.costo_total
+
+        mov_periodo = MovimientoInventario.objects.filter(material=mat, fecha__date__range=[desde, hasta])
+        ent_cant = 0
+        ent_val = Decimal('0.00')
+        sal_cant = 0
+        sal_val = Decimal('0.00')
+        for m in mov_periodo:
+            if m.tipo == 'ENTRADA':
+                ent_cant += m.cantidad
+                ent_val += m.costo_total
+            else:
+                sal_cant += m.cantidad
+                sal_val += m.costo_total
+
+        # Cálculo de Saldos de Cierre
+        fin_cant = ini_cant + ent_cant - sal_cant
+        fin_val = ini_val + ent_val - sal_val
+
+        data.append([
+            mat.codigo,
+            mat.nombre[:35], 
+            mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
+            str(ini_cant),
+            f"{ini_val:.2f}",
+            str(ent_cant),
+            f"{ent_val:.2f}",
+            str(sal_cant),
+            f"{sal_val:.2f}",
+            str(fin_cant),
+            f"{fin_val:.2f}"
+        ])
+
+    response = HttpResponse(content_type='application/pdf')
+    # Cambiado a 'inline' para vista previa en el navegador [28]
+    response['Content-Disposition'] = f'inline; filename="inventario_fisico_valorado_{desde}_{hasta}.pdf"'
+
+    pdf = canvas.Canvas(response, pagesize=landscape(letter))
+    width, height = landscape(letter)
+
+    # =========================================================================
+    # --- NUEVO: CONFIGURAR METADATOS DEL DOCUMENTO PARA EL NAVEGADOR ---
+    # =========================================================================
+    pdf.setTitle(f"Inventario Valorado ({desde} a {hasta})")  # Nombrar tu pestaña automáticamente [28]
+    pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
+    pdf.setAuthor("Sistema de Gestión de Almacenes")
+    # =========================================================================
+
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(50, height - 50, "INVENTARIO FÍSICO VALORADO DE ALMACENES")
+    
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(50, height - 75, "Gobierno Autónomo Departamental de Potosí")
+    pdf.drawString(50, height - 90, f"Período de Evaluación: Desde {desde.strftime('%d/%m/%Y')} hasta {hasta.strftime('%d/%m/%Y')}")
+
+    # Configurar la Tabla con ReportLab
+    col_widths = [65, 142, 35, 45, 60, 45, 60, 45, 60, 45, 65]
+    t = Table(data, colWidths=col_widths)
+
+    t_style = TableStyle([
+        ('SPAN', (0, 0), (0, 1)),  
+        ('SPAN', (1, 0), (1, 1)),  
+        ('SPAN', (2, 0), (2, 1)),  
+        ('SPAN', (3, 0), (4, 0)),  
+        ('SPAN', (5, 0), (6, 0)),  
+        ('SPAN', (7, 0), (8, 0)),  
+        ('SPAN', (9, 0), (10, 0)), 
+
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 2), (1, -1), 'LEFT'),  
+        ('ALIGN', (4, 2), (4, -1), 'RIGHT'), 
+        ('ALIGN', (6, 2), (6, -1), 'RIGHT'),
+        ('ALIGN', (8, 2), (8, -1), 'RIGHT'),
+        ('ALIGN', (10, 2), (10, -1), 'RIGHT'),
+
+        ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 1), 8),
+        ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
+
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
+        ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
+
+        ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 2), (-1, -1), 7.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+    ])
+    t.setStyle(t_style)
+
+    table_height = len(data) * 16  
+    t.wrapOn(pdf, 50, height - 120 - table_height)
+    t.drawOn(pdf, 50, height - 120 - table_height)
+
+    pdf.save()
+
+    # Registrar en bitácora
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Inventario',
+        accion='Exportar Inventario Valorado',
+        descripcion=f'Se exportó el reporte de Inventario Físico Valorado desde {desde} hasta {hasta}.'
     )
 
     return response
@@ -426,16 +434,22 @@ def kardex(request, id):
             'movimientos': movimientos_valorados
         }
     )
+from compras.models import CompraMenor  # Asegura esta importación
+
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def entrada_inventario(request):
     """
-    Registra una Nota de Ingreso formal multi-ítem con proveedor y costos (Pág. 5 del Manual).
+    Registra una Nota de Ingreso jalando los datos de la Orden de Compra y actualizando su estado [28].
     """
+    # Obtenemos las Órdenes de Compra pendientes de ingreso de la gestión actual [28]
+    compras_pendientes = CompraMenor.objects.filter(completada=False, gestion=2026).select_related('proveedor', 'partida')
+    
     proveedores = Proveedor.objects.all().order_by('razon_social')
     materiales = Material.objects.all().order_by('codigo')
 
     if request.method == 'POST':
+        compra_id = request.POST.get('compra_origen')  # <-- Capturamos la Orden seleccionada
         proveedor_id = request.POST.get('proveedor')
         c31 = request.POST.get('c31', '').strip()
         nota_entrega = request.POST.get('nota_entrega', '').strip()
@@ -443,21 +457,22 @@ def entrada_inventario(request):
         reingreso = request.POST.get('reingreso') == 'on'
         fecha = request.POST.get('fecha')
 
-        # Listas dinámicas enviadas desde la tabla dinámica del HTML
         materiales_ids = request.POST.getlist('material_id[]')
         cantidades = request.POST.getlist('cantidad[]')
         precios_unitarios = request.POST.getlist('precio_unitario[]')
 
-        # Validaciones de cabecera e ítems mínimos
         if not proveedor_id or not fecha:
             messages.error(request, 'El proveedor y la fecha de ingreso son campos obligatorios.')
             return redirect('entrada_inventario')
 
-        if not materiales_ids or len(materiales_ids) == 0:
-            messages.error(request, 'Debe registrar al menos un material en el detalle de la nota.')
+        if not materiales_ids:
+            messages.error(request, 'Debe registrar al menos un material en el detalle del ingreso.')
             return redirect('entrada_inventario')
 
         proveedor = get_object_or_404(Proveedor, id=proveedor_id)
+        compra_origen = None
+        if compra_id:
+            compra_origen = get_object_or_404(CompraMenor, id=compra_id)
 
         # Autogenerar nro de nota correlativa automática
         total_notas = NotaIngreso.objects.count() + 1
@@ -465,7 +480,7 @@ def entrada_inventario(request):
 
         try:
             with transaction.atomic():
-                # 1. Crear cabecera de la Nota de Ingreso
+                # 1. Crear cabecera de la Nota de Ingreso vinculándola a la compra
                 nota = NotaIngreso.objects.create(
                     nro_nota=nro_nota,
                     proveedor=proveedor,
@@ -474,18 +489,21 @@ def entrada_inventario(request):
                     factura=factura if factura else None,
                     reingreso=reingreso,
                     fecha=fecha,
-                    usuario=request.user
+                    usuario=request.user,
+                    compra_menor_origen=compra_origen  # <-- GUARDAMOS EL VÍNCULO
                 )
 
-                # 2. Procesar cada material en el lote
+                # 2. Si venía de una compra, la marcamos como completada (Ingresada) [28]
+                if compra_origen:
+                    compra_origen.completada = True
+                    compra_origen.save()
+
+                # 3. Procesar cada material en el lote PEPS
                 for i in range(len(materiales_ids)):
                     m_id = materiales_ids[i]
                     cant = int(cantidades[i])
                     p_uni = Decimal(precios_unitarios[i])
                     p_tot = cant * p_uni
-
-                    if cant <= 0 or p_uni < 0:
-                        raise ValueError("Cantidad o precio unitario inválido en el detalle.")
 
                     material = get_object_or_404(Material, id=m_id)
                     stock_anterior = material.stock_actual
@@ -494,7 +512,7 @@ def entrada_inventario(request):
                     material.stock_actual += cant
                     material.save()
 
-                    # Registrar detalle de la Nota de Ingreso
+                    # Registrar detalle
                     NotaIngresoDetalle.objects.create(
                         nota_ingreso=nota,
                         material=material,
@@ -503,12 +521,12 @@ def entrada_inventario(request):
                         precio_total=p_tot
                     )
 
-                    # Registrar movimiento físico-valorado en el Kardex
+                    # Registrar en el Kardex alimentando el saldo disponible PEPS
                     MovimientoInventario.objects.create(
                         material=material,
                         tipo='ENTRADA',
                         cantidad=cant,
-                        saldo_disponible_lote=cant,
+                        saldo_disponible_lote=cant,  # Alimentamos lote PEPS
                         costo_unitario=p_uni,
                         costo_total=p_tot,
                         stock_anterior=stock_anterior,
@@ -517,15 +535,14 @@ def entrada_inventario(request):
                         usuario=request.user
                     )
 
-                # Registrar auditoría
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
                     accion='Registrar Nota de Ingreso',
-                    descripcion=f'Se registró la Nota de Ingreso {nro_nota} de {proveedor.razon_social} con {len(materiales_ids)} ítems.'
+                    descripcion=f'Se registró la Nota de Ingreso {nro_nota} por compra {nro_nota}'
                 )
 
-            messages.success(request, f'Nota de Ingreso {nro_nota} procesada y stock actualizado de manera exitosa.')
+            messages.success(request, f'Nota de Ingreso {nro_nota} procesada correctamente.')
             return redirect('inventario')
 
         except Exception as e:
@@ -536,6 +553,7 @@ def entrada_inventario(request):
         request,
         'inventario/entrada.html',
         {
+            'compras_pendientes': compras_pendientes,  # <-- ENVIAMOS LAS COMPRAS PENDIENTES
             'proveedores': proveedores,
             'materiales': materiales
         }
@@ -943,107 +961,7 @@ def salida_inventario(request):
             'material_preseleccionado': material_preseleccionado
         }
     )
-@login_required
-@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
-def proveedores_list(request):
-    """
-    Lista todos los proveedores registrados en el sistema.
-    """
-    proveedores = Proveedor.objects.all().order_by('razon_social')
-    return render(
-        request, 
-        'inventario/proveedores_list.html', 
-        {'proveedores': proveedores}
-    )
 
-@login_required
-@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
-def crear_proveedor(request):
-    """
-    Registra un nuevo proveedor en la base de datos.
-    """
-    if request.method == 'POST':
-        nit = request.POST.get('nit', '').strip()
-        razon_social = request.POST.get('razon_social', '').strip()
-        telefono = request.POST.get('telefono', '').strip()
-        direccion = request.POST.get('direccion', '').strip()
-
-        if not nit or not razon_social:
-            messages.error(request, 'El NIT y la Razón Social son campos obligatorios.')
-            return redirect('crear_proveedor')
-
-        if Proveedor.objects.filter(nit=nit).exists():
-            messages.error(request, 'Ya existe un proveedor registrado con este NIT.')
-            return redirect('crear_proveedor')
-
-        try:
-            with transaction.atomic():
-                Proveedor.objects.create(
-                    nit=nit,
-                    razon_social=razon_social,
-                    telefono=telefono if telefono else None,
-                    direccion=direccion if direccion else None
-                )
-                Bitacora.objects.create(
-                    usuario=request.user,
-                    modulo='Inventario',
-                    accion='Registrar Proveedor',
-                    descripcion=f'Se registró al proveedor: {razon_social} (NIT: {nit})'
-                )
-
-            messages.success(request, 'Proveedor registrado correctamente.')
-            return redirect('proveedores_list')
-
-        except Exception as e:
-            messages.error(request, f'Error al registrar el proveedor: {str(e)}')
-            return redirect('crear_proveedor')
-
-    return render(request, 'inventario/crear_proveedor.html')
-
-@login_required
-@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
-def editar_proveedor(request, id):
-    """
-    Modifica la información de un proveedor.
-    """
-    proveedor = get_object_or_404(Proveedor, id=id)
-
-    if request.method == 'POST':
-        nit = request.POST.get('nit', '').strip()
-        razon_social = request.POST.get('razon_social', '').strip()
-
-        if not nit or not razon_social:
-            messages.error(request, 'El NIT y la Razón Social son campos obligatorios.')
-            return redirect('editar_proveedor', id=id)
-
-        # Validar NIT duplicado excluyendo al proveedor actual
-        if Proveedor.objects.filter(nit=nit).exclude(id=id).exists():
-            messages.error(request, 'El NIT ingresado ya pertenece a otro proveedor.')
-            return redirect('editar_proveedor', id=id)
-
-        try:
-            with transaction.atomic():
-                proveedor.nit = nit
-                proveedor.razon_social = razon_social
-                proveedor.telefono = request.POST.get('telefono', '').strip() or None
-                proveedor.direccion = request.POST.get('direccion', '').strip() or None
-                proveedor.save()
-
-                Bitacora.objects.create(
-                    usuario=request.user,
-                    modulo='Inventario',
-                    accion='Editar Proveedor',
-                    descripcion=f'Se modificaron los datos del proveedor: {razon_social}'
-                )
-
-            messages.success(request, 'Proveedor actualizado correctamente.')
-            return redirect('proveedores_list')
-
-        except Exception as e:
-            messages.error(request, f'Error al actualizar el proveedor: {str(e)}')
-            return redirect('editar_proveedor', id=id)
-
-    return render(request, 'inventario/editar_proveedor.html', {'proveedor': proveedor})
 
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
@@ -1078,3 +996,46 @@ def reporte_consumo_unidades(request):
             'datos_consumo': datos_consumo
         }
     )
+
+@login_required
+def obtener_items_compra_view(request):
+    """
+    API asíncrona que devuelve los materiales y cantidades aprobadas de una Orden de Compra [28].
+    """
+    compra_id = request.GET.get('compra_id')
+    if not compra_id:
+        return JsonResponse([], safe=False)
+
+    # Obtenemos la Orden de Compra y su solicitud de origen
+    compra = get_object_or_404(CompraMenor, id=compra_id)
+    solicitud = compra.solicitud_origen
+
+    if not solicitud:
+        return JsonResponse([], safe=False)
+
+    # Recuperamos el detalle de los materiales aprobados
+    detalles = solicitud.detalles.select_related('material')
+    data = []
+
+    for d in detalles:
+        if d.material:
+            # Estimamos el último costo de ingreso registrado en el Kardex PEPS
+            last_ent = MovimientoInventario.objects.filter(
+                material=d.material, 
+                tipo='ENTRADA'
+            ).order_by('-fecha').first()
+            
+            costo_u = last_ent.costo_unitario if last_ent else Decimal('0.00')
+            # Si el jefe aprobó una cantidad menor, arrastramos la cantidad aprobada
+            cantidad = d.cantidad_aprobada if d.cantidad_aprobada is not None else d.cantidad_solicitada
+
+            data.append({
+                'material_id': d.material.id,
+                'codigo': d.material.codigo,
+                'nombre': d.material.nombre,
+                'cantidad': cantidad,
+                'costo_unitario': float(costo_u),
+                'stock_actual': d.material.stock_actual
+            })
+
+    return JsonResponse(data, safe=False)

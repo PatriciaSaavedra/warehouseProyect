@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('', views.solicitudes, name='solicitudes'),
+    path('bandeja/', views.solicitudes_general, name='solicitudes_general'),
     path('nueva/', views.nueva_solicitud, name='nueva_solicitud'),
     path('buscar-materiales/', views.buscar_materiales, name='buscar_materiales'),
     path('detalle/<int:id>/', views.detalle_solicitud, name='detalle_solicitud'),
@@ -26,4 +27,5 @@ urlpatterns = [
     path('retroceder/<int:id>/', views.retroceder_estado_solicitud, name='retroceder_solicitud'),
     # --- EXPORTACIÓN ---
     path('pdf/<int:id>/', views.solicitud_pdf, name='solicitud_pdf'),
+    path('verificar/<str:codigo>/', views.verificar_documento_publico, name='verificar_documento'),
 ]

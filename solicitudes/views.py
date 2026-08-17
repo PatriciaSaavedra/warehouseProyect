@@ -1,107 +1,177 @@
 import json
 import html
-from django.utils import timezone 
 from decimal import Decimal
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, request
+from django.utils import timezone 
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden # <-- CORREGIDO: Se eliminó el import de 'request'
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import transaction, DatabaseError
 from django.contrib import messages
+from django.db.models import Q
+
+# Importaciones de ReportLab para el PDF oficial
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
+from django.core.paginator import Paginator
+
+# Importaciones para el dibujo del código QR nativo de ReportLab [28]
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics import renderPDF
+from reportlab.graphics.barcode.qr import QrCodeWidget
+
 from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD 
-from inventario.models import Material, MovimientoInventario
-from inventario.models import PartidaPresupuestaria, UnidadMedida
+from inventario.models import Material, MovimientoInventario, PartidaPresupuestaria, UnidadMedida
 from inventario.services import registrar_salida_valorada_peps  # Importamos nuestro servicio PEPS (FIFO)
 from usuarios.decorators import tiene_rol, rol_requerido
 from presupuestos.models import POA
 from auditoria.models import Bitacora
-from django.db.models import Q
+
+# Gestión fiscal actual de la Gobernación de Potosí
 GESTION_ACTUAL = 2026
+
+
+# ========================================================
+# FUNCIÓN AUXILIAR DE REDIRECCIÓN INTELIGENTE (UX) [28]
+# ========================================================
+def redirigir_despues_de_accion(request, solicitud):
+    """
+    Determina de forma dinámica adónde redirigir al usuario para no perder su contexto (UX) [28].
+    Garantiza que los revisores se mantengan en la Bandeja de Gestión y los solicitantes en sus pedidos [28].
+    """
+    perfil = getattr(request.user, 'perfilusuario', None)
+    rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+    
+    # Definimos el destino de retorno según el rol del usuario que interactúa [28]
+    if rol == 'UNIDAD_SOLICITANTE':
+        destino_default = 'solicitudes'          # Pestaña personal: Mis Solicitudes
+    else:
+        destino_default = 'solicitudes_general'  # Pestaña administrativa: Bandeja de Gestión [28]
+
+    referer = request.META.get('HTTP_REFERER', '')
+    
+    # Si viene desde el detalle, o de los formularios de revisión/rechazo, lo mantiene en el detalle del folio [28]
+    if 'detalle' in referer or 'revisar' in referer or 'rechazar' in referer:
+        return redirect('detalle_solicitud', id=solicitud.id)
+        
+    # Si opera desde la tabla, lo mantiene en la misma vista (respetando sus filtros y paginación) [28]
+    return redirect(referer if referer else destino_default)
+
+# ========================================================
+# VISTAS OPERATIVAS DEL MÓDULO DE SOLICITUDES
+# ========================================================
 
 @login_required
 def solicitudes(request):
     """
-    Listado principal de solicitudes con soporte de búsqueda y filtros avanzados (RE-SABS) [11, 28].
+    Pestaña Personal: Muestra estrictamente las solicitudes creadas por el usuario autenticado [11, 28].
     """
     perfil = getattr(request.user, 'perfilusuario', None)
-
     if not perfil:
-        return render(request, 'solicitudes/index.html', {'solicitudes': []})
+        return render(request, 'solicitudes/index_propias.html', {'solicitudes': []})
 
-    rol = perfil.rol
-    unidad = perfil.unidad
+    # Filtramos estrictamente por el usuario creador
+    solicitudes_query = Solicitud.objects.filter(solicitante=request.user)
 
-    # 1. Consulta base según el rol del usuario (Seguridad RE-SABS)
-    if rol == 'ADMINISTRADOR':
-        solicitudes_query = Solicitud.objects.all()
-    elif rol in ['JEFE_INMEDIATO', 'PRESUPUESTOS']:
-        solicitudes_query = Solicitud.objects.filter(unidad_solicitante=unidad)
-    else:
-        solicitudes_query = Solicitud.objects.filter(solicitante=request.user)
-
-    # 2. Capturar parámetros de filtrado desde GET [28]
+    # Buscador y rango de fechas básico para uso personal
     query = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
     desde_str = request.GET.get('desde', '').strip()
     hasta_str = request.GET.get('hasta', '').strip()
 
-    # Filtro A: Búsqueda por texto (Folio, Solicitante, Unidad o Justificación) [28]
     if query:
-        solicitudes_query = solicitudes_query.filter(
-            Q(codigo__icontains=query) |
-            Q(solicitante__username__icontains=query) |
-            Q(solicitante__first_name__icontains=query) |
-            Q(solicitante__last_name__icontains=query) |
-            Q(unidad_solicitante__nombre__icontains=query) |
-            Q(justificacion__icontains=query)
-        )
-
-    # Filtro B: Por Estado del Flujo [28]
+        solicitudes_query = solicitudes_query.filter(Q(codigo__icontains=query) | Q(justificacion__icontains=query))
     if filtro_estado:
         solicitudes_query = solicitudes_query.filter(estado=filtro_estado)
-
-    # Filtro C: Rango de Fechas [28]
     if desde_str:
         solicitudes_query = solicitudes_query.filter(fecha__gte=desde_str)
     if hasta_str:
         solicitudes_query = solicitudes_query.filter(fecha__lte=hasta_str)
 
-    # Ordenar por el más reciente
+    solicitudes_query = solicitudes_query.order_by('-id')
+
+    paginator = Paginator(solicitudes_query, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'solicitudes/index_propias.html', {
+        'page_obj': page_obj,
+        'query': query,
+        'filtro_estado': filtro_estado,
+        'desde': desde_str,
+        'hasta': hasta_str,
+        'estados': ESTADOS_SOLICITUD,
+        'rol': perfil.rol,
+    })
+
+
+@login_required
+@rol_requerido(['JEFE_INMEDIATO', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'RPA', 'JEFE_ADMINISTRATIVO', 'ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+def solicitudes_general(request):
+    """
+    Pestaña General / Bandeja de Gestión: Muestra y filtra todos los folios bajo norma SABS [28].
+    """
+    perfil = request.user.perfilusuario
+    rol = perfil.rol
+    unidad = perfil.unidad
+
+    # Consulta base según el rol del revisor [28]
+    if rol == 'ADMINISTRADOR' or rol in ['ALMACENERO', 'KARDISTA']:
+        solicitudes_query = Solicitud.objects.all()
+    else:
+        # Los jefes de unidad solo auditan las solicitudes pertenecientes a su oficina [11]
+        solicitudes_query = Solicitud.objects.filter(unidad_solicitante=unidad)
+
+    # Capturar parámetros de filtros avanzados
+    query = request.GET.get('q', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+    desde_str = request.GET.get('desde', '').strip()
+    hasta_str = request.GET.get('hasta', '').strip()
+
+    if query:
+        solicitudes_query = solicitudes_query.filter(
+            Q(codigo__icontains=query) |
+            Q(solicitante__username__icontains=query) |
+            Q(unidad_solicitante__nombre__icontains=query) |
+            Q(justificacion__icontains=query)
+        )
+    if filtro_estado:
+        solicitudes_query = solicitudes_query.filter(estado=filtro_estado)
+    if desde_str:
+        solicitudes_query = solicitudes_query.filter(fecha__gte=desde_str)
+    if hasta_str:
+        solicitudes_query = solicitudes_query.filter(fecha__lte=hasta_str)
+
     solicitudes_query = solicitudes_query.select_related('solicitante', 'unidad_solicitante').order_by('-id')
 
-    # 3. Cálculo de metricas superiores (KPIs) de la gestión actual
+    # KPIs superiores del Almacén [28]
     hoy = timezone.now().date()
     primer_dia_mes = hoy.replace(day=1)
     
     pendientes_count = Solicitud.objects.filter(estado='REGISTRADA').count()
     preparacion_count = Solicitud.objects.filter(estado__in=['APROBADA', 'PREPARADA']).count()
-    
-    # CORRECCIÓN 1: Contar solicitudes cuya entrega física real (fecha_entrega) haya sido hoy [28]
     entregas_hoy_count = Solicitud.objects.filter(estado='ENTREGADA', fecha_entrega__date=hoy).count()
-    
-    # CORRECCIÓN 2: Contar folios registrados automáticamente en el servidor durante este mes [28]
     total_folios_count = Solicitud.objects.filter(fecha_registro__date__gte=primer_dia_mes).count()
 
-    return render(request, 'solicitudes/index.html', {
-        'solicitudes': solicitudes_query,
+    paginator = Paginator(solicitudes_query, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'solicitudes/index_general.html', {
+        'solicitudes': page_obj, 
         'rol': rol,
         'kpi_pendientes': pendientes_count,
         'kpi_preparacion': preparacion_count,
         'kpi_entregas_hoy': entregas_hoy_count,
         'kpi_total_folios': total_folios_count,
-        # Mantener el estado de los campos de filtro en el HTML
         'query': query,
         'filtro_estado': filtro_estado,
         'desde': desde_str,
         'hasta': hasta_str,
         'estados': ESTADOS_SOLICITUD
     })
-
-@login_required
 @login_required
 def buscar_materiales(request):
     """
@@ -112,18 +182,16 @@ def buscar_materiales(request):
     if not q:
         return JsonResponse([], safe=False)
 
-    # Buscaremos coincidencias usando operadores OR ( | ) de Django [28]
     materiales = Material.objects.filter(
         Q(nombre__icontains=q) |
         Q(codigo__icontains=q) |
         Q(partida__codigo__icontains=q)
-    ).select_related('partida')[:10]  # Optimizamos con select_related para traer la partida rápido
+    ).select_related('partida')[:10]
 
-    # Pre-formateamos el nombre en el JSON para que el usuario vea el código al buscar (Ej: 32100-0001 - Papel Bond) [28]
     data = [
         {
             'id': m.id,
-            'nombre': f"{m.codigo} - {m.nombre}",  # Mostramos Código + Nombre en el buscador [28]
+            'nombre': f"{m.codigo} - {m.nombre}",
             'stock': m.stock_actual
         }
         for m in materiales
@@ -187,7 +255,6 @@ def nueva_solicitud(request):
                         raise ValueError("La cantidad solicitada debe ser mayor a cero.")
 
                     if es_nuevo:
-                        # Si es un ítem no catalogado, se guarda sin material_id
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
                             material=None,
@@ -250,7 +317,6 @@ def catalogar_item_pendiente(request, detalle_id):
 
         nombre = detalle.descripcion_material_no_catalogado
 
-        # Autogenerar código correlativo de manera automática para el nuevo material
         materiales_partida = Material.objects.filter(partida=partida).order_by('codigo')
         if materiales_partida.exists():
             ultimo_codigo = materiales_partida.last().codigo
@@ -265,7 +331,6 @@ def catalogar_item_pendiente(request, detalle_id):
 
         try:
             with transaction.atomic():
-                # 1. Crear el material oficial con stock en 0 para habilitar su posterior compra
                 material = Material.objects.create(
                     partida=partida,
                     codigo=codigo,
@@ -277,7 +342,6 @@ def catalogar_item_pendiente(request, detalle_id):
                     stock_minimo=stock_minimo
                 )
 
-                # 2. Asociar el material al detalle de la solicitud y desactivar bandera
                 detalle.material = material
                 detalle.es_nueva_adquisicion = False
                 detalle.descripcion_material_no_catalogado = None
@@ -307,25 +371,42 @@ def catalogar_item_pendiente(request, detalle_id):
         }
     )
 
+
 @login_required
 def detalle_solicitud(request, id):
+    """
+    Controla el acceso al detalle de la solicitud basándose en el rol del usuario [11, 28].
+    Garantiza que el Almacenero y los revisores SABS tengan acceso global para operar [28].
+    """
     solicitud = get_object_or_404(Solicitud, id=id)
     perfil = request.user.perfilusuario
+    rol = perfil.rol
 
-    # Control de accesos de seguridad
-    if perfil.rol != 'ADMINISTRADOR':
-        if perfil.rol in ['JEFE_INMEDIATO', 'PRESUPUESTOS']:
+    # 1. Definimos los roles que requieren acceso global al detalle para cumplir sus funciones SABS [28]
+    roles_globales = [
+        'ADMINISTRADOR', 
+        'ALMACENERO', 
+        'KARDISTA', 
+        'SECRETARIO_SAF', 
+        'PRESUPUESTOS', 
+        'RPA', 
+        'JEFE_ADMINISTRATIVO'
+    ]
+
+    if rol not in roles_globales:
+        if rol == 'JEFE_INMEDIATO':
+            # Los jefes de unidad solo auditan las solicitudes de su propia oficina [11]
             if solicitud.unidad_solicitante != perfil.unidad:
-                return HttpResponseForbidden("No autorizado para ver solicitudes de otras unidades.")
+                return HttpResponseForbidden("No tiene autorización para ver solicitudes de otras unidades.")
         else:
+            # Los funcionarios comunes solo pueden ver los requerimientos que ellos crearon [11]
             if solicitud.solicitante != request.user:
-                return HttpResponseForbidden("No autorizado.")
+                return HttpResponseForbidden("No tiene autorización para ver esta solicitud.")
 
     return render(request, 'solicitudes/detalle.html', {
         'solicitud': solicitud,
-        'rol': perfil.rol
+        'rol': rol
     })
-
 
 @login_required
 def revisar_solicitud(request, id):
@@ -336,17 +417,14 @@ def revisar_solicitud(request, id):
         return HttpResponseForbidden("No autorizado.")
 
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+    
     if not solicitud.tiene_detalles():
         messages.error(request, "La solicitud no contiene ningún material registrado y no puede ser procesada.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     if solicitud.estado != 'REGISTRADA':
         messages.error(request, "Esta solicitud ya no se encuentra en estado Registrada.")
-        return redirect('solicitudes')
-    
-    if solicitud.estado != 'REGISTRADA':
-        messages.error(request, "Esta solicitud ya no se encuentra en estado Registrada.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     detalles = solicitud.detalles.select_related('material')
 
@@ -363,8 +441,8 @@ def revisar_solicitud(request, id):
 
                 solicitud.estado = 'REVISADA'
                 solicitud.aprobado_por = request.user.get_full_name() or request.user.username
-                solicitud.revisado_por = request.user            # <-- NUEVO: Guarda el usuario
-                solicitud.fecha_revision = timezone.now()         # <-- NUEVO: Guarda fecha/hora
+                solicitud.revisado_por = request.user            
+                solicitud.fecha_revision = timezone.now()         
                 solicitud.save()
 
                 Bitacora.objects.create(
@@ -375,11 +453,11 @@ def revisar_solicitud(request, id):
                 )
 
             messages.success(request, f"Solicitud {solicitud.codigo} revisada y autorizada correctamente.")
-            return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+            return redirigir_despues_de_accion(request, solicitud)
 
         except DatabaseError:
             messages.error(request, "Error al procesar la revisión de la solicitud.")
-            return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+            return redirigir_despues_de_accion(request, solicitud)
 
     return render(request, 'solicitudes/aprobar.html', {
         'solicitud': solicitud,
@@ -388,22 +466,53 @@ def revisar_solicitud(request, id):
 
 
 @login_required
+@rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR'])
+def validar_saf(request, id):
+    """
+    Paso 3: El Secretario de la SAF valida la solicitud (Estado: VALIDADA_SAF) [28].
+    """
+    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+
+    if solicitud.estado != 'REVISADA':
+        messages.error(request, "La solicitud aún no ha sido revisada ni autorizada por su Jefe de Unidad.")
+        return redirigir_despues_de_accion(request, solicitud)
+
+    try:
+        with transaction.atomic():
+            solicitud.estado = 'VALIDADA_SAF'
+            solicitud.saf_por = request.user
+            solicitud.fecha_saf = timezone.now()
+            solicitud.save()
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Solicitudes',
+                accion='Validación SAF',
+                descripcion=f'El Secretario SAF validó la solicitud {solicitud.codigo}'
+            )
+
+        messages.success(request, f"Solicitud {solicitud.codigo} validada por la SAF.")
+    except Exception as e:
+        messages.error(request, f"Error al procesar validación SAF: {str(e)}")
+
+    return redirigir_despues_de_accion(request, solicitud)
+
+
+@login_required
 @rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
 def aprobar_solicitud(request, id):
     """
     Paso 4: Presupuestos verifica la disponibilidad del POA antes del despacho físico [28].
-    Solo permite validar solicitudes que ya cuenten con la validación de la SAF.
     """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    # CORRECCIÓN DE SEGURIDAD SABS: Espera el estado 'VALIDADA_SAF' [28]
     if solicitud.estado != 'VALIDADA_SAF':
         messages.error(request, "Solo solicitudes validadas por la SAF pueden aprobarse presupuestariamente.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes')) # <-- REDIRECCIÓN SEGURA (No te saca del folio)
+        return redirigir_despues_de_accion(request, solicitud)
 
     if not solicitud.tiene_detalles():
         messages.error(request, "La solicitud no contiene ningún material registrado y no puede ser aprobada presupuestariamente.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     detalles = solicitud.detalles.select_related('material__partida')
 
@@ -431,9 +540,8 @@ def aprobar_solicitud(request, id):
 
                 if not poa or poa.monto_disponible < costo:
                     messages.error(request, f"Presupuesto insuficiente en el POA de la unidad para la partida {partida.codigo}. Disponible: {poa.monto_disponible if poa else 0.00} Bs.")
-                    return redirect(request.META.get('HTTP_REFERER', 'solicitudes')) # <-- REDIRECCIÓN SEGURA (No te saca del folio)
+                    return redirigir_despues_de_accion(request, solicitud)
 
-            # Si pasa la validación, cambia a 'VALIDADA_PRESUPUESTOS' (Aprobada presupuestariamente) [28]
             solicitud.estado = 'VALIDADA_PRESUPUESTOS'
             solicitud.presupuestado_por = request.user
             solicitud.fecha_presupuesto = timezone.now()
@@ -447,11 +555,77 @@ def aprobar_solicitud(request, id):
             )
 
         messages.success(request, f"Solicitud {solicitud.codigo} aprobada presupuestariamente de forma correcta.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes')) # <-- REDIRECCIÓN SEGURA
+        return redirigir_despues_de_accion(request, solicitud)
 
     except DatabaseError:
         messages.error(request, "Error de base de datos al realizar el control presupuestario.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
+
+
+@login_required
+@rol_requerido(['RPA', 'ADMINISTRADOR'])
+def validar_rpa(request, id):
+    """
+    Paso 5: El Responsable del Proceso de Contratación (RPA) aprueba [28].
+    """
+    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+
+    if solicitud.estado != 'VALIDADA_PRESUPUESTOS':
+        messages.error(request, "Esta solicitud aún no cuenta con la aprobación presupuestaria.")
+        return redirigir_despues_de_accion(request, solicitud)
+
+    try:
+        with transaction.atomic():
+            solicitud.estado = 'VALIDADA_RPA'
+            solicitud.rpa_por = request.user
+            solicitud.fecha_rpa = timezone.now()
+            solicitud.save()
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Solicitudes',
+                accion='Aprobación RPA',
+                descripcion=f'El RPA aprobó la solicitud {solicitud.codigo}'
+            )
+
+        messages.success(request, f"Solicitud {solicitud.codigo} aprobada por el RPA.")
+    except Exception as e:
+        messages.error(request, f"Error al procesar aprobación RPA: {str(e)}")
+
+    return redirigir_despues_de_accion(request, solicitud)
+
+
+@login_required
+@rol_requerido(['JEFE_ADMINISTRATIVO', 'ADMINISTRADOR'])
+def validar_jefatura(request, id):
+    """
+    Paso 6: El Jefe Administrativo aprueba [28].
+    """
+    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+
+    if solicitud.estado != 'VALIDADA_RPA':
+        messages.error(request, "Esta solicitud aún no cuenta con la aprobación del RPA.")
+        return redirigir_despues_de_accion(request, solicitud)
+
+    try:
+        with transaction.atomic():
+            solicitud.estado = 'VALIDADA_JEFATURA'
+            solicitud.jefatura_por = request.user
+            solicitud.fecha_jefatura = timezone.now()
+            solicitud.save()
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Solicitudes',
+                accion='Aprobación Jefatura Administrativa',
+                descripcion=f'El Jefe Administrativo aprobó la solicitud {solicitud.codigo}'
+            )
+
+        messages.success(request, f"Solicitud {solicitud.codigo} aprobada por la Jefatura Administrativa.")
+    except Exception as e:
+        messages.error(request, f"Error al procesar aprobación de la Jefatura: {str(e)}")
+
+    return redirigir_despues_de_accion(request, solicitud)
 
 
 @login_required
@@ -459,14 +633,12 @@ def aprobar_solicitud(request, id):
 def preparar_solicitud(request, id):
     """
     Paso 7: El Almacenero alista los paquetes físicamente en el depósito [28].
-    Solo permite preparar solicitudes que ya cuenten con la aprobación de la Jefatura Administrativa.
     """
     solicitud = get_object_or_404(Solicitud, id=id)
 
-    # CORRECCIÓN DE SEGURIDAD SABS: Espera la aprobación de la Jefatura Administrativa [28]
     if solicitud.estado != 'VALIDADA_JEFATURA':
         messages.error(request, "Solo solicitudes con aprobación de la Jefatura Administrativa pueden prepararse físicamente.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     solicitud.estado = 'PREPARADA'
     solicitud.preparado_por = request.user
@@ -481,11 +653,13 @@ def preparar_solicitud(request, id):
     )
 
     messages.success(request, f"La solicitud {solicitud.codigo} ha sido marcada como PREPARADA para su despacho.")
-    return redirect(request.META.get('HTTP_REFERER', 'solicitudes')) 
+    return redirigir_despues_de_accion(request, solicitud)
+
+
 @login_required
 def entregar_solicitud(request, id):
     """
-    Paso 5: Entrega física de los materiales. Descuenta stock por PEPS y reduce el POA de la unidad solicitante [28].
+    Paso 8: Entrega física de los materiales. Descuenta stock por PEPS y reduce el POA de la unidad solicitante [28].
     """
     if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR']):
         return HttpResponseForbidden("No autorizado.")
@@ -494,7 +668,7 @@ def entregar_solicitud(request, id):
 
     if solicitud.estado != 'PREPARADA':
         messages.error(request, "Solo solicitudes en estado PREPARADA pueden entregarse físicamente.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     detalles = solicitud.detalles.select_related('material__partida')
 
@@ -505,16 +679,12 @@ def entregar_solicitud(request, id):
 
             for detalle in detalles:
                 material = Material.objects.get(id=detalle.material.id)
-                
-                # --- RESPALDO SEGURO CONTRA NULOS ---
-                # Si cantidad_aprobada es nula, despachamos la cantidad solicitada original
                 cantidad_despacho = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
 
                 if material.stock_actual < cantidad_despacho:
                     messages.error(request, f"Inconsistencia: Stock insuficiente en {material.nombre} para despachar la solicitud.")
-                    return redirect('solicitudes')
+                    return redirigir_despues_de_accion(request, solicitud)
 
-                # Consumir y calcular costo real PEPS
                 mov = registrar_salida_valorada_peps(
                     material=material,
                     cantidad_salida=cantidad_despacho,
@@ -524,15 +694,12 @@ def entregar_solicitud(request, id):
                     unidad_destino=solicitud.unidad_solicitante
                 )
 
-                # Guardamos la cantidad entregada real
                 detalle.cantidad_entregada = cantidad_despacho
                 detalle.save()
 
-                # Acumular el costo real de salida para restar del POA
                 partida = material.partida
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + mov.costo_total
 
-            # B. Descontar el presupuesto real consumido del POA de la unidad
             for partida, costo_real in costos_partidas.items():
                 poa = POA.objects.get(
                     unidad=solicitud.unidad_solicitante,
@@ -542,10 +709,9 @@ def entregar_solicitud(request, id):
                 poa.monto_disponible -= costo_real
                 poa.save()
 
-            # C. Cambiar estado a 'ENTREGADA'
             solicitud.estado = 'ENTREGADA'
-            solicitud.entregado_por = request.user                # <-- NUEVO: Guarda el usuario
-            solicitud.fecha_entrega = timezone.now()               # <-- NUEVO: Guarda fecha/hora
+            solicitud.entregado_por = request.user
+            solicitud.fecha_entrega = timezone.now()
             solicitud.save()
 
             Bitacora.objects.create(
@@ -556,17 +722,17 @@ def entregar_solicitud(request, id):
             )
 
         messages.success(request, f"Entrega física procesada y stock/POA deducidos de forma exitosa.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     except Exception as e:
         messages.error(request, f"Error al procesar el despacho PEPS/POA: {str(e)}")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
 
 @login_required
 def cerrar_solicitud(request, id):
     """
-    Paso 6: Concluye administrativamente la carpeta de solicitud (Pasa de 'ENTREGADA' a 'CERRADA').
+    Paso 9: Concluye administrativamente la carpeta de solicitud (Pasa de 'ENTREGADA' a 'CERRADA').
     """
     if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR']):
         return HttpResponseForbidden("No autorizado.")
@@ -575,11 +741,11 @@ def cerrar_solicitud(request, id):
 
     if solicitud.estado != 'ENTREGADA':
         messages.error(request, "Solo solicitudes ENTREGADAS pueden marcarse como CERRADAS.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     solicitud.estado = 'CERRADA'
-    solicitud.cerrado_por = request.user                          # <-- NUEVO: Guarda el usuario
-    solicitud.fecha_cierre = timezone.now()                        # <-- NUEVO: Guarda fecha/hora
+    solicitud.cerrado_por = request.user
+    solicitud.fecha_cierre = timezone.now()
     solicitud.save()
 
     Bitacora.objects.create(
@@ -590,7 +756,8 @@ def cerrar_solicitud(request, id):
     )
 
     messages.success(request, f"La solicitud {solicitud.codigo} ha sido CERRADA y archivada correctamente.")
-    return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+    return redirigir_despues_de_accion(request, solicitud)
+
 
 @login_required
 def editar_solicitud(request, id):
@@ -600,12 +767,10 @@ def editar_solicitud(request, id):
     solicitud = get_object_or_404(Solicitud, id=id)
     perfil = request.user.perfilusuario
 
-    # Control de accesos de seguridad
     if perfil.rol != 'ADMINISTRADOR':
         if solicitud.unidad_solicitante != perfil.unidad:
             return HttpResponseForbidden("No tiene permisos para modificar solicitudes de otra unidad.")
 
-    # Control de flujo: Solo es editable en estado inicial 'REGISTRADA' [28]
     if solicitud.estado != 'REGISTRADA':
         return HttpResponseForbidden("Esta solicitud ya se encuentra en proceso de revisión y no es editable.")
 
@@ -627,10 +792,8 @@ def editar_solicitud(request, id):
             "detalles_json": detalles_json
         })
 
-    # Procesar actualización mediante carga de payload JSON (POST/PUT)
     try:
         data = json.loads(request.body.decode("utf-8"))
-
         payload = data.get("payload", {})
         justificacion = data.get("justificacion", "")
 
@@ -644,7 +807,6 @@ def editar_solicitud(request, id):
             solicitud.justificacion = justificacion
             solicitud.save()
 
-            # Eliminar el detalle antiguo para registrar los nuevos cambios
             solicitud.detalles.all().delete()
 
             for material_id, cantidad in payload.items():
@@ -677,13 +839,13 @@ def editar_solicitud(request, id):
             "ok": False,
             "error": "Formato de datos JSON inválido"
         }, status=400)
-    
+
+
 @login_required
 def rechazar_solicitud(request, id):
     """
     Permite a cualquier rol revisor de la cadena SABS rechazar y archivar el requerimiento [28].
     """
-    # --- ACTUALIZAMOS LA LISTA DE ROLES AUTORIZADOS ---
     roles_revisores = [
         'JEFE_INMEDIATO', 
         'SECRETARIO_SAF', 
@@ -716,9 +878,10 @@ def rechazar_solicitud(request, id):
         )
 
         messages.info(request, f"La solicitud {solicitud.codigo} ha sido rechazada.")
-        return redirect('solicitudes')
+        return redirigir_despues_de_accion(request, solicitud)
 
     return render(request, 'solicitudes/rechazar.html', {'solicitud': solicitud})
+
 
 @login_required
 def reabrir_solicitud(request, id):
@@ -728,13 +891,13 @@ def reabrir_solicitud(request, id):
     solicitud = get_object_or_404(Solicitud, id=id)
 
     if solicitud.estado != 'RECHAZADA':
-       return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
-    solicitud.estado = 'REGISTRADA'  # Devuelve a estado inicial
+    solicitud.estado = 'REGISTRADA'
     solicitud.save()
 
     messages.info(request, f"La solicitud {solicitud.codigo} ha sido reabierta.")
-    return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+    return redirigir_despues_de_accion(request, solicitud)
 
 
 @login_required
@@ -748,24 +911,24 @@ def solicitud_pdf(request, id):
     )
 
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="pedido_material_{solicitud.codigo}.pdf"'
+    response['Content-Disposition'] = f'inline; filename="pedido_material_{solicitud.codigo}.pdf"'
 
-    # Formato Horizontal (Landscape) para acomodar todas las columnas oficiales del GAD Potosí
     pdf = canvas.Canvas(response, pagesize=landscape(letter))
     width, height = landscape(letter)
+    
+    pdf.setTitle(f"Pedido de Material {solicitud.codigo}")  # <-- ESTA LÍNEA NOMBRA TU PESTAÑA AUTOMÁTICAMENTE [28]
+    pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
+    pdf.setAuthor("Sistema de Gestión de Almacenes")
 
-    # --- DIBUJAR CABECERA INSTITUCIONAL (Lado izquierdo) ---
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawString(50, height - 40, "ESTADO PLURINACIONAL DE BOLIVIA")
     pdf.drawString(50, height - 52, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
     pdf.setFont("Helvetica", 9)
     pdf.drawString(50, height - 64, "ALMACÉN CENTRAL")
 
-    # TÍTULO DEL DOCUMENTO
     pdf.setFont("Helvetica-Bold", 15)
     pdf.drawString(50, height - 95, "PEDIDO DE MATERIALES y/o BIENES")
 
-    # --- DIBUJAR METADATOS DE PLANIFICACIÓN (Lado derecho) ---
     pdf.setFont("Helvetica", 8)
     right_x = 480
     pdf.drawString(right_x, height - 35, "Programa: _____________________________________")
@@ -775,13 +938,10 @@ def solicitud_pdf(request, id):
     pdf.drawString(right_x, height - 83, f"Unid. Ejec.: {solicitud.unidad_solicitante.nombre[:25]}")
     pdf.drawString(right_x, height - 95, f"Código Presup: _______________ Código Nº: {solicitud.codigo}")
 
-    # Fecha de pedido
     pdf.setFont("Helvetica-Bold", 9)
     fecha_pedido = solicitud.fecha.strftime('%d / %m / %Y') if solicitud.fecha else "__ / __ / ____"
     pdf.drawString(50, height - 120, f"Fecha del Pedido: {fecha_pedido}")
 
-    # --- CONSTRUIR LA TABLA DE MOVIMIENTOS ---
-    # Cabeceras divididas de la tabla oficial
     headers_1 = ['CÓDIGO', 'DESCRIPCIÓN', 'Unidad de\nManejo', 'Cantidad', '', 'Partida\nPresupuestaria', 'Costo (Bs.)', '']
     headers_2 = ['', '', '', 'Pedida', 'Entrega', '', 'Unidad', 'TOTAL']
 
@@ -800,7 +960,6 @@ def solicitud_pdf(request, id):
             unidad_cod = d.material.unidad_medida_fk.codigo if d.material.unidad_medida_fk else d.material.unidad_medida
             partida_cod = d.material.partida.codigo
             
-            # Buscar el último costo de ingreso
             last_entrada = MovimientoInventario.objects.filter(material=d.material, tipo='ENTRADA').order_by('-fecha').first()
             costo_u = last_entrada.costo_unitario if last_entrada else Decimal('0.00')
 
@@ -819,20 +978,17 @@ def solicitud_pdf(request, id):
             f"{costo_total:.2f}" if costo_total > 0 else "—"
         ])
 
-    # Configurar anchos de columna para Landscape (Ancho total disponible: 692 pt)
     col_widths = [75, 192, 55, 45, 45, 80, 100, 100]
     t = Table(data, colWidths=col_widths)
 
     t_style = TableStyle([
-        # Uniones de celdas superiores para doble encabezado
-        ('SPAN', (0, 0), (0, 1)),  # Codigo
-        ('SPAN', (1, 0), (1, 1)),  # Descripcion
-        ('SPAN', (2, 0), (2, 1)),  # Unidad de Manejo
-        ('SPAN', (3, 0), (4, 0)),  # Cantidades (Pedida vs Entrega)
-        ('SPAN', (5, 0), (5, 1)),  # Partida Presupuestaria
-        ('SPAN', (6, 0), (7, 0)),  # Costo (Unidad vs Total)
+        ('SPAN', (0, 0), (0, 1)),  
+        ('SPAN', (1, 0), (1, 1)),  
+        ('SPAN', (2, 0), (2, 1)),  
+        ('SPAN', (3, 0), (4, 0)),  
+        ('SPAN', (5, 0), (5, 1)),  
+        ('SPAN', (6, 0), (7, 0)),  
 
-        # Alineación y estilos
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 2), (1, -1), 'LEFT'),
         ('ALIGN', (6, 2), (-1, -1), 'RIGHT'),
@@ -855,10 +1011,8 @@ def solicitud_pdf(request, id):
     t.wrapOn(pdf, 50, height - 150 - table_height)
     t.drawOn(pdf, 50, height - 150 - table_height)
 
-    # --- SECCIÓN DE FIRMAS REGLAMENTARIAS EN LA PARTE INFERIOR ---
     pdf.setFont("Helvetica", 7.5)
     
-    # Fila 1 de Firmas (Pedido por, Autorizado por, Entregado por, Recibido por)
     y_firma_1 = 90
     pdf.drawString(50, y_firma_1, "___________________________")
     pdf.drawString(50, y_firma_1 - 10, "Pedido por:")
@@ -884,7 +1038,6 @@ def solicitud_pdf(request, id):
     pdf.setFont("Helvetica-Bold", 7.5)
     pdf.drawString(590, y_firma_1 - 20, "Firma del Solicitante")
 
-    # Fila 2 de Firmas (Control Existencias, Presupuestos)
     y_firma_2 = 40
     pdf.setFont("Helvetica", 7.5)
     pdf.drawString(140, y_firma_2, "___________________________")
@@ -899,14 +1052,50 @@ def solicitud_pdf(request, id):
     presupuestador = solicitud.presupuestado_por.get_full_name() if solicitud.presupuestado_por else "Unidad de Presupuestos"
     pdf.drawString(320, y_firma_2 - 20, presupuestador)
 
-    # Fecha de salida física real
     pdf.setFont("Helvetica-Bold", 8)
     fecha_salida = solicitud.fecha_entrega.strftime('%d / %m / %Y') if solicitud.fecha_entrega else "__ / __ / ____"
     pdf.drawString(540, y_firma_2, f"Fecha de salida física: {fecha_salida}")
 
+    # =========================================================================
+    # --- SISTEMA DE VALIDACIÓN QR DINÁMICO (Autenticidad Documental SABS) [28] ---
+    # =========================================================================
+    from reportlab.graphics.barcode import qr
+    from reportlab.graphics.shapes import Drawing
+    from reportlab.graphics import renderPDF
+
+    # Si la solicitud completó la entrega física o se cerró, activamos el QR y el Hash [11, 28]
+    if solicitud.estado in ['ENTREGADA', 'CERRADA']:
+        # APUNTA EL QR A LA RUTA PÚBLICA (Usa tu IP local para la prueba) [2]
+        qr_url = f"http://10.153.101.3:8000/solicitudes/verificar/{solicitud.codigo}/"
+        qr_code = qr.QrCodeWidget(qr_url)
+        
+        # Calculamos dimensiones del gráfico en ReportLab
+        bounds = qr_code.getBounds()
+        width_qr = bounds[2] - bounds[0]
+        height_qr = bounds[3] - bounds[1]
+        
+        # Creamos un bloque de dibujo de 55x55 puntos para colocar en la esquina inferior derecha
+        d = Drawing(55, 55, transform=[55./width_qr, 0, 0, 55./height_qr, 0, 0])
+        d.add(qr_code)
+        
+        # Pintamos el QR en las coordenadas de la esquina derecha (x=700, y=10)
+        renderPDF.draw(d, pdf, 710, 15)
+        
+        # Pintamos el código Hash de Verificación al lado del QR
+        pdf.setFont("Helvetica-Bold", 6.5)
+        pdf.setFillColor(colors.HexColor('#16A34A')) # Verde éxito
+        pdf.drawString(540, 15, f"CÓDIGO DE VALIDACIÓN: {solicitud.codigo}-2026-SABS-OK")
+        pdf.setFillColor(colors.black)
+    else:
+        # Si está en trámite, no hay QR y mostramos una advertencia en rojo
+        pdf.setFont("Helvetica-Bold", 8)
+        pdf.setFillColor(colors.HexColor('#DC2626')) # Rojo advertencia
+        pdf.drawString(540, 15, "DOCUMENTO EN TRÁMITE - SIN VALOR OFICIAL")
+        pdf.setFillColor(colors.black)
+
+    # Guardar cambios y cerrar PDF
     pdf.save()
     return response
-# FILE: solicitudes/views.py (Reemplazar el bloque duplicado por esta única función)
 
 @login_required
 @rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR'])
@@ -920,7 +1109,7 @@ def validar_saf(request, id):
     # CORRECCIÓN DE FLUJO: Valida solo si ya fue revisada por su jefe de unidad [28]
     if solicitud.estado != 'REVISADA':
         messages.error(request, "La solicitud aún no ha sido revisada ni autorizada por su Jefe de Unidad.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     try:
         with transaction.atomic():
@@ -1063,3 +1252,38 @@ def retroceder_estado_solicitud(request, id):
         messages.error(request, f"Error al procesar la reversión del estado: {str(e)}")
 
     return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+def redirigir_despues_de_accion(request, solicitud):
+    """
+    Determina de forma dinámica adónde redirigir al usuario para no perder su contexto (UX) [28].
+    Garantiza que si opera dentro de un folio, permanezca dentro de ese folio [28].
+    """
+    referer = request.META.get('HTTP_REFERER', '')
+    
+    # Si viene desde el detalle, o de los formularios de revisión/rechazo, lo mantiene en el detalle del folio [28]
+    if 'detalle' in referer or 'revisar' in referer or 'rechazar' in referer:
+        return redirect('detalle_solicitud', id=solicitud.id)
+        
+    # Si opera desde el listado principal, lo mantiene en la misma página del listado [28]
+    return redirect(referer if referer else 'solicitudes')
+
+def verificar_documento_publico(request, codigo):
+    """
+    Vista pública sin autenticación para verificar la validez de un documento impreso 
+    escaneando el código QR (Garantiza autenticidad sin firma digital con token) [28].
+    """
+    solicitud = get_object_or_404(
+        Solicitud.objects.prefetch_related('detalles__material'),
+        codigo=codigo
+    )
+
+    # Control de seguridad: solo es verificable públicamente si ya concluyó el trámite [28]
+    if solicitud.estado not in ['ENTREGADA', 'CERRADA']:
+        return HttpResponseForbidden("Este documento se encuentra en trámite y no cuenta con certificación de verificación pública aún.")
+
+    return render(
+        request, 
+        'solicitudes/verificar_publico.html', 
+        {
+            'solicitud': solicitud
+        }
+    )

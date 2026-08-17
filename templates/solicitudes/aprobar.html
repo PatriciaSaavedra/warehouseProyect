@@ -1,71 +1,95 @@
 {% extends 'base.html' %}
 
+{% block title %} Revisar Solicitud {% endblock %}
+
 {% block content %}
+<div class="max-w-4xl mx-auto font-['Outfit']">
 
-<div class="max-w-5xl mx-auto">
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100">Revisar Solicitud {{ solicitud.codigo }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Valide la necesidad institucional y autorice las cantidades para cada material</p>
+        </div>
+        <a href="{% url 'detalle_solicitud' solicitud.id %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver al Detalle
+        </a>
+    </div>
 
-    <h1 class="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100">
-        Aprobar Solicitud {{ solicitud.codigo }}
-    </h1>
-
-    <form method="POST" class="card p-6">
+    <!-- FORMULARIO DE REVISIÓN (GAD Potosí) -->
+    <form method="POST" class="card overflow-hidden shadow-sm bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl">
         {% csrf_token %}
 
-        <table class="w-full border border-gray-100 dark:border-gray-800">
+        <div class="p-8 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/40">
+            <h2 class="text-base font-bold text-gray-700 dark:text-gray-200">Autorización de Cantidades por Ítem </h2>
+        </div>
 
-            <thead class="bg-gray-100 dark:bg-slate-900/50">
-                <tr class="text-gray-700 dark:text-gray-300">
-                    <th class="p-2 text-left">Material</th>
-                    <th class="p-2 text-center">Solicitado</th>
-                    <th class="p-2 text-center">Aprobado</th>
+        <table class="w-full text-sm text-gray-700 dark:text-gray-300 border-collapse">
+            <thead class="bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
+                <tr>
+                    <th class="px-6 py-4 text-left">Material / Subartículo</th>
+                    <th class="px-6 py-4 text-center w-36">Cant. Solicitada</th>
+                    <th class="px-6 py-4 text-center w-40">Cant. Autorizada <span class="text-[#8b0000]">*</span></th>
                 </tr>
             </thead>
-
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-
                 {% for d in detalles %}
-                <tr class="border-t border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
-
-                    <td class="p-2 text-sm text-gray-800 dark:text-gray-200">
-                        {{ d.material.nombre }}
+                <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
+                    
+                    <!-- 1. MATERIAL CON ALERTA DE STOCK DINÁMICA [28] -->
+                    <td class="px-6 py-4 font-semibold text-gray-800 dark:text-gray-200">
+                        <span class="block font-bold">{{ d.material.nombre }}</span>
+                        <span class="text-[9px] text-gray-400 dark:text-gray-500 block font-mono mt-0.5">Cód: {{ d.material.codigo }}</span>
+                        
+                        <!-- ALERTA VISUAL DE STOCK PARA TOMA DE DECISIONES [28] -->
+                        {% if d.material.stock_actual < d.cantidad_solicitada %}
+                            <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 dark:bg-amber-950/20 text-[#d97706] border border-amber-200 dark:border-amber-900/30 uppercase tracking-wider mt-2 inline-flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">warning</span>
+                                Stock Insuficiente (Se requerirá Compra Menor) 
+                            </span>
+                        {% else %}
+                            <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30 uppercase tracking-wider mt-2 inline-flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">done</span>
+                                Stock Disponible (Entrega Inmediata) 
+                            </span>
+                        {% endif %}
                     </td>
 
-                    <td class="p-2 text-sm text-center text-gray-700 dark:text-gray-300">
-                        {{ d.cantidad_solicitada }}
+                    <!-- 2. CANTIDAD SOLICITADA -->
+                    <td class="px-6 py-4 text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-50/30 dark:bg-slate-900/10">
+                        {{ d.cantidad_solicitada }} Unidades
                     </td>
 
-                    <td class="p-2 text-center">
+                    <!-- 3. CANTIDAD AUTORIZADA (CORREGIDA) -->
+                    <td class="px-6 py-4">
                         <input
                             type="number"
                             name="aprobado_{{ d.id }}"
                             value="{{ d.cantidad_solicitada }}"
                             min="0"
-                            max="{{ d.material.stock_actual }}"
-                            class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-855 dark:text-gray-200 p-2 rounded-xl w-24 text-center focus:ring-1 focus:ring-red-500 focus:outline-none"
+                            max="{{ d.cantidad_solicitada }}" 
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-2.5 text-center font-bold text-purple-700 dark:text-purple-400 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
+                            required
                         >
+                        <span class="text-[10px] text-gray-400 block text-center mt-1">Máximo permitido: {{ d.cantidad_solicitada }}</span>
                     </td>
-
                 </tr>
                 {% endfor %}
-
             </tbody>
-
         </table>
 
-        <div class="mt-6 flex justify-end gap-3">
-
-            <a href="{% url 'solicitudes' %}" class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition font-medium">
+        <!-- ACCIONES -->
+        <div class="p-8 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-gray-50/30 dark:bg-slate-900/40">
+            <a href="{% url 'detalle_solicitud' solicitud.id %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">
                 Cancelar
             </a>
-
-            <button class="px-4 py-2 bg-green-600 dark:bg-green-700 hover:bg-green-700 dark:hover:bg-green-800 text-white rounded-xl transition font-semibold">
-                Guardar Aprobación
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">done_all</span>
+                Confirmar y Autorizar Solicitud
             </button>
-
         </div>
 
     </form>
 
 </div>
-
 {% endblock %}

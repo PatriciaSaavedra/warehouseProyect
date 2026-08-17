@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %} Unidades Organizacionales {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-8">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Unidades Organizacionales</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Directorio y catálogo de Secretarías y Direcciones autorizadas en la Gobernación [28].</p>
+        </div>
+        <div class="flex gap-2 w-full sm:w-auto">
+            <a href="{% url 'crear_unidad' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">add_box</span> Registrar Unidad
+            </a>
+            <a href="{% url 'usuarios' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver a Usuarios
+            </a>
+        </div>
+    </div>
+
+    <!-- BUSCADOR -->
+    <form method="GET" class="mb-6 flex gap-3 max-w-lg">
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Buscar por nombre o código SIGEP..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+        <button type="submit" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-5 rounded-2xl text-sm font-semibold transition flex items-center justify-center">
+            <span class="material-symbols-outlined text-[20px]">search</span>
+        </button>
+    </form>
+
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-green-50 text-green-700 border-green-200 mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[700px]">
+                <thead class="bg-gray-50 border-b border-gray-100 dark:bg-slate-900 dark:border-gray-800">
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">
+                        <th class="px-6 py-4">Nombre de la Unidad</th>
+                        <th class="px-6 py-4 w-64 text-center">Código SIGEP</th>
+                        <th class="px-6 py-4 text-right pr-8 w-24">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
+                    {% for uni in page_obj %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
+                        <td class="px-6 py-4 text-sm font-bold text-gray-800 dark:text-gray-100">{{ uni.nombre }}</td>
+                        <td class="px-6 py-4 text-center text-sm font-semibold font-mono text-gray-500">{{ uni.codigo_sigep|default:"—" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
+                            <a href="{% url 'editar_unidad' uni.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 inline-flex items-center justify-center transition" title="Editar Unidad">
+                                <span class="material-symbols-outlined text-[#d97706] text-[20px]">edit</span>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">domain</span>
+                            No se registran unidades organizacionales en el sistema.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

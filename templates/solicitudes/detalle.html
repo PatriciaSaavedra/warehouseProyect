@@ -36,13 +36,17 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Fecha de Registro: {{ solicitud.fecha_registro|date:"d \d\e F, Y | H:i" }} AM</p>
         </div>
         
+        
         <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <!-- Botones estándar de exportación -->
-            <a href="{% url 'solicitud_pdf' solicitud.id %}" class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
-                <span class="material-symbols-outlined text-[16px]">print</span> Imprimir Documento
-            </a>
-            <a href="{% url 'solicitud_pdf' solicitud.id %}" class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
-                <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> Descargar PDF
+            <!-- BOTÓN UNIFICADO: VISTA PREVIA / IMPRIMIR (Abre en pestaña nueva) [28] -->
+            <a 
+                href="{% url 'solicitud_pdf' solicitud.id %}" 
+                target="_blank" 
+                class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition animate-pulse"
+                title="Visualizar y mandar a imprimir el comprobante"
+            >
+                <span class="material-symbols-outlined text-[16px]">visibility</span> 
+                Vista Previa / Imprimir
             </a>
 
             <!-- CONTROL DE SEGURIDAD: SOLO MOSTRAR BOTONES SI CONTIENE MATERIALES [11, 28] -->

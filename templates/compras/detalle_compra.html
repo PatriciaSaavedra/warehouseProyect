@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %} Detalle Orden {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-8 font-['Outfit']">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100">Orden de Compra {{ compra.nro_orden }}</h1>
+                {% if compra.completada %}
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">Ingresado en Almacén</span>
+                {% else %}
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">En Tránsito</span>
+                {% endif %}
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Fecha de Emisión: {{ compra.fecha_registro|date:"d \d\e F, Y | H:i" }} AM</p>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <!-- Botón de Vista Previa (Forzando la apertura inline del PDF original de la Gobernación) [28] -->
+            <a href="{% url 'compra_pdf' compra.id %}" target="_blank" class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
+                <span class="material-symbols-outlined text-[16px]">visibility</span> Vista Previa / Imprimir
+            </a>
+            <a href="{% url 'compras_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- REJILLA CENTRAL DE DATOS (2 Columnas) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Información General (Ancho 5/12) -->
+        <div class="lg:col-span-5 space-y-6">
+            <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+                <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">info</span> Datos de Adjudicación [28]
+                </h3>
+                
+                <div class="grid grid-cols-2 gap-y-6 gap-x-4 text-xs font-['Outfit']">
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Proveedor Adjudicado</span>
+                        <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ compra.proveedor.razon_social }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Partida de Gasto</span>
+                        <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ compra.partida.codigo }} - {{ compra.partida.nombre }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Monto Total</span>
+                        <span class="font-black text-gray-800 dark:text-gray-100 text-base text-green-700">{{ compra.monto_total|floatformat:2 }} Bs.</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Folio de Origen</span>
+                        <span class="font-bold text-gray-700 dark:text-gray-200 text-sm font-mono">{{ compra.solicitud_origen.codigo|default:"Adquisición Libre" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Artículos Adquiridos (Ancho 7/12) -->
+        <div class="lg:col-span-7">
+            <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+                <div class="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/40">
+                    <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">inventory</span> Artículos de la Orden
+                    </h3>
+                </div>
+                
+                <table class="w-full text-xs text-gray-700 dark:text-gray-300 border-collapse">
+                    <thead class="bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-gray-500 uppercase font-semibold">
+                        <tr>
+                            <th class="px-6 py-3 text-left">Descripción del Artículo</th>
+                            <th class="px-6 py-3 text-center">Cantidad Solicitada</th>
+                            <th class="px-6 py-3 text-center">Unidad</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        {% for d in detalles %}
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
+                            <td class="px-6 py-4 font-semibold text-gray-800 dark:text-gray-200">
+                                {{ d.material.nombre|default:d.descripcion_material_no_catalogado }}<br>
+                                <span class="text-[9px] text-gray-400 block font-mono">Cód: {{ d.material.codigo|default:"N/C" }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-center font-bold text-gray-600 dark:text-gray-400">{{ d.cantidad_solicitada }} Unidades</td>
+                            <td class="px-6 py-4 text-center font-semibold text-gray-500">
+                                {{ d.material.unidad_medida|default:"Pieza" }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
+                            <td class="px-6 py-4 font-semibold text-gray-800 dark:text-gray-200">ADQUISICIÓN GENERAL DE SUMINISTROS</td>
+                            <td class="px-6 py-4 text-center font-bold text-gray-600 dark:text-gray-400">1</td>
+                            <td class="px-6 py-4 text-center font-semibold text-gray-500">Global</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
