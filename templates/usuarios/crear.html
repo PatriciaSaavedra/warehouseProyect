@@ -31,7 +31,7 @@ Crear Usuario
         </a>
     </div>
 
-    <!-- MENSAJES -->
+    <!-- MENSAJES (Nota: Si su archivo base.html ya incluye estos mensajes de manera global, puede eliminar este bloque para evitar duplicados) -->
     {% if messages %}
         <div class="space-y-3 mb-6">
             {% for message in messages %}
@@ -73,8 +73,10 @@ Crear Usuario
                     Nombres <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
+                    id="first_name"
                     type="text"
                     name="first_name"
+                    value="{{ valores.first_name|default:'' }}"
                     class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
                     placeholder="Ingrese nombres"
                     required
@@ -88,8 +90,10 @@ Crear Usuario
                     Apellidos <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
+                    id="last_name"
                     type="text"
                     name="last_name"
+                    value="{{ valores.last_name|default:'' }}"
                     class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
                     placeholder="Ingrese apellidos"
                     required
@@ -103,8 +107,10 @@ Crear Usuario
                     Nombre de Usuario <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
+                    id="username"
                     type="text"
                     name="username"
+                    value="{{ valores.username|default:'' }}"
                     class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
                     placeholder="Ingrese usuario"
                     required
@@ -118,39 +124,95 @@ Crear Usuario
                     Correo Electrónico
                 </label>
                 <input
+                    id="email"
                     type="email"
                     name="email"
+                    value="{{ valores.email|default:'' }}"
                     class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
                     placeholder="correo@institucion.gob.bo"
                     autocomplete="off"
                 >
             </div>
 
-            <!-- PASSWORD (Con bloqueo de autocompletado del administrador) -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Contraseña <span class="text-[#8b0000]">*</span>
-                </label>
-                <div class="relative flex items-center">
-                    <input
-                        id="password"
-                        type="password"
-                        name="password"
-                        class="w-full border border-gray-300 rounded-2xl p-3 pr-12 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
-                        placeholder="Ingrese contraseña"
-                        required
-                        autocomplete="new-password"
-                    >
-                    <button
-                        type="button"
-                        onclick="togglePassword()"
-                        class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#8b0000] transition flex items-center justify-center cursor-pointer"
-                        aria-label="Mostrar u ocultar contraseña"
-                    >
-                        <span id="eyeIcon" class="material-symbols-outlined text-[22px]">
-                            visibility
-                        </span>
-                    </button>
+            <!-- CONTRASEÑA -->
+            <style>
+                /* Desactiva el icono de ojo nativo del navegador */
+                input::-ms-reveal,
+                input::-ms-clear {
+                    display: none !important;
+                }
+            </style>
+
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-bold text-gray-700 font-['Outfit']">
+                            Contraseña <span class="text-[#8b0000]">*</span>
+                        </label>
+                        <!-- Enlace para generar contraseña aleatoria -->
+                        <button
+                            type="button"
+                            onclick="generarContrasenaAleatoria()"
+                            class="text-xs text-[#8b0000] hover:underline font-bold flex items-center gap-1 transition"
+                        >
+                            <span class="material-symbols-outlined text-[15px]">key</span>
+                            Generar aleatoria
+                        </button>
+                    </div>
+                    
+                    <div class="relative flex items-center">
+                        <input
+                            id="password"
+                            type="password"
+                            name="password"
+                            class="w-full border border-gray-300 rounded-2xl p-3 pr-12 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                            placeholder="Ingrese contraseña"
+                            required
+                            autocomplete="new-password"
+                        >
+                        <button
+                            type="button"
+                            onclick="togglePasswordVisibility('password', this)"
+                            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#8b0000] transition flex items-center justify-center cursor-pointer"
+                            aria-label="Mostrar u ocultar contraseña"
+                        >
+                            <!-- Icono de ojo (SVG) -->
+                            <svg id="eye-icon-password" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CONFIRMAR CONTRASEÑA -->
+                <div>
+                    <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                        Confirmar Contraseña <span class="text-[#8b0000]">*</span>
+                    </label>
+                    <div class="relative flex items-center">
+                        <input
+                            id="password_confirm"
+                            type="password"
+                            name="password_confirm"
+                            class="w-full border border-gray-300 rounded-2xl p-3 pr-12 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
+                            placeholder="Confirme la contraseña"
+                            required
+                            autocomplete="new-password"
+                        >
+                        <button
+                            type="button"
+                            onclick="togglePasswordVisibility('password_confirm', this)"
+                            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#8b0000] transition flex items-center justify-center cursor-pointer"
+                            aria-label="Mostrar u ocultar confirmation de contraseña"
+                        >
+                            <!-- Icono de ojo (SVG) -->
+                            <svg id="eye-icon-password_confirm" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -167,7 +229,7 @@ Crear Usuario
                     >
                         <option value="">Seleccione un rol</option>
                         {% for value, label in roles %}
-                            <option value="{{ value }}">
+                            <option value="{{ value }}" {% if valores.rol == value %}selected{% endif %}>
                                 {{ label }}
                             </option>
                         {% endfor %}
@@ -190,7 +252,7 @@ Crear Usuario
                     >
                         <option value="">Seleccione una unidad</option>
                         {% for unidad in unidades %}
-                            <option value="{{ unidad.id }}">
+                            <option value="{{ unidad.id }}" {% if valores.unidad == unidad.id|stringformat:"s" %}selected{% endif %}>
                                 {{ unidad.nombre }}
                             </option>
                         {% endfor %}
@@ -201,9 +263,8 @@ Crear Usuario
                 </div>
             </div>
 
-            <!-- BOTONES DE ACCIÓN (Alineados a la derecha) -->
+            <!-- BOTONES DE ACCIÓN -->
             <div class="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3 pt-4 border-t border-gray-100">
-                
                 <a
                     href="{% url 'usuarios' %}"
                     class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition"
@@ -220,7 +281,6 @@ Crear Usuario
                     </span>
                     Crear Usuario
                 </button>
-
             </div>
 
         </form>
@@ -229,22 +289,129 @@ Crear Usuario
 
 </div>
 
-<!-- SCRIPT DE INTERACTIVIDAD PARA LA CONTRASEÑA -->
+<!-- SCRIPTS DE INTERACTIVIDAD -->
 <script>
-function togglePassword() {
-    const password = document.getElementById('password');
-    const eyeIcon = document.getElementById('eyeIcon');
-    
-    if (password && eyeIcon) {
-        if (password.type === 'password') {
-            password.type = 'text';
-            eyeIcon.innerText = 'visibility_off';
+    // 1. Mostrar/Ocultar contraseñas
+    function togglePasswordVisibility(fieldId, button) {
+        const passwordField = document.getElementById(fieldId);
+        if (!passwordField) return;
+
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            button.classList.add('text-[#8b0000]'); 
         } else {
-            password.type = 'password';
-            eyeIcon.innerText = 'visibility';
+            passwordField.type = 'password';
+            button.classList.remove('text-[#8b0000]');
         }
     }
-}
+
+    // 2. Generación automática y sugerencia de Nombre de Usuario
+    const firstNameInput = document.getElementById('first_name');
+    const lastNameInput = document.getElementById('last_name');
+    const usernameInput = document.getElementById('username');
+    
+    // Bandera para saber si el usuario ingresó manualmente un valor en Username
+    let isUsernameEditedManually = false;
+
+    // Detectamos si el administrador escribe manualmente en el campo Username
+    usernameInput.addEventListener('input', () => {
+        isUsernameEditedManually = usernameInput.value.trim() !== '';
+    });
+
+    // Función para normalizar texto (remueve acentos, tildes, eñes y caracteres especiales)
+    function limpiarTexto(texto) {
+        return texto
+            .toLowerCase()
+            .normalize("NFD") 
+            .replace(/[\u0300-\u036f]/g, "") 
+            .replace(/ñ/g, "n")
+            .replace(/[^a-z0-9]/g, ""); 
+    }
+
+    // Lógica para generar la sugerencia dinámicamente con día y mes actual
+    function sugerirUsername() {
+        if (isUsernameEditedManually) return;
+
+        const primerNombreRaw = firstNameInput.value.trim().split(' ')[0]; // Tomamos únicamente el primer nombre
+        const apellidoRaw = lastNameInput.value.trim();
+
+        const primerNombre = limpiarTexto(primerNombreRaw);
+        const apellido = limpiarTexto(apellidoRaw);
+
+        if (primerNombre) {
+            const primeraLetraApellido = apellido.charAt(0);
+            
+            // Obtener fecha actual (día y mes) en formato numérico de dos dígitos (DDMM)
+            const hoy = new Date();
+            const dia = String(hoy.getDate()).padStart(2, '0');
+            const mes = String(hoy.getMonth() + 1).padStart(2, '0'); // getMonth() es 0-indexado
+            const diaMes = `${dia}${mes}`; // Ejemplo: "2108" para el 21 de agosto
+
+            // Formato de sugerencia: primernombre + inicial de apellido + día y mes (ej: "juanp2108")
+            usernameInput.value = `${primeraLetraApellido}${primerNombre}${diaMes}`;
+        } else {
+            usernameInput.value = '';
+        }
+    }
+
+    // Eventos para recalcular la sugerencia mientras se escribe
+    firstNameInput.addEventListener('input', sugerirUsername);
+    lastNameInput.addEventListener('input', sugerirUsername);
+
+    // 3. Generación de Contraseñas Aleatorias Robustas
+    function generarContrasenaAleatoria() {
+        const minusculas = "abcdefghijklmnopqrstuvwxyz";
+        const mayusculas = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const numeros = "0123456789";
+        const simbolos = "!@#$%&*?+-";
+        const todosLosCaracteres = minusculas + mayusculas + numeros + simbolos;
+        
+        let password = "";
+        
+        // Garantizamos que contenga al menos un carácter de cada tipo para máxima seguridad
+        password += minusculas[Math.floor(Math.random() * minusculas.length)];
+        password += mayusculas[Math.floor(Math.random() * mayusculas.length)];
+        password += numeros[Math.floor(Math.random() * numeros.length)];
+        password += simbolos[Math.floor(Math.random() * simbolos.length)];
+        
+        // Completamos los caracteres restantes hasta llegar a 12
+        for (let i = 4; i < 12; i++) {
+            password += todosLosCaracteres[Math.floor(Math.random() * todosLosCaracteres.length)];
+        }
+        
+        // Mezclamos el string resultante para evitar patrones predecibles
+        password = password.split('').sort(() => 0.5 - Math.random()).join('');
+        
+        const passwordInput = document.getElementById('password');
+        const confirmInput = document.getElementById('password_confirm');
+        
+        // Seteamos el valor en ambos campos
+        passwordInput.value = password;
+        confirmInput.value = password;
+        
+        // Forzamos visibilidad a "text" para que el administrador pueda visualizarla directamente
+        passwordInput.type = 'text';
+        confirmInput.type = 'text';
+        
+        // Activamos visualmente el indicador de "ojo abierto" (cambia el color del botón del ojo)
+        const eyePasswordBtn = document.querySelector('button[onclick*="\'password\'"]');
+        const eyeConfirmBtn = document.querySelector('button[onclick*="\'password_confirm\'"]');
+        if (eyePasswordBtn) eyePasswordBtn.classList.add('text-[#8b0000]');
+        if (eyeConfirmBtn) eyeConfirmBtn.classList.add('text-[#8b0000]');
+        
+        // Intentamos copiar la contraseña generada automáticamente al portapapeles
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(password)
+                .then(() => {
+                    alert("Contraseña generada y copiada al portapapeles: " + password);
+                })
+                .catch(() => {
+                    alert("Contraseña generada: " + password);
+                });
+        } else {
+            alert("Contraseña generada: " + password);
+        }
+    }
 </script>
 
 {% endblock %}
