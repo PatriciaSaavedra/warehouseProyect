@@ -12,7 +12,7 @@
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Historial y control de Órdenes de Adquisición emitidas por la Unidad de Bienes y Servicios </p>
         </div>
          <div class="flex gap-2 w-full sm:w-auto">
-            <!-- BOTÓN DE PROVEEDORES (Bordeado Gris - Ubicado en su módulo correcto) [28] -->
+            <!-- BOTÓN DE PROVEEDORES -->
             <a
                 href="{% url 'proveedores_list' %}"
                 class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
@@ -30,14 +30,6 @@
             >
                 <span class="material-symbols-outlined text-[18px]">add_box</span> Registrar Orden
             </a>
-            
-            <!-- Botón Volver al Almacén
-            <a 
-                href="{% url 'inventario' %}" 
-                class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition"
-            >
-                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver al Almacén
-            </a> -->
         </div>
     </div>
 
@@ -64,7 +56,7 @@
                         <th class="px-6 py-4 w-44">Solicitud Origen</th>
                         <th class="px-6 py-4 text-right w-44">Monto Adjudicado</th>
                         <th class="px-6 py-4 text-center w-32">Estado</th>
-                        <th class="px-6 py-4 text-right pr-8 w-24">Acciones</th>  <!-- <-- AGREGAR ESTO -->
+                        <th class="px-6 py-4 text-right pr-8 w-24">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
@@ -86,14 +78,16 @@
                                 <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">En Tránsito</span>
                             {% endif %}
                         </td>
-                        <!-- AGREGAR ESTA COLUMNA DE ACCIONES -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
                             <a href="{% url 'detalle_compra' compra.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 inline-flex items-center justify-center transition" title="Ver Detalle de Orden">
                                 <span class="material-symbols-outlined text-blue-600 text-[20px]">visibility</span>
                             </a>
                         </td>
                     </tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    {% empty %}
+                    <!-- Se muestra únicamente si no existen registros -->
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                             <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2 block">
                                 shopping_cart
                             </span>

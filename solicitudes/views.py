@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction, DatabaseError
 from django.contrib import messages
 from django.db.models import Q
-
+from django.db import transaction
 # Importaciones de ReportLab para el PDF oficial
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
@@ -407,7 +407,7 @@ def detalle_solicitud(request, id):
         'solicitud': solicitud,
         'rol': rol
     })
-
+@transaction.atomic
 @login_required
 def revisar_solicitud(request, id):
     """
@@ -1195,6 +1195,7 @@ def validar_jefatura(request, id):
         messages.error(request, f"Error al procesar aprobación de la Jefatura: {str(e)}")
 
     return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+@transaction.atomic
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def retroceder_estado_solicitud(request, id):
