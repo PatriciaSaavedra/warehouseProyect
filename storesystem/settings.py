@@ -10,22 +10,34 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
+import environ
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 1. Inicializar django-environ
+env = environ.Env(
+    DEBUG=(bool, False)  # Valor por defecto si no se encuentra en el .env
+)
+
+# 2. Leer el archivo .env desde la raíz del proyecto
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-jko$wadkn4o1)01bllfz+hu6%q1&v6*8y5hl-6++&hiy%y-xd='
+# Extraído de forma segura del archivo .env
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '10.10.10.152','10.153.101.3'] 
+# Extraído de forma segura del archivo .env
+DEBUG = env('DEBUG')
 
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '10.10.10.152', '10.153.101.3'] 
 
 
 # Application definition
@@ -70,7 +82,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-
                 'storesystem.context_processors.theme_processor',                      
             ],
         },
@@ -82,18 +93,13 @@ WSGI_APPLICATION = 'storesystem.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+# Reemplazado dinámicamente con PostgreSQL e integridad transaccional habilitada
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'storesystem_db',
-        'USER': 'postgres',
-        'PASSWORD': '123456',
-        'HOST': 'localhost',
-        'PORT': '5432',
-        'ATOMIC_REQUESTS': True, 
-    }
+    'default': env.db('DATABASE_URL')
 }
+DATABASES['default']['ATOMIC_REQUESTS'] = True
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

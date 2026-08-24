@@ -1,6 +1,6 @@
 import re
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import transaction, IntegrityError  # <-- Control de integridad
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import User
@@ -18,130 +18,120 @@ from usuarios.decorators import rol_requerido
 # ==========================================
 # FUNCIONES AUXILIARES DE VALIDACIÓN Y NORMALIZACIÓN
 # ==========================================
+
+def normalizar_espacios(texto):
+    if not texto:
+        return ""
+    return re.sub(r'\s+', ' ', texto.strip())
+
+
 def capitalizar_nombre_propio(texto):
     """
-    Convierte un nombre a formato "Title Case" de forma inteligente.
-    Mantiene partículas intermedias del español en minúsculas (ej: "de", "la", "del").
-    Ejemplo: "JUAN DE LA CRUZ" -> "Juan de la Cruz"
+    Convierte nombres a formato "Title Case" manteniendo minúsculas 
+    en preposiciones intermedias del español (ej: "Juan de la Cruz").
     """
     if not texto:
         return ""
-    
     palabras = texto.split()
     palabras_formateadas = []
-    # Partículas comunes en nombres en español que deben permanecer en minúscula
     particulas_bajas = ["de", "la", "del", "y", "los", "las", "e"]
     
     for i, pal in enumerate(palabras):
         pal_lower = pal.lower()
-        # Si es una partícula intermedia, se deja en minúscula (excepto si es la primera palabra)
         if pal_lower in particulas_bajas and i > 0:
             palabras_formateadas.append(pal_lower)
         else:
-            # Capitaliza solo la primera letra de la palabra (ej: "PÉREZ", "pÉrez" -> "Pérez")
             palabras_formateadas.append(pal.capitalize())
-            
     return " ".join(palabras_formateadas)
 
 
-def normalizar_espacios(texto):
-    if not texto:
-        return ""
-    return re.sub(r'\s+', ' ', texto.strip())
-def normalizar_espacios(texto):
-    """
-    Elimina espacios en los extremos y colapsa múltiples espacios 
-    internos consecutivos en un solo espacio en blanco.
-    """
-    if not texto:
-        return ""
-    return re.sub(r'\s+', ' ', texto.strip())
-
-
 def validar_datos_usuario(datos, es_creacion=False, user_id=None):
+    """
+    Valida y normaliza exhaustivamente los datos del usuario.
+    Controla longitud, formato, unicidad y repetición de caracteres.
+    """
     errores = []
 
-    # 1. Normalización
-    username = normalizar_espacios(datos.get('username', '')).lower()
+    # 1. Normalización inicial (Username se pasa a minúsculas)
+    username = datos.get('username', '').strip().lower()
     first_name = capitalizar_nombre_propio(normalizar_espacios(datos.get('first_name', '')))
     last_name = capitalizar_nombre_propio(normalizar_espacios(datos.get('last_name', '')))
     email = normalizar_espacios(datos.get('email', '')).lower()
     rol = datos.get('rol', '').strip()
     unidad_id = datos.get('unidad', '').strip()
 
-    # Expresión regular para detectar más de 3 caracteres idénticos consecutivos (ej: "ssss")
+    # Expresión regular anti-spam (Detecta más de 3 letras idénticas seguidas)
     regex_spam_letras = r"(.)\1{3,}"
 
-    # 2. Validación de Username (Límites más lógicos: 4 a 30 caracteres)
-    if username:
-        if len(username) < 4 or len(username) > 30:
+    # 2. VALIDACIÓN DEL USERNAME
+    if not username:
+        errores.append("El nombre de usuario (username) es obligatorio.")
+    else:
+        # Validación de espacios
+        if " " in username:
+            errores.append("El nombre de usuario no puede contener espacios en blanco.")
+        # Validación de longitud (4 a 30 caracteres)
+        elif len(username) < 4 or len(username) > 30:
             errores.append("El nombre de usuario debe tener entre 4 y 30 caracteres.")
+        # Caracteres permitidos (letras minúsculas, números, guiones y guión bajo)
+        elif not re.match(r"^[a-z0-9_\-]+$", username):
+            errores.append("El nombre de usuario solo puede contener letras, números, guiones (-) y guiones bajos (_).")
         
-        # Evitar duplicados
+        # Comprobación de unicidad insensible a mayúsculas
         query_username = User.objects.filter(username__iexact=username)
         if not es_creacion and user_id:
             query_username = query_username.exclude(id=user_id)
         if query_username.exists():
-            errores.append("El nombre de usuario ya está registrado en el sistema.")
+            errores.append("El nombre de usuario ya está registrado por otra cuenta.")
 
-    # 3. Validación de Nombres (Límites: 2 a 40 caracteres + Anti-Spam)
+    # 3. VALIDACIÓN DE NOMBRES Y APELLIDOS (Límites: 2 a 40 caracteres + Anti-Spam)
     if not first_name:
-        errores.append("El nombre es obligatorio.")
+        errores.append("El nombre es obligatorio y no puede contener únicamente espacios.")
     else:
         if len(first_name) < 2 or len(first_name) > 40:
             errores.append("El nombre debe tener entre 2 y 40 caracteres.")
-        
         if first_name.isdigit():
             errores.append("El nombre no puede ser únicamente numérico.")
         elif not re.match(r"^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-\']+$", first_name):
             errores.append("El nombre contiene caracteres no permitidos.")
-            
-        # Filtro Anti-Spam (Detecta si hay letras repetidas consecutivamente de manera exagerada)
         elif re.search(regex_spam_letras, first_name):
             errores.append("El nombre ingresado no es válido debido a una repetición excesiva de caracteres (anti-spam).")
 
-    # 4. Validación de Apellidos (Límites: 2 a 40 caracteres + Anti-Spam)
     if not last_name:
-        errores.append("El apellido es obligatorio.")
+        errores.append("El apellido es obligatorio y no puede contener únicamente espacios.")
     else:
         if len(last_name) < 2 or len(last_name) > 40:
             errores.append("El apellido debe tener entre 2 y 40 caracteres.")
-            
         if last_name.isdigit():
             errores.append("El apellido no puede ser únicamente numérico.")
         elif not re.match(r"^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-\']+$", last_name):
             errores.append("El apellido contiene caracteres no permitidos.")
-            
-        # Filtro Anti-Spam para apellidos
         elif re.search(regex_spam_letras, last_name):
             errores.append("El apellido ingresado no es válido debido a una repetición excesiva de caracteres (anti-spam).")
 
-    # 3. Validación de Username (Unicidad, longitud, espacios)
-    if username:
-        if len(username) < 4 or len(username) > 150:
-            errores.append("El nombre de usuario debe tener entre 4 y 150 caracteres.")
+# 4. VALIDACIÓN DE EMAIL (Campo obligatorio, formato, longitud y unicidad)
+    if not email:
+        errores.append("El correo electrónico es obligatorio para el registro institucional.")
+    else:
+        # Validación de longitud (Mínimo 5 caracteres ej: a@b.c, Máximo 100 por diseño)
+        if len(email) < 5 or len(email) > 100:
+            errores.append("El correo electrónico debe tener entre 5 y 100 caracteres.")
         
-        # Evitar usernames duplicados (con exclusión si es edición)
-        query_username = User.objects.filter(username__iexact=username)
-        if not es_creacion and user_id:
-            query_username = query_username.exclude(id=user_id)
-        if query_username.exists():
-            errores.append("El nombre de usuario ya está registrado en el sistema.")
-
-    # 4. Validación de Correo Electrónico (Formato y unicidad)
-    if email:
-        try:
-            validate_email(email)
-        except ValidationError:
-            errores.append("El formato del correo electrónico no es válido.")
+        # Validación de estructura/formato (Usa el validador nativo de Django)
+        else:
+            try:
+                validate_email(email)
+            except ValidationError:
+                errores.append("El formato del correo electrónico no es válido (ejemplo: usuario@institucion.gob.bo).")
         
+        # Evitar correos duplicados (Garantiza unicidad en toda la base de datos)
         query_email = User.objects.filter(email__iexact=email)
         if not es_creacion and user_id:
             query_email = query_email.exclude(id=user_id)
         if query_email.exists():
-            errores.append("El correo electrónico ya está registrado por otra cuenta.")
-
-    # 5. Validación de Contraseña y confirmación (solo aplica en creación)
+            errores.append("El correo electrónico ya está registrado por otro funcionario en el sistema.")
+            
+    # 5. VALIDACIÓN DE CONTRASEÑA (Solo creación)
     password = ""
     if es_creacion:
         password = datos.get('password', '')
@@ -157,6 +147,9 @@ def validar_datos_usuario(datos, es_creacion=False, user_id=None):
 
         if password != password_confirm:
             errores.append("La contraseña y su confirmación no coinciden.")
+
+    if not rol:
+        errores.append("El rol del usuario es obligatorio.")
 
     datos_normalizados = {
         'username': username,
@@ -213,13 +206,11 @@ def crear_usuario_view(request):
     unidades = UnidadOrganizacional.objects.all()
 
     if request.method == 'POST':
-        # Procesar y validar de manera centralizada
         datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=True)
 
         if errores:
             for error in errores:
                 messages.error(request, error)
-            # Retorna el formulario de creación manteniendo los datos previamente ingresados
             return render(
                 request,
                 'usuarios/crear.html',
@@ -256,6 +247,17 @@ def crear_usuario_view(request):
             messages.success(request, 'Usuario creado correctamente.')
             return redirect('usuarios')
 
+        except IntegrityError:
+            messages.error(request, 'Error de integridad: El nombre de usuario o correo ya está siendo utilizado.')
+            return render(
+                request,
+                'usuarios/crear.html',
+                {
+                    'roles': ROLES,
+                    'unidades': unidades,
+                    'valores': request.POST
+                }
+            )
         except Exception:
             messages.error(request, 'Ocurrió un error inesperado al registrar el usuario en el sistema.')
             return redirect('crear_usuario')
@@ -278,7 +280,6 @@ def editar_usuario_view(request, user_id):
     unidades = UnidadOrganizacional.objects.all()
 
     if request.method == 'POST':
-        # Validar y procesar datos conservando el identificador del usuario para la exclusión de duplicados
         datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=False, user_id=user_id)
 
         if errores:
@@ -318,6 +319,19 @@ def editar_usuario_view(request, user_id):
             messages.success(request, 'Usuario actualizado correctamente.')
             return redirect('usuarios')
 
+        except IntegrityError:
+            messages.error(request, 'Error de integridad: No se pudo guardar porque el nombre de usuario o correo ya existe.')
+            return render(
+                request,
+                'usuarios/editar.html',
+                {
+                    'usuario_obj': usuario,
+                    'perfil': perfil,
+                    'roles': ROLES,
+                    'unidades': unidades,
+                    'valores': request.POST
+                }
+            )
         except Exception:
             messages.error(request, 'Error al actualizar la información del usuario.')
             return redirect('editar_usuario', user_id=user_id)
@@ -413,42 +427,42 @@ def perfil_usuario_view(request):
     perfil = getattr(usuario, 'perfilusuario', None)
 
     if request.method == 'POST':
-        first_name = normalizar_espacios(request.POST.get('first_name', ''))
-        last_name = normalizar_espacios(request.POST.get('last_name', ''))
-        email = normalizar_espacios(request.POST.get('email', ''))
+        first_name = capitalizar_nombre_propio(normalizar_espacios(request.POST.get('first_name', '')))
+        last_name = capitalizar_nombre_propio(normalizar_espacios(request.POST.get('last_name', '')))
+        email = normalizar_espacios(request.POST.get('email', '')).lower()
 
         errores = []
-
-        # Validaciones de nombre y apellido para perfil propio
-        regex_nombre = r"^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-\']+$"
+        regex_spam_letras = r"(.)\1{3,}"
 
         if not first_name:
-            errores.append("El nombre es obligatorio y no puede contener únicamente espacios.")
+            errores.append("El nombre es obligatorio.")
         else:
-            if len(first_name) < 2 or len(first_name) > 150:
-                errores.append("El nombre debe tener entre 2 y 150 caracteres.")
+            if len(first_name) < 2 or len(first_name) > 40:
+                errores.append("El nombre debe tener entre 2 y 40 caracteres.")
             if first_name.isdigit():
                 errores.append("El nombre no puede ser únicamente numérico.")
-            elif not re.match(regex_nombre, first_name):
+            elif not re.match(r"^[a-zA-ZáéíóüñÁÉÍÓÚÜÑ\s\-\']+$", first_name):
                 errores.append("El nombre contiene caracteres no permitidos.")
+            elif re.search(regex_spam_letras, first_name):
+                errores.append("El nombre contiene una repetición excesiva de caracteres (spam).")
 
         if not last_name:
-            errores.append("El apellido es obligatorio y no puede contener únicamente espacios.")
+            errores.append("El apellido es obligatorio.")
         else:
-            if len(last_name) < 2 or len(last_name) > 150:
-                errores.append("El apellido debe tener entre 2 y 150 caracteres.")
+            if len(last_name) < 2 or len(last_name) > 40:
+                errores.append("El apellido debe tener entre 2 y 40 caracteres.")
             if last_name.isdigit():
                 errores.append("El apellido no puede ser únicamente numérico.")
-            elif not re.match(regex_nombre, last_name):
+            elif not re.match(r"^[a-zA-ZáéíóüñÁÉÍÓÚÜÑ\s\-\']+$", last_name):
                 errores.append("El apellido contiene caracteres no permitidos.")
+            elif re.search(regex_spam_letras, last_name):
+                errores.append("El apellido contiene una repetición excesiva de caracteres (spam).")
 
-        # Validación de correo propio
         if email:
             try:
                 validate_email(email)
             except ValidationError:
                 errores.append("El formato del correo electrónico no es válido.")
-            
             if User.objects.filter(email__iexact=email).exclude(id=usuario.id).exists():
                 errores.append("El correo electrónico ya está registrado por otra cuenta.")
 

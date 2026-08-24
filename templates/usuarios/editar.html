@@ -108,20 +108,22 @@ Editar Usuario
                 >
             </div>
 
-            <!-- EMAIL -->
+            <!-- EMAIL en editar.html -->
             <div>
                 <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Correo Electrónico
+                    Correo Electrónico <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
+                    id="email"
                     type="email"
                     name="email"
-                    value="{{ usuario_obj.email }}"
+                    value="{{ valores.email|default:usuario_obj.email|default:'' }}"
                     class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
-                    placeholder="Ej. jperez@gobierno.gob"
+                    placeholder="correo@institucion.gob.bo"
+                    required
+                    autocomplete="off"
                 >
             </div>
-
             <!-- ROL -->
             <div>
                 <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">

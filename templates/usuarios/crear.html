@@ -118,18 +118,19 @@ Crear Usuario
                 >
             </div>
 
-            <!-- EMAIL -->
+            <!-- EMAIL en crear.html -->
             <div>
                 <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Correo Electrónico
+                    Correo Electrónico <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
                     id="email"
                     type="email"
                     name="email"
-                    value="{{ valores.email|default:'' }}"
+                    value="{{ valores.email|default:'' }}" 
                     class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
                     placeholder="correo@institucion.gob.bo"
+                    required
                     autocomplete="off"
                 >
             </div>
