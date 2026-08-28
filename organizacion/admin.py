@@ -1,5 +1,15 @@
 from django.contrib import admin
-from .models import UnidadOrganizacional
+from organizacion.models import Secretaria, UnidadOrganizacional
 
+@admin.register(Secretaria)
+class SecretariaAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'codigo')
+    search_fields = ('nombre', 'codigo')
+    ordering = ('nombre',)
 
-admin.site.register(UnidadOrganizacional)
+@admin.register(UnidadOrganizacional)
+class UnidadOrganizacionalAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'codigo_sigep', 'secretaria')
+    search_fields = ('nombre', 'codigo_sigep')
+    list_filter = ('secretaria',)
+    ordering = ('nombre',)

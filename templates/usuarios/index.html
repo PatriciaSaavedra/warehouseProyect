@@ -50,31 +50,88 @@ Usuarios
 
     </div>
 
-    <!-- MENSAJES DE ALERTA -->
-    {% if messages %}
-        <div class="space-y-3 mb-6">
-            {% for message in messages %}
-                <div class="px-4 py-3 rounded-2xl border flex items-center gap-3
-                    {% if message.tags == 'success' %}
-                        bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30 text-green-700 dark:text-green-400
-                    {% else %}
-                        bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400
-                    {% endif %}
-                ">
-                    <span class="material-symbols-outlined">
-                        {% if message.tags == 'success' %}
-                            check_circle
-                        {% else %}
-                            error
-                        {% endif %}
-                    </span>
-                    <span class="text-sm font-medium">
-                        {{ message }}
-                    </span>
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
+   
+
+    <div class="card p-6 mb-8 bg-white dark:bg-[#151010] shadow-sm rounded-2xl border border-gray-100 dark:border-[#241919]">
+    
+        <form method="GET" action="{% url 'usuarios' %}" class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            
+            <!-- Búsqueda por texto libre -->
+            <div class="relative">
+                <input 
+                    type="text" 
+                    name="q" 
+                    value="{{ query }}" 
+                    placeholder="Buscar por nombre, usuario..." 
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                >
+            </div>
+
+            <!-- Filtrar por Secretaría -->
+            <div>
+                <select 
+                    name="secretaria" 
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                >
+                    <option value="">Todas las Secretarías</option>
+                    {% for sec in secretarias %}
+                        <option value="{{ sec.id }}" {% if secretaria_filter == sec.id|stringformat:"s" %}selected{% endif %}>
+                            {{ sec.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtrar por Rol -->
+            <div>
+                <select 
+                    name="rol" 
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                >
+                    <option value="">Todos los Roles</option>
+                    {% for value, label in roles %}
+                        <option value="{{ value }}" {% if rol_filter == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtrar por Estado -->
+            <div>
+                <select 
+                    name="estado" 
+                    class="w-full border border-gray-300 rounded-2xl p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
+                >
+                    <option value="">Todos los Estados</option>
+                    <option value="activo" {% if estado_filter == 'activo' %}selected{% endif %}>Activos</option>
+                    <option value="inactivo" {% if estado_filter == 'inactivo' %}selected{% endif %}>Inactivos</option>
+                </select>
+            </div>
+
+            <!-- Botones de Acción (Filtrar y Limpiar) -->
+            <div class="flex gap-2 justify-stretch items-center col-span-1">
+                <button 
+                    type="submit" 
+                    class="btn-primary w-full p-3 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer shadow"
+                >
+                    <span class="material-symbols-outlined text-base">filter_list</span>
+                    Filtrar
+                </button>
+                
+                {% if query or rol_filter or secretaria_filter or estado_filter %}
+                    <a 
+                        href="{% url 'usuarios' %}" 
+                        class="border border-gray-300 hover:bg-gray-50 text-gray-700 p-3 rounded-2xl text-center text-sm font-semibold transition"
+                        title="Limpiar filtros"
+                    >
+                        <span class="material-symbols-outlined text-base align-middle">close</span>
+                    </a>
+                {% endif %}
+            </div>
+
+        </form>
+    </div>
 
     <!-- CARD PRINCIPAL -->
     <div class="card overflow-hidden shadow-sm">

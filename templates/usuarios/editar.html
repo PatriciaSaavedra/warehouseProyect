@@ -31,31 +31,7 @@ Editar Usuario
         </a>
     </div>
 
-    <!-- MENSAJES -->
-    {% if messages %}
-        <div class="space-y-3 mb-6">
-            {% for message in messages %}
-                <div class="px-4 py-3 rounded-2xl border flex items-center gap-3
-                    {% if message.tags == 'success' %}
-                        bg-green-50 border-green-200 text-green-700
-                    {% else %}
-                        bg-red-50 border-red-200 text-red-700
-                    {% endif %}
-                ">
-                    <span class="material-symbols-outlined text-[22px]">
-                        {% if message.tags == 'success' %}
-                            check_circle
-                        {% else %}
-                            error
-                        {% endif %}
-                    </span>
-                    <span class="text-sm font-medium">
-                        {{ message }}
-                    </span>
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
+    
 
     <!-- CARD DEL FORMULARIO -->
     <div class="card p-8 shadow-sm">
@@ -151,21 +127,45 @@ Editar Usuario
             </div>
 
             <!-- UNIDAD ORGANIZACIONAL -->
+            <!-- SECRETARÍA DEPARTAMENTAL -->
             <div>
                 <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Unidad Organizacional
+                    Secretaría Departamental
                 </label>
                 <div class="relative">
                     <select
+                        id="secretaria"
+                        name="secretaria"
+                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                    >
+                        <option value="">Seleccione una secretaría</option>
+                        {% for sec in secretarias %}
+                            <option value="{{ sec.id }}" {% if valores.secretaria == sec.id|stringformat:"s" or perfil.secretaria_id == sec.id %}selected{% endif %}>
+                                {{ sec.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                        keyboard_arrow_down
+                    </span>
+                </div>
+            </div>
+
+            <!-- UNIDAD ORGANIZACIONAL / ADMINISTRATIVA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                    Unidad Administrativa
+                </label>
+                <div class="relative">
+                    <select
+                        id="unidad"
                         name="unidad"
+                        data-preseleccionada="{% if valores.unidad %}{{ valores.unidad }}{% else %}{{ perfil.unidad_id|default:'' }}{% endif %}"
                         class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
                     >
                         <option value="">Seleccione una unidad</option>
                         {% for unidad in unidades %}
-                            <option
-                                value="{{ unidad.id }}"
-                                {% if perfil.unidad.id == unidad.id %}selected{% endif %}
-                            >
+                            <option value="{{ unidad.id }}" data-secretaria="{{ unidad.secretaria_id|default:'' }}">
                                 {{ unidad.nombre }}
                             </option>
                         {% endfor %}
@@ -203,5 +203,47 @@ Editar Usuario
     </div>
 
 </div>
+<script> // Filtrado interactivo de Unidades Administrativas dependiendo de la Secretaría seleccionada
+const secretariaSelect = document.getElementById('secretaria');
+const unidadSelect = document.getElementById('unidad');
+
+if (secretariaSelect && unidadSelect) {
+    const todasLasUnidades = Array.from(unidadSelect.options);
+
+    function filtrarUnidades() {
+        const secretariaId = secretariaSelect.value;
+        const valorActual = unidadSelect.getAttribute('data-preseleccionada') || unidadSelect.value;
+        
+        unidadSelect.innerHTML = '';
+
+        // Clonar la opción por defecto
+        const opcionDefecto = todasLasUnidades.find(opt => opt.value === '');
+        if (opcionDefecto) {
+            unidadSelect.appendChild(opcionDefecto.cloneNode(true));
+        }
+
+        todasLasUnidades.forEach(opt => {
+            if (opt.value === '') return;
+            const optSecretariaId = opt.getAttribute('data-secretaria');
+
+            // Mostrar si no hay secretaría seleccionada o si coincide la relación jerárquica
+            if (!secretariaId || optSecretariaId === secretariaId) {
+                unidadSelect.appendChild(opt.cloneNode(true));
+            }
+        });
+
+        // Restablecer el valor preseleccionado si sigue estando disponible en el listado filtrado
+        unidadSelect.value = valorActual;
+        unidadSelect.removeAttribute('data-preseleccionada'); // Consumir bandera
+    }
+
+    secretariaSelect.addEventListener('change', () => {
+        unidadSelect.value = ''; // Limpiar selección previa al cambiar de Secretaría
+        filtrarUnidades();
+    });
+
+    // Ejecutar al cargar para sincronizar el estado inicial de edición o reenvío de formulario por error
+    filtrarUnidades();
+}</script>
 
 {% endblock %}

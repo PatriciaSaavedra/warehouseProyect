@@ -1,6 +1,6 @@
 import re
 from django.core.paginator import Paginator
-from django.db import transaction, IntegrityError  # <-- Control de integridad
+from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import User
@@ -10,7 +10,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
 from .models import PerfilUsuario, ROLES
-from organizacion.models import UnidadOrganizacional
+from organizacion.models import Secretaria, UnidadAdministrativa, UnidadOrganizacional
 from auditoria.models import Bitacora
 from usuarios.decorators import rol_requerido
 
@@ -26,10 +26,6 @@ def normalizar_espacios(texto):
 
 
 def capitalizar_nombre_propio(texto):
-    """
-    Convierte nombres a formato "Title Case" manteniendo minúsculas 
-    en preposiciones intermedias del español (ej: "Juan de la Cruz").
-    """
     if not texto:
         return ""
     palabras = texto.split()
@@ -44,94 +40,130 @@ def capitalizar_nombre_propio(texto):
             palabras_formateadas.append(pal.capitalize())
     return " ".join(palabras_formateadas)
 
-
 def validar_datos_usuario(datos, es_creacion=False, user_id=None):
     """
-    Valida y normaliza exhaustivamente los datos del usuario.
-    Controla longitud, formato, unicidad y repetición de caracteres.
+    Valida y normaliza de forma exhaustiva todos los campos de un usuario.
+    
+    Asegura:
+    - Normalización de espacios y formato Tipo Título (Title Case) en nombres [11].
+    - Username obligatorio, único, sin espacios y con límites estrictos [11, 28].
+    - Email obligatorio, de formato válido, único y con protección anti-spam [11, 28].
+    - Fuerza estricta de contraseña (complejidad, longitud mínima de 8, sin coincidir con username) [11].
+    - Validación de rol existente y consistente en el sistema [11].
+    - Consistencia jerárquica obligatoria (Secretaría -> Unidad Administrativa) [28].
     """
     errores = []
 
-    # 1. Normalización inicial (Username se pasa a minúsculas)
+    # ==========================================
+    # 1. NORMALIZACIÓN DE CAMPOS INICIALES
+    # ==========================================
     username = datos.get('username', '').strip().lower()
     first_name = capitalizar_nombre_propio(normalizar_espacios(datos.get('first_name', '')))
     last_name = capitalizar_nombre_propio(normalizar_espacios(datos.get('last_name', '')))
     email = normalizar_espacios(datos.get('email', '')).lower()
     rol = datos.get('rol', '').strip()
+    
+    # Rescatamos los IDs de la estructura orgánica
+    secretaria_id = datos.get('secretaria', '').strip()
     unidad_id = datos.get('unidad', '').strip()
 
-    # Expresión regular anti-spam (Detecta más de 3 letras idénticas seguidas)
+    # Expresión regular anti-spam (Detecta más de 3 letras idénticas seguidas, ej: "ssss")
     regex_spam_letras = r"(.)\1{3,}"
 
+
+    # ==========================================
     # 2. VALIDACIÓN DEL USERNAME
+    # ==========================================
     if not username:
         errores.append("El nombre de usuario (username) es obligatorio.")
     else:
-        # Validación de espacios
+        # Evitar espacios intermedios
         if " " in username:
             errores.append("El nombre de usuario no puede contener espacios en blanco.")
-        # Validación de longitud (4 a 30 caracteres)
+        # Longitud estricta (4 a 30 caracteres)
         elif len(username) < 4 or len(username) > 30:
             errores.append("El nombre de usuario debe tener entre 4 y 30 caracteres.")
-        # Caracteres permitidos (letras minúsculas, números, guiones y guión bajo)
+        # Caracteres válidos (letras minúsculas, números, guiones y guión bajo)
         elif not re.match(r"^[a-z0-9_\-]+$", username):
             errores.append("El nombre de usuario solo puede contener letras, números, guiones (-) y guiones bajos (_).")
         
-        # Comprobación de unicidad insensible a mayúsculas
+        # Comprobar unicidad (Evitar duplicaciones, insensible a mayúsculas)
         query_username = User.objects.filter(username__iexact=username)
         if not es_creacion and user_id:
             query_username = query_username.exclude(id=user_id)
         if query_username.exists():
             errores.append("El nombre de usuario ya está registrado por otra cuenta.")
 
-    # 3. VALIDACIÓN DE NOMBRES Y APELLIDOS (Límites: 2 a 40 caracteres + Anti-Spam)
+
+    # ==========================================
+    # 3. VALIDACIÓN DE NOMBRES Y APELLIDOS
+    # ==========================================
+    # --- NOMBRES ---
     if not first_name:
         errores.append("El nombre es obligatorio y no puede contener únicamente espacios.")
     else:
+        # Longitud (2 a 40 caracteres)
         if len(first_name) < 2 or len(first_name) > 40:
             errores.append("El nombre debe tener entre 2 y 40 caracteres.")
+        # Evitar que sea puramente numérico
         if first_name.isdigit():
             errores.append("El nombre no puede ser únicamente numérico.")
+        # Caracteres permitidos (letras, tildes, guión y comilla simple)
         elif not re.match(r"^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-\']+$", first_name):
             errores.append("El nombre contiene caracteres no permitidos.")
+        # Filtro Anti-Spam
         elif re.search(regex_spam_letras, first_name):
             errores.append("El nombre ingresado no es válido debido a una repetición excesiva de caracteres (anti-spam).")
 
+    # --- APELLIDOS ---
     if not last_name:
         errores.append("El apellido es obligatorio y no puede contener únicamente espacios.")
     else:
+        # Longitud (2 a 40 caracteres)
         if len(last_name) < 2 or len(last_name) > 40:
             errores.append("El apellido debe tener entre 2 y 40 caracteres.")
+        # Evitar que sea puramente numérico
         if last_name.isdigit():
             errores.append("El apellido no puede ser únicamente numérico.")
+        # Caracteres permitidos
         elif not re.match(r"^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-\']+$", last_name):
             errores.append("El apellido contiene caracteres no permitidos.")
+        # Filtro Anti-Spam
         elif re.search(regex_spam_letras, last_name):
             errores.append("El apellido ingresado no es válido debido a una repetición excesiva de caracteres (anti-spam).")
 
-# 4. VALIDACIÓN DE EMAIL (Campo obligatorio, formato, longitud y unicidad)
+
+    # ==========================================
+    # 4. VALIDACIÓN DE EMAIL
+    # ==========================================
     if not email:
         errores.append("El correo electrónico es obligatorio para el registro institucional.")
     else:
-        # Validación de longitud (Mínimo 5 caracteres ej: a@b.c, Máximo 100 por diseño)
+        # Longitud (5 a 100 caracteres)
         if len(email) < 5 or len(email) > 100:
             errores.append("El correo electrónico debe tener entre 5 y 100 caracteres.")
-        
-        # Validación de estructura/formato (Usa el validador nativo de Django)
         else:
+            # Estructura del correo electrónico
             try:
                 validate_email(email)
             except ValidationError:
                 errores.append("El formato del correo electrónico no es válido (ejemplo: usuario@institucion.gob.bo).")
         
-        # Evitar correos duplicados (Garantiza unicidad en toda la base de datos)
+        # Filtro Anti-Spam
+        if re.search(regex_spam_letras, email):
+            errores.append("El correo electrónico ingresado no es válido debido a una repetición excesiva de caracteres (anti-spam).")
+
+        # Evitar correos duplicados
         query_email = User.objects.filter(email__iexact=email)
         if not es_creacion and user_id:
             query_email = query_email.exclude(id=user_id)
         if query_email.exists():
             errores.append("El correo electrónico ya está registrado por otro funcionario en el sistema.")
-            
-    # 5. VALIDACIÓN DE CONTRASEÑA (Solo creación)
+
+
+    # ==========================================
+    # 5. VALIDACIÓN DE CONTRASEÑA (Solo Creación)
+    # ==========================================
     password = ""
     if es_creacion:
         password = datos.get('password', '')
@@ -140,31 +172,88 @@ def validar_datos_usuario(datos, es_creacion=False, user_id=None):
         if not password:
             errores.append("La contraseña es obligatoria.")
         else:
-            if len(password) < 6 or len(password) > 128:
-                errores.append("La contraseña debe tener entre 6 y 128 caracteres.")
+            # Longitud mínima de 8 caracteres y máxima de 128
+            if len(password) < 8 or len(password) > 128:
+                errores.append("La contraseña debe tener entre 8 y 128 caracteres.")
+            
+            # Espacios en los extremos
             if password.strip() != password:
                 errores.append("La contraseña no debe comenzar ni terminar con espacios en blanco.")
+            
+            # Evitar contraseñas únicamente numéricas o alfabéticas
+            if password.isdigit():
+                errores.append("La contraseña es demasiado simple. No puede contener únicamente números.")
+            elif password.isalpha():
+                errores.append("La contraseña es demasiado simple. No puede contener únicamente letras.")
+            
+            # Evaluar complejidad (Al menos una mayúscula, una minúscula y un número de forma independiente)
+            if not re.search(r"[A-Z]", password) or not re.search(r"[a-z]", password) or not re.search(r"[0-9]", password):
+                errores.append("La contraseña es débil. Debe incluir al menos una letra mayúscula, una letra minúscula y un número.")
+            
+            # Evitar que la contraseña contenga el username
+            if username and username in password.lower():
+                errores.append("La contraseña no es segura porque contiene su nombre de usuario.")
 
         if password != password_confirm:
             errores.append("La contraseña y su confirmación no coinciden.")
 
+
+    # ==========================================
+    # 6. VALIDACIÓN DEL ROL DE SISTEMA
+    # ==========================================
+    roles_validos = [r[0] for r in ROLES]
     if not rol:
         errores.append("El rol del usuario es obligatorio.")
+    elif rol not in roles_validos:
+        errores.append("El rol seleccionado no es válido en el sistema.")
 
+
+    # ==========================================
+    # 7. VALIDACIÓN DE RELACIÓN SECRETARÍA -> UNIDAD
+    # ==========================================
+    if not secretaria_id:
+        errores.append("La selección de la Secretaría Departamental es obligatoria para registrar al funcionario.")
+    
+    if not unidad_id:
+        errores.append("La selección de la Unidad Administrativa es obligatoria para registrar al funcionario.")
+
+    secretaria_obj = None
+    unidad_obj = None
+
+    if secretaria_id:
+        try:
+            secretaria_obj = Secretaria.objects.get(id=secretaria_id)
+        except (Secretaria.DoesNotExist, ValueError):
+            errores.append("La Secretaría seleccionada no existe en el sistema.")
+
+    if unidad_id:
+        try:
+            unidad_obj = UnidadAdministrativa.objects.get(id=unidad_id)
+        except (UnidadAdministrativa.DoesNotExist, ValueError):
+            errores.append("La Unidad Administrativa seleccionada no existe en el sistema.")
+
+    # Evitar asociaciones inexistentes o incoherentes
+    if secretaria_obj and unidad_obj:
+        if unidad_obj.secretaria != secretaria_obj:
+            errores.append("La Unidad Administrativa seleccionada no pertenece a la Secretaría indicada.")
+
+
+    # ==========================================
+    # 8. ESTRUCTURA DE RETORNO CONSOLIDADA
+    # ==========================================
     datos_normalizados = {
         'username': username,
         'first_name': first_name,
         'last_name': last_name,
         'email': email,
         'rol': rol,
+        'secretaria_id': secretaria_id if secretaria_id else None,
         'unidad_id': unidad_id if unidad_id else None,
     }
     if es_creacion:
         datos_normalizados['password'] = password
 
     return datos_normalizados, errores
-
-
 # ==========================================
 # VISTAS DE USUARIOS
 # ==========================================
@@ -172,20 +261,46 @@ def validar_datos_usuario(datos, es_creacion=False, user_id=None):
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def usuarios_view(request):
+    """
+    Lista y filtra de manera avanzada los funcionarios de la Gobernación.
+    Ordenamiento predeterminado: Último creado primero (Descendente) [28].
+    """
+    # 1. Rescatar parámetros de búsqueda y filtros
     query = request.GET.get('q', '').strip()
-    usuarios = User.objects.select_related('perfilusuario').all()
+    rol_filter = request.GET.get('rol', '').strip()
+    secretaria_filter = request.GET.get('secretaria', '').strip()
+    estado_filter = request.GET.get('estado', '').strip()
 
+    # Optimizamos la consulta con select_related para evitar el problema de N+1 consultas [28]
+    usuarios = User.objects.select_related('perfilusuario', 'perfilusuario__secretaria', 'perfilusuario__unidad').all()
+
+    # 2. Aplicar Búsqueda por Texto (Username, Nombre, Apellido, Correo) [11, 28]
     if query:
         usuarios = usuarios.filter(
             Q(first_name__icontains=query) |
             Q(last_name__icontains=query) |
             Q(username__icontains=query) |
-            Q(email__icontains=query) |
-            Q(perfilusuario__rol__icontains=query)
+            Q(email__icontains=query)
         )
 
-    usuarios = usuarios.order_by('first_name')
+    # 3. Filtrar por Rol del sistema
+    if rol_filter:
+        usuarios = usuarios.filter(perfilusuario__rol=rol_filter)
 
+    # 4. Filtrar por Secretaría Departamental de pertenencia
+    if secretaria_filter:
+        usuarios = usuarios.filter(perfilusuario__secretaria_id=secretaria_filter)
+
+    # 5. Filtrar por Estado (Activo / Inactivo)
+    if estado_filter == 'activo':
+        usuarios = usuarios.filter(is_active=True)
+    elif estado_filter == 'inactivo':
+        usuarios = usuarios.filter(is_active=False)
+
+    # 6. ORDENAMIENTO: Lo último creado primero (Descendente por fecha de unión) [28]
+    usuarios = usuarios.order_by('-date_joined')
+
+    # 7. Paginación de resultados (10 por página) [28]
     paginator = Paginator(usuarios, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -195,7 +310,12 @@ def usuarios_view(request):
         'usuarios/index.html',
         {
             'page_obj': page_obj,
-            'query': query
+            'query': query,
+            'rol_filter': rol_filter,
+            'secretaria_filter': secretaria_filter,
+            'estado_filter': estado_filter,
+            'roles': ROLES,
+            'secretarias': Secretaria.objects.all(),
         }
     )
 
@@ -203,7 +323,8 @@ def usuarios_view(request):
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def crear_usuario_view(request):
-    unidades = UnidadOrganizacional.objects.all()
+    unidades = UnidadAdministrativa.objects.all()
+    secretarias = Secretaria.objects.all()
 
     if request.method == 'POST':
         datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=True)
@@ -217,6 +338,7 @@ def crear_usuario_view(request):
                 {
                     'roles': ROLES,
                     'unidades': unidades,
+                    'secretarias': secretarias,
                     'valores': request.POST
                 }
             )
@@ -234,6 +356,7 @@ def crear_usuario_view(request):
                 PerfilUsuario.objects.create(
                     user=user,
                     rol=datos_normalizados['rol'],
+                    secretaria_id=datos_normalizados['secretaria_id'],
                     unidad_id=datos_normalizados['unidad_id']
                 )
 
@@ -241,7 +364,7 @@ def crear_usuario_view(request):
                     usuario=request.user,
                     modulo='Usuarios',
                     accion='Crear usuario',
-                    descripcion=f'Se creó el usuario {datos_normalizados["username"]} con el rol {datos_normalizados["rol"]}'
+                    descripcion=f'Se creó el usuario {datos_normalizados["username"]} con rol {datos_normalizados["rol"]}'
                 )
 
             messages.success(request, 'Usuario creado correctamente.')
@@ -255,11 +378,12 @@ def crear_usuario_view(request):
                 {
                     'roles': ROLES,
                     'unidades': unidades,
+                    'secretarias': secretarias,
                     'valores': request.POST
                 }
             )
         except Exception:
-            messages.error(request, 'Ocurrió un error inesperado al registrar el usuario en el sistema.')
+            messages.error(request, 'Ocurrió un error inesperado al registrar el usuario.')
             return redirect('crear_usuario')
 
     return render(
@@ -267,17 +391,20 @@ def crear_usuario_view(request):
         'usuarios/crear.html',
         {
             'roles': ROLES,
-            'unidades': unidades
+            'unidades': unidades,
+            'secretarias': secretarias
         }
     )
 
 
+# VISTA DE EDICIÓN
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def editar_usuario_view(request, user_id):
     usuario = get_object_or_404(User, id=user_id)
     perfil = usuario.perfilusuario
-    unidades = UnidadOrganizacional.objects.all()
+    unidades = UnidadAdministrativa.objects.all()
+    secretarias = Secretaria.objects.all()
 
     if request.method == 'POST':
         datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=False, user_id=user_id)
@@ -293,6 +420,7 @@ def editar_usuario_view(request, user_id):
                     'perfil': perfil,
                     'roles': ROLES,
                     'unidades': unidades,
+                    'secretarias': secretarias,
                     'valores': request.POST
                 }
             )
@@ -306,6 +434,7 @@ def editar_usuario_view(request, user_id):
                 usuario.save()
 
                 perfil.rol = datos_normalizados['rol']
+                perfil.secretaria_id = datos_normalizados['secretaria_id']
                 perfil.unidad_id = datos_normalizados['unidad_id']
                 perfil.save()
 
@@ -320,7 +449,7 @@ def editar_usuario_view(request, user_id):
             return redirect('usuarios')
 
         except IntegrityError:
-            messages.error(request, 'Error de integridad: No se pudo guardar porque el nombre de usuario o correo ya existe.')
+            messages.error(request, 'Error de integridad: El nombre de usuario o correo ya existe.')
             return render(
                 request,
                 'usuarios/editar.html',
@@ -329,11 +458,12 @@ def editar_usuario_view(request, user_id):
                     'perfil': perfil,
                     'roles': ROLES,
                     'unidades': unidades,
+                    'secretarias': secretarias,
                     'valores': request.POST
                 }
             )
         except Exception:
-            messages.error(request, 'Error al actualizar la información del usuario.')
+            messages.error(request, 'Error al actualizar el usuario.')
             return redirect('editar_usuario', user_id=user_id)
 
     return render(
@@ -343,10 +473,10 @@ def editar_usuario_view(request, user_id):
             'usuario_obj': usuario,
             'perfil': perfil,
             'roles': ROLES,
-            'unidades': unidades
+            'unidades': unidades,
+            'secretarias': secretarias
         }
     )
-
 
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
@@ -386,10 +516,24 @@ def reset_password_view(request, user_id):
         if not nueva_password:
             errores.append('La nueva contraseña es obligatoria.')
         else:
-            if len(nueva_password) < 6 or len(nueva_password) > 128:
-                errores.append('La nueva contraseña debe tener entre 6 y 128 caracteres.')
+            # Longitud mínima de 8 caracteres y máxima de 128
+            if len(nueva_password) < 8 or len(nueva_password) > 128:
+                errores.append('La nueva contraseña debe tener entre 8 y 128 caracteres.')
+            
             if nueva_password.strip() != nueva_password:
                 errores.append('La contraseña no debe iniciar ni finalizar con espacios en blanco.')
+            # Complejidad
+            if nueva_password.isdigit():
+                errores.append("La contraseña es demasiado simple. No puede contener únicamente números.")
+            elif nueva_password.isalpha():
+                errores.append("La contraseña es demasiado simple. No puede contener únicamente letras.")
+            
+            # Cambiado de "elif" a "if" para evaluar de forma independiente
+            if not re.search(r"[A-Z]", nueva_password) or not re.search(r"[a-z]", nueva_password) or not re.search(r"[0-9]", nueva_password):
+                errores.append("La contraseña es débil. Debe incluir al menos una letra mayúscula, una letra minúscula y un número.")
+            
+            if usuario.username and usuario.username.lower() in nueva_password.lower():
+                errores.append("La contraseña no puede contener el nombre de usuario de la cuenta.")
 
         if nueva_password != confirmar_password:
             errores.append('La contraseña y su confirmación no coinciden.')
@@ -441,7 +585,7 @@ def perfil_usuario_view(request):
                 errores.append("El nombre debe tener entre 2 y 40 caracteres.")
             if first_name.isdigit():
                 errores.append("El nombre no puede ser únicamente numérico.")
-            elif not re.match(r"^[a-zA-ZáéíóüñÁÉÍÓÚÜÑ\s\-\']+$", first_name):
+            elif not re.match(r"^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-\']+$", first_name):
                 errores.append("El nombre contiene caracteres no permitidos.")
             elif re.search(regex_spam_letras, first_name):
                 errores.append("El nombre contiene una repetición excesiva de caracteres (spam).")
@@ -453,7 +597,7 @@ def perfil_usuario_view(request):
                 errores.append("El apellido debe tener entre 2 y 40 caracteres.")
             if last_name.isdigit():
                 errores.append("El apellido no puede ser únicamente numérico.")
-            elif not re.match(r"^[a-zA-ZáéíóüñÁÉÍÓÚÜÑ\s\-\']+$", last_name):
+            elif not re.match(r"^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-\']+$", last_name):
                 errores.append("El apellido contiene caracteres no permitidos.")
             elif re.search(regex_spam_letras, last_name):
                 errores.append("El apellido contiene una repetición excesiva de caracteres (spam).")
@@ -537,9 +681,15 @@ def unidades_list_view(request):
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def crear_unidad_view(request):
+    """
+    Registra una nueva Unidad de forma atómica asociándola a una Secretaría [11, 28].
+    """
+    secretarias = Secretaria.objects.all()  # <-- Cargamos las secretarías para el formulario
+
     if request.method == 'POST':
         nombre = normalizar_espacios(request.POST.get('nombre', ''))
         codigo_sigep = normalizar_espacios(request.POST.get('codigo_sigep', ''))
+        secretaria_id = request.POST.get('secretaria', '').strip()  # <-- Rescatamos la secretaría
 
         if not nombre:
             messages.error(request, 'El nombre de la unidad es obligatorio.')
@@ -553,7 +703,8 @@ def crear_unidad_view(request):
             with transaction.atomic():
                 UnidadOrganizacional.objects.create(
                     nombre=nombre,
-                    codigo_sigep=codigo_sigep if codigo_sigep else None
+                    codigo_sigep=codigo_sigep if codigo_sigep else None,
+                    secretaria_id=secretaria_id if secretaria_id else None  # <-- Guardamos relación
                 )
                 Bitacora.objects.create(
                     usuario=request.user,
@@ -569,17 +720,22 @@ def crear_unidad_view(request):
             messages.error(request, f'Error al registrar la unidad: {str(e)}')
             return redirect('crear_unidad')
 
-    return render(request, 'usuarios/crear_unidad.html')
+    return render(request, 'usuarios/crear_unidad.html', {'secretarias': secretarias})
 
 
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def editar_unidad_view(request, id):
+    """
+    Modifica los datos de una Unidad Organizacional existente [11, 28].
+    """
     unidad = get_object_or_404(UnidadOrganizacional, id=id)
+    secretarias = Secretaria.objects.all()  # <-- Cargamos las secretarías
 
     if request.method == 'POST':
         nombre = normalizar_espacios(request.POST.get('nombre', ''))
         codigo_sigep = normalizar_espacios(request.POST.get('codigo_sigep', ''))
+        secretaria_id = request.POST.get('secretaria', '').strip()  # <-- Rescatamos la secretaría
 
         if not nombre:
             messages.error(request, 'El nombre de la unidad es un campo obligatorio.')
@@ -593,6 +749,7 @@ def editar_unidad_view(request, id):
             with transaction.atomic():
                 unidad.nombre = nombre
                 unidad.codigo_sigep = codigo_sigep if codigo_sigep else None
+                unidad.secretaria_id = secretaria_id if secretaria_id else None  # <-- Actualizamos relación
                 unidad.save()
 
                 Bitacora.objects.create(
@@ -609,4 +766,5 @@ def editar_unidad_view(request, id):
             messages.error(request, f'Error al actualizar la unidad: {str(e)}')
             return redirect('editar_unidad', id=id)
 
-    return render(request, 'usuarios/editar_unidad.html', {'unidad': unidad})
+    return render(request, 'usuarios/editar_unidad.html', {'unidad': unidad, 'secretarias': secretarias})
+
