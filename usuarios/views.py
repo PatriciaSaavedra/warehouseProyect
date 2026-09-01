@@ -768,3 +768,179 @@ def editar_unidad_view(request, id):
 
     return render(request, 'usuarios/editar_unidad.html', {'unidad': unidad, 'secretarias': secretarias})
 
+# ==========================================
+# CRUD DE SECRETARÍAS (NUEVAS VISTAS)
+# ==========================================
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def secretarias_list_view(request):
+    """
+    Lista y busca las Secretarías Departamentales registradas en el sistema.
+    """
+    query = request.GET.get('q', '').strip()
+    secretarias = Secretaria.objects.all()
+
+    if query:
+        secretarias = secretarias.filter(
+            Q(nombre__icontains=query) |
+            Q(codigo__icontains=query)
+        )
+
+    secretarias = secretarias.order_by('nombre')
+
+    paginator = Paginator(secretarias, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        'usuarios/secretarias_list.html',
+        {
+            'page_obj': page_obj,
+            'query': query
+        }
+    )
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def crear_secretaria_view(request):
+    """
+    Registra una nueva Secretaría Departamental de manera atómica.
+    """
+    if request.method == 'POST':
+        nombre = normalizar_espacios(request.POST.get('nombre', ''))
+        codigo = normalizar_espacios(request.POST.get('codigo', '')).upper()
+
+        if not nombre:
+            messages.error(request, 'El nombre de la secretaría es obligatorio.')
+            return redirect('crear_secretaria')
+
+        if Secretaria.objects.filter(nombre__iexact=nombre).exists():
+            messages.error(request, 'Ya existe una Secretaría registrada con este nombre.')
+            return redirect('crear_secretaria')
+
+        try:
+            with transaction.atomic():
+                Secretaria.objects.create(
+                    nombre=nombre,
+                    codigo=codigo if codigo else None
+                )
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Organización',
+                    accion='Crear Secretaría',
+                    descripcion=f'Se creó la Secretaría Departamental: {nombre}'
+                )
+
+            messages.success(request, 'Secretaría Departamental creada correctamente.')
+            return redirect('secretarias_list')
+
+        except Exception as e:
+            messages.error(request, f'Error al registrar la secretaría: {str(e)}')
+            return redirect('crear_secretaria')
+
+    return render(request, 'usuarios/crear_secretaria.html')
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def editar_secretaria_view(request, id):
+    """
+    Modifica los datos de una Secretaría Departamental existente.
+    Recupera los datos de forma segura tanto en GET como ante fallos en POST [11, 28].
+    """
+    secretaria_real = get_object_or_404(Secretaria, id=id)
+
+    if request.method == 'POST':
+        nombre = normalizar_espacios(request.POST.get('nombre', ''))
+        codigo = normalizar_espacios(request.POST.get('codigo', '')).upper()
+
+        # Si el nombre viene vacío, mostramos error conservando lo que se escribió
+        if not nombre:
+            messages.error(request, 'El nombre de la secretaría es un campo obligatorio.')
+            return render(request, 'usuarios/editar_secretaria.html', {
+                'secretaria': {'id': id, 'nombre': nombre, 'codigo': codigo}
+            })
+
+        # Si el nombre ya existe en otra secretaría, mostramos error conservando los datos
+        if Secretaria.objects.filter(nombre__iexact=nombre).exclude(id=id).exists():
+            messages.error(request, 'Ya existe otra Secretaría registrada con ese nombre.')
+            return render(request, 'usuarios/editar_secretaria.html', {
+                'secretaria': {'id': id, 'nombre': nombre, 'codigo': codigo}
+            })
+
+        try:
+            with transaction.atomic():
+                secretaria_real.nombre = nombre
+                secretaria_real.codigo = codigo if codigo else None
+                secretaria_real.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Organización',
+                    accion='Editar Secretaría',
+                    descripcion=f'Se actualizaron los datos de la secretaría: {nombre}'
+                )
+
+            messages.success(request, 'Secretaría actualizada correctamente.')
+            return redirect('secretarias_list')
+
+        except Exception as e:
+            messages.error(request, f'Error al actualizar la secretaría: {str(e)}')
+            return render(request, 'usuarios/editar_secretaria.html', {
+                'secretaria': {'id': id, 'nombre': nombre, 'codigo': codigo}
+            })
+
+    # Al cargar la página por primera vez (GET), pasamos el objeto real de la Base de Datos
+    return render(request, 'usuarios/editar_secretaria.html', {'secretaria': secretaria_real})
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def toggle_secretaria_view(request, id):
+    """
+    Da de baja (Desactiva) o reactiva de manera lógica una Secretaría Departamental [11, 28].
+    """
+    secretaria = get_object_or_404(Secretaria, id=id)
+    secretaria.is_active = not secretaria.is_active
+    secretaria.save()
+
+    estado = 'reactivada' if secretaria.is_active else 'desactivada (dada de baja)'
+
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Organización',
+        accion='Cambio de estado Secretaría',
+        descripcion=f'Se cambió el estado a {estado} de la secretaría: {secretaria.nombre}'
+    )
+
+    messages.success(request, f'La Secretaría ha sido {estado} correctamente.')
+    return redirect('secretarias_list')
+
+
+# ==========================================
+# BAJA LÓGICA DE UNIDADES (NUEVA VISTA)
+# ==========================================
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def toggle_unidad_view(request, id):
+    """
+    Da de baja (Desactiva) o reactiva de manera lógica una Unidad Administrativa [11, 28].
+    """
+    unidad = get_object_or_404(UnidadOrganizacional, id=id)
+    unidad.is_active = not unidad.is_active
+    unidad.save()
+
+    estado = 'reactivada' if unidad.is_active else 'desactivada (dada de baja)'
+
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Organización',
+        accion='Cambio de estado Unidad',
+        descripcion=f'Se cambió el estado a {estado} de la unidad: {unidad.nombre}'
+    )
+
+    messages.success(request, f'La Unidad Administrativa ha sido {estado} correctamente.')
+    return redirect('unidades_list')
