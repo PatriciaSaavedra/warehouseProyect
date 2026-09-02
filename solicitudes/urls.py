@@ -28,4 +28,7 @@ urlpatterns = [
     # --- EXPORTACIÓN ---
     path('pdf/<int:id>/', views.solicitud_pdf, name='solicitud_pdf'),
     path('verificar/<str:codigo>/', views.verificar_documento_publico, name='verificar_documento'),
+        path('nuevo-pedido-almacen/', views.nuevo_pedido_almacen, name='nuevo_pedido_almacen'),
+    path('nueva-solicitud-compra/', views.nueva_solicitud_compra, name='nueva_solicitud_compra'),
+
 ]

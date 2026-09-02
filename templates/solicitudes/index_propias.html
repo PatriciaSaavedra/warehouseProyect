@@ -9,22 +9,32 @@
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
         <div class="min-w-0">
             <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Mis Requerimientos Personales</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Consulte el estado, descargue sus comprobantes o edite sus solicitudes registradas .</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Consulte el estado, descargue sus comprobantes o edite sus solicitudes registradas.</p>
         </div>
+        
+        <!-- Tarjeta 1 y 3: Separación de botones desde el origen -->
         {% if request.user.perfilusuario.rol == 'UNIDAD_SOLICITANTE' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-            <a href="{% url 'nueva_solicitud' %}" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap self-start lg:self-center">
-                <span class="material-symbols-outlined text-[18px]">add</span> Nueva Solicitud
-            </a>
+            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto self-start lg:self-center">
+                <!-- Botón 1: Consumo directo de stock -->
+                <a href="{% url 'nuevo_pedido_almacen' %}" class="bg-gray-950 hover:bg-gray-900 text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[18px]">warehouse</span> Pedir de Almacén
+                </a>
+
+                <!-- Botón 2: Adquisición o servicio con partida y precio referencial -->
+                <a href="{% url 'nueva_solicitud_compra' %}" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[18px]">shopping_cart</span> Requerimiento / POA
+                </a>
+            </div>
         {% endif %}
     </div>
 
     <!-- PESTAÑAS DE NAVEGACIÓN (Tabs de la Gobernación) -->
     <div class="border-b border-gray-200 dark:border-gray-800 flex gap-6">
-        <!-- PESTAÑA 1: ACTIVA (Color Vino y Borde Inferior) -->
+        <!-- PESTAÑA 1: ACTIVA -->
         <a href="{% url 'solicitudes' %}" class="border-b-2 border-[#580000] text-[#580000] dark:text-red-400 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit']">
             <span class="material-symbols-outlined text-[18px]">person</span> Mis Solicitudes
         </a>
-        <!-- PESTAÑA 2: INACTIVA (Gris) -->
+        <!-- PESTAÑA 2: INACTIVA -->
         {% if rol != 'UNIDAD_SOLICITANTE' %}
             <a href="{% url 'solicitudes_general' %}" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit'] transition">
                 <span class="material-symbols-outlined text-[18px]">warehouse</span> Bandeja de Gestión
@@ -32,13 +42,15 @@
         {% endif %}
     </div>
 
-    <!-- TABLA DE MIS SOLICITUDES (Estructura simple) -->
+    <!-- TABLA DE MIS SOLICITUDES -->
     <div class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl">
         <div class="overflow-x-auto">
             <table class="w-full min-w-[900px]">
                 <thead class="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-gray-800">
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">
-                        <th class="px-6 py-4 w-40">Folio</th>
+                        <th class="px-6 py-4 w-36">Folio</th>
+                        <!-- Tarjeta 6: Mostrar tipo y flujo asignado en el listado -->
+                        <th class="px-6 py-4 w-44">Flujo / Tipo</th>
                         <th class="px-6 py-4">Justificación</th>
                         <th class="px-6 py-4 w-40">Fecha</th>
                         <th class="px-6 py-4 text-center w-36">Estado</th>
@@ -49,7 +61,18 @@
                     {% for sol in page_obj %}
                     <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-100">{{ sol.codigo }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-350 truncate max-w-[300px]" title="{{ sol.justificacion }}">{{ sol.justificacion }}</td>
+                        
+                        <!-- Tarjeta 6: Visualizar Tipo y Flujo asignado en cada fila -->
+                        <td class="px-6 py-4 whitespace-nowrap text-xs">
+                            <span class="block font-bold text-gray-700 dark:text-gray-200">
+                                {{ sol.get_flujo_atencion_display|default:"Salida de Almacén" }}
+                            </span>
+                            <span class="text-[10px] text-gray-400 block mt-0.5 uppercase tracking-wider">
+                                {{ sol.get_tipo_requerimiento_display|default:"Bien" }}
+                            </span>
+                        </td>
+
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-350 truncate max-w-[250px]" title="{{ sol.justificacion }}">{{ sol.justificacion }}</td>
                         <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ sol.fecha|date:"d/m/Y" }}</td>
                         <td class="px-6 py-4 text-center text-xs font-bold">
                             <!-- Badges unificados con el flujo oficial -->
@@ -79,28 +102,25 @@
                             <div class="flex justify-end gap-2">
                                 <a href="{% url 'detalle_solicitud' sol.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center justify-center transition" title="Ver Detalle"><span class="material-symbols-outlined text-gray-600 dark:text-gray-400 text-[20px]">visibility</span></a>
                                 <a href="{% url 'solicitud_pdf' sol.id %}" target="_blank" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition" title="Descargar PDF"><span class="material-symbols-outlined text-red-600 dark:text-red-400 text-[20px]">picture_as_pdf</span></a>
-                                
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-['Outfit']">No se registran solicitudes personales creadas.</td>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-['Outfit']">No se registran solicitudes personales creadas.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        
         {% if page_obj.has_other_pages %}
         <div class="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 font-['Outfit']">
-            <!-- Izquierda: Cantidad de folios mostrados -->
             <div class="text-xs text-gray-500 dark:text-gray-400">
                 Mostrando del <strong>{{ page_obj.start_index }}</strong> al <strong>{{ page_obj.end_index }}</strong> de <strong>{{ page_obj.paginator.count }}</strong> requerimientos personales totales [28].
             </div>
             
-            <!-- Derecha: Índices de navegación de páginas (Arrastrando filtros activos) [28] -->
             <div class="flex items-center gap-1 text-xs">
-                <!-- Página Anterior -->
                 {% if page_obj.has_previous %}
                     <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
                         <span class="material-symbols-outlined text-[16px]">chevron_left</span>
@@ -111,7 +131,6 @@
                     </span>
                 {% endif %}
                 
-                <!-- Números de Página Centrales -->
                 {% for num in page_obj.paginator.page_range %}
                     {% if page_obj.number == num %}
                         <span class="w-8 h-8 rounded-xl bg-[#580000] text-white flex items-center justify-center font-bold shadow-sm select-none">
@@ -124,7 +143,6 @@
                     {% endif %}
                 {% endfor %}
                 
-                <!-- Página Siguiente -->
                 {% if page_obj.has_next %}
                     <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
                         <span class="material-symbols-outlined text-[16px]">chevron_right</span>
@@ -138,7 +156,6 @@
         </div>
         {% endif %}
 
-    </div>
     </div>
 </div>
 {% endblock %}

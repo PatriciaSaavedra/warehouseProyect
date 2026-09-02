@@ -15,11 +15,10 @@ Nueva Solicitud
                 Nueva Solicitud
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Completa el formulario para requerir materiales del almacén central [11]
+                Completa el formulario para requerir bienes o contratación de servicios [11]
             </p>
         </div>
         
-        <!-- Botón Volver -->
         <a
             href="{% url 'solicitudes' %}"
             class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
@@ -31,7 +30,7 @@ Nueva Solicitud
         </a>
     </div>
 
-    <!-- FORMULARIO (Usando la clase .card) -->
+    <!-- FORMULARIO -->
     <form method="POST" id="form-solicitud" class="card p-8 shadow-sm">
         {% csrf_token %}
 
@@ -52,23 +51,38 @@ Nueva Solicitud
                 <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
             </div>
 
+            <!-- Tarjeta 1: Campo Tipo de requerimiento -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                    Tipo de Requerimiento <span class="text-[#8b0000]">*</span>
+                </label>
+                <select
+                    name="tipo_requerimiento"
+                    id="tipo_requerimiento"
+                    required
+                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10"
+                >
+                    <option value="BIEN" selected>Bien (Material o Inventario)</option>
+                    <option value="SERVICIO">Servicio (Contratación)</option>
+                </select>
+            </div>
+
             <!-- MATERIALES -->
             <div class="md:col-span-2">
-
                 <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
-                    Materiales Solicitados
+                    Agregar Artículo / Servicio Solicitado
                 </label>
 
                 <div class="grid grid-cols-12 gap-3 items-start">
 
-                    <!-- Buscador y Selector -->
+                    <!-- Buscador y Selector (6 columnas) -->
                     <div class="col-span-12 sm:col-span-6">
                         <select
                             id="material_select"
                             class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none bg-white pr-10"
                             onchange="document.getElementById('buscador_material').value = '';"
                         >
-                            <option value="" class="dark:bg-[#151010]">Seleccionar material</option>
+                            <option value="" class="dark:bg-[#151010]">Seleccionar material existente</option>
                             {% for material in materiales %}
                             <option 
                                 value="{{ material.id }}" 
@@ -81,11 +95,10 @@ Nueva Solicitud
                         </select>
 
                         <div class="mt-2 relative">
-                            <!-- Input buscador dinámico -->
                             <input
                                 type="text"
                                 id="buscador_material"
-                                placeholder="Buscar material o escribir nueva adquisición..."
+                                placeholder="Buscar material o escribir nueva descripción..."
                                 class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
                                 onkeyup="buscarMateriales()"
                             >
@@ -93,8 +106,8 @@ Nueva Solicitud
                         </div>                        
                     </div>
 
-                    <!-- Input de Cantidad -->
-                    <div class="col-span-8 sm:col-span-3">
+                    <!-- Input de Cantidad (2 columnas) -->
+                    <div class="col-span-6 sm:col-span-2">
                         <input
                             type="number"
                             id="cantidad_input"
@@ -104,18 +117,30 @@ Nueva Solicitud
                         >
                     </div>
 
-                    <!-- BOTÓN DE AGREGAR -->
-                    <div class="col-span-4 sm:col-span-3">
+                    <!-- Tarjeta 2: Input de Precio Unitario Referencial (2 columnas) -->
+                    <div class="col-span-6 sm:col-span-2">
+                        <input
+                            type="number"
+                            id="precio_input"
+                            min="0"
+                            step="0.01"
+                            placeholder="P. Unit Ref (Bs.)"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <!-- BOTÓN DE AGREGAR (2 columnas) -->
+                    <div class="col-span-12 sm:col-span-2">
                         <button
                             type="button"
                             onclick="agregarMaterial()"
-                            class="w-full h-[50px] bg-gray-900 dark:bg-slate-800 hover:bg-gray-800 dark:hover:bg-slate-700 text-white rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-md active:scale-95 cursor-pointer"
+                            class="w-full h-[50px] bg-gray-900 dark:bg-slate-800 hover:bg-gray-800 dark:hover:bg-slate-700 text-white rounded-2xl flex items-center justify-center gap-1 transition-all duration-200 hover:shadow-md active:scale-95 cursor-pointer"
                             title="Agregar a la lista"
                         >
-                            <span class="material-symbols-outlined text-[20px]">
+                            <span class="material-symbols-outlined text-[18px]">
                                 add_circle
                             </span>
-                            <span class="text-sm font-bold font-['Outfit']">
+                            <span class="text-xs font-bold font-['Outfit']">
                                 Añadir
                             </span>
                         </button>
@@ -130,23 +155,25 @@ Nueva Solicitud
         <!-- TABLA DE MATERIALES SELECCIONADOS -->
         <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-850">
+                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-850 text-gray-600 dark:text-gray-300">
                     <tr>
-                        <th class="p-4 font-bold text-gray-700 dark:text-gray-200">
-                            Material
-                        </th>
-                        <th class="p-4 font-bold text-gray-700 dark:text-gray-200 text-center w-32">
-                            Cantidad
-                        </th>
-                        <th class="p-4 font-bold text-gray-700 dark:text-gray-200 text-center w-24">
-                            Acción
-                        </th>
+                        <th class="p-4 font-bold">Concepto / Material</th>
+                        <th class="p-4 font-bold text-center w-28 font-['Outfit']">Cantidad</th>
+                        <th class="p-4 font-bold text-center w-32 font-['Outfit']">Precio Unitario (Bs.)</th>
+                        <th class="p-4 font-bold text-center w-32 font-['Outfit']">Subtotal (Bs.)</th>
+                        <th class="p-4 font-bold text-center w-24">Acción</th>
                     </tr>
                 </thead>
                 <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
-                    <!-- Se renderiza dinámicamente -->
+                    <!-- Renders dinámicamente desde javascript -->
                 </tbody>
             </table>
+            
+            <!-- Tarjeta 2: Mostrar total referencial acumulado en el formulario -->
+            <div class="p-4 bg-gray-50 dark:bg-slate-900/40 flex justify-between items-center text-sm font-['Outfit'] border-t border-gray-200 dark:border-gray-800">
+                <span class="font-bold text-gray-700 dark:text-gray-300">Total Referencial de la Solicitud:</span>
+                <span id="total_referencial_form" class="font-extrabold text-base text-[#8b0000] dark:text-red-400 font-mono">Bs. 0.00</span>
+            </div>
         </div>
 
         <!-- JUSTIFICACION -->
@@ -165,7 +192,6 @@ Nueva Solicitud
 
         <!-- BOTONES DE ACCIÓN -->
         <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
-            
             <a
                 href="{% url 'solicitudes' %}"
                 class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition"
@@ -182,18 +208,15 @@ Nueva Solicitud
                 </span>
                 Enviar Solicitud
             </button>
-
         </div>
 
     </form>
 
 </div>
 
-<!-- CONTROL JAVASCRIPT UNIFICADO (Sin duplicados y libre de advertencias) [28] -->
 <script>
 let carrito = {};
 
-// Iniciar la vista por defecto
 document.addEventListener('DOMContentLoaded', () => {
     renderTabla();
     renderInputs();
@@ -202,25 +225,35 @@ document.addEventListener('DOMContentLoaded', () => {
 function agregarMaterial() {
     const select = document.getElementById('material_select');
     const cantidadInput = document.getElementById('cantidad_input');
+    const precioInput = document.getElementById('precio_input');
     const buscador = document.getElementById('buscador_material');
 
     const materialId = select.value;
     const selectedOption = select.options[select.selectedIndex];
     const cantidad = parseInt(cantidadInput.value);
+    
+    // Tarjeta 2: Validar que el precio sea mayor o igual a 0
+    let precioRef = parseFloat(precioInput.value);
 
     if (isNaN(cantidad) || cantidad <= 0) {
         alert("Defina una cantidad válida mayor a 0.");
         return;
     }
+    
+    if (isNaN(precioRef) || precioRef < 0) {
+        alert("Defina un precio unitario referencial válido (mayor o igual a 0).");
+        return;
+    }
 
-    // --- ESCENARIO A: EL MATERIAL NO EXISTE (NUEVA ADQUISICIÓN) [28] ---
+    // --- ESCENARIO A: EL MATERIAL NO EXISTE (NUEVA ADQUISICIÓN) ---
     if (!materialId && buscador.value.trim() !== "") {
         const nombreNoCatalogado = buscador.value.trim();
-        const tempId = "temp_" + Date.now(); // ID temporal único en milisegundos
+        const tempId = "temp_" + Date.now();
 
         carrito[tempId] = {
             nombre: nombreNoCatalogado,
             cantidad: cantidad,
+            precio_referencial: precioRef,
             stock: 99999, // Stock temporal ficticio alto para pasar validación de frontend
             es_nuevo: true
         };
@@ -229,6 +262,7 @@ function agregarMaterial() {
         renderInputs();
         buscador.value = '';
         cantidadInput.value = '';
+        precioInput.value = '';
         return;
     }
 
@@ -253,10 +287,12 @@ function agregarMaterial() {
             return;
         }
         carrito[materialId].cantidad = nuevaCantidad;
+        carrito[materialId].precio_referencial = precioRef; // Actualiza con el último precio ingresado
     } else {
         carrito[materialId] = {
             nombre: materialNombre,
             cantidad: cantidad,
+            precio_referencial: precioRef,
             stock: stockActual,
             es_nuevo: false
         };
@@ -268,6 +304,7 @@ function agregarMaterial() {
     select.value = '';
     buscador.value = '';
     cantidadInput.value = '';
+    precioInput.value = '';
 }
 
 function renderTabla() {
@@ -278,16 +315,22 @@ function renderTabla() {
     if (keys.length === 0) {
         tabla.innerHTML = `
             <tr>
-                <td colspan="3" class="p-8 text-center text-gray-400 dark:text-gray-500 bg-transparent">
-                    No se han añadido materiales a la solicitud todavía [11].
+                <td colspan="5" class="p-8 text-center text-gray-400 dark:text-gray-500 bg-transparent">
+                    No se han añadido conceptos a la solicitud todavía [11].
                 </td>
             </tr>
         `;
+        document.getElementById('total_referencial_form').textContent = "Bs. 0.00";
         return;
     }
 
+    let totalAcumulado = 0;
+
     keys.forEach(id => {
         const item = carrito[id];
+        // Tarjeta 2: Calcular automáticamente el subtotal (cantidad x precio referencial)
+        const subtotal = item.cantidad * item.precio_referencial;
+        totalAcumulado += subtotal;
 
         tabla.innerHTML += `
             <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
@@ -305,6 +348,20 @@ function renderTabla() {
                         class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-20 text-center focus:ring-1 focus:ring-red-500 focus:outline-none"
                     >
                 </td>
+                <!-- Tarjeta 2: Permitir la edición del precio referencial en la propia tabla -->
+                <td class="p-4 text-center">
+                    <input 
+                        type="number"
+                        value="${item.precio_referencial.toFixed(2)}"
+                        min="0"
+                        step="0.01"
+                        onchange="editarPrecio('${id}', this)"
+                        class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-24 text-center focus:ring-1 focus:ring-red-500 focus:outline-none font-mono"
+                    >
+                </td>
+                <td class="p-4 text-right font-bold text-gray-800 dark:text-gray-200 font-mono pr-8">
+                    Bs. ${subtotal.toFixed(2)}
+                </td>
                 <td class="p-4 text-center">
                     <button type="button" onclick="eliminar('${id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium transition">
                         Eliminar
@@ -313,6 +370,9 @@ function renderTabla() {
             </tr>
         `;
     });
+
+    // Tarjeta 2: Mostrar el Total Referencial calculado automáticamente
+    document.getElementById('total_referencial_form').textContent = `Bs. ${totalAcumulado.toFixed(2)}`;
 }
 
 function editarCantidad(id, inputElement) {
@@ -328,6 +388,24 @@ function editarCantidad(id, inputElement) {
         item.cantidad = nuevaCantidad;
         inputElement.value = nuevaCantidad;
     }
+    renderTabla();
+    renderInputs();
+}
+
+// Tarjeta 2: Permitir la edición dinámica del precio referencial en el listado
+function editarPrecio(id, inputElement) {
+    let nuevoPrecio = parseFloat(inputElement.value);
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+        alert("El precio debe ser un número mayor o igual a 0.");
+        nuevoPrecio = 0.00;
+    }
+
+    const item = carrito[id];
+    if (item) {
+        item.precio_referencial = nuevoPrecio;
+        inputElement.value = nuevoPrecio.toFixed(2);
+    }
+    renderTabla();
     renderInputs();
 }
 
@@ -342,11 +420,12 @@ function renderInputs() {
     const payload = {};
 
     Object.keys(carrito).forEach(id => {
-        // Formato de payload enriquecido compatible con tu backend views.py [28]
+        // Tarjeta 2: Incorporamos el campo de precio_referencial al payload JSON que recibe views.py
         payload[id] = {
             cantidad: carrito[id].cantidad,
             es_nuevo: carrito[id].es_nuevo,
-            nombre: carrito[id].nombre
+            nombre: carrito[id].nombre,
+            precio_referencial: carrito[id].precio_referencial
         };
     });
 
@@ -376,7 +455,6 @@ function buscarMateriales() {
                 resultados.innerHTML = '<div class="p-3 text-gray-500 dark:text-gray-400 text-sm text-center">Sin resultados</div>';
             } else {
                 data.forEach(material => {
-                    // Crear elemento div programáticamente para evitar errores de sintaxis con las comillas del linter [28]
                     const div = document.createElement('div');
                     div.className = "p-3 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-sm border-b border-gray-100 dark:border-gray-800 last:border-none transition duration-100";
                     div.innerHTML = `
@@ -384,7 +462,6 @@ function buscarMateriales() {
                         <span class="text-xs text-gray-400 dark:text-gray-500 block mt-0.5">(Stock actual: ${material.stock})</span>
                     `;
                     
-                    // Evento clic asignado limpiamente desde Javascript nativo [28]
                     div.addEventListener('click', function() {
                         seleccionarMaterial(material.id, material.nombre, material.stock);
                     });

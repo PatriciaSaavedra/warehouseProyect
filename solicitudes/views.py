@@ -1,6 +1,6 @@
 import json
 import html
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.utils import timezone 
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden # <-- CORREGIDO: Se eliminó el import de 'request'
 from django.views.decorators.csrf import csrf_exempt
@@ -16,6 +16,7 @@ from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
 from django.core.paginator import Paginator
+
 
 # Importaciones para el dibujo del código QR nativo de ReportLab [28]
 from reportlab.graphics.shapes import Drawing
@@ -127,6 +128,7 @@ def solicitudes_general(request):
     # Capturar parámetros de filtros avanzados
     query = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
+    filtro_flujo = request.GET.get('flujo', '').strip()  # <-- NUEVO FILTRO PARA TARJETA 4
     desde_str = request.GET.get('desde', '').strip()
     hasta_str = request.GET.get('hasta', '').strip()
 
@@ -139,6 +141,8 @@ def solicitudes_general(request):
         )
     if filtro_estado:
         solicitudes_query = solicitudes_query.filter(estado=filtro_estado)
+    if filtro_flujo:  # <-- NUEVO FILTRO APLICADO
+        solicitudes_query = solicitudes_query.filter(flujo_atencion=filtro_flujo)
     if desde_str:
         solicitudes_query = solicitudes_query.filter(fecha__gte=desde_str)
     if hasta_str:
@@ -159,6 +163,9 @@ def solicitudes_general(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Importamos las tuplas oficiales de flujo para pasarlas al template
+    from .models import FLUJOS_ATENCION
+
     return render(request, 'solicitudes/index_general.html', {
         'solicitudes': page_obj, 
         'rol': rol,
@@ -168,25 +175,35 @@ def solicitudes_general(request):
         'kpi_total_folios': total_folios_count,
         'query': query,
         'filtro_estado': filtro_estado,
+        'filtro_flujo': filtro_flujo,  # <-- PASAR A LA PLANTILLA
         'desde': desde_str,
         'hasta': hasta_str,
-        'estados': ESTADOS_SOLICITUD
+        'estados': ESTADOS_SOLICITUD,
+        'flujos': FLUJOS_ATENCION  # <-- PASAR A LA PLANTILLA
     })
 @login_required
 def buscar_materiales(request):
     """
-    Busca materiales en tiempo real por Nombre, Código de Material o Código de Partida (RE-SABS) [28].
+    Busca materiales en tiempo real. Admite el parámetro opcional 'solo_con_stock'
+    para filtrar únicamente materiales disponibles en estanterías.
     """
     q = request.GET.get('q', '').strip()
+    solo_con_stock = request.GET.get('solo_con_stock', 'false').lower() == 'true'
     
     if not q:
         return JsonResponse([], safe=False)
 
-    materiales = Material.objects.filter(
+    query_base = Material.objects.filter(
         Q(nombre__icontains=q) |
         Q(codigo__icontains=q) |
         Q(partida__codigo__icontains=q)
-    ).select_related('partida')[:10]
+    )
+
+    # Si se pide desde Almacén, solo mostramos materiales con existencias
+    if solo_con_stock:
+        query_base = query_base.filter(stock_actual__gt=0)
+
+    materiales = query_base.select_related('partida')[:10]
 
     data = [
         {
@@ -198,15 +215,21 @@ def buscar_materiales(request):
     ]
     return JsonResponse(data, safe=False)
 
-
 @login_required
 def nueva_solicitud(request):
     """
-    Registra solicitudes soportando materiales existentes y nuevas adquisiciones no catalogadas [11, 28].
+    Registra solicitudes soportando materiales existentes y nuevas adquisiciones no catalogadas,
+    almacenando el tipo de requerimiento y los precios referenciales unitarios.
     """
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
+        
+        # Tarjeta 1: Obtener y validar tipo de requerimiento
+        tipo_requerimiento = request.POST.get('tipo_requerimiento', '').strip()
+        if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
+            messages.error(request, "Debe seleccionar un Tipo de Requerimiento válido (Bien o Servicio).")
+            return redirect('nueva_solicitud')
 
         if not payload_raw:
             messages.error(request, "No se recibió información de materiales.")
@@ -238,43 +261,60 @@ def nueva_solicitud(request):
                 numero = (ultima.id + 1) if ultima else 1
                 codigo = f'SOL-{numero:05d}'
 
+                # Tarjeta 1: Guardar tipo de requerimiento
                 solicitud = Solicitud.objects.create(
                     codigo=codigo,
                     unidad_solicitante=unidad_solicitante,
                     solicitante=request.user,
                     fecha=fecha,
                     justificacion=justificacion,
+                    tipo_requerimiento=tipo_requerimiento,
                     estado='REGISTRADA'
                 )
 
                 for item_key, item_data in payload.items():
                     cantidad = int(item_data.get('cantidad', 1))
                     es_nuevo = item_data.get('es_nuevo', False)
+                    
+                    # Tarjeta 2: Obtener y validar el precio referencial (>= 0)
+                    precio_ref_raw = item_data.get('precio_referencial', 0)
+                    try:
+                        precio_ref = Decimal(str(precio_ref_raw))
+                    except (ValueError, TypeError, InvalidOperation):
+                        precio_ref = Decimal('0.00')
 
                     if cantidad <= 0:
                         raise ValueError("La cantidad solicitada debe ser mayor a cero.")
+                        
+                    if precio_ref < 0:
+                        raise ValueError("El precio unitario referencial debe ser mayor o igual a 0.")
 
+                    # Tarjeta 2: Registrar el precio referencial proporcionado por la Unidad Solicitante
                     if es_nuevo:
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
                             material=None,
                             es_nueva_adquisicion=True,
                             descripcion_material_no_catalogado=item_data.get('nombre'),
-                            cantidad_solicitada=cantidad
+                            cantidad_solicitada=cantidad,
+                            precio_unitario_referencial=precio_ref
                         )
                     else:
                         material = Material.objects.get(id=item_key)
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
                             material=material,
-                            cantidad_solicitada=cantidad
+                            cantidad_solicitada=cantidad,
+                            precio_unitario_referencial=precio_ref
                         )
+
+                solicitud.determinar_y_asignar_flujo()
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Solicitudes',
                     accion='Registrar Solicitud',
-                    descripcion=f'Se registró la Solicitud {codigo} con ítems personalizados para la unidad {unidad_solicitante.nombre}'
+                    descripcion=f'Se registró la Solicitud {codigo} con flujo asignado: {solicitud.get_flujo_atencion_display()}'
                 )
 
             messages.success(request, f"Solicitud {codigo} registrada correctamente.")
@@ -291,8 +331,124 @@ def nueva_solicitud(request):
     return render(request, 'solicitudes/nueva.html', {
         'materiales': materiales
     })
+@login_required
+def nueva_solicitud_compra(request):
+    """
+    Registra solicitudes para compras de bienes inexistentes/no catalogados o contratación de servicios.
+    Sigue el Flujo Completo Administrativo de Adquisición o Contratación.
+    """
+    if request.method == 'POST':
+        fecha = request.POST.get('fecha')
+        payload_raw = request.POST.get("payload")
+        tipo_requerimiento = request.POST.get('tipo_requerimiento', '').strip()
 
+        if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
+            messages.error(request, "Debe seleccionar un Tipo de Requerimiento válido (Bien o Servicio).")
+            return redirect('nueva_solicitud_compra')
 
+        if not payload_raw:
+            messages.error(request, "No se recibió información de los conceptos solicitados.")
+            return redirect('nueva_solicitud_compra')
+
+        payload_raw = html.unescape(payload_raw)
+
+        try:
+            payload = json.loads(payload_raw)
+        except json.JSONDecodeError:
+            messages.error(request, "Error en el formato de los datos de adquisición.")
+            return redirect('nueva_solicitud_compra')
+
+        if not payload:
+            messages.error(request, "Debe agregar al menos un concepto o artículo.")
+            return redirect('nueva_solicitud_compra')
+
+        justificacion = request.POST.get('justificacion', '').strip()
+        perfil = getattr(request.user, 'perfilusuario', None)
+        unidad_solicitante = perfil.unidad if perfil else None
+
+        if not unidad_solicitante:
+            messages.error(request, "Su usuario no tiene asignada una Unidad Organizacional.")
+            return redirect('nueva_solicitud_compra')
+
+        try:
+            with transaction.atomic():
+                ultima = Solicitud.objects.select_for_update().order_by('id').last()
+                numero = (ultima.id + 1) if ultima else 1
+                
+                # Asignamos el prefijo y el flujo de atención correspondiente
+                if tipo_requerimiento == 'SERVICIO':
+                    codigo = f'REQ-SRV-{numero:05d}'
+                    flujo = 'CONTRATACION_SERVICIO'
+                else:
+                    codigo = f'REQ-ADQ-{numero:05d}'
+                    flujo = 'ADQUISICION'
+
+                solicitud = Solicitud.objects.create(
+                    codigo=codigo,
+                    unidad_solicitante=unidad_solicitante,
+                    solicitante=request.user,
+                    fecha=fecha,
+                    justificacion=justificacion,
+                    tipo_requerimiento=tipo_requerimiento,
+                    flujo_atencion=flujo,
+                    estado='REGISTRADA'
+                )
+
+                for item_key, item_data in payload.items():
+                    cantidad = int(item_data.get('cantidad', 1))
+                    es_nuevo = item_data.get('es_nuevo', False)
+                    
+                    precio_ref_raw = item_data.get('precio_referencial', 0)
+                    try:
+                        precio_ref = Decimal(str(precio_ref_raw))
+                    except (ValueError, TypeError, InvalidOperation):
+                        precio_ref = Decimal('0.00')
+
+                    if cantidad <= 0:
+                        raise ValueError("La cantidad solicitada debe ser mayor a cero.")
+                    if precio_ref < 0:
+                        raise ValueError("El precio referencial debe ser mayor o igual a 0.")
+
+                    if es_nuevo:
+                        DetalleSolicitud.objects.create(
+                            solicitud=solicitud,
+                            material=None,
+                            es_nueva_adquisicion=True,
+                            descripcion_material_no_catalogado=item_data.get('nombre'),
+                            cantidad_solicitada=cantidad,
+                            precio_unitario_referencial=precio_ref
+                        )
+                    else:
+                        material = Material.objects.get(id=item_key)
+                        DetalleSolicitud.objects.create(
+                            solicitud=solicitud,
+                            material=material,
+                            cantidad_solicitada=cantidad,
+                            precio_unitario_referencial=precio_ref
+                        )
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Solicitudes',
+                    accion='Registrar Solicitud Compra/Servicio',
+                    descripcion=f'Se registró el Requerimiento de Adquisición {codigo} ({tipo_requerimiento})'
+                )
+
+            messages.success(request, f"Requerimiento {codigo} registrado correctamente.")
+            return redirect('solicitudes')
+
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect('nueva_solicitud_compra')
+        except DatabaseError:
+            messages.error(request, "Hubo un error al guardar el requerimiento en la base de datos.")
+            return redirect('nueva_solicitud_compra')
+
+    # Para compras se puede buscar todo el catálogo (incluso los que tienen stock 0 o mínimo)
+    materiales = Material.objects.all().values('id', 'nombre', 'stock_actual')
+    return render(request, 'solicitudes/nueva_solicitud_compra.html', {
+        'materiales': materiales
+    })
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def catalogar_item_pendiente(request, detalle_id):
@@ -501,10 +657,12 @@ def validar_saf(request, id):
 @login_required
 @rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
 def aprobar_solicitud(request, id):
-    """
-    Paso 4: Presupuestos verifica la disponibilidad del POA antes del despacho físico [28].
-    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+
+    # Tarjeta 7: No intervenir en solicitudes de bienes con stock
+    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+        messages.warning(request, "Las solicitudes con stock disponible se despachan directamente y no intervienen en el flujo presupuestario de compras.")
+        return redirigir_despues_de_accion(request, solicitud)
 
     if solicitud.estado != 'VALIDADA_SAF':
         messages.error(request, "Solo solicitudes validadas por la SAF pueden aprobarse presupuestariamente.")
@@ -565,13 +723,11 @@ def aprobar_solicitud(request, id):
 @login_required
 @rol_requerido(['RPA', 'ADMINISTRADOR'])
 def validar_rpa(request, id):
-    """
-    Paso 5: El Responsable del Proceso de Contratación (RPA) aprueba [28].
-    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    if solicitud.estado != 'VALIDADA_PRESUPUESTOS':
-        messages.error(request, "Esta solicitud aún no cuenta con la aprobación presupuestaria.")
+    # Tarjeta 3: No intervenir en stock
+    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+        messages.warning(request, "Las solicitudes con stock no requieren validación del RPA.")
         return redirigir_despues_de_accion(request, solicitud)
 
     try:
@@ -598,13 +754,11 @@ def validar_rpa(request, id):
 @login_required
 @rol_requerido(['JEFE_ADMINISTRATIVO', 'ADMINISTRADOR'])
 def validar_jefatura(request, id):
-    """
-    Paso 6: El Jefe Administrativo aprueba [28].
-    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    if solicitud.estado != 'VALIDADA_RPA':
-        messages.error(request, "Esta solicitud aún no cuenta con la aprobación del RPA.")
+    # Tarjeta 3: No intervenir en stock
+    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+        messages.warning(request, "Las solicitudes con stock no requieren aprobación de Jefatura Administrativa.")
         return redirigir_despues_de_accion(request, solicitud)
 
     try:
@@ -631,15 +785,20 @@ def validar_jefatura(request, id):
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def preparar_solicitud(request, id):
-    """
-    Paso 7: El Almacenero alista los paquetes físicamente en el depósito [28].
-    """
     solicitud = get_object_or_404(Solicitud, id=id)
 
-    if solicitud.estado != 'VALIDADA_JEFATURA':
-        messages.error(request, "Solo solicitudes con aprobación de la Jefatura Administrativa pueden prepararse físicamente.")
-        return redirigir_despues_de_accion(request, solicitud)
+    # Tarjeta 3: Permitir preparación inmediata para bienes con stock
+    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+        permitido = (solicitud.estado == 'REVISADA')
+        mensaje_error = "Para solicitudes con stock, se requiere primero la autorización del Jefe de Unidad (Estado: Revisada)."
+    else:
+        # Requerimientos sin stock o servicios requieren validación hasta la Jefatura
+        permitido = (solicitud.estado == 'VALIDADA_JEFATURA')
+        mensaje_error = "Solo solicitudes validadas administrativamente por Jefatura pueden prepararse."
 
+    if not permitido:
+        messages.error(request, mensaje_error)
+        return redirigir_despues_de_accion(request, solicitud)
     solicitud.estado = 'PREPARADA'
     solicitud.preparado_por = request.user
     solicitud.fecha_preparado = timezone.now()
@@ -649,12 +808,11 @@ def preparar_solicitud(request, id):
         usuario=request.user,
         modulo='Solicitudes',
         accion='Preparación física',
-        descripcion=f'El almacenero preparó y empaquetó físicamente los materiales de la solicitud {solicitud.codigo}'
+        descripcion=f'El almacenero preparó físicamente los materiales de la solicitud {solicitud.codigo}'
     )
 
     messages.success(request, f"La solicitud {solicitud.codigo} ha sido marcada como PREPARADA para su despacho.")
     return redirigir_despues_de_accion(request, solicitud)
-
 
 @login_required
 def entregar_solicitud(request, id):
@@ -666,9 +824,18 @@ def entregar_solicitud(request, id):
 
     solicitud = get_object_or_404(Solicitud, id=id)
 
+    # NUEVO CONTROL DE SEGURIDAD (Tarjeta 3): Evitar que un servicio ingrese al flujo de inventario
+    if solicitud.flujo_atencion == 'CONTRATACION_SERVICIO':
+        messages.error(
+            request, 
+            "Error: Un requerimiento de tipo SERVICIO no puede ser procesado para entrega física de inventario."
+        )
+        return redirigir_despues_de_accion(request, solicitud)
+
     if solicitud.estado != 'PREPARADA':
         messages.error(request, "Solo solicitudes en estado PREPARADA pueden entregarse físicamente.")
         return redirigir_despues_de_accion(request, solicitud)
+
 
     detalles = solicitud.detalles.select_related('material__partida')
 
@@ -759,10 +926,13 @@ def cerrar_solicitud(request, id):
     return redirigir_despues_de_accion(request, solicitud)
 
 
+# --- EN TU ARCHIVO views.py ---
+
 @login_required
 def editar_solicitud(request, id):
     """
-    Permite modificar una solicitud existente únicamente si se encuentra en el primer paso del flujo ('REGISTRADA') [11, 28].
+    Permite modificar una solicitud existente únicamente si se encuentra en 'REGISTRADA',
+    actualizando tipo de requerimiento, materiales y precios unitarios referenciales.
     """
     solicitud = get_object_or_404(Solicitud, id=id)
     perfil = request.user.perfilusuario
@@ -777,12 +947,15 @@ def editar_solicitud(request, id):
     if request.method == "GET":
         detalles = solicitud.detalles.select_related('material')
 
+        # Tarjeta 2: Exportar el precio referencial para que se muestre en el formulario frontend
         detalles_json = json.dumps([
             {
-                "id": d.material.id,
-                "nombre": d.material.nombre,
+                "id": d.material.id if d.material else d.id,
+                "nombre": d.material.nombre if d.material else d.descripcion_material_no_catalogado,
                 "cantidad": d.cantidad_solicitada,
-                "stock": d.material.stock_actual
+                "stock": d.material.stock_actual if d.material else 0,
+                "precio_referencial": float(d.precio_unitario_referencial),
+                "es_nuevo": d.es_nueva_adquisicion
             }
             for d in detalles
         ])
@@ -796,6 +969,15 @@ def editar_solicitud(request, id):
         data = json.loads(request.body.decode("utf-8"))
         payload = data.get("payload", {})
         justificacion = data.get("justificacion", "")
+        
+        # Tarjeta 1: Recibir tipo de requerimiento
+        tipo_requerimiento = data.get("tipo_requerimiento", "BIEN")
+
+        if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
+            return JsonResponse({
+                "ok": False,
+                "error": "Debe seleccionar un tipo de requerimiento válido (Bien o Servicio)."
+            }, status=400)
 
         if not payload:
             return JsonResponse({
@@ -805,13 +987,28 @@ def editar_solicitud(request, id):
 
         with transaction.atomic():
             solicitud.justificacion = justificacion
+            solicitud.tipo_requerimiento = tipo_requerimiento
             solicitud.save()
 
             solicitud.detalles.all().delete()
 
-            for material_id, cantidad in payload.items():
-                material = Material.objects.get(id=material_id)
-                cantidad = int(cantidad)
+            for material_id, item_data in payload.items():
+                # Soportamos tanto el formato estructurado de diccionario como valores planos
+                if isinstance(item_data, dict):
+                    cantidad = int(item_data.get('cantidad', 1))
+                    precio_ref_raw = item_data.get('precio_referencial', 0)
+                    es_nuevo = item_data.get('es_nuevo', False)
+                    nombre_no_catalogado = item_data.get('nombre', '')
+                else:
+                    cantidad = int(item_data)
+                    precio_ref_raw = 0
+                    es_nuevo = False
+                    nombre_no_catalogado = ''
+
+                try:
+                    precio_ref = Decimal(str(precio_ref_raw))
+                except (ValueError, TypeError):
+                    precio_ref = Decimal('0.00')
 
                 if cantidad <= 0:
                     return JsonResponse({
@@ -819,18 +1016,38 @@ def editar_solicitud(request, id):
                         "error": "La cantidad de los ítems debe ser mayor a cero."
                     }, status=400)
 
-                DetalleSolicitud.objects.create(
-                    solicitud=solicitud,
-                    material=material,
-                    cantidad_solicitada=cantidad
-                )
+                if precio_ref < 0:
+                    return JsonResponse({
+                        "ok": False,
+                        "error": "El precio referencial no puede ser negativo."
+                    }, status=400)
 
-            Bitacora.objects.create(
-                usuario=request.user,
-                modulo='Solicitudes',
-                accion='Editar Solicitud',
-                descripcion=f'Se modificaron las cantidades o datos de la solicitud {solicitud.codigo}'
-            )
+                if es_nuevo or not str(material_id).isdigit():
+                    DetalleSolicitud.objects.create(
+                        solicitud=solicitud,
+                        material=None,
+                        es_nueva_adquisicion=True,
+                        descripcion_material_no_catalogado=nombre_no_catalogado,
+                        cantidad_solicitada=cantidad,
+                        precio_unitario_referencial=precio_ref
+                    )
+                else:
+                    material = Material.objects.get(id=material_id)
+                    DetalleSolicitud.objects.create(
+                        solicitud=solicitud,
+                        material=material,
+                        cantidad_solicitada=cantidad,
+                        precio_unitario_referencial=precio_ref
+                    )
+
+                solicitud.determinar_y_asignar_flujo()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Solicitudes',
+                    accion='Registrar Solicitud',
+                    descripcion=f'Se registró la Solicitud {solicitud.codigo} con flujo asignado: {solicitud.get_flujo_atencion_display()}'
+                )
 
         return JsonResponse({"ok": True})
 
@@ -839,7 +1056,6 @@ def editar_solicitud(request, id):
             "ok": False,
             "error": "Formato de datos JSON inválido"
         }, status=400)
-
 
 @login_required
 def rechazar_solicitud(request, id):
@@ -1100,13 +1316,13 @@ def solicitud_pdf(request, id):
 @login_required
 @rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR'])
 def validar_saf(request, id):
-    """
-    Paso 3: El Secretario de la SAF valida la solicitud (Estado: VALIDADA_SAF) [28].
-    Solo permite validar solicitudes que ya fueron previamente revisadas por el Jefe de Unidad.
-    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    # CORRECCIÓN DE FLUJO: Valida solo si ya fue revisada por su jefe de unidad [28]
+    # Tarjeta 3 y Tarjeta 7: No intervenir en solicitudes de bienes con stock
+    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+        messages.warning(request, "Las solicitudes con stock disponible pasan directamente de Autorización de Unidad a Preparación en Almacén.")
+        return redirigir_despues_de_accion(request, solicitud)
+
     if solicitud.estado != 'REVISADA':
         messages.error(request, "La solicitud aún no ha sido revisada ni autorizada por su Jefe de Unidad.")
         return redirigir_despues_de_accion(request, solicitud)
@@ -1253,6 +1469,100 @@ def retroceder_estado_solicitud(request, id):
         messages.error(request, f"Error al procesar la reversión del estado: {str(e)}")
 
     return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+
+@login_required
+def nuevo_pedido_almacen(request):
+    """
+    Registra solicitudes de materiales que se encuentran catalogados y con stock.
+    Sigue el Flujo Rápido de Almacén (SALIDA_ALMACEN) y no requiere cotización ni POA.
+    """
+    if request.method == 'POST':
+        fecha = request.POST.get('fecha')
+        payload_raw = request.POST.get("payload")
+
+        if not payload_raw:
+            messages.error(request, "No se recibió información de materiales.")
+            return redirect('nuevo_pedido_almacen')
+
+        payload_raw = html.unescape(payload_raw)
+
+        try:
+            payload = json.loads(payload_raw)
+        except json.JSONDecodeError:
+            messages.error(request, "Error en el formato de los datos enviados.")
+            return redirect('nuevo_pedido_almacen')
+
+        if not payload:
+            messages.error(request, "Debe agregar al menos un material.")
+            return redirect('nuevo_pedido_almacen')
+
+        justificacion = request.POST.get('justificacion', '').strip()
+        perfil = getattr(request.user, 'perfilusuario', None)
+        unidad_solicitante = perfil.unidad if perfil else None
+
+        if not unidad_solicitante:
+            messages.error(request, "Su usuario no tiene asignada una Unidad Organizacional.")
+            return redirect('nuevo_pedido_almacen')
+
+        try:
+            with transaction.atomic():
+                ultima = Solicitud.objects.select_for_update().order_by('id').last()
+                numero = (ultima.id + 1) if ultima else 1
+                codigo = f'PED-{numero:05d}' # Prefijo distintivo para Pedido de Stock
+
+                solicitud = Solicitud.objects.create(
+                    codigo=codigo,
+                    unidad_solicitante=unidad_solicitante,
+                    solicitante=request.user,
+                    fecha=fecha,
+                    justificacion=justificacion,
+                    tipo_requerimiento='BIEN',
+                    flujo_atencion='SALIDA_ALMACEN', # Forzado directamente a salida de stock
+                    estado='REGISTRADA'
+                )
+
+                for item_key, item_data in payload.items():
+                    cantidad = int(item_data.get('cantidad', 1))
+
+                    if cantidad <= 0:
+                        raise ValueError("La cantidad solicitada debe ser mayor a cero.")
+
+                    material = Material.objects.get(id=item_key)
+                    
+                    # Validación estricta de stock en el backend
+                    if material.stock_actual < cantidad:
+                        raise ValueError(f"No existe stock suficiente para el material: {material.nombre} (Disponible: {material.stock_actual}).")
+
+                    DetalleSolicitud.objects.create(
+                        solicitud=solicitud,
+                        material=material,
+                        cantidad_solicitada=cantidad,
+                        precio_unitario_referencial=Decimal('0.00') # No requiere cotización previa
+                    )
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Solicitudes',
+                    accion='Registrar Pedido Almacén',
+                    descripcion=f'Se registró el Pedido de Consumo {codigo} para la unidad {unidad_solicitante.nombre}'
+                )
+
+            messages.success(request, f"Pedido de Almacén {codigo} registrado correctamente.")
+            return redirect('solicitudes')
+
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect('nuevo_pedido_almacen')
+        except DatabaseError:
+            messages.error(request, "Hubo un error al procesar el guardado en la base de datos.")
+            return redirect('nuevo_pedido_almacen')
+
+    # Al ser consumo de stock, solo cargamos los materiales que tienen stock real > 0
+    materiales = Material.objects.filter(stock_actual__gt=0).values('id', 'nombre', 'stock_actual')
+    return render(request, 'solicitudes/nuevo_pedido_almacen.html', {
+        'materiales': materiales
+    })
+
 def redirigir_despues_de_accion(request, solicitud):
     """
     Determina de forma dinámica adónde redirigir al usuario para no perder su contexto (UX) [28].

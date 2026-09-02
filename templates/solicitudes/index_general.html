@@ -9,17 +9,15 @@
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
         <div class="min-w-0">
             <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Bandeja de Gestión Institucional</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xl">Audite, valide partidas del POA y procese la preparación física y despachos del almacén .</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xl">Audite, valide partidas del POA y procese la preparación física y despachos del almacén.</p>
         </div>
     </div>
 
     <!-- PESTAÑAS DE NAVEGACIÓN (Tabs SABS) -->
     <div class="border-b border-gray-200 dark:border-gray-800 flex gap-6">
-        <!-- PESTAÑA 1: INACTIVA (Gris) -->
         <a href="{% url 'solicitudes' %}" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit'] transition">
             <span class="material-symbols-outlined text-[18px]">person</span> Mis Solicitudes
         </a>
-        <!-- PESTAÑA 2: ACTIVA (Color Vino y Borde Inferior) -->
         <a href="{% url 'solicitudes_general' %}" class="border-b-2 border-[#580000] text-[#580000] dark:text-red-400 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit']">
             <span class="material-symbols-outlined text-[18px]">warehouse</span> Bandeja de Gestión
         </a>
@@ -81,16 +79,18 @@
             Buscador y Filtros de Búsqueda
         </h3>
         
-        <form method="GET" action="{% url 'solicitudes_general' %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <form method="GET" action="{% url 'solicitudes_general' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <!-- Buscar -->
             <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Buscar por Folio / Unidad</label>
-                <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Ej. SOL-00020 o Recursos..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Buscar por Folio / Solicitante</label>
+                <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Ej. REQ-ADQ- o Recursos..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
             </div>
 
+            <!-- Filtrar por Estado -->
             <div>
                 <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Filtrar por Estado</label>
                 <div class="relative">
-                    <select name="estado" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10">
+                    <select name="estado" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10">
                         <option value="">-- Todos los Estados --</option>
                         {% for valor, etiqueta in estados %}
                             <option value="{{ valor }}" {% if filtro_estado == valor %}selected{% endif %}>{{ etiqueta }}</option>
@@ -100,11 +100,27 @@
                 </div>
             </div>
 
+            <!-- Tarjeta 4: Filtrar por Flujo (Stock, Compras, Servicios) -->
             <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha Desde</label>
-                <input type="date" name="desde" value="{{ desde|default:'' }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Filtrar por Flujo</label>
+                <div class="relative">
+                    <select name="flujo" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10">
+                        <option value="">-- Todos los Flujos --</option>
+                        {% for fl_code, fl_name in flujos %}
+                            <option value="{{ fl_code }}" {% if filtro_flujo == fl_code %}selected{% endif %}>{{ fl_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
             </div>
 
+            <!-- Fecha Desde -->
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha Desde</label>
+                <input type="date" name="desde" value="{{ desde|default:'' }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+            </div>
+
+            <!-- Botones de Acción -->
             <div class="flex gap-2">
                 <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 flex-1 h-[48px] cursor-pointer">
                     <span class="material-symbols-outlined text-[18px]">search</span> Buscar
@@ -125,13 +141,36 @@
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between p-6 border border-gray-100 dark:border-gray-800 rounded-2xl hover:shadow-md transition duration-200 gap-6 bg-white dark:bg-slate-800/40 shadow-sm">
                 
                 <!-- Datos básicos -->
-                <div class="min-w-[240px] space-y-1">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-black bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-wider font-['Outfit']">
-                        Folio: {{ sol.codigo }}
-                    </span>
+                <div class="min-w-[260px] space-y-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-wider font-['Outfit']">
+                            {{ sol.codigo }}
+                        </span>
+                        
+                        <!-- Tarjeta 6: Visualizar Tipo y Flujo asignado en cada tarjeta de trámite -->
+                        <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border font-['Outfit']
+                            {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
+                                bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30
+                            {% elif sol.flujo_atencion == 'CONTRATACION_SERVICIO' %}
+                                bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/30
+                            {% else %}
+                                bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30
+                            {% endif %}">
+                            {{ sol.get_flujo_atencion_display|default:"Salida de Almacén" }}
+                        </span>
+                    </div>
+
                     <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] pt-1">{{ sol.unidad_solicitante.nombre }}</h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400 font-['Outfit']">Solicitante: {{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</p>
-                    <p class="text-xs text-gray-400 dark:text-gray-500 font-['Outfit']">Fecha: {{ sol.fecha|date:"d M Y" }}</p>
+                    
+                    <p class="text-xs text-gray-400 dark:text-gray-500 font-['Outfit'] flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[14px]">calendar_month</span> Fecha: {{ sol.fecha|date:"d M Y" }}
+                    </p>
+
+                    <!-- Tarjeta 2 y 6: Mostrar el costo total referencial con formato decimal -->
+                    <p class="text-xs font-bold text-[#8b0000] dark:text-red-400 font-['Outfit'] flex items-center gap-1 font-mono pt-1">
+                        <span class="material-symbols-outlined text-[15px]">payments</span> Total Ref: Bs. {{ sol.total_referencial|floatformat:2 }}
+                    </p>
                 </div>
 
                 <!-- LÍNEA DE TIEMPO VISUAL (Stepper 8 Pasos SABS con data-width nativo) [28] -->
@@ -299,15 +338,30 @@
                                 <span class="material-symbols-outlined text-sm">rate_review</span> Autorizar (Jefe)
                             </a>
                         {% endif %}
+                    
+                    <!-- Tarjeta 3: Habilitar preparación inmediata si hay stock (REVISADA -> PREPARAR PEDIDO) -->
                     {% elif sol.estado == 'REVISADA' %}
-                        {% if request.user.perfilusuario.rol == 'SECRETARIO_SAF' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'validar_saf' sol.id %}" class="w-full">
-                                {% csrf_token %}
-                                <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
-                                    <span class="material-symbols-outlined text-sm">assignment_turned_in</span> Validar (SAF)
-                                </button>
-                            </form>
+                        {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
+                            {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                                <form method="POST" action="{% url 'preparar_solicitud' sol.id %}" class="w-full">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                        <span class="material-symbols-outlined text-sm">inventory_2</span> Preparar Pedido
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% else %}
+                            <!-- Adquisiciones o servicios ordinarios siguen el flujo administrativo normal -->
+                            {% if request.user.perfilusuario.rol == 'SECRETARIO_SAF' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                                <form method="POST" action="{% url 'validar_saf' sol.id %}" class="w-full">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                        <span class="material-symbols-outlined text-sm">assignment_turned_in</span> Validar (SAF)
+                                    </button>
+                                </form>
+                            {% endif %}
                         {% endif %}
+
                     {% elif sol.estado == 'VALIDADA_SAF' %}
                         {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'aprobar_solicitud' sol.id %}" class="w-full">
@@ -376,18 +430,17 @@
             {% endfor %}
         </div>
     </div>
+    
+    <!-- PAGINACIÓN -->
     {% if solicitudes.has_other_pages %}
         <div class="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 font-['Outfit']">
-            <!-- Izquierda: Cantidad de folios mostrados -->
             <div class="text-xs text-gray-500 dark:text-gray-400">
                 Mostrando del <strong>{{ solicitudes.start_index }}</strong> al <strong>{{ solicitudes.end_index }}</strong> de <strong>{{ solicitudes.paginator.count }}</strong> solicitudes totales [28].
             </div>
             
-            <!-- Derecha: Índices de navegación de páginas (Arrastrando filtros activos) [28] -->
             <div class="flex items-center gap-1 text-xs">
-                <!-- Página Anterior -->
                 {% if solicitudes.has_previous %}
-                    <a href="?page={{ solicitudes.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
+                    <a href="?page={{ solicitudes.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
                         <span class="material-symbols-outlined text-[16px]">chevron_left</span>
                     </a>
                 {% else %}
@@ -396,22 +449,20 @@
                     </span>
                 {% endif %}
                 
-                <!-- Números de Página Centrales -->
                 {% for num in solicitudes.paginator.page_range %}
                     {% if solicitudes.number == num %}
                         <span class="w-8 h-8 rounded-xl bg-[#580000] text-white flex items-center justify-center font-bold shadow-sm select-none">
                             {{ num }}
                         </span>
                     {% elif num > solicitudes.number|add:'-3' and num < solicitudes.number|add:'3' %}
-                        <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 font-semibold transition">
+                        <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 font-semibold transition">
                             {{ num }}
                         </a>
                     {% endif %}
                 {% endfor %}
                 
-                <!-- Página Siguiente -->
                 {% if solicitudes.has_next %}
-                    <a href="?page={{ solicitudes.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
+                    <a href="?page={{ solicitudes.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
                         <span class="material-symbols-outlined text-[16px]">chevron_right</span>
                     </a>
                 {% else %}
@@ -427,7 +478,6 @@
 </div>
 
 <script>
-    // Aplica el ancho dinámico a las barras de progreso sin activar alertas de CSS [28]
     document.querySelectorAll('.progress-bar-line').forEach(el => el.style.width = el.getAttribute('data-width') + '%');
 </script>
 {% endblock %}

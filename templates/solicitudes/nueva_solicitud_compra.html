@@ -1,0 +1,389 @@
+{% extends 'base.html' %}
+
+{% block title %} Requerimiento de Adquisición o Servicio {% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
+                Requerimiento de Adquisición
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Solicitud de compras de bienes sin stock o contratación de servicios generales [11]
+            </p>
+        </div>
+        <a href="{% url 'solicitudes' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Volver
+        </a>
+    </div>
+
+    <!-- FORMULARIO -->
+    <form method="POST" id="form-solicitud" class="card p-8 shadow-sm">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- FECHA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Fecha de Requerimiento</label>
+                <input type="text" value="{% now 'd/m/Y' %}" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none font-medium focus:outline-none" readonly>
+                <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
+            </div>
+
+            <!-- TIPO DE REQUERIMIENTO -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Tipo de Requerimiento <span class="text-[#8b0000]">*</span></label>
+                <select name="tipo_requerimiento" id="tipo_requerimiento" required onchange="adaptarFormularioPorTipo()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
+                    <option value="BIEN" selected>Bien (Adquisición de Materiales / Equipos)</option>
+                    <option value="SERVICIO">Servicio (Contrataciones / Consultorías)</option>
+                </select>
+            </div>
+
+            <!-- BUSCADOR / AGREGADOR -->
+            <div class="md:col-span-2">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']" id="label_seccion_items">Artículos requeridos</label>
+                <div class="grid grid-cols-12 gap-3 items-start">
+                    
+                    <div class="col-span-12 sm:col-span-6">
+                        <!-- Selector de catálogo (Se desactiva/oculta si es un Servicio) -->
+                        <select id="material_select" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10" onchange="document.getElementById('buscador_material').value = '';">
+                            <option value="">Seleccionar material del catálogo para reabastecer</option>
+                            {% for material in materiales %}
+                            <option value="{{ material.id }}" data-stock="{{ material.stock_actual }}">
+                                {{ material.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        <div class="mt-2 relative">
+                            <input type="text" id="buscador_material" placeholder="Escribe la descripción del ítem o servicio..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition" onkeyup="buscarMateriales()">
+                            <div id="resultados_busqueda" class="absolute bg-white dark:bg-[#151010] w-full border border-gray-100 dark:border-gray-800 rounded-xl mt-1 shadow-lg z-50 hidden"></div>
+                        </div>                        
+                    </div>
+
+                    <div class="col-span-6 sm:col-span-2">
+                        <input type="number" id="cantidad_input" min="1" placeholder="Cantidad" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition">
+                    </div>
+
+                    <div class="col-span-6 sm:col-span-2">
+                        <input type="number" id="precio_input" min="0" step="0.01" placeholder="P. Unit Ref (Bs.)" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition">
+                    </div>
+
+                    <div class="col-span-12 sm:col-span-2">
+                        <button type="button" onclick="agregarItem()" class="w-full h-[50px] bg-gray-900 dark:bg-slate-800 hover:bg-gray-800 dark:hover:bg-slate-700 text-white rounded-2xl flex items-center justify-center gap-1 transition shadow-sm cursor-pointer">
+                            <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                            <span class="text-xs font-bold font-['Outfit']">Añadir</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="inputs_ocultos"></div>
+            </div>
+        </div>
+
+        <!-- TABLA DE ITEMS -->
+        <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-850 text-gray-600 dark:text-gray-300">
+                    <tr>
+                        <th class="p-4 font-bold">Concepto</th>
+                        <th class="p-4 font-bold text-center w-28">Cantidad</th>
+                        <th class="p-4 font-bold text-center w-32">P. Unitario Ref. (Bs.)</th>
+                        <th class="p-4 font-bold text-center w-32">Subtotal (Bs.)</th>
+                        <th class="p-4 font-bold text-center w-24">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
+                </tbody>
+            </table>
+            
+            <div class="p-4 bg-gray-50 dark:bg-slate-900/40 flex justify-between items-center text-sm font-['Outfit'] border-t border-gray-200 dark:border-gray-800">
+                <span class="font-bold text-gray-700 dark:text-gray-300">Total Referencial de Adquisición:</span>
+                <span id="total_referencial_form" class="font-extrabold text-base text-[#8b0000] dark:text-red-400 font-mono">Bs. 0.00</span>
+            </div>
+        </div>
+
+        <!-- JUSTIFICACION -->
+        <div class="mt-6">
+            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Justificación POA <span class="text-[#8b0000]">*</span></label>
+            <textarea name="justificacion" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition" rows="4" placeholder="Describa la necesidad y fundamentación técnica para el POA..." required></textarea>
+        </div>
+
+        <!-- BOTONES -->
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'solicitudes' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">send</span>
+                Enviar Requerimiento
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+let carrito = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+    adaptarFormularioPorTipo();
+    renderTabla();
+    renderInputs();
+});
+
+function adaptarFormularioPorTipo() {
+    const tipo = document.getElementById('tipo_requerimiento').value;
+    const selectCat = document.getElementById('material_select');
+    const labelItems = document.getElementById('label_seccion_items');
+    const buscador = document.getElementById('buscador_material');
+
+    if (tipo === 'SERVICIO') {
+        labelItems.textContent = "Servicios requeridos";
+        selectCat.classList.add('hidden'); // Ocultar catálogo físico de Almacén
+        selectCat.value = '';
+        buscador.placeholder = "Describe de forma detallada el servicio a contratar...";
+    } else {
+        labelItems.textContent = "Artículos de adquisición requeridos";
+        selectCat.classList.remove('hidden');
+        buscador.placeholder = "Escribe una descripción si no está en el catálogo...";
+    }
+    
+    // Limpiamos el carrito si cambian de tipo para no mezclar bienes y servicios
+    carrito = {};
+    renderTabla();
+    renderInputs();
+}
+
+function agregarItem() {
+    const select = document.getElementById('material_select');
+    const cantidadInput = document.getElementById('cantidad_input');
+    const precioInput = document.getElementById('precio_input');
+    const buscador = document.getElementById('buscador_material');
+    const tipo = document.getElementById('tipo_requerimiento').value;
+
+    const materialId = select.value;
+    const selectedOption = select.options[select.selectedIndex];
+    const cantidad = parseInt(cantidadInput.value);
+    const precioRef = parseFloat(precioInput.value);
+
+    if (isNaN(cantidad) || cantidad <= 0) {
+        alert("Defina una cantidad válida mayor a 0.");
+        return;
+    }
+    
+    if (isNaN(precioRef) || precioRef < 0) {
+        alert("Defina un precio unitario referencial válido.");
+        return;
+    }
+
+    // --- ESCENARIO A: NUEVA DESCRIPCIÓN (OBLIGATORIA PARA SERVICIOS O BIENES FUERA DE CATÁLOGO) ---
+    if (!materialId && buscador.value.trim() !== "") {
+        const nombreDescriptivo = buscador.value.trim();
+        const tempId = "temp_" + Date.now();
+
+        carrito[tempId] = {
+            nombre: nombreDescriptivo,
+            cantidad: cantidad,
+            precio_referencial: precioRef,
+            stock: 99999,
+            es_nuevo: true
+        };
+
+        renderTabla();
+        renderInputs();
+        buscador.value = '';
+        cantidadInput.value = '';
+        precioInput.value = '';
+        return;
+    }
+
+    // --- ESCENARIO B: MATERIAL CATALOGADO SIN STOCK (SOLO PARA BIENES) ---
+    if (tipo === 'BIEN' && materialId && selectedOption) {
+        const materialNombre = selectedOption.text;
+        
+        if (carrito[materialId]) {
+            carrito[materialId].cantidad += cantidad;
+            carrito[materialId].precio_referencial = precioRef;
+        } else {
+            carrito[materialId] = {
+                nombre: materialNombre,
+                cantidad: cantidad,
+                precio_referencial: precioRef,
+                stock: 99999,
+                es_nuevo: false
+            };
+        }
+
+        renderTabla();
+        renderInputs();
+        select.value = '';
+        buscador.value = '';
+        cantidadInput.value = '';
+        precioInput.value = '';
+        return;
+    }
+
+    alert("Escriba una descripción textual o seleccione un material válido.");
+}
+
+function renderTabla() {
+    const tabla = document.getElementById('tabla_materiales');
+    tabla.innerHTML = '';
+
+    const keys = Object.keys(carrito);
+    if (keys.length === 0) {
+        tabla.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-8 text-center text-gray-400 bg-transparent">
+                    Agregue los conceptos de contratación o adquisición desde el panel superior.
+                </td>
+            </tr>
+        `;
+        document.getElementById('total_referencial_form').textContent = "Bs. 0.00";
+        return;
+    }
+
+    let totalAcumulado = 0;
+
+    keys.forEach(id => {
+        const item = carrito[id];
+        const subtotal = item.cantidad * item.precio_referencial;
+        totalAcumulado += subtotal;
+
+        tabla.innerHTML += `
+            <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
+                <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">
+                    ${item.nombre}
+                    ${item.es_nuevo ? '<span class="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 border border-amber-200 py-0.5 px-2 rounded-full font-bold ml-2">Nuevo/Externo</span>' : ''}
+                </td>
+                <td class="p-4 text-center">
+                    <input type="number" value="${item.cantidad}" min="1" onchange="editarCantidad('${id}', this)" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-20 text-center focus:outline-none">
+                </td>
+                <td class="p-4 text-center">
+                    <input type="number" value="${item.precio_referencial.toFixed(2)}" min="0" step="0.01" onchange="editarPrecio('${id}', this)" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-24 text-center focus:outline-none font-mono">
+                </td>
+                <td class="p-4 text-right font-bold text-gray-800 dark:text-gray-200 font-mono pr-8">
+                    Bs. ${subtotal.toFixed(2)}
+                </td>
+                <td class="p-4 text-center">
+                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 font-medium transition">Eliminar</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    document.getElementById('total_referencial_form').textContent = `Bs. ${totalAcumulado.toFixed(2)}`;
+}
+
+function editarCantidad(id, inputElement) {
+    let nuevaCantidad = parseInt(inputElement.value) || 1;
+    if (nuevaCantidad < 1) nuevaCantidad = 1;
+
+    const item = carrito[id];
+    if (item) {
+        item.cantidad = nuevaCantidad;
+        inputElement.value = nuevaCantidad;
+    }
+    renderTabla();
+    renderInputs();
+}
+
+function editarPrecio(id, inputElement) {
+    let nuevoPrecio = parseFloat(inputElement.value);
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+        alert("El precio debe ser mayor o igual a 0.");
+        nuevoPrecio = 0.00;
+    }
+
+    const item = carrito[id];
+    if (item) {
+        item.precio_referencial = nuevoPrecio;
+        inputElement.value = nuevoPrecio.toFixed(2);
+    }
+    renderTabla();
+    renderInputs();
+}
+
+function eliminar(id) {
+    delete carrito[id];
+    renderTabla();
+    renderInputs();
+}
+
+function renderInputs() {
+    const contenedor = document.getElementById('inputs_ocultos');
+    const payload = {};
+
+    Object.keys(carrito).forEach(id => {
+        payload[id] = {
+            cantidad: carrito[id].cantidad,
+            es_nuevo: carrito[id].es_nuevo,
+            nombre: carrito[id].nombre,
+            precio_referencial: carrito[id].precio_referencial
+        };
+    });
+
+    contenedor.innerHTML = `
+        <input type="hidden" name="payload" value='${JSON.stringify(payload)}'>
+    `;
+}
+
+function buscarMateriales() {
+    const query = document.getElementById('buscador_material').value;
+    const resultados = document.getElementById('resultados_busqueda');
+    const tipo = document.getElementById('tipo_requerimiento').value;
+
+    if (query.length < 2 || tipo === 'SERVICIO') {
+        resultados.innerHTML = '';
+        resultados.classList.add('hidden');
+        return;
+    }
+
+    // Buscador general (sin filtro de stock, admite reabastecer stock 0)
+    fetch(`/solicitudes/buscar-materiales/?q=${query}&solo_con_stock=false`)
+        .then(response => response.json())
+        .then(data => {
+            resultados.innerHTML = '';
+            if (data.length === 0) {
+                resultados.innerHTML = '<div class="p-3 text-gray-500 text-sm text-center">Sin coincidencias</div>';
+            } else {
+                data.forEach(material => {
+                    const div = document.createElement('div');
+                    div.className = "p-3 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-sm border-b border-gray-100 last:border-none";
+                    div.innerHTML = `
+                        <span class="font-medium text-gray-800 dark:text-gray-200">${material.nombre}</span>
+                        <span class="text-xs text-gray-400 block mt-0.5">(Existencias en almacén: ${material.stock})</span>
+                    `;
+                    div.addEventListener('click', () => seleccionarMaterial(material.id, material.nombre, material.stock));
+                    resultados.appendChild(div);
+                });
+            }
+            resultados.classList.remove('hidden');
+        });
+}
+
+function seleccionarMaterial(id, nombre, stock) {
+    const select = document.getElementById('material_select');
+    let option = select.querySelector(`option[value="${id}"]`);
+    if (!option) {
+        option = document.createElement('option');
+        option.value = id;
+        option.textContent = nombre;
+        option.setAttribute('data-stock', stock);
+        select.appendChild(option);
+    }
+    select.value = id;
+    document.getElementById('cantidad_input').focus();
+    document.getElementById('buscador_material').value = nombre;
+    document.getElementById('resultados_busqueda').classList.add('hidden');
+}
+
+document.addEventListener('click', (e) => {
+    const buscador = document.getElementById('buscador_material');
+    const resultados = document.getElementById('resultados_busqueda');
+    if (buscador && resultados && !buscador.contains(e.target) && !resultados.contains(e.target)) {
+        resultados.classList.add('hidden');
+    }
+});
+</script>
+{% endblock %}
