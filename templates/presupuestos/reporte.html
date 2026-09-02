@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %} Reporte de Ejecución Presupuestaria {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Ejecución Presupuestaria POA</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Consulte el estado financiero de las partidas asignadas a cada Unidad Organizacional.</p>
+        </div>
+    </div>
+        <div class="flex items-center gap-2 mb-3">
+        <a href="{% url 'poa_list' %}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-[#8b0000] dark:text-gray-400 dark:hover:text-red-400 transition">
+            <span class="material-symbols-outlined text-[16px] align-middle">arrow_back</span>
+            Volver al listado POA
+        </a>
+    </div>  
+
+    <!-- TARJETAS DE CONSOLIDACIÓN GENERAL -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Presupuesto Inicial</span>
+            <span class="text-2xl font-black text-gray-800 dark:text-gray-100 block mt-2 font-mono">Bs. {{ total_inicial|floatformat:2 }}</span>
+        </div>
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Presupuesto Comprometido</span>
+            <span class="text-2xl font-black text-amber-600 dark:text-amber-400 block mt-2 font-mono">Bs. {{ total_comprometido|floatformat:2 }}</span>
+        </div>
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Presupuesto Ejecutado</span>
+            <span class="text-2xl font-black text-green-600 dark:text-green-400 block mt-2 font-mono">Bs. {{ total_ejecutado|floatformat:2 }}</span>
+        </div>
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Saldo Disponible</span>
+            <span class="text-2xl font-black text-blue-600 dark:text-blue-400 block mt-2 font-mono">Bs. {{ total_disponible|floatformat:2 }}</span>
+        </div>
+    </div>
+
+    <!-- PANEL DE FILTRADO -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Unidad Organizacional</label>
+                <div class="relative">
+                    <select name="unidad" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] appearance-none pr-10">
+                        <option value="">-- Todas las Unidades --</option>
+                        {% for u in unidades %}
+                            <option value="{{ u.id }}" {% if filtro_unidad == u.id|stringformat:"i" %}selected{% endif %}>{{ u.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Partida Presupuestaria</label>
+                <div class="relative">
+                    <select name="partida" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] appearance-none pr-10">
+                        <option value="">-- Todas las Partidas --</option>
+                        {% for p in partidas %}
+                            <option value="{{ p.id }}" {% if filtro_partida == p.id|stringformat:"i" %}selected{% endif %}>{{ p.codigo }} - {{ p.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Gestión Fiscal</label>
+                <input type="number" name="gestion" value="{{ filtro_gestion }}" placeholder="Ej. 2026" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition">
+            </div>
+
+            <div class="flex gap-2">
+                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 flex-1 h-[48px] cursor-pointer font-['Outfit']">
+                    <span class="material-symbols-outlined text-[18px]">search</span> Buscar
+                </button>
+                <a href="{% url 'reporte_presupuestos' %}" class="border border-gray-300 hover:bg-gray-50 text-gray-700 dark:text-gray-300 px-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition h-[48px]" title="Limpiar filtros">
+                    <span class="material-symbols-outlined text-[18px]">restart_alt</span>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- TABLA DE RESULTADOS -->
+    <div class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[950px] border-collapse text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-100 dark:border-gray-800">
+                        <th class="px-6 py-4">Partida</th>
+                        <th class="px-6 py-4">Unidad Organizacional</th>
+                        <th class="px-6 py-4 text-right">Inicial (Bs)</th>
+                        <th class="px-6 py-4 text-right">Comprometido (Bs)</th>
+                        <th class="px-6 py-4 text-right">Ejecutado (Bs)</th>
+                        <th class="px-6 py-4 text-right">Disponible (Bs)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    {% for poa in poas %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition text-gray-700 dark:text-gray-300">
+                        <td class="px-6 py-4 font-bold">
+                            {{ poa.partida.codigo }}
+                            <span class="block text-[10px] text-gray-400 font-normal">{{ poa.partida.nombre }}</span>
+                        </td>
+                        <td class="px-6 py-4">{{ poa.unidad.nombre }}</td>
+                        <td class="px-6 py-4 text-right font-mono">{{ poa.monto_inicial|floatformat:2 }}</td>
+                        <td class="px-6 py-4 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">{{ poa.monto_comprometido|floatformat:2 }}</td>
+                        <td class="px-6 py-4 text-right font-mono text-green-600 dark:text-green-400 font-semibold">{{ poa.monto_ejecutado|floatformat:2 }}</td>
+                        <td class="px-6 py-4 text-right font-mono text-blue-600 dark:text-blue-400 font-bold">{{ poa.monto_disponible|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500 font-['Outfit']">No se registran datos para la combinación de filtros seleccionada.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <!-- FILA DE TOTALES CONSOLIDADOS -->
+                {% if poas %}
+                <tfoot>
+                    <tr class="bg-gray-50/50 dark:bg-slate-900/60 font-bold text-gray-800 dark:text-gray-100 border-t-2 border-gray-200 dark:border-gray-800">
+                        <td colspan="2" class="px-6 py-5 text-left uppercase text-xs tracking-wider">Total Consolidado General</td>
+                        <td class="px-6 py-5 text-right font-mono">{{ total_inicial|floatformat:2 }}</td>
+                        <td class="px-6 py-5 text-right font-mono text-amber-600 dark:text-amber-400">{{ total_comprometido|floatformat:2 }}</td>
+                        <td class="px-6 py-5 text-right font-mono text-green-600 dark:text-green-400">{{ total_ejecutado|floatformat:2 }}</td>
+                        <td class="px-6 py-5 text-right font-mono text-blue-600 dark:text-blue-400">{{ total_disponible|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

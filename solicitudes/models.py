@@ -95,6 +95,26 @@ class Solicitud(models.Model):
             'RECHAZADA': 0,
         }
         return map_estados.get(self.estado, 0)
+    # --- EN TU ARCHIVO models.py (Dentro de la clase Solicitud) ---
+
+    @property
+    def progreso_porcentaje_sabs(self):
+        """
+        Retorna la anchura matemática exacta para el Stepper de 8 círculos del SABS (7 segmentos) [28].
+        """
+        map_estados = {
+            'REGISTRADA': 0,              # Paso 1
+            'REVISADA': 14,               # Paso 2
+            'VALIDADA_SAF': 28,           # Paso 3
+            'VALIDADA_PRESUPUESTOS': 42,   # Paso 4
+            'VALIDADA_RPA': 57,            # Paso 5
+            'VALIDADA_JEFATURA': 71,       # Paso 6
+            'PREPARADA': 85,              # Paso 7
+            'ENTREGADA': 100,             # Paso 8
+            'CERRADA': 100,
+            'RECHAZADA': 0,
+        }
+        return map_estados.get(self.estado, 0)
 
     # Tarjeta 2: Calcular automáticamente el total referencial de la solicitud
     @property
@@ -107,7 +127,37 @@ class Solicitud(models.Model):
     def __str__(self):
         return self.codigo
 
-
+    def determinar_y_asignar_flujo(self):
+            """
+            Determina y guarda automáticamente el flujo de atención:
+            - Si es un Servicio -> Contratación de Servicio.
+            - Si es un Bien y hay stock de todos los ítems -> Salida de Almacén.
+            - Si es un Bien y falta stock en al menos un ítem -> Adquisición.
+            """
+            if self.tipo_requerimiento == 'SERVICIO':
+                self.flujo_atencion = 'CONTRATACION_SERVICIO'
+            else:
+                hay_insuficiencia_stock = False
+                
+                # Validamos el stock disponible de cada uno de los detalles
+                for detalle in self.detalles.all():
+                    # Si es una nueva adquisición no catalogada, asumimos sin stock
+                    if detalle.es_nueva_adquisicion or not detalle.material:
+                        hay_insuficiencia_stock = True
+                        break
+                    
+                    # Tarjeta 5: Comparar cantidad solicitada contra cantidad disponible
+                    if detalle.material.stock_actual < detalle.cantidad_solicitada:
+                        hay_insuficiencia_stock = True
+                        break
+                
+                if hay_insuficiencia_stock:
+                    self.flujo_atencion = 'ADQUISICION'
+                else:
+                    self.flujo_atencion = 'SALIDA_ALMACEN'
+            
+            self.save()
+        
 # =========================================
 # DETALLE SOLICITUD
 # =========================================
@@ -125,6 +175,15 @@ class DetalleSolicitud(models.Model):
         blank=True
     )
     
+    # CORREGIDO: Se alineó correctamente la sangría de este campo
+    partida = models.ForeignKey(
+        'inventario.PartidaPresupuestaria',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='detalles_solicitud'
+    )
+    
     es_nueva_adquisicion = models.BooleanField(default=False)
     descripcion_material_no_catalogado = models.CharField(max_length=200, blank=True, null=True)
     
@@ -132,52 +191,25 @@ class DetalleSolicitud(models.Model):
     cantidad_aprobada = models.IntegerField(null=True, blank=True)
     cantidad_entregada = models.IntegerField(default=0)
     observacion = models.TextField(blank=True, null=True)
-
-    # Tarjeta 2: Agregar precio unitario referencial al detalle de la solicitud
+    
     precio_unitario_referencial = models.DecimalField(
         max_digits=12, 
         decimal_places=2, 
         default=Decimal('0.00')
     )
 
-    # Tarjeta 2: Calcular automáticamente el subtotal
     @property
     def subtotal_referencial(self):
         return Decimal(self.cantidad_solicitada) * self.precio_unitario_referencial
+
+    # Tarjeta 8: Propiedad para obtener la partida independientemente de si el ítem es catalogado o no
+    @property
+    def partida_afectada(self):
+        if self.material and self.material.partida:
+            return self.material.partida
+        return self.partida
 
     def __str__(self):
         if self.es_nueva_adquisicion:
             return f"{self.solicitud.codigo} - [No Catalogado] {self.descripcion_material_no_catalogado}"
         return f"{self.solicitud.codigo} - {self.material.nombre}"
-
-
-def determinar_y_asignar_flujo(self):
-        """
-        Determina y guarda automáticamente el flujo de atención:
-        - Si es un Servicio -> Contratación de Servicio.
-        - Si es un Bien y hay stock de todos los ítems -> Salida de Almacén.
-        - Si es un Bien y falta stock en al menos un ítem -> Adquisición.
-        """
-        if self.tipo_requerimiento == 'SERVICIO':
-            self.flujo_atencion = 'CONTRATACION_SERVICIO'
-        else:
-            hay_insuficiencia_stock = False
-            
-            # Validamos el stock disponible de cada uno de los detalles
-            for detalle in self.detalles.all():
-                # Si es una nueva adquisición no catalogada, asumimos sin stock
-                if detalle.es_nueva_adquisicion or not detalle.material:
-                    hay_insuficiencia_stock = True
-                    break
-                
-                # Tarjeta 5: Comparar cantidad solicitada contra cantidad disponible
-                if detalle.material.stock_actual < detalle.cantidad_solicitada:
-                    hay_insuficiencia_stock = True
-                    break
-            
-            if hay_insuficiencia_stock:
-                self.flujo_atencion = 'ADQUISICION'
-            else:
-                self.flujo_atencion = 'SALIDA_ALMACEN'
-        
-        self.save()

@@ -3,79 +3,83 @@
 {% block title %} Bandeja de Gestión {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
 
     <!-- CABECERA -->
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
         <div class="min-w-0">
-            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Bandeja de Gestión Institucional</h1>
+            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit'] tracking-tight">Bandeja de Gestión Institucional</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xl">Audite, valide partidas del POA y procese la preparación física y despachos del almacén.</p>
         </div>
     </div>
 
     <!-- PESTAÑAS DE NAVEGACIÓN (Tabs SABS) -->
     <div class="border-b border-gray-200 dark:border-gray-800 flex gap-6">
-        <a href="{% url 'solicitudes' %}" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit'] transition">
+        <a href="{% url 'solicitudes' %}" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 pb-3 text-sm font-bold flex items-center gap-2 font-['Outfit'] transition-all">
             <span class="material-symbols-outlined text-[18px]">person</span> Mis Solicitudes
         </a>
-        <a href="{% url 'solicitudes_general' %}" class="border-b-2 border-[#580000] text-[#580000] dark:text-red-400 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit']">
+        <a href="{% url 'solicitudes_general' %}" class="border-b-2 border-[#580000] dark:border-red-500 text-[#580000] dark:text-red-400 pb-3 text-sm font-bold flex items-center gap-2 font-['Outfit'] transition-all">
             <span class="material-symbols-outlined text-[18px]">warehouse</span> Bandeja de Gestión
         </a>
     </div>
 
     <!-- TARJETAS DE INDICADORES (KPIs) -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="card p-6 bg-white dark:bg-slate-900 border-t-4 border-amber-500 rounded-2xl flex justify-between items-center shadow-sm">
+        <!-- Pendientes -->
+        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-amber-500 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
             <div>
                 <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Pendientes de Revisión</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1">{{ kpi_pendientes }}</span>
-                <span class="text-[10px] text-amber-600 dark:text-amber-400 font-bold block mt-1 flex items-center gap-1 font-['Outfit']">
+                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_pendientes }}</span>
+                <span class="text-[10px] text-amber-655 dark:text-amber-405 font-bold block mt-2 flex items-center gap-1 font-['Outfit']">
                     <span class="material-symbols-outlined text-[12px]">warning</span> Requiere Acción
                 </span>
             </div>
-            <div class="p-3 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-2xl">
+            <div class="p-3 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-105 transition-transform duration-300">
                 <span class="material-symbols-outlined text-2xl">rate_review</span>
             </div>
         </div>
 
-        <div class="card p-6 bg-white dark:bg-slate-900 border-t-4 border-indigo-500 rounded-2xl flex justify-between items-center shadow-sm">
+        <!-- En Preparación -->
+        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-indigo-500 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
             <div>
                 <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">En Preparación</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1">{{ kpi_preparacion }}</span>
-                <span class="text-[10px] text-gray-400 dark:text-gray-500 block mt-1 font-['Outfit']">Procesando en Almacén</span>
+                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_preparacion }}</span>
+                <span class="text-[10px] text-gray-400 dark:text-gray-500 block mt-2 font-['Outfit']">Procesando en Almacén</span>
             </div>
-            <div class="p-3 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-2xl">
+            <div class="p-3 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-105 transition-transform duration-300">
                 <span class="material-symbols-outlined text-2xl">inventory_2</span>
             </div>
         </div>
 
-        <div class="card p-6 bg-white dark:bg-slate-900 border-t-4 border-green-600 rounded-2xl flex justify-between items-center shadow-sm">
+        <!-- Entregas de Hoy -->
+        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-green-600 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
             <div>
                 <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Entregas de Hoy</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1">{{ kpi_entregas_hoy }}</span>
-                <span class="text-[10px] text-green-600 dark:text-green-400 font-bold block mt-1 font-['Outfit']">Despachados con Éxito</span>
+                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_entregas_hoy }}</span>
+                <span class="text-[10px] text-green-655 dark:text-green-455 font-bold block mt-2 font-['Outfit']">Despachados con Éxito</span>
             </div>
-            <div class="p-3 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 rounded-2xl">
+            <div class="p-3 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 rounded-2xl group-hover:scale-105 transition-transform duration-300">
                 <span class="material-symbols-outlined text-2xl">local_shipping</span>
             </div>
         </div>
 
-        <div class="card p-6 bg-white dark:bg-slate-900 border-t-4 border-gray-700 rounded-2xl flex justify-between items-center shadow-sm">
+        <!-- Total Folios -->
+        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-gray-700 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
             <div>
                 <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Total Folios (Mes)</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1">{{ kpi_total_folios }}</span>
-                <span class="text-[10px] text-gray-400 dark:text-gray-500 block mt-1 font-['Outfit']">Acumulado Mensual</span>
+                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_total_folios }}</span>
+                <span class="text-[10px] text-gray-400 dark:text-gray-500 block mt-2 font-['Outfit']">Acumulado Mensual</span>
             </div>
-            <div class="p-3 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl">
+            <div class="p-3 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl group-hover:scale-105 transition-transform duration-300">
                 <span class="material-symbols-outlined text-2xl">receipt_long</span>
             </div>
         </div>
     </div>
 
     <!-- PANEL DE FILTRADO Y BÚSQUEDA AVANZADA -->
-    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 font-['Outfit'] mb-4 flex items-center gap-2">
-            <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">filter_alt</span>
+    <div class="bg-white dark:bg-slate-900 border border-gray-150 dark:border-gray-800 rounded-2xl shadow-sm p-6">
+        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-355 font-['Outfit'] mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-gray-400">filter_alt</span>
             Buscador y Filtros de Búsqueda
         </h3>
         
@@ -83,14 +87,17 @@
             <!-- Buscar -->
             <div>
                 <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Buscar por Folio / Solicitante</label>
-                <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Ej. REQ-ADQ- o Recursos..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+                <div class="relative">
+                    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Ej. REQ-ADQ- o Recursos..." class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 pl-9 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base pointer-events-none">search</span>
+                </div>
             </div>
 
             <!-- Filtrar por Estado -->
             <div>
                 <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Filtrar por Estado</label>
                 <div class="relative">
-                    <select name="estado" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10">
+                    <select name="estado" class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all appearance-none pr-10">
                         <option value="">-- Todos los Estados --</option>
                         {% for valor, etiqueta in estados %}
                             <option value="{{ valor }}" {% if filtro_estado == valor %}selected{% endif %}>{{ etiqueta }}</option>
@@ -100,11 +107,11 @@
                 </div>
             </div>
 
-            <!-- Tarjeta 4: Filtrar por Flujo (Stock, Compras, Servicios) -->
+            <!-- Filtrar por Flujo -->
             <div>
                 <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Filtrar por Flujo</label>
                 <div class="relative">
-                    <select name="flujo" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10">
+                    <select name="flujo" class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all appearance-none pr-10">
                         <option value="">-- Todos los Flujos --</option>
                         {% for fl_code, fl_name in flujos %}
                             <option value="{{ fl_code }}" {% if filtro_flujo == fl_code %}selected{% endif %}>{{ fl_name }}</option>
@@ -117,15 +124,15 @@
             <!-- Fecha Desde -->
             <div>
                 <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha Desde</label>
-                <input type="date" name="desde" value="{{ desde|default:'' }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+                <input type="date" name="desde" value="{{ desde|default:'' }}" class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all">
             </div>
 
             <!-- Botones de Acción -->
             <div class="flex gap-2">
-                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 flex-1 h-[48px] cursor-pointer">
+                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 flex-1 h-[44px] cursor-pointer shadow-sm active:scale-95">
                     <span class="material-symbols-outlined text-[18px]">search</span> Buscar
                 </button>
-                <a href="{% url 'solicitudes_general' %}" class="border border-gray-300 hover:bg-gray-50 text-gray-700 dark:text-gray-300 px-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition h-[48px]" title="Limpiar filtros">
+                <a href="{% url 'solicitudes_general' %}" class="border border-gray-355 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all h-[44px] shadow-sm" title="Limpiar filtros">
                     <span class="material-symbols-outlined text-[18px]">restart_alt</span>
                 </a>
             </div>
@@ -133,21 +140,30 @@
     </div>
 
     <!-- LISTADO DE SOLICITUDES ACTIVAS (Bandeja SABS) -->
-    <div class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm space-y-6">
-        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] border-b border-gray-100 dark:border-gray-800 pb-4">Bandeja de Trámites del SABS</h2>
+    <div class="bg-white dark:bg-slate-900 border border-gray-150 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-150 dark:border-gray-800">
+            <h2 class="text-xl font-bold text-gray-850 dark:text-gray-100 font-['Outfit']">Bandeja de Trámites del SABS</h2>
+        </div>
         
-        <div class="space-y-4">
+        <div class="divide-y divide-gray-100 dark:divide-gray-850">
             {% for sol in solicitudes %}
-            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between p-6 border border-gray-100 dark:border-gray-800 rounded-2xl hover:shadow-md transition duration-200 gap-6 bg-white dark:bg-slate-800/40 shadow-sm">
+            <!-- Tarjeta de Trámite con Borde de Color Acorde al Flujo -->
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between p-6 hover:bg-gray-50/60 dark:hover:bg-slate-855/40 transition-all duration-200 gap-6 border-l-4 
+                {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
+                    border-l-green-500
+                {% elif sol.flujo_atencion == 'CONTRATACION_SERVICIO' %}
+                    border-l-purple-500
+                {% else %}
+                    border-l-blue-500
+                {% endif %}">
                 
                 <!-- Datos básicos -->
-                <div class="min-w-[260px] space-y-2">
+                <div class="min-w-[260px] space-y-2.5">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-wider font-['Outfit']">
                             {{ sol.codigo }}
                         </span>
                         
-                        <!-- Tarjeta 6: Visualizar Tipo y Flujo asignado en cada tarjeta de trámite -->
                         <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border font-['Outfit']
                             {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
                                 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30
@@ -160,202 +176,301 @@
                         </span>
                     </div>
 
-                    <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] pt-1">{{ sol.unidad_solicitante.nombre }}</h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 font-['Outfit']">Solicitante: {{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</p>
+                    <div>
+                        <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit']">{{ sol.unidad_solicitante.nombre }}</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 font-['Outfit'] mt-0.5">Solicitante: {{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</p>
+                    </div>
                     
-                    <p class="text-xs text-gray-400 dark:text-gray-500 font-['Outfit'] flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[14px]">calendar_month</span> Fecha: {{ sol.fecha|date:"d M Y" }}
-                    </p>
-
-                    <!-- Tarjeta 2 y 6: Mostrar el costo total referencial con formato decimal -->
-                    <p class="text-xs font-bold text-[#8b0000] dark:text-red-400 font-['Outfit'] flex items-center gap-1 font-mono pt-1">
-                        <span class="material-symbols-outlined text-[15px]">payments</span> Total Ref: Bs. {{ sol.total_referencial|floatformat:2 }}
-                    </p>
+                    <div class="flex flex-col gap-1 text-xs font-['Outfit']">
+                        <p class="text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[15px]">calendar_month</span> {{ sol.fecha|date:"d M Y" }}
+                        </p>
+                        <p class="font-bold text-[#8b0000] dark:text-red-400 flex items-center gap-1.5 font-mono">
+                            <span class="material-symbols-outlined text-[15px]">payments</span> Total Ref: Bs. {{ sol.total_referencial|floatformat:2 }}
+                        </p>
+                    </div>
                 </div>
 
-                <!-- LÍNEA DE TIEMPO VISUAL (Stepper 8 Pasos SABS con data-width nativo) [28] -->
-                <div class="flex-1 max-w-2xl hidden xl:flex items-center relative py-4 mx-auto">
-                    <div class="absolute h-0.5 w-[90%] bg-gray-200 dark:bg-gray-800 left-[5%] right-[5%] top-1/2 -translate-y-1/2 z-0"></div>
-                    <!-- Barra Dinámica -->
-                    <div class="absolute h-0.5 bg-[#580000] left-[5%] top-1/2 -translate-y-1/2 z-0 transition-all duration-300 progress-bar-line" data-width="{{ sol.progreso_porcentaje }}"></div>
-                    
-                    <div class="flex justify-between w-full z-10 text-center text-[9px] font-bold uppercase tracking-wider font-['Outfit']">
-                        <!-- 1. Registrada -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                <span class="material-symbols-outlined text-[12px]">done</span>
-                            </span>
-                            <span class="text-[#580000] dark:text-red-400 text-[8px]">Registrada</span>
-                        </div>
-
-                        <!-- 2. Revisada (Jefe) -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            {% if sol.estado != 'REGISTRADA' and sol.estado != 'RECHAZADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                    <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span>
-                                <span class="text-[#580000] dark:text-red-400 text-[8px]">Revisada</span>
-                            {% elif sol.estado == 'REGISTRADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 shadow-sm animate-spin">
-                                    <span class="material-symbols-outlined text-[12px]">sync</span>
-                                </span>
-                                <span class="text-amber-700 dark:text-amber-400 text-[8px]">Revisada</span>
+                <!-- LÍNEA DE TIEMPO VISUAL (Stepper SABS - Desktop) -->
+                <div class="flex-1 max-w-lg hidden xl:flex flex-col justify-center py-4 px-4 mx-auto">
+                    <!-- Indicador de Fase Actual Superior -->
+                    <div class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1 font-['Outfit']">
+                        <span>Fase actual:</span>
+                        <span class="text-[#8b0000] dark:text-red-405 font-bold">
+                            {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
+                                {% if sol.estado == 'REGISTRADA' %}Registrada{% elif sol.estado == 'REVISADA' %}Revisada{% elif sol.estado == 'PREPARADA' %}Preparada en Almacén{% elif sol.estado == 'ENTREGADA' %}Entregada{% else %}Cerrada{% endif %}
                             {% else %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-300 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-[12px]">rate_review</span>
-                                </span>
-                                <span class="text-gray-400 dark:text-gray-500 text-[8px]">Revisada</span>
+                                {% if sol.estado == 'REGISTRADA' %}Registrada{% elif sol.estado == 'REVISADA' %}Revisada{% elif sol.estado == 'VALIDADA_SAF' %}Validada por SAF{% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}Aprobada (POA){% elif sol.estado == 'VALIDADA_RPA' %}Aprobada por RPA{% elif sol.estado == 'VALIDADA_JEFATURA' %}Aprobada Jefatura{% elif sol.estado == 'PREPARADA' %}Preparada{% else %}Entregada{% endif %}
                             {% endif %}
-                        </div>
+                        </span>
+                    </div>
 
-                        <!-- 3. Validada SAF -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            {% if sol.estado in 'VALIDADA_SAF,VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                    <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span>
-                                <span class="text-[#580000] dark:text-red-400 text-[8px]">Val. SAF</span>
-                            {% elif sol.estado == 'REVISADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 shadow-sm animate-spin">
-                                    <span class="material-symbols-outlined text-[12px]">sync</span>
-                                </span>
-                                <span class="text-amber-700 dark:text-amber-400 text-[8px]">Val. SAF</span>
-                            {% else %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-300 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-[12px]">assignment_turned_in</span>
-                                </span>
-                                <span class="text-gray-400 dark:text-gray-500 text-[8px]">Val. SAF</span>
-                            {% endif %}
-                        </div>
+                    <!-- Contenedor Geométrico de Doble Capa (Evita cualquier desvío de píxeles) -->
+                    <div class="relative w-full py-3">
+                        {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
+                            <!-- CASO A: STEPPER DE 5 PASOS -->
+                            <!-- Capa 1: Pista de progreso encapsulada matemáticamente centrada en el eje Y -->
+                            <div class="absolute h-0.5 left-3 right-3 top-1/2 -translate-y-1/2 z-0 overflow-hidden rounded-full pointer-events-none">
+                                <div class="absolute inset-0 bg-gray-200 dark:bg-gray-800"></div>
+                                <div class="absolute left-0 top-0 h-full bg-[#8b0000] dark:bg-red-550 transition-all duration-350 progress-bar-line" data-width="{{ sol.progreso_porcentaje }}"></div>
+                            </div>
 
-                        <!-- 4. Aprobada POA -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            {% if sol.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                    <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span>
-                                <span class="text-[#580000] dark:text-red-400 text-[8px]">Aprob. POA</span>
-                            {% elif sol.estado == 'VALIDADA_SAF' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 shadow-sm animate-spin">
-                                    <span class="material-symbols-outlined text-[12px]">sync</span>
-                                </span>
-                                <span class="text-amber-700 dark:text-amber-400 text-[8px]">Aprob. POA</span>
-                            {% else %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-300 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-[12px]">account_balance_wallet</span>
-                                </span>
-                                <span class="text-gray-400 dark:text-gray-500 text-[8px]">Aprob. POA</span>
-                            {% endif %}
-                        </div>
+                            <!-- Capa 2: Fila de círculos con estructura y flexbox uniforme -->
+                            <div class="relative z-10 flex items-center justify-between w-full">
+                                <!-- 1. Registrada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="1. Registrada (Completado)">
+                                    <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                        <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                    </div>
+                                </div>
 
-                        <!-- 5. Validada RPA -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            {% if sol.estado in 'VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                    <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span>
-                                <span class="text-[#580000] dark:text-red-400 text-[8px]">Val. RPA</span>
-                            {% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 shadow-sm animate-spin">
-                                    <span class="material-symbols-outlined text-[12px]">sync</span>
-                                </span>
-                                <span class="text-amber-700 dark:text-amber-400 text-[8px]">Val. RPA</span>
-                            {% else %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-300 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-[12px]">how_to_reg</span>
-                                </span>
-                                <span class="text-gray-400 dark:text-gray-500 text-[8px]">Val. RPA</span>
-                            {% endif %}
-                        </div>
+                                <!-- 2. Revisada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="2. Revisada">
+                                    {% if sol.estado != 'REGISTRADA' and sol.estado != 'RECHAZADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'REGISTRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
 
-                        <!-- 6. Validada Jefatura -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            {% if sol.estado in 'VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                    <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span>
-                                <span class="text-[#580000] dark:text-red-400 text-[8px]">Val. Jefat.</span>
-                            {% elif sol.estado == 'VALIDADA_RPA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 shadow-sm animate-spin">
-                                    <span class="material-symbols-outlined text-[12px]">sync</span>
-                                </span>
-                                <span class="text-amber-700 dark:text-amber-400 text-[8px]">Val. Jefat.</span>
-                            {% else %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-300 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-[12px]">gavel</span>
-                                </span>
-                                <span class="text-gray-400 dark:text-gray-500 text-[8px]">Val. Jefat.</span>
-                            {% endif %}
-                        </div>
+                                <!-- 3. Preparada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="3. Preparada">
+                                    {% if sol.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'REVISADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
 
-                        <!-- 7. Preparada -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            {% if sol.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                    <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span>
-                                <span class="text-[#580000] dark:text-red-400 text-[8px]">Preparada</span>
-                            {% elif sol.estado == 'VALIDADA_JEFATURA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-indigo-500 bg-indigo-50 text-indigo-600 shadow-sm animate-spin">
-                                    <span class="material-symbols-outlined text-[12px]">sync</span>
-                                </span>
-                                <span class="text-indigo-600 dark:text-indigo-400 text-[8px]">Preparada</span>
-                            {% else %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-300 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-[12px]">inventory_2</span>
-                                </span>
-                                <span class="text-gray-400 dark:text-gray-500 text-[8px]">Preparada</span>
-                            {% endif %}
-                        </div>
+                                <!-- 4. Entregada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="4. Entregada">
+                                    {% if sol.estado in 'ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'PREPARADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
 
-                        <!-- 8. Entregada -->
-                        <div class="flex flex-col items-center gap-1.5 w-14">
-                            {% if sol.estado in 'ENTREGADA,CERRADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow-sm">
-                                    <span class="material-symbols-outlined text-[12px]">done</span>
-                                </span>
-                                <span class="text-[#580000] dark:text-red-400 text-[8px]">Entregada</span>
-                            {% elif sol.estado == 'PREPARADA' %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-green-600 bg-green-50 text-green-700 shadow-sm animate-spin">
-                                    <span class="material-symbols-outlined text-[12px]">sync</span>
-                                </span>
-                                <span class="text-green-700 dark:text-green-400 text-[8px] font-bold">Entregada</span>
-                            {% else %}
-                                <span class="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-300 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-[12px]">local_shipping</span>
-                                </span>
-                                <span class="text-gray-400 dark:text-gray-500 text-[8px]">Entregada</span>
-                            {% endif %}
-                        </div>
+                                <!-- 5. Cerrada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="5. Cerrada">
+                                    {% if sol.estado == 'CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'ENTREGADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                        {% else %}
+                            <!-- CASO B: STEPPER DE 8 PASOS SABS -->
+                            <!-- Capa 1: Pista de progreso encapsulada matemáticamente centrada en el eje Y -->
+                            <div class="absolute h-0.5 left-3 right-3 top-1/2 -translate-y-1/2 z-0 overflow-hidden rounded-full pointer-events-none">
+                                <div class="absolute inset-0 bg-gray-200 dark:bg-gray-800"></div>
+                                <div class="absolute left-0 top-0 h-full bg-[#8b0000] dark:bg-red-550 transition-all duration-350 progress-bar-line" data-width="{{ sol.progreso_porcentaje_sabs }}"></div>
+                            </div>
+
+                            <!-- Capa 2: Fila de círculos con estructura y flexbox uniforme -->
+                            <div class="relative z-10 flex items-center justify-between w-full">
+                                <!-- 1. Registrada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="1. Registrada (Completado)">
+                                    <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                        <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                    </div>
+                                </div>
+
+                                <!-- 2. Revisada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="2. Revisada">
+                                    {% if sol.estado != 'REGISTRADA' and sol.estado != 'RECHAZADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'REGISTRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 3. Val. SAF -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="3. Validación SAF">
+                                    {% if sol.estado in 'VALIDADA_SAF,VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'REVISADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 4. Aprob. POA -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="4. Aprobación POA">
+                                    {% if sol.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'VALIDADA_SAF' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-650 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 5. Val. RPA -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="5. Validación RPA">
+                                    {% if sol.estado in 'VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 6. Val. Jefat. -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="6. Validación Jefatura">
+                                    {% if sol.estado in 'VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'VALIDADA_RPA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 7. Preparada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="7. Preparada">
+                                    {% if sol.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'VALIDADA_JEFATURA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 8. Entregada -->
+                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="8. Entregada">
+                                    {% if sol.estado in 'ENTREGADA,CERRADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
+                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
+                                        </div>
+                                    {% elif sol.estado == 'PREPARADA' %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
+                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- LÍNEA DE TIEMPO / ESTADO SIMPLIFICADO (Mobile y Tablet - xl:hidden) -->
+                <div class="xl:hidden w-full pt-4 border-t border-gray-100 dark:border-gray-800/80 mt-2">
+                    <div class="flex items-center justify-between text-xs font-['Outfit']">
+                        <span class="text-gray-455 font-medium">Progreso del Trámite</span>
+                        <span class="font-bold text-[#8b0000] dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded-lg border border-red-100 dark:border-red-900/30 uppercase tracking-wide text-[10px]">
+                            {{ sol.estado }}
+                        </span>
+                    </div>
+                    <div class="w-full bg-gray-150 dark:bg-slate-800 h-1.5 mt-2 overflow-hidden rounded-full">
+                        <div class="bg-[#8b0000] dark:bg-red-550 h-full transition-all duration-500 progress-bar-line" 
+                             data-width="{% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}{{ sol.progreso_porcentaje }}{% else %}{{ sol.progreso_porcentaje_sabs }}{% endif %}"></div>
                     </div>
                 </div>
 
                 <!-- Botones contextuales de acción -->
-                <div class="flex flex-row lg:flex-col gap-2 min-w-[170px] justify-center">
+                <div class="flex flex-row lg:flex-col gap-2 min-w-[170px] justify-center lg:justify-end">
                     {% if sol.estado == 'REGISTRADA' %}
                         {% if request.user.perfilusuario.rol == 'JEFE_INMEDIATO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <a href="{% url 'revisar_solicitud' sol.id %}" class="bg-[#ffa726] hover:bg-[#fb8c00] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 font-['Outfit']">
+                            <a href="{% url 'revisar_solicitud' sol.id %}" class="bg-amber-550 hover:bg-amber-600 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] w-full active:scale-95">
                                 <span class="material-symbols-outlined text-sm">rate_review</span> Autorizar (Jefe)
                             </a>
                         {% endif %}
                     
-                    <!-- Tarjeta 3: Habilitar preparación inmediata si hay stock (REVISADA -> PREPARAR PEDIDO) -->
                     {% elif sol.estado == 'REVISADA' %}
                         {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
                             {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                                 <form method="POST" action="{% url 'preparar_solicitud' sol.id %}" class="w-full">
                                     {% csrf_token %}
-                                    <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                    <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                         <span class="material-symbols-outlined text-sm">inventory_2</span> Preparar Pedido
                                     </button>
                                 </form>
                             {% endif %}
                         {% else %}
-                            <!-- Adquisiciones o servicios ordinarios siguen el flujo administrativo normal -->
                             {% if request.user.perfilusuario.rol == 'SECRETARIO_SAF' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                                 <form method="POST" action="{% url 'validar_saf' sol.id %}" class="w-full">
                                     {% csrf_token %}
-                                    <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                    <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                         <span class="material-symbols-outlined text-sm">assignment_turned_in</span> Validar (SAF)
                                     </button>
                                 </form>
@@ -366,7 +481,7 @@
                         {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'aprobar_solicitud' sol.id %}" class="w-full">
                                 {% csrf_token %}
-                                <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                     <span class="material-symbols-outlined text-sm">account_balance_wallet</span> Validar (POA)
                                 </button>
                             </form>
@@ -375,7 +490,7 @@
                         {% if request.user.perfilusuario.rol == 'RPA' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'validar_rpa' sol.id %}" class="w-full">
                                 {% csrf_token %}
-                                <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                     <span class="material-symbols-outlined text-sm">how_to_reg</span> Validar (RPA)
                                 </button>
                             </form>
@@ -384,7 +499,7 @@
                         {% if request.user.perfilusuario.rol == 'JEFE_ADMINISTRATIVO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'validar_jefatura' sol.id %}" class="w-full">
                                 {% csrf_token %}
-                                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                     <span class="material-symbols-outlined text-sm">gavel</span> Validar (Jefatura)
                                 </button>
                             </form>
@@ -393,7 +508,7 @@
                         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'preparar_solicitud' sol.id %}" class="w-full">
                                 {% csrf_token %}
-                                <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                     <span class="material-symbols-outlined text-sm">inventory_2</span> Preparar Pedido
                                 </button>
                             </form>
@@ -402,7 +517,7 @@
                         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'entregar_solicitud' sol.id %}" class="w-full">
                                 {% csrf_token %}
-                                <button type="submit" class="bg-[#580000] hover:bg-[#400000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                     <span class="material-symbols-outlined text-sm">local_shipping</span> Entrega Final
                                 </button>
                             </form>
@@ -411,7 +526,7 @@
                         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                             <form method="POST" action="{% url 'cerrar_solicitud' sol.id %}" class="w-full">
                                 {% csrf_token %}
-                                <button type="submit" class="bg-gray-700 hover:bg-gray-800 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer">
+                                <button type="submit" class="bg-gray-700 hover:bg-gray-800 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all w-full shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
                                     <span class="material-symbols-outlined text-sm">task</span> Cerrar Trámite
                                 </button>
                             </form>
@@ -419,32 +534,34 @@
                     {% endif %}
 
                     <!-- Botón de Ver Detalles (Fijo) -->
-                    <a href="{% url 'detalle_solicitud' sol.id %}" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900/60 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 text-center py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition font-['Outfit']">
+                    <a href="{% url 'detalle_solicitud' sol.id %}" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900/60 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 text-center py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all font-['Outfit'] w-full shadow-sm">
                         <span class="material-symbols-outlined text-sm">visibility</span> Detalles
                     </a>
                 </div>
 
             </div>
             {% empty %}
-            <div class="p-8 text-center text-gray-400 dark:text-gray-500 font-['Outfit']">No se registran trámites pendientes en esta bandeja de gestión.</div>
+            <div class="p-12 text-center text-gray-400 dark:text-gray-500 font-['Outfit'] flex flex-col items-center justify-center gap-3">
+                <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-700">inbox</span>
+                <span>No se registran trámites pendientes en esta bandeja de gestión.</span>
+            </div>
             {% endfor %}
         </div>
-    </div>
-    
-    <!-- PAGINACIÓN -->
-    {% if solicitudes.has_other_pages %}
-        <div class="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 font-['Outfit']">
+
+        <!-- PAGINACIÓN -->
+        {% if solicitudes.has_other_pages %}
+        <div class="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/40 border-t border-gray-150 dark:border-gray-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 font-['Outfit']">
             <div class="text-xs text-gray-500 dark:text-gray-400">
-                Mostrando del <strong>{{ solicitudes.start_index }}</strong> al <strong>{{ solicitudes.end_index }}</strong> de <strong>{{ solicitudes.paginator.count }}</strong> solicitudes totales [28].
+                Mostrando del <strong class="text-gray-700 dark:text-gray-200">{{ solicitudes.start_index }}</strong> al <strong class="text-gray-700 dark:text-gray-200">{{ solicitudes.end_index }}</strong> de <strong class="text-gray-700 dark:text-gray-200">{{ solicitudes.paginator.count }}</strong> solicitudes totales.
             </div>
             
             <div class="flex items-center gap-1 text-xs">
                 {% if solicitudes.has_previous %}
-                    <a href="?page={{ solicitudes.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
+                    <a href="?page={{ solicitudes.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-650 dark:text-gray-400 transition-all shadow-sm">
                         <span class="material-symbols-outlined text-[16px]">chevron_left</span>
                     </a>
                 {% else %}
-                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
+                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900/60 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
                         <span class="material-symbols-outlined text-[16px]">chevron_left</span>
                     </span>
                 {% endif %}
@@ -455,18 +572,18 @@
                             {{ num }}
                         </span>
                     {% elif num > solicitudes.number|add:'-3' and num < solicitudes.number|add:'3' %}
-                        <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 font-semibold transition">
+                        <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-650 dark:text-gray-400 font-semibold transition-all shadow-sm">
                             {{ num }}
                         </a>
                     {% endif %}
                 {% endfor %}
                 
                 {% if solicitudes.has_next %}
-                    <a href="?page={{ solicitudes.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
+                    <a href="?page={{ solicitudes.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-650 dark:text-gray-400 transition-all shadow-sm">
                         <span class="material-symbols-outlined text-[16px]">chevron_right</span>
                     </a>
                 {% else %}
-                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
+                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900/60 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
                         <span class="material-symbols-outlined text-[16px]">chevron_right</span>
                     </span>
                 {% endif %}

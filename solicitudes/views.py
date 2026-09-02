@@ -334,8 +334,8 @@ def nueva_solicitud(request):
 @login_required
 def nueva_solicitud_compra(request):
     """
-    Registra solicitudes para compras de bienes inexistentes/no catalogados o contratación de servicios.
-    Sigue el Flujo Completo Administrativo de Adquisición o Contratación.
+    Registra solicitudes de adquisición de nuevos bienes (sin stock o no catalogados) 
+    o de contratación de servicios.
     """
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
@@ -347,7 +347,7 @@ def nueva_solicitud_compra(request):
             return redirect('nueva_solicitud_compra')
 
         if not payload_raw:
-            messages.error(request, "No se recibió información de los conceptos solicitados.")
+            messages.error(request, "No se recibió información de ítems.")
             return redirect('nueva_solicitud_compra')
 
         payload_raw = html.unescape(payload_raw)
@@ -355,11 +355,11 @@ def nueva_solicitud_compra(request):
         try:
             payload = json.loads(payload_raw)
         except json.JSONDecodeError:
-            messages.error(request, "Error en el formato de los datos de adquisición.")
+            messages.error(request, "Error en el formato de los datos enviados.")
             return redirect('nueva_solicitud_compra')
 
         if not payload:
-            messages.error(request, "Debe agregar al menos un concepto o artículo.")
+            messages.error(request, "Debe agregar al menos un ítem.")
             return redirect('nueva_solicitud_compra')
 
         justificacion = request.POST.get('justificacion', '').strip()
@@ -375,7 +375,6 @@ def nueva_solicitud_compra(request):
                 ultima = Solicitud.objects.select_for_update().order_by('id').last()
                 numero = (ultima.id + 1) if ultima else 1
                 
-                # Asignamos el prefijo y el flujo de atención correspondiente
                 if tipo_requerimiento == 'SERVICIO':
                     codigo = f'REQ-SRV-{numero:05d}'
                     flujo = 'CONTRATACION_SERVICIO'
@@ -397,8 +396,14 @@ def nueva_solicitud_compra(request):
                 for item_key, item_data in payload.items():
                     cantidad = int(item_data.get('cantidad', 1))
                     es_nuevo = item_data.get('es_nuevo', False)
-                    
                     precio_ref_raw = item_data.get('precio_referencial', 0)
+                    
+                    # Tarjeta 8: Recuperar partida asignada para ítems no catalogados o servicios
+                    partida_id = item_data.get('partida_id')
+                    partida_obj = None
+                    if partida_id:
+                        partida_obj = PartidaPresupuestaria.objects.get(id=partida_id)
+
                     try:
                         precio_ref = Decimal(str(precio_ref_raw))
                     except (ValueError, TypeError, InvalidOperation):
@@ -407,12 +412,14 @@ def nueva_solicitud_compra(request):
                     if cantidad <= 0:
                         raise ValueError("La cantidad solicitada debe ser mayor a cero.")
                     if precio_ref < 0:
-                        raise ValueError("El precio referencial debe ser mayor o igual a 0.")
+                        raise ValueError("El precio unitario referencial debe ser mayor o igual a 0.")
 
                     if es_nuevo:
+                        # Se registra asignándole la partida presupuestaria de adquisición/servicio
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
                             material=None,
+                            partida=partida_obj,
                             es_nueva_adquisicion=True,
                             descripcion_material_no_catalogado=item_data.get('nombre'),
                             cantidad_solicitada=cantidad,
@@ -423,6 +430,7 @@ def nueva_solicitud_compra(request):
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
                             material=material,
+                            partida=None, # Obtiene la partida del material
                             cantidad_solicitada=cantidad,
                             precio_unitario_referencial=precio_ref
                         )
@@ -444,11 +452,15 @@ def nueva_solicitud_compra(request):
             messages.error(request, "Hubo un error al guardar el requerimiento en la base de datos.")
             return redirect('nueva_solicitud_compra')
 
-    # Para compras se puede buscar todo el catálogo (incluso los que tienen stock 0 o mínimo)
     materiales = Material.objects.all().values('id', 'nombre', 'stock_actual')
+    # Tarjeta 8: Pasar las partidas presupuestarias existentes al contexto del formulario de compras
+    partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
     return render(request, 'solicitudes/nueva_solicitud_compra.html', {
-        'materiales': materiales
+        'materiales': materiales,
+        'partidas': partidas
     })
+
+
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def catalogar_item_pendiente(request, detalle_id):
@@ -657,48 +669,70 @@ def validar_saf(request, id):
 @login_required
 @rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
 def aprobar_solicitud(request, id):
+    """
+    Paso 4 (Tarjeta 8 y 9): Validación presupuestaria de adquisiciones y servicios.
+    Controla el saldo disponible en el POA y reserva (compromete) el presupuesto estimado.
+    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    # Tarjeta 7: No intervenir en solicitudes de bienes con stock
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-        messages.warning(request, "Las solicitudes con stock disponible se despachan directamente y no intervienen en el flujo presupuestario de compras.")
+        messages.warning(request, "Las solicitudes atendidas directamente desde stock no requieren intervención presupuestaria (POA).")
         return redirigir_despues_de_accion(request, solicitud)
 
     if solicitud.estado != 'VALIDADA_SAF':
-        messages.error(request, "Solo solicitudes validadas por la SAF pueden aprobarse presupuestariamente.")
+        messages.error(request, "Solo solicitudes validadas por la SAF pueden someterse al control presupuestario.")
         return redirigir_despues_de_accion(request, solicitud)
 
     if not solicitud.tiene_detalles():
-        messages.error(request, "La solicitud no contiene ningún material registrado y no puede ser aprobada presupuestariamente.")
+        messages.error(request, "La solicitud no contiene ningún concepto y no puede ser aprobada presupuestariamente.")
         return redirigir_despues_de_accion(request, solicitud)
 
-    detalles = solicitud.detalles.select_related('material__partida')
+    detalles = solicitud.detalles.all()
 
     try:
         with transaction.atomic():
             costos_partidas = {}
+            
             for detalle in detalles:
-                last_entrada = MovimientoInventario.objects.filter(material=detalle.material, tipo='ENTRADA').order_by('-fecha').first()
-                costo_u = last_entrada.costo_unitario if last_entrada else Decimal('0.00')
+                partida = detalle.partida_afectada
                 
-                # Respaldo seguro contra nulos
-                cant_para_calculo = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
-                costo_estimado = cant_para_calculo * costo_u
-                
-                partida = detalle.material.partida
+                if not partida:
+                    messages.error(
+                        request, 
+                        f"Error: El concepto '{detalle.descripcion_material_no_catalogado or detalle}' no tiene asociada una Partida Presupuestaria."
+                    )
+                    return redirigir_despues_de_accion(request, solicitud)
+
+                costo_estimado = detalle.subtotal_referencial
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + costo_estimado
 
-            # Verificar la disponibilidad en el POA para cada partida involucrada
+            # Verificar saldo disponible y ejecutar la reserva en el POA
             for partida, costo in costos_partidas.items():
-                poa = POA.objects.filter(
+                poa = POA.objects.select_for_update().filter(
                     unidad=solicitud.unidad_solicitante,
                     partida=partida,
                     gestion=GESTION_ACTUAL
                 ).first()
 
-                if not poa or poa.monto_disponible < costo:
-                    messages.error(request, f"Presupuesto insuficiente en el POA de la unidad para la partida {partida.codigo}. Disponible: {poa.monto_disponible if poa else 0.00} Bs.")
+                if not poa:
+                    messages.error(
+                        request, 
+                        f"La unidad {solicitud.unidad_solicitante.nombre} no tiene registrada la partida {partida.codigo} en su POA {GESTION_ACTUAL}."
+                    )
                     return redirigir_despues_de_accion(request, solicitud)
+
+                if poa.monto_disponible < costo:
+                    messages.error(
+                        request, 
+                        f"Presupuesto insuficiente en la partida {partida.codigo}. "
+                        f"Requerido: {costo:.2f} Bs. | Disponible: {poa.monto_disponible:.2f} Bs."
+                    )
+                    return redirigir_despues_de_accion(request, solicitud)
+
+                # Tarjeta 9: Comprometer (reservar) presupuesto automáticamente
+                poa.monto_comprometido += costo
+                poa.monto_disponible -= costo
+                poa.save()
 
             solicitud.estado = 'VALIDADA_PRESUPUESTOS'
             solicitud.presupuestado_por = request.user
@@ -707,19 +741,21 @@ def aprobar_solicitud(request, id):
 
             Bitacora.objects.create(
                 usuario=request.user,
-                modulo='Solicitudes',
-                accion='Aprobación Presupuestaria',
-                descripcion=f'Se aprobó presupuestariamente la Solicitud {solicitud.codigo} contra el POA de la unidad {solicitud.unidad_solicitante.nombre}'
+                modulo='Presupuestos',
+                accion='Validación Presupuestaria',
+                descripcion=(
+                    f'Se aprobó y reservó presupuesto para la solicitud {solicitud.codigo} '
+                    f'por un monto comprometido total de {solicitud.total_referencial:.2f} Bs.'
+                )
             )
 
-        messages.success(request, f"Solicitud {solicitud.codigo} aprobada presupuestariamente de forma correcta.")
+        messages.success(request, f"Solicitud {solicitud.codigo} validada presupuestariamente y monto reservado en el POA.")
         return redirigir_despues_de_accion(request, solicitud)
 
     except DatabaseError:
         messages.error(request, "Error de base de datos al realizar el control presupuestario.")
         return redirigir_despues_de_accion(request, solicitud)
-
-
+    
 @login_required
 @rol_requerido(['RPA', 'ADMINISTRADOR'])
 def validar_rpa(request, id):
@@ -817,25 +853,21 @@ def preparar_solicitud(request, id):
 @login_required
 def entregar_solicitud(request, id):
     """
-    Paso 8: Entrega física de los materiales. Descuenta stock por PEPS y reduce el POA de la unidad solicitante [28].
+    Paso 8 (Tarjeta 9 y 21): Entrega física de materiales. 
+    Descuenta stock por PEPS, libera la reserva del POA y consolida la ejecución real.
     """
     if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR']):
         return HttpResponseForbidden("No autorizado.")
 
     solicitud = get_object_or_404(Solicitud, id=id)
 
-    # NUEVO CONTROL DE SEGURIDAD (Tarjeta 3): Evitar que un servicio ingrese al flujo de inventario
     if solicitud.flujo_atencion == 'CONTRATACION_SERVICIO':
-        messages.error(
-            request, 
-            "Error: Un requerimiento de tipo SERVICIO no puede ser procesado para entrega física de inventario."
-        )
+        messages.error(request, "Error: Un requerimiento de tipo SERVICIO no puede ser procesado para entrega física de inventario.")
         return redirigir_despues_de_accion(request, solicitud)
 
     if solicitud.estado != 'PREPARADA':
         messages.error(request, "Solo solicitudes en estado PREPARADA pueden entregarse físicamente.")
         return redirigir_despues_de_accion(request, solicitud)
-
 
     detalles = solicitud.detalles.select_related('material__partida')
 
@@ -844,6 +876,7 @@ def entregar_solicitud(request, id):
             solicitud = Solicitud.objects.select_for_update().get(id=id)
             costos_partidas = {}
 
+            # 1. Descontar stock usando PEPS y agrupar costos reales de salida
             for detalle in detalles:
                 material = Material.objects.get(id=detalle.material.id)
                 cantidad_despacho = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
@@ -852,6 +885,7 @@ def entregar_solicitud(request, id):
                     messages.error(request, f"Inconsistencia: Stock insuficiente en {material.nombre} para despachar la solicitud.")
                     return redirigir_despues_de_accion(request, solicitud)
 
+                # Despacho PEPS
                 mov = registrar_salida_valorada_peps(
                     material=material,
                     cantidad_salida=cantidad_despacho,
@@ -867,13 +901,31 @@ def entregar_solicitud(request, id):
                 partida = material.partida
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + mov.costo_total
 
+            # 2. Tarjeta 9: Ejecutar presupuesto real y liberar compromisos
             for partida, costo_real in costos_partidas.items():
-                poa = POA.objects.get(
+                poa = POA.objects.select_for_update().get(
                     unidad=solicitud.unidad_solicitante,
                     partida=partida,
                     gestion=GESTION_ACTUAL
                 )
-                poa.monto_disponible -= costo_real
+                
+                if solicitud.flujo_atencion == 'ADQUISICION':
+                    # Sumamos el costo referencial originalmente reservado para esta partida
+                    costo_estimado_partida = sum(
+                        d.subtotal_referencial for d in detalles if d.partida_afectada == partida
+                    )
+                    
+                    # - Liberamos la reserva provisional comprometida
+                    poa.monto_comprometido -= costo_estimado_partida
+                    # - Registramos la ejecución real de compra/despacho
+                    poa.monto_ejecutado += costo_real
+                    # - Ajustamos la diferencia (ahorro o sobreprecio) en el saldo disponible
+                    poa.monto_disponible += (costo_estimado_partida - costo_real)
+                else:
+                    # Flujo directo de almacén (No requirió aprobación presupuestaria previa)
+                    poa.monto_disponible -= costo_real
+                    poa.monto_ejecutado += costo_real
+                
                 poa.save()
 
             solicitud.estado = 'ENTREGADA'
@@ -883,18 +935,17 @@ def entregar_solicitud(request, id):
 
             Bitacora.objects.create(
                 usuario=request.user,
-                modulo='Solicitudes',
-                accion='Entregar Solicitud',
-                descripcion=f'Despacho y entrega física de la Solicitud {solicitud.codigo}. Se afectó el stock y el POA.'
+                modulo='Presupuestos',
+                accion='Ejecución Presupuestaria Consolidada',
+                descripcion=f'Se consolidó el gasto real de la solicitud {solicitud.codigo} en el POA de la unidad.'
             )
 
-        messages.success(request, f"Entrega física procesada y stock/POA deducidos de forma exitosa.")
+        messages.success(request, f"Entrega física procesada y ejecución presupuestaria consolidada de forma correcta.")
         return redirigir_despues_de_accion(request, solicitud)
 
     except Exception as e:
         messages.error(request, f"Error al procesar el despacho PEPS/POA: {str(e)}")
         return redirigir_despues_de_accion(request, solicitud)
-
 
 @login_required
 def cerrar_solicitud(request, id):
@@ -1060,7 +1111,8 @@ def editar_solicitud(request, id):
 @login_required
 def rechazar_solicitud(request, id):
     """
-    Permite a cualquier rol revisor de la cadena SABS rechazar y archivar el requerimiento [28].
+    Permite a cualquier rol revisor de la cadena SABS rechazar y archivar el requerimiento.
+    Tarjeta 9: Devuelve los recursos comprometidos al saldo disponible del POA si el trámite se anula.
     """
     roles_revisores = [
         'JEFE_INMEDIATO', 
@@ -1081,23 +1133,50 @@ def rechazar_solicitud(request, id):
         if motivo == 'OTRO':
             motivo = request.POST.get('motivo_personalizado')
 
-        solicitud.estado = 'RECHAZADA'
-        solicitud.motivo_rechazo = motivo
-        solicitud.aprobado_por = request.user.get_full_name() or request.user.username
-        solicitud.save()
+        try:
+            with transaction.atomic():
+                solicitud = Solicitud.objects.select_for_update().get(id=id)
+                
+                # Tarjeta 9: Si la solicitud ya contaba con reserva presupuestaria, liberamos los recursos
+                estados_con_reserva = ['VALIDADA_PRESUPUESTOS', 'VALIDADA_RPA', 'VALIDADA_JEFATURA', 'PREPARADA']
+                
+                if solicitud.estado in estados_con_reserva and solicitud.flujo_atencion in ['ADQUISICION', 'CONTRATACION_SERVICIO']:
+                    for detalle in solicitud.detalles.all():
+                        partida = detalle.partida_afectada
+                        if partida:
+                            poa = POA.objects.select_for_update().filter(
+                                unidad=solicitud.unidad_solicitante,
+                                partida=partida,
+                                gestion=GESTION_ACTUAL
+                            ).first()
+                            
+                            if poa:
+                                costo_estimado = detalle.subtotal_referencial
+                                # Devolvemos de comprometido a disponible
+                                poa.monto_comprometido -= costo_estimado
+                                poa.monto_disponible += costo_estimado
+                                poa.save()
 
-        Bitacora.objects.create(
-            usuario=request.user,
-            modulo='Solicitudes',
-            accion='Rechazar Solicitud',
-            descripcion=f'Se rechazó la solicitud {solicitud.codigo} por: {motivo}'
-        )
+                solicitud.estado = 'RECHAZADA'
+                solicitud.motivo_rechazo = motivo
+                solicitud.aprobado_por = request.user.get_full_name() or request.user.username
+                solicitud.save()
 
-        messages.info(request, f"La solicitud {solicitud.codigo} ha sido rechazada.")
-        return redirigir_despues_de_accion(request, solicitud)
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Solicitudes',
+                    accion='Rechazar Solicitud',
+                    descripcion=f'Se rechazó la solicitud {solicitud.codigo} por: {motivo}. Fondos del POA liberados.'
+                )
+
+            messages.info(request, f"La solicitud {solicitud.codigo} ha sido rechazada y sus fondos han sido liberados.")
+            return redirigir_despues_de_accion(request, solicitud)
+
+        except Exception as e:
+            messages.error(request, f"Error al procesar el rechazo de la solicitud: {str(e)}")
+            return redirigir_despues_de_accion(request, solicitud)
 
     return render(request, 'solicitudes/rechazar.html', {'solicitud': solicitud})
-
 
 @login_required
 def reabrir_solicitud(request, id):

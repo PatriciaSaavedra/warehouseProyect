@@ -47,8 +47,9 @@
                 <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']" id="label_seccion_items">Artículos requeridos</label>
                 <div class="grid grid-cols-12 gap-3 items-start">
                     
+                    <!-- Buscador / Selector en nueva_solicitud_compra.html -->
                     <div class="col-span-12 sm:col-span-6">
-                        <!-- Selector de catálogo (Se desactiva/oculta si es un Servicio) -->
+                        <!-- Selector de catálogo -->
                         <select id="material_select" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10" onchange="document.getElementById('buscador_material').value = '';">
                             <option value="">Seleccionar material del catálogo para reabastecer</option>
                             {% for material in materiales %}
@@ -64,6 +65,15 @@
                         </div>                        
                     </div>
 
+                    <!-- Tarjeta 8: Selector de Partidas Presupuestarias (Aparece para servicios o ítems nuevos) -->
+                    <div class="col-span-12 sm:col-span-6" id="seccion_partida_adicional">
+                        <select id="partida_select" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
+                            <option value="">-- Seleccionar Partida Presupuestaria --</option>
+                            {% for partida in partidas %}
+                            <option value="{{ partida.id }}">{{ partida.codigo }} - {{ partida.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="col-span-6 sm:col-span-2">
                         <input type="number" id="cantidad_input" min="1" placeholder="Cantidad" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition">
                     </div>
@@ -136,19 +146,20 @@ function adaptarFormularioPorTipo() {
     const selectCat = document.getElementById('material_select');
     const labelItems = document.getElementById('label_seccion_items');
     const buscador = document.getElementById('buscador_material');
+    const partidaSelectDiv = document.getElementById('seccion_partida_adicional');
 
     if (tipo === 'SERVICIO') {
         labelItems.textContent = "Servicios requeridos";
-        selectCat.classList.add('hidden'); // Ocultar catálogo físico de Almacén
+        selectCat.classList.add('hidden'); // Ocultar catálogo
         selectCat.value = '';
         buscador.placeholder = "Describe de forma detallada el servicio a contratar...";
+        partidaSelectDiv.classList.remove('hidden'); // Forzar selección de partida
     } else {
         labelItems.textContent = "Artículos de adquisición requeridos";
         selectCat.classList.remove('hidden');
         buscador.placeholder = "Escribe una descripción si no está en el catálogo...";
     }
     
-    // Limpiamos el carrito si cambian de tipo para no mezclar bienes y servicios
     carrito = {};
     renderTabla();
     renderInputs();
@@ -159,12 +170,15 @@ function agregarItem() {
     const cantidadInput = document.getElementById('cantidad_input');
     const precioInput = document.getElementById('precio_input');
     const buscador = document.getElementById('buscador_material');
+    const partidaSelect = document.getElementById('partida_select');
     const tipo = document.getElementById('tipo_requerimiento').value;
 
     const materialId = select.value;
     const selectedOption = select.options[select.selectedIndex];
     const cantidad = parseInt(cantidadInput.value);
     const precioRef = parseFloat(precioInput.value);
+    const partidaId = partidaSelect.value;
+    const selectedPartidaOption = partidaSelect.options[partidaSelect.selectedIndex];
 
     if (isNaN(cantidad) || cantidad <= 0) {
         alert("Defina una cantidad válida mayor a 0.");
@@ -176,8 +190,13 @@ function agregarItem() {
         return;
     }
 
-    // --- ESCENARIO A: NUEVA DESCRIPCIÓN (OBLIGATORIA PARA SERVICIOS O BIENES FUERA DE CATÁLOGO) ---
+    // --- ESCENARIO A: NUEVO CONCEPTO / SERVICIO (Texto libre) ---
     if (!materialId && buscador.value.trim() !== "") {
+        if (!partidaId) {
+            alert("Debe seleccionar una Partida Presupuestaria para registrar un concepto nuevo o servicio.");
+            return;
+        }
+        
         const nombreDescriptivo = buscador.value.trim();
         const tempId = "temp_" + Date.now();
 
@@ -185,19 +204,19 @@ function agregarItem() {
             nombre: nombreDescriptivo,
             cantidad: cantidad,
             precio_referencial: precioRef,
+            partida_id: partidaId,
+            partida_codigo: selectedPartidaOption.text.split(' - ')[0],
             stock: 99999,
             es_nuevo: true
         };
 
         renderTabla();
         renderInputs();
-        buscador.value = '';
-        cantidadInput.value = '';
-        precioInput.value = '';
+        clearInputs();
         return;
     }
 
-    // --- ESCENARIO B: MATERIAL CATALOGADO SIN STOCK (SOLO PARA BIENES) ---
+    // --- ESCENARIO B: MATERIAL CATALOGADO SIN STOCK (Selector de catálogo) ---
     if (tipo === 'BIEN' && materialId && selectedOption) {
         const materialNombre = selectedOption.text;
         
@@ -209,6 +228,8 @@ function agregarItem() {
                 nombre: materialNombre,
                 cantidad: cantidad,
                 precio_referencial: precioRef,
+                partida_id: null, // El backend lo saca automáticamente del material
+                partida_codigo: "Catálogo",
                 stock: 99999,
                 es_nuevo: false
             };
@@ -216,14 +237,19 @@ function agregarItem() {
 
         renderTabla();
         renderInputs();
-        select.value = '';
-        buscador.value = '';
-        cantidadInput.value = '';
-        precioInput.value = '';
+        clearInputs();
         return;
     }
 
-    alert("Escriba una descripción textual o seleccione un material válido.");
+    alert("Escriba una descripción de texto o seleccione un material válido.");
+}
+
+function clearInputs() {
+    document.getElementById('material_select').value = '';
+    document.getElementById('buscador_material').value = '';
+    document.getElementById('cantidad_input').value = '';
+    document.getElementById('precio_input').value = '';
+    document.getElementById('partida_select').value = '';
 }
 
 function renderTabla() {
@@ -253,8 +279,13 @@ function renderTabla() {
         tabla.innerHTML += `
             <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
                 <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">
-                    ${item.nombre}
-                    ${item.es_nuevo ? '<span class="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 border border-amber-200 py-0.5 px-2 rounded-full font-bold ml-2">Nuevo/Externo</span>' : ''}
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span>${item.nombre}</span>
+                        ${item.es_nuevo ? 
+                            `<span class="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 border border-amber-200 py-0.5 px-2 rounded-full font-bold">Partida: ${item.partida_codigo}</span>` : 
+                            '<span class="text-[9px] bg-blue-50 dark:bg-blue-950/20 text-blue-700 border border-blue-200 py-0.5 px-2 rounded-full font-bold">Del Catálogo</span>'
+                        }
+                    </div>
                 </td>
                 <td class="p-4 text-center">
                     <input type="number" value="${item.cantidad}" min="1" onchange="editarCantidad('${id}', this)" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-20 text-center focus:outline-none">
@@ -319,7 +350,8 @@ function renderInputs() {
             cantidad: carrito[id].cantidad,
             es_nuevo: carrito[id].es_nuevo,
             nombre: carrito[id].nombre,
-            precio_referencial: carrito[id].precio_referencial
+            precio_referencial: carrito[id].precio_referencial,
+            partida_id: carrito[id].partida_id  // <-- CORREGIDO: Se envía físicamente al backend
         };
     });
 
@@ -339,7 +371,6 @@ function buscarMateriales() {
         return;
     }
 
-    // Buscador general (sin filtro de stock, admite reabastecer stock 0)
     fetch(`/solicitudes/buscar-materiales/?q=${query}&solo_con_stock=false`)
         .then(response => response.json())
         .then(data => {

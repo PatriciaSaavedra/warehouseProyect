@@ -11,13 +11,20 @@
             <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Asignación Presupuestaria POA</h1>
             <p class="text-sm text-gray-500 mt-1">Control de techos financieros por Unidad Organizacional y Partidas de la gestión actual [28].</p>
         </div>
-        <div class="flex gap-2 w-full sm:w-auto">
+        <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+            <!-- Registrar POA -->
             <a href="{% url 'crear_poa' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
                 <span class="material-symbols-outlined text-[18px]">add_box</span> Registrar Techo POA
             </a>
+            
+            <!-- Tarjeta 11: Acceso Directo al Reporte de Ejecución Presupuestaria -->
+            <a href="{% url 'reporte_presupuestos' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">analytics</span> Ver Reporte POA
+            </a>
+<!-- 
             <a href="{% url 'inventario' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
                 <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
-            </a>
+            </a> -->
         </div>
     </div>
 
@@ -48,7 +55,7 @@
                         <th class="px-6 py-4 w-48 text-center">Partida</th>
                         <th class="px-6 py-4 text-right w-44">Monto Inicial (Bs.)</th>
                         <th class="px-6 py-4 text-right w-44">Monto Disponible (Bs.)</th>
-                        <th class="px-6 py-4 text-right pr-8 w-24">Acciones</th>
+                        <th class="px-6 py-4 text-right pr-8 w-32">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -63,15 +70,23 @@
                         <td class="px-6 py-4 text-right text-sm font-bold text-gray-500">{{ poa.monto_inicial|floatformat:2 }}</td>
                         <td class="px-6 py-4 text-right text-sm font-black text-gray-800">
                             {% if poa.monto_disponible <= 0 %}
-                                <span class="text-red-700">{{ poa.monto_disponible|floatformat:2 }}</span>
+                                <span class="text-red-700 font-mono">{{ poa.monto_disponible|floatformat:2 }}</span>
                             {% else %}
-                                {{ poa.monto_disponible|floatformat:2 }}
+                                <span class="font-mono">{{ poa.monto_disponible|floatformat:2 }}</span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
-                            <a href="{% url 'editar_poa' poa.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 inline-flex items-center justify-center transition" title="Editar Montos">
-                                <span class="material-symbols-outlined text-[#d97706] text-[20px]">edit</span>
-                            </a>
+                            <div class="flex justify-end gap-2">
+                                <!-- Tarjeta 10: Botón verde para Registrar Modificación (Ajuste) -->
+                                <a href="{% url 'registrar_modificacion' poa.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-green-50 hover:border-green-200 inline-flex items-center justify-center transition" title="Ajuste Presupuestario (Incrementar / Reducir Saldo)">
+                                    <span class="material-symbols-outlined text-green-600 text-[20px]">payments</span>
+                                </a>
+
+                                <!-- Botón de Edición (Original) -->
+                                <a href="{% url 'editar_poa' poa.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 inline-flex items-center justify-center transition" title="Editar Montos Directamente">
+                                    <span class="material-symbols-outlined text-[#d97706] text-[20px]">edit</span>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}

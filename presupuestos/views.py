@@ -1,16 +1,19 @@
+# --- TU ARCHIVO presupuestos/views.py INTEGRADO ---
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db import transaction
+from django.db import transaction, DatabaseError
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.core.exceptions import ValidationError  # <-- NUEVO: Para capturar saldo insuficiente en modificaciones
+from django.db.models import Q, Sum  # <-- NUEVO: Sum para agregaciones del reporte
 from decimal import Decimal
 
 from usuarios.decorators import rol_requerido
 from auditoria.models import Bitacora
 from organizacion.models import UnidadOrganizacional
 from inventario.models import PartidaPresupuestaria
-from .models import POA
+from .models import POA, ModificacionPresupuestaria  # <-- NUEVO: Importar modelo de modificaciones
 
 GESTION_DEFAULT = 2026
 
@@ -152,3 +155,112 @@ def editar_poa(request, id):
             return redirect('editar_poa', id=id)
 
     return render(request, 'presupuestos/editar_poa.html', {'poa': poa})
+
+
+# ========================================================
+# NUEVAS VISTAS OPERATIVAS (TARJETAS 10 Y 11)
+# ========================================================
+
+@login_required
+@rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
+def registrar_modificacion(request, poa_id):
+    """
+    Tarjeta 10: Registra un incremento o reducción presupuestaria (traspaso) 
+    para un POA específico, manteniendo el historial y actualizando saldos automáticamente.
+    """
+    poa = get_object_or_404(POA, id=poa_id)
+
+    if request.method == 'POST':
+        tipo = request.POST.get('tipo')
+        monto_raw = request.POST.get('monto', '0.00')
+        justificacion = request.POST.get('justificacion', '').strip()
+
+        if not tipo or not monto_raw or not justificacion:
+            messages.error(request, 'Todos los campos son obligatorios.')
+            return redirect('registrar_modificacion', poa_id=poa.id)
+
+        try:
+            monto = Decimal(monto_raw)
+            if monto <= 0:
+                raise ValueError
+        except (ValueError, ArithmeticError):
+            messages.error(request, 'El monto debe ser un número decimal válido y estrictamente mayor a cero.')
+            return redirect('registrar_modificacion', poa_id=poa.id)
+
+        try:
+            with transaction.atomic():
+                # El método save() del modelo ModificacionPresupuestaria se encarga de:
+                # 1. Validar fondos antes de aplicar reducciones.
+                # 2. Actualizar monto_disponible en el POA de forma segura (Transacción).
+                # 3. Registrar el log en la Bitácora de Auditoría.
+                ModificacionPresupuestaria.objects.create(
+                    poa=poa,
+                    tipo=tipo,
+                    monto=monto,
+                    justificacion=justificacion,
+                    usuario=request.user
+                )
+
+            messages.success(request, f'Modificación presupuestaria ({tipo}) aplicada correctamente.')
+            return redirect('poa_list')
+
+        except ValidationError as e:
+            # Captura la validación de fondos insuficientes levantada por el modelo
+            messages.error(request, e.message)
+            return redirect('registrar_modificacion', poa_id=poa.id)
+        except Exception as e:
+            messages.error(request, f'Error al registrar la modificación presupuestaria: {str(e)}')
+            return redirect('registrar_modificacion', poa_id=poa.id)
+
+    return render(request, 'presupuestos/registrar_modificacion.html', {
+        'poa': poa
+    })
+
+
+@login_required
+@rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
+def reporte_presupuestos(request):
+    """
+    Tarjeta 11: Genera el reporte consolidado de ejecución del POA,
+    permitiendo búsquedas y filtros cruzados por Unidad, Partida y Gestión.
+    """
+    unidades = UnidadOrganizacional.objects.all().order_by('nombre')
+    partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
+
+    # Capturar parámetros de filtros de URL
+    filtro_unidad = request.GET.get('unidad', '').strip()
+    filtro_partida = request.GET.get('partida', '').strip()
+    filtro_gestion = request.GET.get('gestion', str(GESTION_DEFAULT)).strip()
+
+    poas_query = POA.objects.all()
+
+    if filtro_unidad:
+        poas_query = poas_query.filter(unidad_id=filtro_unidad)
+    if filtro_partida:
+        poas_query = poas_query.filter(partida_id=filtro_partida)
+    if filtro_gestion:
+        poas_query = poas_query.filter(gestion=filtro_gestion)
+
+    # Ordenar por Unidad y Partida
+    poas = poas_query.select_related('unidad', 'partida').order_by('unidad__nombre', 'partida__codigo')
+
+    # Tarjeta 11: Calcular de forma automatizada las sumas y totales de las columnas del reporte
+    totales = poas.aggregate(
+        total_inicial=Sum('monto_inicial'),
+        total_comprometido=Sum('monto_comprometido'),
+        total_ejecutado=Sum('monto_ejecutado'),
+        total_disponible=Sum('monto_disponible')
+    )
+
+    return render(request, 'presupuestos/reporte.html', {
+        'poas': poas,
+        'unidades': unidades,
+        'partidas': partidas,
+        'filtro_unidad': filtro_unidad,
+        'filtro_partida': filtro_partida,
+        'filtro_gestion': filtro_gestion,
+        'total_inicial': totales['total_inicial'] or 0.00,
+        'total_comprometido': totales['total_comprometido'] or 0.00,
+        'total_ejecutado': totales['total_ejecutado'] or 0.00,
+        'total_disponible': totales['total_disponible'] or 0.00,
+    })

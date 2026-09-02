@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %} Registrar Modificación Presupuestaria {% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
+                Ajuste Presupuestario
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Registrar un incremento o reducción sobre el POA de la unidad
+            </p>
+        </div>
+        <a href="{% url 'poa_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Volver
+        </a>
+    </div>
+
+    <!-- TARJETA INFORMATIVA DEL POA ACTUAL -->
+    <div class="card p-6 bg-gray-50 dark:bg-slate-900/60 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm mb-6 font-['Outfit']">
+        <h3 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">info</span> Estado Presupuestario del Folio
+        </h3>
+        <div class="grid grid-cols-2 gap-4 text-xs">
+            <div>
+                <span class="text-gray-400 dark:text-gray-500 block">Unidad</span>
+                <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ poa.unidad.nombre }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 dark:text-gray-500 block">Partida Presupuestaria</span>
+                <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ poa.partida.codigo }} - {{ poa.partida.nombre }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 dark:text-gray-500 block">Inicial Asignado</span>
+                <span class="font-bold text-gray-600 dark:text-gray-400 text-sm font-mono">Bs. {{ poa.monto_inicial|floatformat:2 }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 dark:text-gray-500 block">Saldo Disponible Actual</span>
+                <span class="font-bold text-blue-600 dark:text-blue-400 text-sm font-mono">Bs. {{ poa.monto_disponible|floatformat:2 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- FORMULARIO -->
+    <form method="POST" class="card p-8 shadow-sm">
+        {% csrf_token %}
+
+        <div class="space-y-6">
+            <!-- TIPO DE MODIFICACIÓN -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                    Tipo de Operación <span class="text-[#8b0000]">*</span>
+                </label>
+                <div class="relative">
+                    <select name="tipo" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
+                        <option value="INCREMENTO" selected>Incrementar Techo Disponible (+ Bs.)</option>
+                        <option value="REDUCCION">Reducir Techo Disponible (- Bs.)</option>
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+                <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Nota: Las reducciones presupuestarias no pueden dejar el saldo disponible en valores menores a cero.</p>
+            </div>
+
+            <!-- MONTO -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                    Monto de Ajuste (Bs.) <span class="text-[#8b0000]">*</span>
+                </label>
+                <input type="number" name="monto" min="0.01" step="0.01" required placeholder="0.00" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition font-mono">
+            </div>
+
+            <!-- JUSTIFICACIÓN -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                    Justificación Técnica / Resolución <span class="text-[#8b0000]">*</span>
+                </label>
+                <textarea name="justificacion" required rows="4" placeholder="Describa el motivo legal o la resolución de traspaso presupuestario..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition"></textarea>
+            </div>
+        </div>
+
+        <!-- BOTONES -->
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'poa_list' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">gavel</span>
+                Aplicar Ajuste
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
