@@ -95,7 +95,6 @@ class Solicitud(models.Model):
             'RECHAZADA': 0,
         }
         return map_estados.get(self.estado, 0)
-    # --- EN TU ARCHIVO models.py (Dentro de la clase Solicitud) ---
 
     @property
     def progreso_porcentaje_sabs(self):
@@ -115,7 +114,26 @@ class Solicitud(models.Model):
             'RECHAZADA': 0,
         }
         return map_estados.get(self.estado, 0)
-
+    @property
+    def almacen_origen(self):
+        """
+        Tarjeta 9: Resuelve dinámicamente el almacén de origen del requerimiento.
+        Si la Unidad Solicitante tiene un Subalmacén asignado, se usa ese;
+        de lo contrario, se deriva automáticamente al Almacén Central de la Gobernación.
+        """
+        from inventario.models import Almacen
+        
+        # 1. Buscar un subalmacén activo asociado a la unidad solicitante
+        subalmacen = Almacen.objects.filter(
+            unidad_organizacional=self.unidad_solicitante, 
+            is_active=True
+        ).first()
+        
+        if subalmacen:
+            return subalmacen
+            
+        # 2. Fallback al Almacén Central de la Gobernación
+        return Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
     # Tarjeta 2: Calcular automáticamente el total referencial de la solicitud
     @property
     def total_referencial(self):

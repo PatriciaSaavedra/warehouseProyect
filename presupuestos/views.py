@@ -117,37 +117,42 @@ def crear_poa(request):
 @rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
 def editar_poa(request, id):
     """
-    Modifica los montos de una asignación POA existente [28].
+    Modifica la información básica del POA (Presupuesto de apertura).
+    Tarjeta 10: Se bloquea la modificación manual del saldo disponible
+    para forzar el uso de la bitácora de Traspasos/Modificaciones Presupuestarias.
     """
     poa = get_object_or_404(POA, id=id)
 
     if request.method == 'POST':
         monto_inicial_raw = request.POST.get('monto_inicial', '0.00')
-        monto_disponible_raw = request.POST.get('monto_disponible', '0.00')
 
         try:
             monto_inicial = Decimal(monto_inicial_raw)
-            monto_disponible = Decimal(monto_disponible_raw)
-            if monto_inicial < 0 or monto_disponible < 0:
+            if monto_inicial < 0:
                 raise ValueError
         except (ValueError, ArithmeticError):
-            messages.error(request, 'Los montos numéricos deben ser decimales válidos y no negativos.')
+            messages.error(request, 'El monto inicial debe ser un decimal válido y no negativo.')
             return redirect('editar_poa', id=id)
 
         try:
             with transaction.atomic():
+                # Al cambiar el inicial, el disponible se reajusta por la diferencia inicial [28]
+                diferencia = monto_inicial - poa.monto_inicial
                 poa.monto_inicial = monto_inicial
-                poa.monto_disponible = monto_disponible
+                poa.monto_disponible += diferencia
                 poa.save()
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Presupuestos',
                     accion='Editar POA',
-                    descripcion=f'Modificación de montos POA para {poa.unidad.nombre} - Partida {poa.partida.codigo}'
+                    descripcion=(
+                        f'Se reajustó el presupuesto de apertura POA de {poa.unidad.nombre} '
+                        f'- Partida {poa.partida.codigo} a un monto inicial de {monto_inicial} Bs.'
+                    )
                 )
 
-            messages.success(request, 'Montos presupuestarios actualizados correctamente.')
+            messages.success(request, 'Presupuesto POA de apertura reajustado correctamente.')
             return redirect('poa_list')
 
         except Exception as e:
@@ -155,8 +160,6 @@ def editar_poa(request, id):
             return redirect('editar_poa', id=id)
 
     return render(request, 'presupuestos/editar_poa.html', {'poa': poa})
-
-
 # ========================================================
 # NUEVAS VISTAS OPERATIVAS (TARJETAS 10 Y 11)
 # ========================================================

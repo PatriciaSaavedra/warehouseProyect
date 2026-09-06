@@ -1,6 +1,6 @@
 <aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-white dark:bg-slate-950 border-r border-gray-100 dark:border-gray-800 shadow-sm select-none sidebar-custom transition-colors duration-200">
 
-    <!-- LOGO (Borde dinámico para separar) -->
+    <!-- LOGO (GAD Potosí Almacén Central) -->
     <div class="p-6 flex flex-col items-center border-b border-gray-100 dark:border-gray-800 mb-4">
         <h1 class="text-2xl font-extrabold text-[#8b0000] dark:text-red-500 font-['Outfit'] tracking-wide">
             Almacén Central
@@ -13,7 +13,7 @@
     <!-- MENU -->
     <nav class="flex-1 px-4 space-y-1.5 overflow-y-auto">
 
-        <!-- DASHBOARD (Efectos hover dinámicos y textos legibles en ambos modos) -->
+        <!-- 1️⃣ DASHBOARD -->
         <a 
             href="/dashboard/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
@@ -25,7 +25,69 @@
             Dashboard
         </a>
 
-        <!-- SOLICITUDES -->
+        <!-- 2️⃣ ADMINISTRACIÓN (Tarjeta 1, 2, 3 - Exclusivo Administradores) [28] -->
+        {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+        <details 
+            class="group" 
+            {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path %}open{% endif %}
+        >
+            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white cursor-pointer transition duration-150 list-none select-none">
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined mr-3 text-[22px]">
+                        settings_applications
+                    </span>
+                    Administración
+                </div>
+                <span class="material-symbols-outlined text-[18px] transition duration-200 group-open:rotate-180 text-gray-400">
+                    expand_more
+                </span>
+            </summary>
+            
+            <div class="pl-8 pr-2 mt-1.5 space-y-1">
+                <!-- Secretarías (Tarjeta 1 - Apunta a tu nueva vista y plantilla) -->
+                <a 
+                    href="{% url 'secretaria_list' %}" 
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/organizacion/secretarias/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">corporate_fare</span>
+                    Secretarías
+                </a>
+
+                <!-- Unidades Organizacionales (Tarjeta 1 - Apunta a tu nueva vista y plantilla) -->
+                <a 
+                    href="{% url 'unidad_list' %}" 
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/organizacion/unidades/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">account_tree</span>
+                    Unidades Org.
+                </a>
+
+                <!-- Almacenes (Tarjeta 2 - Se movió de Inventario a Administración) [28] -->
+                <a 
+                    href="{% url 'almacen_list' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/almacenes/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">warehouse</span>
+                    Almacenes
+                </a>
+
+                <!-- Usuarios (Tarjeta 3) -->
+                <a 
+                    href="/usuarios/"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/usuarios/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">group</span>
+                    Usuarios
+                </a>
+            </div>
+        </details>
+        {% endif %}
+
+        <!-- 3️⃣ SOLICITUDES -->
         <a 
             href="/solicitudes/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
@@ -37,49 +99,111 @@
             Solicitudes
         </a>
 
-        <!-- INVENTARIO -->
+        <!-- 4️⃣ INVENTARIO (Desplegable estrictamente operativo) [28] -->
         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'KARDISTA' %}
-        <a 
-            href="/inventario/"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/inventario/' in request.path and '/movimientos/' not in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
+        <details 
+            class="group" 
+            {% if '/inventario/' in request.path and '/inventario/almacenes/' not in request.path or '/movimientos/' in request.path %}open{% endif %}
         >
-            <span class="material-symbols-outlined mr-3 text-[22px]">
-                inventory_2
-            </span>
-            Inventario
-        </a>
+            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white cursor-pointer transition duration-150 list-none select-none">
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined mr-3 text-[22px]">
+                        inventory_2
+                    </span>
+                    Inventario
+                </div>
+                <span class="material-symbols-outlined text-[18px] transition duration-200 group-open:rotate-180 text-gray-400">
+                    expand_more
+                </span>
+            </summary>
+            
+            <div class="pl-8 pr-2 mt-1.5 space-y-1">
+                <!-- Stock por Almacén / Existencias (Tarjeta 5) -->
+                <a 
+                    href="{% url 'inventario_por_almacen' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/existencias/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">fact_check</span>
+                    Existencias
+                </a>
+
+                <!-- Notas de Ingreso / Entradas (Tarjeta 7) -->
+                <a 
+                    href="{% url 'nota_ingreso_list' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/entradas/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">input</span>
+                    Entradas (Ingresos)
+                </a>
+
+                <!-- Notas de Salida / Salidas (Tarjeta 12) -->
+                <a 
+                    href="{% url 'nota_salida_list' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/salidas/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">output</span>
+                    Salidas (Egresos)
+                </a>
+
+                <!-- Historial Kardex / Movimientos (Tarjeta 16) -->
+                <a 
+                    href="{% url 'movimientos' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/movimientos/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">swap_horiz</span>
+                    Historial Kardex
+                </a>
+            </div>
+        </details>
         {% endif %}
 
-        <!-- MOVIMIENTOS -->
-        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'KARDISTA' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-        <a 
-            href="{% url 'movimientos' %}"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/movimientos/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
-        >
-            <span class="material-symbols-outlined mr-3 text-[22px]">
-                swap_horiz
-            </span>
-            Movimientos
-        </a>
-        {% endif %}
-
-        <!-- PRESUPUESTOS (Filtro por Rol) -->
+        <!-- 5️⃣ PRESUPUESTOS (POA) -->
         {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-        <a 
-            href="/presupuestos/"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/presupuestos/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
+        <details 
+            class="group" 
+            {% if '/presupuestos/' in request.path %}open{% endif %}
         >
-            <span class="material-symbols-outlined mr-3 text-[22px]">
-                account_balance
-            </span>
-            Presupuestos
-        </a>
+            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white cursor-pointer transition duration-150 list-none select-none">
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined mr-3 text-[22px]">
+                        account_balance
+                    </span>
+                    Presupuestos
+                </div>
+                <span class="material-symbols-outlined text-[18px] transition duration-200 group-open:rotate-180 text-gray-400">
+                    expand_more
+                </span>
+            </summary>
+            
+            <div class="pl-8 pr-2 mt-1.5 space-y-1">
+                <!-- Techos POA (Tarjeta 20) -->
+                <a 
+                    href="/presupuestos/"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/presupuestos/' in request.path and '/presupuestos/reporte-ejecucion/' not in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">wallet</span>
+                    Techos POA
+                </a>
+
+                <!-- Reporte de Ejecución Presupuestaria (Tarjeta 23) -->
+                <a 
+                    href="{% url 'reporte_presupuestos' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/presupuestos/reporte-ejecucion/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">query_stats</span>
+                    Ejecución POA
+                </a>
+            </div>
+        </details>
         {% endif %}
 
-        <!-- COMPRAS (Filtro por Rol) -->
+        <!-- 6️⃣ COMPRAS / BIENES Y SERVICIOS -->
         {% if request.user.perfilusuario.rol == 'BIENES_SERVICIOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <a 
             href="/compras/"
@@ -93,21 +217,7 @@
         </a>
         {% endif %}
 
-        <!-- USUARIOS (Filtro por Rol) -->
-        {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-        <a 
-            href="/usuarios/"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/usuarios/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
-        >
-            <span class="material-symbols-outlined mr-3 text-[22px]">
-                group
-            </span>
-            Usuarios
-        </a>
-        {% endif %}
-
-        <!-- AUDITORIA (Filtro por Rol) -->
+        <!-- 7️⃣ AUDITORÍA -->
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <a 
             href="/auditoria/"
@@ -123,10 +233,10 @@
 
     </nav>
 
-    <!-- FOOTER: Fondo y bordes oscurecidos en modo oscuro -->
+    <!-- FOOTER -->
     <div class="p-4 border-t border-gray-100 dark:border-gray-850 bg-gray-50/50 dark:bg-slate-900/40">
 
-        <!-- Info del Usuario (Textos adaptables) -->
+        <!-- Info del Usuario -->
         <div class="px-4 mb-3">
             <p class="font-bold text-gray-800 dark:text-gray-100 text-sm font-['Outfit'] truncate">
                 {% if request.user.first_name or request.user.last_name %}
@@ -137,10 +247,11 @@
             </p>
             <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-wider mt-0.5">
                 {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
+
             </p>
         </div>
 
-        <!-- Botón Cerrar Sesión seguro (Colores de advertencia adaptables para el hover) -->
+        <!-- Cerrar Sesión -->
         <form method="POST" action="{% url 'logout' %}">
             {% csrf_token %}
             <button

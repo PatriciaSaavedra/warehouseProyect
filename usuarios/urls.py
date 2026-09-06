@@ -1,4 +1,4 @@
-# FILE: usuarios/urls.py
+# usuarios/urls.py
 from django.urls import path
 from .views import (
     usuarios_view,
@@ -12,9 +12,9 @@ from .views import (
     unidades_list_view,   
     crear_unidad_view,    
     editar_unidad_view,   
-    toggle_unidad_view,     # <-- NUEVA VISTA (Dar de baja)
+    toggle_unidad_view,
     
-    # CRUD de Secretarías (NUEVO)
+    # CRUD de Secretarías
     secretarias_list_view,
     crear_secretaria_view,
     editar_secretaria_view,
@@ -22,6 +22,7 @@ from .views import (
 )
 
 urlpatterns = [
+    # Gestión de Usuarios
     path('', usuarios_view, name='usuarios'),
     path('perfil/', perfil_usuario_view, name='perfil'),
     path('crear/', crear_usuario_view, name='crear_usuario'),
@@ -30,14 +31,20 @@ urlpatterns = [
     path('reset-password/<int:user_id>/', reset_password_view, name='reset_password'),
     
     # --- CRUD UNIDADES ---
+    # Soportar tanto plural como singular para evitar el error NoReverseMatch
     path('unidades/', unidades_list_view, name='unidades_list'),
+    path('unidades/lista-singular/', unidades_list_view, name='unidad_list'), # Alias singular
+    
     path('unidades/crear/', crear_unidad_view, name='crear_unidad'),
     path('unidades/editar/<int:id>/', editar_unidad_view, name='editar_unidad'),
-    path('unidades/toggle/<int:id>/', toggle_unidad_view, name='toggle_unidad'), # Dar de baja
+    path('unidades/toggle/<int:id>/', toggle_unidad_view, name='toggle_unidad'), 
     
     # --- CRUD SECRETARÍAS ---
+    # Soportar tanto plural como singular para evitar el error NoReverseMatch
     path('secretarias/', secretarias_list_view, name='secretarias_list'),
+    path('secretarias/lista-singular/', secretarias_list_view, name='secretaria_list'), # Alias singular
+    
     path('secretarias/crear/', crear_secretaria_view, name='crear_secretaria'),
     path('secretarias/editar/<int:id>/', editar_secretaria_view, name='editar_secretaria'),
-    path('secretarias/toggle/<int:id>/', toggle_secretaria_view, name='toggle_secretaria'), # Dar de baja
+    path('secretarias/toggle/<int:id>/', toggle_secretaria_view, name='toggle_secretaria'), 
 ]

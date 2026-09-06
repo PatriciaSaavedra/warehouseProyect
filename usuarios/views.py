@@ -13,6 +13,8 @@ from .models import PerfilUsuario, ROLES
 from organizacion.models import Secretaria, UnidadAdministrativa, UnidadOrganizacional
 from auditoria.models import Bitacora
 from usuarios.decorators import rol_requerido
+from inventario.models import Almacen
+
 
 
 # ==========================================
@@ -325,9 +327,11 @@ def usuarios_view(request):
 def crear_usuario_view(request):
     unidades = UnidadAdministrativa.objects.all()
     secretarias = Secretaria.objects.all()
+    almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')  # <--- Obtener almacenes activos
 
     if request.method == 'POST':
         datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=True)
+        almacenes_seleccionados = request.POST.getlist('almacenes')  # <--- Capturar IDs de almacenes
 
         if errores:
             for error in errores:
@@ -339,6 +343,7 @@ def crear_usuario_view(request):
                     'roles': ROLES,
                     'unidades': unidades,
                     'secretarias': secretarias,
+                    'almacenes': almacenes,  # <--- Pasar al contexto de error
                     'valores': request.POST
                 }
             )
@@ -353,18 +358,22 @@ def crear_usuario_view(request):
                     email=datos_normalizados['email']
                 )
 
-                PerfilUsuario.objects.create(
+                perfil = PerfilUsuario.objects.create(
                     user=user,
                     rol=datos_normalizados['rol'],
                     secretaria_id=datos_normalizados['secretaria_id'],
                     unidad_id=datos_normalizados['unidad_id']
                 )
 
+                # Asignar los almacenes autorizados al perfil recién creado
+                if almacenes_seleccionados:
+                    perfil.almacenes_autorizados.set(almacenes_seleccionados)
+
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Usuarios',
                     accion='Crear usuario',
-                    descripcion=f'Se creó el usuario {datos_normalizados["username"]} con rol {datos_normalizados["rol"]}'
+                    descripcion=f'Se creó el usuario {datos_normalizados["username"]} con rol {datos_normalizados["rol"]} y almacenes autorizados.'
                 )
 
             messages.success(request, 'Usuario creado correctamente.')
@@ -379,6 +388,7 @@ def crear_usuario_view(request):
                     'roles': ROLES,
                     'unidades': unidades,
                     'secretarias': secretarias,
+                    'almacenes': almacenes,
                     'valores': request.POST
                 }
             )
@@ -392,11 +402,10 @@ def crear_usuario_view(request):
         {
             'roles': ROLES,
             'unidades': unidades,
-            'secretarias': secretarias
+            'secretarias': secretarias,
+            'almacenes': almacenes  # <--- Pasar al formulario GET
         }
     )
-
-
 # VISTA DE EDICIÓN
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
@@ -676,20 +685,19 @@ def unidades_list_view(request):
             'query': query
         }
     )
-
-
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def crear_unidad_view(request):
     """
-    Registra una nueva Unidad de forma atómica asociándola a una Secretaría [11, 28].
+    Registra una nueva Unidad de forma atómica asociándola a una Secretaría activa.
     """
-    secretarias = Secretaria.objects.all()  # <-- Cargamos las secretarías para el formulario
+    # MODIFICADO: Solo cargamos secretarías activas para evitar asociar unidades a áreas dadas de baja
+    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
 
     if request.method == 'POST':
         nombre = normalizar_espacios(request.POST.get('nombre', ''))
         codigo_sigep = normalizar_espacios(request.POST.get('codigo_sigep', ''))
-        secretaria_id = request.POST.get('secretaria', '').strip()  # <-- Rescatamos la secretaría
+        secretaria_id = request.POST.get('secretaria', '').strip()
 
         if not nombre:
             messages.error(request, 'El nombre de la unidad es obligatorio.')
@@ -704,7 +712,7 @@ def crear_unidad_view(request):
                 UnidadOrganizacional.objects.create(
                     nombre=nombre,
                     codigo_sigep=codigo_sigep if codigo_sigep else None,
-                    secretaria_id=secretaria_id if secretaria_id else None  # <-- Guardamos relación
+                    secretaria_id=secretaria_id if secretaria_id else None
                 )
                 Bitacora.objects.create(
                     usuario=request.user,
@@ -721,21 +729,20 @@ def crear_unidad_view(request):
             return redirect('crear_unidad')
 
     return render(request, 'usuarios/crear_unidad.html', {'secretarias': secretarias})
-
-
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def editar_unidad_view(request, id):
     """
-    Modifica los datos de una Unidad Organizacional existente [11, 28].
+    Modifica los datos de una Unidad Organizacional existente.
     """
     unidad = get_object_or_404(UnidadOrganizacional, id=id)
-    secretarias = Secretaria.objects.all()  # <-- Cargamos las secretarías
+    # MODIFICADO: Solo cargamos secretarías activas
+    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
 
     if request.method == 'POST':
         nombre = normalizar_espacios(request.POST.get('nombre', ''))
         codigo_sigep = normalizar_espacios(request.POST.get('codigo_sigep', ''))
-        secretaria_id = request.POST.get('secretaria', '').strip()  # <-- Rescatamos la secretaría
+        secretaria_id = request.POST.get('secretaria', '').strip()
 
         if not nombre:
             messages.error(request, 'El nombre de la unidad es un campo obligatorio.')
@@ -749,7 +756,7 @@ def editar_unidad_view(request, id):
             with transaction.atomic():
                 unidad.nombre = nombre
                 unidad.codigo_sigep = codigo_sigep if codigo_sigep else None
-                unidad.secretaria_id = secretaria_id if secretaria_id else None  # <-- Actualizamos relación
+                unidad.secretaria_id = secretaria_id if secretaria_id else None
                 unidad.save()
 
                 Bitacora.objects.create(
@@ -767,7 +774,6 @@ def editar_unidad_view(request, id):
             return redirect('editar_unidad', id=id)
 
     return render(request, 'usuarios/editar_unidad.html', {'unidad': unidad, 'secretarias': secretarias})
-
 # ==========================================
 # CRUD DE SECRETARÍAS (NUEVAS VISTAS)
 # ==========================================
@@ -895,52 +901,82 @@ def editar_secretaria_view(request, id):
 
     # Al cargar la página por primera vez (GET), pasamos el objeto real de la Base de Datos
     return render(request, 'usuarios/editar_secretaria.html', {'secretaria': secretaria_real})
-
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def toggle_secretaria_view(request, id):
     """
-    Da de baja (Desactiva) o reactiva de manera lógica una Secretaría Departamental [11, 28].
+    Da de baja (Desactiva) o reactiva de manera lógica una Secretaría Departamental.
+    Si se desactiva, de forma automática se desactivan todas sus unidades dependientes.
     """
     secretaria = get_object_or_404(Secretaria, id=id)
-    secretaria.is_active = not secretaria.is_active
-    secretaria.save()
+    nuevo_estado = not secretaria.is_active
 
-    estado = 'reactivada' if secretaria.is_active else 'desactivada (dada de baja)'
+    try:
+        with transaction.atomic():
+            secretaria.is_active = nuevo_estado
+            secretaria.save()
 
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Organización',
-        accion='Cambio de estado Secretaría',
-        descripcion=f'Se cambió el estado a {estado} de la secretaría: {secretaria.nombre}'
-    )
+            # MODIFICADO: Baja lógica en cascada para evitar unidades activas de secretarias inactivas
+            detalle_unidades = ""
+            if not nuevo_estado:
+                unidades_activas = secretaria.unidades_organizacionales.filter(is_active=True)
+                cantidad_unidades = unidades_activas.count()
+                unidades_activas.update(is_active=False)
+                if cantidad_unidades > 0:
+                    detalle_unidades = f" y se desactivaron {cantidad_unidades} unidades dependientes"
 
-    messages.success(request, f'La Secretaría ha sido {estado} correctamente.')
+            estado_texto = 'reactivada' if nuevo_estado else 'desactivada (dada de baja)'
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Organización',
+                accion='Cambio de estado Secretaría',
+                descripcion=f'Se cambió el estado a {estado_texto} de la secretaría: {secretaria.nombre}{detalle_unidades}.'
+            )
+
+        messages.success(request, f'La Secretaría ha sido {estado_texto} correctamente.')
+    except Exception as e:
+        messages.error(request, f'Error al cambiar el estado de la secretaría: {str(e)}')
+
     return redirect('secretarias_list')
-
 
 # ==========================================
 # BAJA LÓGICA DE UNIDADES (NUEVA VISTA)
 # ==========================================
-
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def toggle_unidad_view(request, id):
     """
-    Da de baja (Desactiva) o reactiva de manera lógica una Unidad Administrativa [11, 28].
+    Da de baja (Desactiva) o reactiva de manera lógica una Unidad Administrativa.
+    Evita reactivar una unidad si su secretaría de pertenencia está desactivada.
     """
     unidad = get_object_or_404(UnidadOrganizacional, id=id)
-    unidad.is_active = not unidad.is_active
-    unidad.save()
+    nuevo_estado = not unidad.is_active
 
-    estado = 'reactivada' if unidad.is_active else 'desactivada (dada de baja)'
+    # MODIFICADO: Validación de consistencia jerárquica
+    if nuevo_estado and unidad.secretaria and not unidad.secretaria.is_active:
+        messages.error(
+            request, 
+            f"No es posible activar la unidad '{unidad.nombre}' porque la Secretaría '{unidad.secretaria.nombre}' está desactivada."
+        )
+        return redirect('unidades_list')
 
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Organización',
-        accion='Cambio de estado Unidad',
-        descripcion=f'Se cambió el estado a {estado} de la unidad: {unidad.nombre}'
-    )
+    try:
+        with transaction.atomic():
+            unidad.is_active = nuevo_estado
+            unidad.save()
 
-    messages.success(request, f'La Unidad Administrativa ha sido {estado} correctamente.')
+            estado = 'reactivada' if nuevo_estado else 'desactivada (dada de baja)'
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Organización',
+                accion='Cambio de estado Unidad',
+                descripcion=f'Se cambió el estado a {estado} de la unidad: {unidad.nombre}'
+            )
+
+        messages.success(request, f'La Unidad Organizacional ha sido {estado} correctamente.')
+    except Exception as e:
+        messages.error(request, f'Error al cambiar el estado de la unidad: {str(e)}')
+
     return redirect('unidades_list')

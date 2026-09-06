@@ -15,6 +15,8 @@ ROLES = [
     ('JEFE_ADMINISTRATIVO', 'Jefe Administrativo'),
 ]
 
+# --- EN TU ARCHIVO usuarios/models.py ---
+
 class PerfilUsuario(models.Model):
     user = models.OneToOneField(
         User,
@@ -45,6 +47,23 @@ class PerfilUsuario(models.Model):
         blank=True,
         null=True
     )
-
+    
+    # Tarjeta 3: Almacenes o Subalmacenes autorizados para que este usuario pueda operar
+    almacenes_autorizados = models.ManyToManyField(
+        'inventario.Almacen',
+        blank=True,
+        related_name='usuarios_autorizados',
+        help_text="Almacenes autorizados que este usuario puede administrar u operar"
+    )
+    def tiene_acceso_almacen(self, almacen):
+        """
+        Tarjeta 3: Control de acceso según almacén.
+        Verifica si este usuario está autorizado a operar en un almacén específico.
+        Los administradores del sistema tienen acceso global absoluto garantizado.
+        """
+        if self.rol == 'ADMINISTRADOR':
+            return True
+        return self.almacenes_autorizados.filter(id=almacen.id).exists()
     def __str__(self):
         return self.user.username
+    

@@ -1,10 +1,9 @@
-# FILE: organizacion/models.py
 from django.db import models
 
 class Secretaria(models.Model):
     nombre = models.CharField(max_length=200, unique=True)
     codigo = models.CharField(max_length=50, blank=True, null=True)
-    is_active = models.BooleanField(default=True)  # <-- CAMPO NUEVO PARA BAJA LÓGICA
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.nombre
@@ -20,7 +19,25 @@ class UnidadOrganizacional(models.Model):
         null=True,
         blank=True
     )
-    is_active = models.BooleanField(default=True)  # <-- CAMPO NUEVO PARA BAJA LÓGICA
+    is_active = models.BooleanField(default=True)
+
+    # Tarjeta 17: Retorna únicamente los materiales permitidos para esta Unidad según su POA 2026
+    def materiales_autorizados_poa(self, gestion=2026):
+        """
+        Retorna la lista de materiales autorizados para esta Unidad Organizacional,
+        filtrando únicamente aquellos cuya Partida Presupuestaria está registrada en su POA activo.
+        """
+        from presupuestos.models import POA
+        from inventario.models import Material
+
+        # Obtenemos los IDs de las partidas que tienen fondos asignados en el POA de esta unidad
+        partidas_permitidas = POA.objects.filter(
+            unidad=self,
+            gestion=gestion
+        ).values_list('partida_id', flat=True)
+
+        # Retornamos solo los materiales que pertenezcan a esas partidas permitidas
+        return Material.objects.filter(partida_id__in=partidas_permitidas)
 
     def __str__(self):
         if self.secretaria:

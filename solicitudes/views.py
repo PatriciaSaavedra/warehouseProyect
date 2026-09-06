@@ -24,7 +24,7 @@ from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
 
 from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD 
-from inventario.models import Material, MovimientoInventario, PartidaPresupuestaria, UnidadMedida
+from inventario.models import InventarioAlmacen, Material, MovimientoInventario, PartidaPresupuestaria, UnidadMedida
 from inventario.services import registrar_salida_valorada_peps  # Importamos nuestro servicio PEPS (FIFO)
 from usuarios.decorators import tiene_rol, rol_requerido
 from presupuestos.models import POA
@@ -575,11 +575,12 @@ def detalle_solicitud(request, id):
         'solicitud': solicitud,
         'rol': rol
     })
-@transaction.atomic
+
 @login_required
 def revisar_solicitud(request, id):
     """
-    Paso 2: El Jefe Inmediato revisa y autoriza las cantidades (Pasa de 'REGISTRADA' a 'REVISADA') [11].
+    Paso 2 (Tarjeta 5): El Jefe Inmediato revisa y autoriza las cantidades.
+    Aplica la reserva de existencias físicas de forma segura y compatible con SQLite/Postgres.
     """
     if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR']):
         return HttpResponseForbidden("No autorizado.")
@@ -596,9 +597,20 @@ def revisar_solicitud(request, id):
 
     detalles = solicitud.detalles.select_related('material')
 
+    from inventario.models import InventarioAlmacen
+
     if request.method == 'POST':
         try:
             with transaction.atomic():
+                # NUEVO CONTROL DE ROBUSTEZ: Validar que el almacén de origen esté registrado
+                almacen_origen = solicitud.almacen_origen
+                if not almacen_origen:
+                    raise ValueError(
+                        "No se pudo determinar el almacén de origen para esta solicitud. "
+                        "Asegúrese de haber registrado un Almacén Central activo (Tipo: 'CENTRAL') "
+                        "en el Panel de Administración de Django."
+                    )
+
                 for detalle in detalles:
                     aprobada = int(request.POST.get(f"aprobado_{detalle.id}") or 0)
                     if aprobada < 0:
@@ -606,6 +618,25 @@ def revisar_solicitud(request, id):
 
                     detalle.cantidad_aprobada = aprobada
                     detalle.save()
+
+                    # Tarjeta 5: Reservar stock físico en el Almacén de origen
+                    if solicitud.flujo_atencion == 'SALIDA_ALMACEN' and detalle.material:
+                        # Ahora pasamos el almacen_origen ya validado y seguro
+                        inv, created = InventarioAlmacen.objects.get_or_create(
+                            material=detalle.material,
+                            almacen=almacen_origen,
+                            defaults={'stock_fisico': 0, 'stock_reservado': 0}
+                        )
+
+                        if inv.stock_disponible < aprobada:
+                            raise ValueError(
+                                f"No es posible autorizar. Stock disponible insuficiente en "
+                                f"'{detalle.material.nombre}' para el {almacen_origen.nombre}. "
+                                f"Solicitado: {aprobada} | Disponible: {inv.stock_disponible}"
+                            )
+                        
+                        inv.stock_reservado += aprobada
+                        inv.save()
 
                 solicitud.estado = 'REVISADA'
                 solicitud.aprobado_por = request.user.get_full_name() or request.user.username
@@ -617,22 +648,25 @@ def revisar_solicitud(request, id):
                     usuario=request.user,
                     modulo='Solicitudes',
                     accion='Revisar Solicitud',
-                    descripcion=f'El jefe inmediato revisó y autorizó cantidades para la solicitud {solicitud.codigo}'
+                    descripcion=f'El jefe inmediato revisó, autorizó y reservó stock para la solicitud {solicitud.codigo}'
                 )
 
             messages.success(request, f"Solicitud {solicitud.codigo} revisada y autorizada correctamente.")
             return redirigir_despues_de_accion(request, solicitud)
 
-        except DatabaseError:
-            messages.error(request, "Error al procesar la revisión de la solicitud.")
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirigir_despues_de_accion(request, solicitud)
+        except DatabaseError as e:
+            # Imprime el error real en tu consola del servidor para depuración
+            print(f"DatabaseError real: {str(e)}")
+            messages.error(request, "Error de base de datos al procesar la revisión de la solicitud.")
             return redirigir_despues_de_accion(request, solicitud)
 
     return render(request, 'solicitudes/aprobar.html', {
         'solicitud': solicitud,
         'detalles': detalles
     })
-
-
 @login_required
 @rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR'])
 def validar_saf(request, id):
@@ -821,20 +855,26 @@ def validar_jefatura(request, id):
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def preparar_solicitud(request, id):
+    """
+    Paso 7 (Tarjeta 3 y 5): El Almacenero alista los paquetes físicamente en el depósito [28].
+    Distingue la ruta de preparación inmediata para stock de la ruta de compras/servicios.
+    """
     solicitud = get_object_or_404(Solicitud, id=id)
 
-    # Tarjeta 3: Permitir preparación inmediata para bienes con stock
+    # Tarjeta 3 y 5: Permitir preparación inmediata para bienes con stock
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-        permitido = (solicitud.estado == 'REVISADA')
+        # Se admite REVISADA (flujo simplificado directo) y VALIDADA_JEFATURA (salvavidas de consistencia)
+        permitido = (solicitud.estado in ['REVISADA', 'VALIDADA_JEFATURA'])
         mensaje_error = "Para solicitudes con stock, se requiere primero la autorización del Jefe de Unidad (Estado: Revisada)."
     else:
-        # Requerimientos sin stock o servicios requieren validación hasta la Jefatura
+        # Requerimientos sin stock o servicios requieren validación completa hasta la Jefatura
         permitido = (solicitud.estado == 'VALIDADA_JEFATURA')
-        mensaje_error = "Solo solicitudes validadas administrativamente por Jefatura pueden prepararse."
+        mensaje_error = "Solo solicitudes validadas administrativamente por la Jefatura Administrativa pueden prepararse."
 
     if not permitido:
         messages.error(request, mensaje_error)
         return redirigir_despues_de_accion(request, solicitud)
+
     solicitud.estado = 'PREPARADA'
     solicitud.preparado_por = request.user
     solicitud.fecha_preparado = timezone.now()
@@ -844,7 +884,7 @@ def preparar_solicitud(request, id):
         usuario=request.user,
         modulo='Solicitudes',
         accion='Preparación física',
-        descripcion=f'El almacenero preparó físicamente los materiales de la solicitud {solicitud.codigo}'
+        descripcion=f'El almacenero preparó y empaquetó físicamente los materiales de la solicitud {solicitud.codigo}'
     )
 
     messages.success(request, f"La solicitud {solicitud.codigo} ha sido marcada como PREPARADA para su despacho.")
@@ -853,8 +893,9 @@ def preparar_solicitud(request, id):
 @login_required
 def entregar_solicitud(request, id):
     """
-    Paso 8 (Tarjeta 9 y 21): Entrega física de materiales. 
-    Descuenta stock por PEPS, libera la reserva del POA y consolida la ejecución real.
+    Paso 8 (Tarjeta 9, 12 y 21): Entrega física de materiales. 
+    Descuenta stock por PEPS, genera la Nota de Salida (Egreso físico) 
+    y consolida la ejecución real en el POA.
     """
     if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR']):
         return HttpResponseForbidden("No autorizado.")
@@ -871,12 +912,28 @@ def entregar_solicitud(request, id):
 
     detalles = solicitud.detalles.select_related('material__partida')
 
+    # Importamos los modelos de Notas de Salida para poder instanciarlos
+    from inventario.models import NotaSalida, NotaSalidaDetalle, InventarioAlmacen
+
     try:
         with transaction.atomic():
             solicitud = Solicitud.objects.select_for_update().get(id=id)
             costos_partidas = {}
 
-            # 1. Descontar stock usando PEPS y agrupar costos reales de salida
+            # Tarjeta 12: Generar de forma atómica la cabecera del Egreso Físico (Nota de Salida)
+            ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
+            nro_salida_num = (ultima_salida.id + 1) if ultima_salida else 1
+            nro_nota_salida = f"NS-{nro_salida_num:05d}"
+
+            nota_salida = NotaSalida.objects.create(
+                nro_nota=nro_nota_salida,
+                solicitud_origen=solicitud,
+                unidad_destino=solicitud.unidad_solicitante,
+                fecha=timezone.now().date(),
+                usuario=request.user
+            )
+
+            # Descontar stock usando PEPS y registrar ítems en el documento de salida
             for detalle in detalles:
                 material = Material.objects.get(id=detalle.material.id)
                 cantidad_despacho = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
@@ -885,7 +942,7 @@ def entregar_solicitud(request, id):
                     messages.error(request, f"Inconsistencia: Stock insuficiente en {material.nombre} para despachar la solicitud.")
                     return redirigir_despues_de_accion(request, solicitud)
 
-                # Despacho PEPS
+                # Procesar salida PEPS y registrar movimiento en Kardex (Argumentos Completos)
                 mov = registrar_salida_valorada_peps(
                     material=material,
                     cantidad_salida=cantidad_despacho,
@@ -898,10 +955,30 @@ def entregar_solicitud(request, id):
                 detalle.cantidad_entregada = cantidad_despacho
                 detalle.save()
 
+                # Tarjeta 12: Registrar la salida física del ítem en la Nota de Salida Detallada
+                NotaSalidaDetalle.objects.create(
+                    nota_salida=nota_salida,
+                    material=material,
+                    cantidad=cantidad_despacho,
+                    costo_unitario_real=mov.costo_unitario,  # Costo obtenido por PEPS
+                    costo_total_real=mov.costo_total
+                )
+
+                # Tarjeta 5: Actualizar el inventario físico y liberar la reserva
+                inv = InventarioAlmacen.objects.select_for_update().filter(
+                    material=material,
+                    almacen=solicitud.almacen_origen
+                ).first()
+                
+                if inv:
+                    inv.stock_fisico -= cantidad_despacho     # Sale físicamente de estantería
+                    inv.stock_reservado -= cantidad_despacho  # Se limpia la reserva
+                    inv.save()
+
                 partida = material.partida
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + mov.costo_total
 
-            # 2. Tarjeta 9: Ejecutar presupuesto real y liberar compromisos
+            # Ejecutar presupuesto real y liberar compromisos en el POA
             for partida, costo_real in costos_partidas.items():
                 poa = POA.objects.select_for_update().get(
                     unidad=solicitud.unidad_solicitante,
@@ -915,14 +992,10 @@ def entregar_solicitud(request, id):
                         d.subtotal_referencial for d in detalles if d.partida_afectada == partida
                     )
                     
-                    # - Liberamos la reserva provisional comprometida
                     poa.monto_comprometido -= costo_estimado_partida
-                    # - Registramos la ejecución real de compra/despacho
                     poa.monto_ejecutado += costo_real
-                    # - Ajustamos la diferencia (ahorro o sobreprecio) en el saldo disponible
                     poa.monto_disponible += (costo_estimado_partida - costo_real)
                 else:
-                    # Flujo directo de almacén (No requirió aprobación presupuestaria previa)
                     poa.monto_disponible -= costo_real
                     poa.monto_ejecutado += costo_real
                 
@@ -940,13 +1013,12 @@ def entregar_solicitud(request, id):
                 descripcion=f'Se consolidó el gasto real de la solicitud {solicitud.codigo} en el POA de la unidad.'
             )
 
-        messages.success(request, f"Entrega física procesada y ejecución presupuestaria consolidada de forma correcta.")
+        messages.success(request, f"Entrega física procesada y Nota de Salida {nro_nota_salida} generada con éxito.")
         return redirigir_despues_de_accion(request, solicitud)
 
     except Exception as e:
         messages.error(request, f"Error al procesar el despacho PEPS/POA: {str(e)}")
-        return redirigir_despues_de_accion(request, solicitud)
-
+        return redirigir_despues_de_accion(request, solicitud)    
 @login_required
 def cerrar_solicitud(request, id):
     """
@@ -1136,6 +1208,18 @@ def rechazar_solicitud(request, id):
         try:
             with transaction.atomic():
                 solicitud = Solicitud.objects.select_for_update().get(id=id)
+
+                if solicitud.estado in ['REVISADA', 'PREPARADA'] and solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+                    for detalle in solicitud.detalles.all():
+                        if detalle.material:
+                            inv = InventarioAlmacen.objects.select_for_update().filter(
+                                material=detalle.material,
+                                almacen=solicitud.almacen_origen
+                            ).first()
+                            if inv:
+                                cantidad_reserva = detalle.cantidad_aprobada or detalle.cantidad_solicitada
+                                inv.stock_reservado -= cantidad_reserva
+                                inv.save()
                 
                 # Tarjeta 9: Si la solicitud ya contaba con reserva presupuestaria, liberamos los recursos
                 estados_con_reserva = ['VALIDADA_PRESUPUESTOS', 'VALIDADA_RPA', 'VALIDADA_JEFATURA', 'PREPARADA']
@@ -1490,26 +1574,36 @@ def validar_jefatura(request, id):
         messages.error(request, f"Error al procesar aprobación de la Jefatura: {str(e)}")
 
     return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+# --- EN TU ARCHIVO views.py (Reemplazar retroceder_estado_solicitud) ---
+
 @transaction.atomic
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def retroceder_estado_solicitud(request, id):
     """
     Permite únicamente al Administrador revertir de forma segura el estado de una solicitud 
-    al paso inmediato anterior limpiando las firmas y marcas de tiempo del paso anulado [28].
+    al paso inmediato anterior, adaptando la ruta según el flujo de stock o adquisición [28].
     """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
     estado_actual = solicitud.estado
 
-    # Mapa de retroceso secuencial: (Estado_Anterior, Atributo_Usuario, Atributo_Fecha)
-    map_retroceso = {
-        'REVISADA': ('REGISTRADA', 'revisado_por', 'fecha_revision'),
-        'VALIDADA_SAF': ('REVISADA', 'saf_por', 'fecha_saf'),
-        'VALIDADA_PRESUPUESTOS': ('VALIDADA_SAF', 'presupuestado_por', 'fecha_presupuesto'),
-        'VALIDADA_RPA': ('VALIDADA_PRESUPUESTOS', 'rpa_por', 'fecha_rpa'),
-        'VALIDADA_JEFATURA': ('VALIDADA_RPA', 'jefatura_por', 'fecha_jefatura'),
-        'PREPARADA': ('VALIDADA_JEFATURA', 'preparado_por', 'fecha_preparado'),
-    }
+    # Tarjeta 4: Mapa de retroceso dinámico según el flujo asignado
+    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+        # Flujo simplificado de Almacén (5 Pasos)
+        map_retroceso = {
+            'REVISADA': ('REGISTRADA', 'revisado_por', 'fecha_revision'),
+            'PREPARADA': ('REVISADA', 'preparado_por', 'fecha_preparado'),
+        }
+    else:
+        # Flujo completo del SABS de Adquisiciones y Servicios (8 Pasos)
+        map_retroceso = {
+            'REVISADA': ('REGISTRADA', 'revisado_por', 'fecha_revision'),
+            'VALIDADA_SAF': ('REVISADA', 'saf_por', 'fecha_saf'),
+            'VALIDADA_PRESUPUESTOS': ('VALIDADA_SAF', 'presupuestado_por', 'fecha_presupuesto'),
+            'VALIDADA_RPA': ('VALIDADA_PRESUPUESTOS', 'rpa_por', 'fecha_rpa'),
+            'VALIDADA_JEFATURA': ('VALIDADA_RPA', 'jefatura_por', 'fecha_jefatura'),
+            'PREPARADA': ('VALIDADA_JEFATURA', 'preparado_por', 'fecha_preparado'),
+        }
 
     if estado_actual not in map_retroceso:
         messages.error(
@@ -1523,15 +1617,11 @@ def retroceder_estado_solicitud(request, id):
 
     try:
         with transaction.atomic():
-            # 1. Retroceder el estado del flujo
             solicitud.estado = nuevo_estado
-            
-            # 2. Limpiar las firmas físicas/digitales registradas en el paso anulado
             setattr(solicitud, campo_usuario, None)
             setattr(solicitud, campo_fecha, None)
             solicitud.save()
 
-            # 3. Registrar auditoría en la Bitácora
             Bitacora.objects.create(
                 usuario=request.user,
                 modulo='Solicitudes',
@@ -1548,7 +1638,6 @@ def retroceder_estado_solicitud(request, id):
         messages.error(request, f"Error al procesar la reversión del estado: {str(e)}")
 
     return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
-
 @login_required
 def nuevo_pedido_almacen(request):
     """

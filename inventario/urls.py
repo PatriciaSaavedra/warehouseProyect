@@ -15,8 +15,17 @@ urlpatterns = [
     path('saldo-inicial/<int:id>/', views.establecer_saldo_inicial, name='establecer_saldo_inicial'),
     path('baja/', views.registrar_baja, name='registrar_baja'),
 
-    
+    path('almacenes/', views.almacen_list, name='almacen_list'),
+    path('almacenes/nuevo/', views.crear_almacen, name='crear_almacen'),
+    path('almacenes/editar/<int:id>/', views.editar_almacen, name='editar_almacen'),
+    path('almacenes/toggle/<int:id>/', views.toggle_almacen, name='toggle_almacen'), 
     path('reporte/consumo/', views.reporte_consumo_unidades, name='reporte_consumo_unidades'),
     path('entrada/obtener-items-compra/', views.obtener_items_compra_view, name='obtener_items_compra'),
-
+    path('existencias/', views.inventario_por_almacen, name='inventario_por_almacen'),
+    path('entradas/', views.nota_ingreso_list, name='nota_ingreso_list'), 
+    path('salidas/', views.nota_salida_list, name='nota_salida_list'),   
+    path('unidades/crear-ajax/', views.crear_unidad_medida_ajax, name='crear_unidad_medida_ajax'),
+    path('entradas/detalle/<int:id>/', views.detalle_nota_ingreso, name='detalle_nota_ingreso'),
+    path('salidas/detalle/<int:id>/', views.detalle_nota_salida, name='detalle_nota_salida'),
+    
 ]

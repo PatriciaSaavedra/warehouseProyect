@@ -1,5 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+import json 
+import html
 from django.contrib import messages
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse 
@@ -7,7 +10,6 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.utils.dateparse import parse_date
 import datetime
-
 from auditoria.models import Bitacora
 from organizacion.models import UnidadOrganizacional
 
@@ -19,6 +21,10 @@ from reportlab.lib.pagesizes import letter, landscape
 from usuarios.decorators import rol_requerido
 from .services import registrar_salida_valorada_peps
 
+from django.db.models import Q
+from django.contrib.auth.models import User
+
+
 from .models import (
     Material,
     MovimientoInventario,
@@ -26,7 +32,8 @@ from .models import (
     UnidadMedida,
     Proveedor,
     NotaIngreso,
-    NotaIngresoDetalle
+    NotaIngresoDetalle,Almacen, InventarioAlmacen,
+    
 )
 @login_required
 @rol_requerido([
@@ -47,6 +54,144 @@ def inventario_view(request):
         }
     )
 
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def almacen_list(request):
+    """
+    Tarjeta 2: Muestra la lista de Almacenes (Central y Subalmacenes) de la Gobernación.
+    """
+    query = request.GET.get('q', '').strip()
+    almacenes = Almacen.objects.select_related('unidad_organizacional', 'responsable').all()
+
+    if query:
+        almacenes = almacenes.filter(
+            Q(nombre__icontains=query) |
+            Q(tipo__icontains=query) |
+            Q(unidad_organizacional__nombre__icontains=query) |
+            Q(responsable__username__icontains=query)
+        )
+
+    almacenes = almacenes.order_by('tipo', 'nombre')
+
+    paginator = Paginator(almacenes, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'inventario/almacen_list.html', {
+        'page_obj': page_obj,
+        'query': query
+    })
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def crear_almacen(request):
+    """
+    Tarjeta 2: Registra un nuevo almacén o subalmacén, vinculándolo con su Unidad y Responsable [28].
+    """
+    unidades = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
+    usuarios = User.objects.filter(is_active=True).order_by('username')
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        descripcion = request.POST.get('descripcion', '').strip()
+        tipo = request.POST.get('tipo', 'SUBALMACEN')
+        unidad_id = request.POST.get('unidad_organizacional')
+        responsable_id = request.POST.get('responsable')
+
+        if not nombre or not tipo:
+            messages.error(request, "El Nombre y el Tipo de Almacén son campos obligatorios.")
+            return redirect('crear_almacen')
+
+        if Almacen.objects.filter(nombre=nombre).exists():
+            messages.error(request, f"Ya existe un almacén registrado con el nombre '{nombre}'.")
+            return redirect('crear_almacen')
+
+        unidad = get_object_or_404(UnidadOrganizacional, id=unidad_id) if unidad_id else None
+        responsable = get_object_or_404(User, id=responsable_id) if responsable_id else None
+
+        try:
+            with transaction.atomic():
+                Almacen.objects.create(
+                    nombre=nombre,
+                    descripcion=descripcion,
+                    tipo=tipo,
+                    unidad_organizacional=unidad,
+                    responsable=responsable,
+                    is_active=True
+                )
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Crear Almacén',
+                    descripcion=f'Se creó el almacén "{nombre}" de tipo {tipo} en la base de datos.'
+                )
+            messages.success(request, f"Almacén '{nombre}' registrado correctamente.")
+            return redirect('almacen_list')
+
+        except Exception as e:
+            messages.error(request, f"Error de base de datos al registrar: {str(e)}")
+            return redirect('crear_almacen')
+
+    return render(request, 'inventario/crear_almacen.html', {
+        'unidades': unidades,
+        'usuarios': usuarios
+    })
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def editar_almacen(request, id):
+    """
+    Tarjeta 2: Permite modificar el responsable, la unidad o dar de baja lógica a un almacén [28].
+    """
+    almacen = get_object_or_404(Almacen, id=id)
+    unidades = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
+    usuarios = User.objects.filter(is_active=True).order_by('username')
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        descripcion = request.POST.get('descripcion', '').strip()
+        tipo = request.POST.get('tipo', 'SUBALMACEN')
+        unidad_id = request.POST.get('unidad_organizacional')
+        responsable_id = request.POST.get('responsable')
+        is_active = request.POST.get('is_active') == 'true'
+
+        if not nombre or not tipo:
+            messages.error(request, "El Nombre y el Tipo de Almacén son obligatorios.")
+            return redirect('editar_almacen', id=almacen.id)
+
+        unidad = get_object_or_404(UnidadOrganizacional, id=unidad_id) if unidad_id else None
+        responsable = get_object_or_404(User, id=responsable_id) if responsable_id else None
+
+        try:
+            with transaction.atomic():
+                almacen.nombre = nombre
+                almacen.descripcion = descripcion
+                almacen.tipo = tipo
+                almacen.unidad_organizacional = unidad
+                almacen.responsable = responsable
+                almacen.is_active = is_active
+                almacen.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Editar Almacén',
+                    descripcion=f'Se modificaron los datos del almacén "{nombre}" (ID: {almacen.id})'
+                )
+            messages.success(request, f"Almacén '{nombre}' actualizado correctamente.")
+            return redirect('almacen_list')
+
+        except Exception as e:
+            messages.error(request, f"Error al actualizar el almacén: {str(e)}")
+            return redirect('editar_almacen', id=almacen.id)
+
+    return render(request, 'inventario/editar_almacen.html', {
+        'almacen': almacen,
+        'unidades': unidades,
+        'usuarios': usuarios
+    })
 @login_required
 @rol_requerido([
     'ALMACENERO',
@@ -440,125 +585,139 @@ from compras.models import CompraMenor  # Asegura esta importación
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def entrada_inventario(request):
     """
-    Registra una Nota de Ingreso jalando los datos de la Orden de Compra y actualizando su estado [28].
+    Tarjeta 6 y 7: Registra un documento formal de Nota de Ingreso (Entrada) en un almacén específico.
+    Crea automáticamente el lote de inventario (Movimiento con saldo_disponible_lote) y actualiza el stock.
     """
-    # Obtenemos las Órdenes de Compra pendientes de ingreso de la gestión actual [28]
-    compras_pendientes = CompraMenor.objects.filter(completada=False, gestion=2026).select_related('proveedor', 'partida')
+    perfil = getattr(request.user, 'perfilusuario', None)
+    rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
     
+    # Tarjeta 3: Filtrar selección de almacenes según permisos de usuario
+    if rol == 'ADMINISTRADOR':
+        almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
+    else:
+        almacenes = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
+
     proveedores = Proveedor.objects.all().order_by('razon_social')
-    materiales = Material.objects.all().order_by('codigo')
+    materiales = Material.objects.all().order_by('nombre')
 
     if request.method == 'POST':
-        compra_id = request.POST.get('compra_origen')  # <-- Capturamos la Orden seleccionada
+        nro_nota = request.POST.get('nro_nota', '').strip()
         proveedor_id = request.POST.get('proveedor')
+        almacen_id = request.POST.get('almacen_destino')
         c31 = request.POST.get('c31', '').strip()
         nota_entrega = request.POST.get('nota_entrega', '').strip()
         factura = request.POST.get('factura', '').strip()
-        reingreso = request.POST.get('reingreso') == 'on'
+        reingreso = request.POST.get('reingreso') == 'true'
         fecha = request.POST.get('fecha')
+        payload_raw = request.POST.get('payload')  # JSON con el detalle de materiales
 
-        materiales_ids = request.POST.getlist('material_id[]')
-        cantidades = request.POST.getlist('cantidad[]')
-        precios_unitarios = request.POST.getlist('precio_unitario[]')
-
-        if not proveedor_id or not fecha:
-            messages.error(request, 'El proveedor y la fecha de ingreso son campos obligatorios.')
+        if not nro_nota or not proveedor_id or not almacen_id or not fecha or not payload_raw:
+            messages.error(request, "Los campos con asterisco (*) son obligatorios.")
             return redirect('entrada_inventario')
 
-        if not materiales_ids:
-            messages.error(request, 'Debe registrar al menos un material en el detalle del ingreso.')
+        payload_raw = html.unescape(payload_raw) if hasattr(html, 'unescape') else payload_raw
+        try:
+            payload = json.loads(payload_raw)
+        except json.JSONDecodeError:
+            messages.error(request, "Error en el formato de los datos de entrada.")
+            return redirect('entrada_inventario')
+
+        if not payload:
+            messages.error(request, "Debe agregar al menos un material a la nota de ingreso.")
             return redirect('entrada_inventario')
 
         proveedor = get_object_or_404(Proveedor, id=proveedor_id)
-        compra_origen = None
-        if compra_id:
-            compra_origen = get_object_or_404(CompraMenor, id=compra_id)
+        almacen = get_object_or_404(Almacen, id=almacen_id)
 
-        # Autogenerar nro de nota correlativa automática
-        total_notas = NotaIngreso.objects.count() + 1
-        nro_nota = f"NI-{str(total_notas).zfill(5)}"
+        # Tarjeta 3: Control de acceso al almacén destino
+        if not perfil.tiene_acceso_almacen(almacen):
+            messages.error(request, f"No tiene autorización para registrar ingresos en: {almacen.nombre}")
+            return redirect('entrada_inventario')
+
+        if NotaIngreso.objects.filter(nro_nota=nro_nota).exists():
+            messages.error(request, f"Ya existe una Nota de Ingreso registrada con el nro: {nro_nota}.")
+            return redirect('entrada_inventario')
 
         try:
             with transaction.atomic():
-                # 1. Crear cabecera de la Nota de Ingreso vinculándola a la compra
+                # 1. Crear cabecera de Nota de Ingreso
                 nota = NotaIngreso.objects.create(
                     nro_nota=nro_nota,
                     proveedor=proveedor,
-                    c31=c31 if c31 else None,
-                    nota_entrega=nota_entrega if nota_entrega else None,
-                    factura=factura if factura else None,
+                    almacen_destino=almacen,
+                    c31=c31,
+                    nota_entrega=nota_entrega,
+                    factura=factura,
                     reingreso=reingreso,
                     fecha=fecha,
-                    usuario=request.user,
-                    compra_menor_origen=compra_origen  # <-- GUARDAMOS EL VÍNCULO
+                    usuario=request.user
                 )
 
-                # 2. Si venía de una compra, la marcamos como completada (Ingresada) [28]
-                if compra_origen:
-                    compra_origen.completada = True
-                    compra_origen.save()
+                # 2. Registrar cada material (Detalle + Stock Almacén + Lote PEPS)
+                for item_key, item_data in payload.items():
+                    material = Material.objects.get(id=item_key)
+                    cantidad = int(item_data.get('cantidad', 0))
+                    precio_u = Decimal(str(item_data.get('precio_unitario', '0.00')))
 
-                # 3. Procesar cada material en el lote PEPS
-                for i in range(len(materiales_ids)):
-                    m_id = materiales_ids[i]
-                    cant = int(cantidades[i])
-                    p_uni = Decimal(precios_unitarios[i])
-                    p_tot = cant * p_uni
+                    if cantidad <= 0 or precio_u < 0:
+                        raise ValueError("Las cantidades y precios de los materiales deben ser mayores a cero.")
 
-                    material = get_object_or_404(Material, id=m_id)
-                    stock_anterior = material.stock_actual
+                    precio_total = cantidad * precio_u
 
-                    # Incrementar stock del material
-                    material.stock_actual += cant
-                    material.save()
-
-                    # Registrar detalle
+                    # A. Guardar en NotaIngresoDetalle
                     NotaIngresoDetalle.objects.create(
                         nota_ingreso=nota,
                         material=material,
-                        cantidad=cant,
-                        precio_unitario=p_uni,
-                        precio_total=p_tot
+                        cantidad=cantidad,
+                        precio_unitario=precio_u,
+                        precio_total=precio_total
                     )
 
-                    # Registrar en el Kardex alimentando el saldo disponible PEPS
+                    # B. Obtener o crear stock físico aislado por almacén
+                    inv, created = InventarioAlmacen.objects.get_or_create(
+                        material=material,
+                        almacen=almacen,
+                        defaults={'stock_fisico': 0, 'stock_reservado': 0}
+                    )
+                    
+                    stock_anterior = inv.stock_fisico
+                    inv.stock_fisico += cantidad
+                    inv.save()  # Actualiza stock consolidado global en Material automáticamente
+
+                    # C. Tarjeta 6: Crear el lote de inventario en MovimientoInventario para costeo PEPS
                     MovimientoInventario.objects.create(
                         material=material,
+                        almacen=almacen,
                         tipo='ENTRADA',
-                        cantidad=cant,
-                        saldo_disponible_lote=cant,  # Alimentamos lote PEPS
-                        costo_unitario=p_uni,
-                        costo_total=p_tot,
+                        cantidad=cantidad,
+                        costo_unitario=precio_u,
+                        costo_total=precio_total,
                         stock_anterior=stock_anterior,
-                        stock_resultante=material.stock_actual,
+                        stock_resultante=inv.stock_fisico,
                         referencia=f"NOTA INGRESO NRO {nro_nota}",
-                        usuario=request.user
+                        usuario=request.user,
+                        saldo_disponible_lote=cantidad  # El lote inicia al 100% disponible
                     )
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
-                    accion='Registrar Nota de Ingreso',
-                    descripcion=f'Se registró la Nota de Ingreso {nro_nota} por compra {nro_nota}'
+                    accion='Registrar Entrada',
+                    descripcion=f'Se registró la Nota de Ingreso {nro_nota} en el almacén {almacen.nombre}'
                 )
 
-            messages.success(request, f'Nota de Ingreso {nro_nota} procesada correctamente.')
-            return redirect('inventario')
+            messages.success(request, f"Nota de Ingreso {nro_nota} registrada con éxito en {almacen.nombre}.")
+            return redirect('nota_ingreso_list')
 
         except Exception as e:
-            messages.error(request, f'Error al registrar el ingreso: {str(e)}')
+            messages.error(request, f"Error al procesar el ingreso físico de materiales: {str(e)}")
             return redirect('entrada_inventario')
 
-    return render(
-        request,
-        'inventario/entrada.html',
-        {
-            'compras_pendientes': compras_pendientes,  # <-- ENVIAMOS LAS COMPRAS PENDIENTES
-            'proveedores': proveedores,
-            'materiales': materiales
-        }
-    )
-
+    return render(request, 'inventario/crear_entrada.html', {
+        'almacenes': almacenes,
+        'proveedores': proveedores,
+        'materiales': materiales
+    })
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def salida_inventario(request):
@@ -685,80 +844,123 @@ def registrar_baja(request):
         }
     )
 
+
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def nuevo_material(request):
+    """
+    Tarjeta 4: Registra un nuevo material en el catálogo general.
+    El stock inicial se fija estrictamente en 0 de forma inalterable.
+    """
+    partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
+    unidades = UnidadMedida.objects.all().order_by('nombre')
+
     if request.method == 'POST':
+        partida_id = request.POST.get('partida')
+        codigo = request.POST.get('codigo', '').strip()
         nombre = request.POST.get('nombre', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
         unidad_id = request.POST.get('unidad_medida_fk')
-        partida_id = request.POST.get('partida')
-        stock_minimo = int(request.POST.get('stock_minimo', 5))
+        stock_minimo = request.POST.get('stock_minimo', 5)
 
+        if not codigo or not nombre or not unidad_id:
+            messages.error(request, "Los campos con asterisco (Código, Nombre y Unidad de Medida) son obligatorios.")
+            return redirect('nuevo_material')
+
+        partida = get_object_or_404(PartidaPresupuestaria, id=partida_id) if partida_id else None
         unidad = get_object_or_404(UnidadMedida, id=unidad_id)
-        partida = get_object_or_404(PartidaPresupuestaria, id=partida_id)
 
-        # Validar existencia de duplicados
-        material_existente = Material.objects.filter(
-            partida=partida,
-            nombre__iexact=nombre
-        ).exists()
-
-        if material_existente:
-            return render(
-                request,
-                'inventario/nuevo_material.html',
-                {
-                    'partidas': PartidaPresupuestaria.objects.all(),
-                    'unidades': UnidadMedida.objects.all(),
-                    'error': 'Ya existe un material con ese nombre en esta partida presupuestaria.'
-                }
+        # NUEVO CONTROL LEGAL SABS (Tarjeta 4): Validar que el código inicie con el código de la partida
+        if partida and not codigo.startswith(partida.codigo):
+            messages.error(
+                request, 
+                f"Error de Codificación SABS: El código del material debe comenzar obligatoriamente "
+                f"con el código de su partida presupuestaria ({partida.codigo}). "
+                f"Ejemplo correcto: {partida.codigo}-0001"
             )
+            return redirect('nuevo_material')
 
-        # Generar código correlativo de manera automática
-        materiales_partida = Material.objects.filter(partida=partida).order_by('codigo')
-        if materiales_partida.exists():
-            ultimo_codigo = materiales_partida.last().codigo
-            try:
-                correlativo = int(ultimo_codigo.split('-')[1]) + 1
-            except (ValueError, IndexError):
-                correlativo = 1
-        else:
-            correlativo = 1
+        # 2. NUEVA VALIDACIÓN (Tarjeta 4): Validar que el código no termine en guion y tenga un correlativo
+        if '-' in codigo:
+            prefijo, correlativo = codigo.split('-', 1)
+            if not correlativo.strip():
+                messages.error(
+                    request, 
+                    "Error de Codificación SABS: Debe ingresar un número correlativo o identificador "
+                    "después del guion. Ejemplo correcto: 39100-0001"
+                )
+                return redirect('nuevo_material')
+        # Validación de código único en el sistema
+        if Material.objects.filter(codigo=codigo).exists():
+            messages.error(request, f"Ya existe un material registrado con el código '{codigo}'.")
+            return redirect('nuevo_material')
 
-        codigo = f"{partida.codigo}-{str(correlativo).zfill(4)}"
-
-        # El material se crea estrictamente con stock_actual en 0.
-        with transaction.atomic():
-            material = Material.objects.create(
+        try:
+            # Tarjeta 4: El stock_actual se inicializa estrictamente en 0
+            Material.objects.create(
                 partida=partida,
                 codigo=codigo,
                 nombre=nombre,
                 descripcion=descripcion,
-                unidad_medida=unidad.nombre,
                 unidad_medida_fk=unidad,
-                stock_actual=0,  # Stock inicial en cero
-                stock_minimo=stock_minimo
+                unidad_medida=unidad.nombre,  # Respaldo textual
+                stock_actual=0,
+                stock_minimo=int(stock_minimo)
             )
-            
+
+            # Registrar trazabilidad en la Bitácora (Tarjeta 30)
             Bitacora.objects.create(
                 usuario=request.user,
                 modulo='Inventario',
-                accion='Creación de material',
-                descripcion=f'Se registró el nuevo subartículo: {nombre} ({codigo})'
+                accion='Registrar Material',
+                descripcion=f'Se registró el material {nombre} con el código {codigo} en el catálogo.'
             )
 
-        messages.success(request, f'Material {nombre} registrado correctamente con stock inicial en 0. Proceda a establecer su saldo inicial.')
-        return redirect('inventario')
+            messages.success(request, f"El material '{nombre}' ha sido registrado en el catálogo.")
+            return redirect('inventario_por_almacen')
 
-    return render(
-        request,
-        'inventario/nuevo_material.html',
-        {
-            'partidas': PartidaPresupuestaria.objects.all(),
-            'unidades': UnidadMedida.objects.all()
-        }
-    )
+        except Exception as e:
+            messages.error(request, f"Error al procesar el guardado del material: {str(e)}")
+            return redirect('nuevo_material')
+
+    return render(request, 'inventario/nuevo_material.html', {
+        'partidas': partidas,
+        'unidades': unidades
+    })
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def crear_unidad_medida_ajax(request):
+    """
+    Tarjeta 4: Registra de forma rápida una nueva unidad de medida mediante AJAX,
+    evitando que el catalogador pierda el progreso de su formulario.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            codigo = data.get('codigo', '').strip().upper()
+            nombre = data.get('nombre', '').strip()
+
+            if not codigo or not nombre:
+                return JsonResponse({'ok': False, 'error': 'Código y Nombre son obligatorios.'}, status=400)
+
+            # Validar unicidad del código
+            if UnidadMedida.objects.filter(codigo=codigo).exists():
+                return JsonResponse({'ok': False, 'error': f"El código de unidad '{codigo}' ya existe en el sistema."}, status=400)
+
+            # Crear el registro de forma atómica
+            unidad = UnidadMedida.objects.create(codigo=codigo, nombre=nombre)
+            
+            return JsonResponse({
+                'ok': True,
+                'id': unidad.id,
+                'codigo': unidad.codigo,
+                'nombre': unidad.nombre
+            })
+
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+
+    return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def establecer_saldo_inicial(request, id):
@@ -832,70 +1034,57 @@ def establecer_saldo_inicial(request, id):
             'material': material
         }
     )
-@login_required
-@rol_requerido([
-    'ALMACENERO',
-    'ADMINISTRADOR'
-])
-def editar_material(request, id):
 
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def editar_material(request, id):
+    """
+    Tarjeta 4: Modifica metadatos básicos de catalogación y el stock mínimo (alerta).
+    Protege el inventario impidiendo que el stock real sea alterado manualmente.
+    """
     material = get_object_or_404(Material, id=id)
+    unidades = UnidadMedida.objects.all().order_by('nombre')
 
     if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        descripcion = request.POST.get('descripcion', '').strip()
+        unidad_id = request.POST.get('unidad_medida_fk')
+        stock_minimo = request.POST.get('stock_minimo', 5)
 
-        nombre = request.POST.get('nombre')
-        existe = Material.objects.filter(
-            partida=material.partida,
-            nombre__iexact=nombre
-        ).exclude(
-            id=material.id
-        ).exists()
+        if not nombre or not unidad_id:
+            messages.error(request, "Los campos Nombre y Unidad de Medida son obligatorios.")
+            return redirect('editar_material', id=id)
 
-        if existe:
+        unidad = get_object_or_404(UnidadMedida, id=unidad_id)
 
-            return render(
-                request,
-                'inventario/editar_material.html',
-                {
-                    'material': material,
-                    'unidades': UnidadMedida.objects.all(),
-                    'error': (
-                        'Ya existe un material con ese nombre '
-                        'en esta partida.'
-                    )
-                }
-            )
-        material.nombre = nombre
-        material.descripcion = request.POST.get('descripcion')
+        try:
+            with transaction.atomic():
+                material.nombre = nombre
+                material.descripcion = descripcion
+                material.unidad_medida_fk = unidad
+                material.unidad_medida = unidad.nombre
+                material.stock_minimo = int(stock_minimo)
+                # NO se altera 'stock_actual' en este guardado bajo ninguna condición.
+                material.save()
 
-        unidad_id = request.POST.get(
-            'unidad_medida_fk'
-        )
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Editar Material',
+                    descripcion=f'Se modificaron los datos de catalogación del material {nombre} (Cód: {material.codigo})'
+                )
 
-        unidad = UnidadMedida.objects.get(
-            id=unidad_id
-        )
+            messages.success(request, f"La ficha del material '{nombre}' ha sido actualizada.")
+            return redirect('inventario_por_almacen')
 
-        material.unidad_medida_fk = unidad
+        except Exception as e:
+            messages.error(request, f"Error al actualizar la ficha del material: {str(e)}")
+            return redirect('editar_material', id=id)
 
-        material.unidad_medida = unidad.nombre
-
-        material.stock_minimo = int(
-            request.POST.get('stock_minimo')
-        )
-
-        material.save()
-
-        return redirect('inventario')
-        
-    return render(
-        request,
-        'inventario/editar_material.html',
-        {
-            'material': material,
-            'unidades': UnidadMedida.objects.all()     
-        }
-    )
+    return render(request, 'inventario/editar_material.html', {
+        'material': material,
+        'unidades': unidades
+    })
 @login_required
 @rol_requerido([
     'ADMINISTRADOR'
@@ -1039,3 +1228,192 @@ def obtener_items_compra_view(request):
             })
 
     return JsonResponse(data, safe=False)
+
+@login_required
+def inventario_por_almacen(request):
+    """
+    Tarjeta 5: Consulta de stock consolidado y aislado por Almacén / Subalmacén.
+    Aplica controles de seguridad Multi-almacén según la Tarjeta 3.
+    """
+    perfil = getattr(request.user, 'perfilusuario', None)
+    rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+    
+    # Tarjeta 3: Cargar solo los almacenes que el usuario tiene permitido operar
+    if rol == 'ADMINISTRADOR':
+        almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+    else:
+        almacenes_disponibles = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
+
+    # Capturar parámetros de filtrado
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
+    filtro_sin_stock = request.GET.get('sin_stock', 'false').lower() == 'true'
+    query_busqueda = request.GET.get('q', '').strip()
+
+    almacen_seleccionado = None
+    if filtro_almacen_id:
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
+        
+        # Tarjeta 3: Control estricto de acceso. Si el usuario intenta forzar por URL un almacén no autorizado:
+        if not perfil.tiene_acceso_almacen(almacen_seleccionado):
+            messages.error(request, f"No tiene autorización para auditar el almacén: {almacen_seleccionado.nombre}")
+            return redirect('inventario_por_almacen')
+
+    # Aplicar lógica de filtrado de Tarjeta 5
+    if almacen_seleccionado:
+        # Aislado: Consultar materiales en este almacén específico
+        inventario_query = InventarioAlmacen.objects.filter(almacen=almacen_seleccionado).select_related('material', 'material__partida')
+        
+        if query_busqueda:
+            inventario_query = inventario_query.filter(
+                Q(material__nombre__icontains=query_busqueda) |
+                Q(material__codigo__icontains=query_busqueda)
+            )
+        if filtro_sin_stock:
+            # Tarjeta 5: Identificar materiales sin stock en este almacén
+            inventario_query = inventario_query.filter(stock_disponible=0)
+            
+        inventario_query = inventario_query.order_by('material__nombre')
+    else:
+        # Consolidado: Consultar materiales a nivel global en la Gobernación
+        inventario_query = Material.objects.all().select_related('partida')
+        
+        if query_busqueda:
+            inventario_query = inventario_query.filter(
+                Q(nombre__icontains=query_busqueda) |
+                Q(codigo__icontains=query_busqueda)
+            )
+        if filtro_sin_stock:
+            # Tarjeta 5: Identificar materiales agotados a nivel consolidado
+            inventario_query = inventario_query.filter(stock_actual__lte=0)
+            
+        inventario_query = inventario_query.order_by('nombre')
+
+    paginator = Paginator(inventario_query, 15)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'inventario/stock_list.html', {
+        'page_obj': page_obj,
+        'almacenes_disponibles': almacenes_disponibles,
+        'almacen_seleccionado': almacen_seleccionado,
+        'filtro_almacen_id': filtro_almacen_id,
+        'filtro_sin_stock': filtro_sin_stock,
+        'query_busqueda': query_busqueda,
+        'rol': rol
+    })
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+def nota_ingreso_list(request):
+    """
+    Tarjeta 7: Lista las Notas de Ingreso (Entradas físicas) del almacén.
+    """
+    query = request.GET.get('q', '').strip()
+    notas = NotaIngreso.objects.select_related('proveedor', 'usuario').all()
+
+    if query:
+        notas = notas.filter(
+            Q(nro_nota__icontains=query) |
+            Q(proveedor__razon_social__icontains=query) |
+            Q(factura__icontains=query)
+        )
+
+    notas = notas.order_by('-id')
+
+    paginator = Paginator(notas, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'inventario/entrada_list.html', {
+        'page_obj': page_obj,
+        'query': query
+    })
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+def nota_salida_list(request):
+    """
+    Tarjeta 12: Lista las Notas de Salida / Actas de entrega (Egresos físicos) del almacén.
+    """
+    query = request.GET.get('q', '').strip()
+    # Importamos NotaSalida del mismo archivo para consultas
+    from .models import NotaSalida
+    notas = NotaSalida.objects.select_related('unidad_destino', 'usuario').all()
+
+    if query:
+        notas = notas.filter(
+            Q(nro_nota__icontains=query) |
+            Q(unidad_destino__nombre__icontains=query)
+        )
+
+    notas = notas.order_by('-id')
+
+    paginator = Paginator(notas, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'inventario/salida_list.html', {
+        'page_obj': page_obj,
+        'query': query
+    })
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+def detalle_nota_ingreso(request, id):
+    """
+    Tarjeta 7: Detalle de una Nota de Ingreso (Entrada) con sus respectivos materiales.
+    """
+    nota = get_object_or_404(
+        NotaIngreso.objects.prefetch_related('detalles__material__partida').select_related('proveedor', 'usuario'),
+        id=id
+    )
+    return render(request, 'inventario/detalle_entrada.html', {
+        'nota': nota
+    })
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+def detalle_nota_salida(request, id):
+    """
+    Tarjeta 12: Detalle de una Nota de Salida (Egreso) con su valuación PEPS y enlace de origen.
+    """
+    from .models import NotaSalida
+    nota = get_object_or_404(
+        NotaSalida.objects.prefetch_related('detalles__material__partida').select_related('solicitud_origen', 'unidad_destino', 'usuario'),
+        id=id
+    )
+    return render(request, 'inventario/detalle_salida.html', {
+        'nota': nota
+    })
+# inventario/views.py
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def toggle_almacen(request, id):
+    """
+    Tarjeta 3: Activa o desactiva de manera lógica un Almacén o Subalmacén.
+    """
+    almacen = get_object_or_404(Almacen, id=id)
+    nuevo_estado = not almacen.is_active
+
+    try:
+        with transaction.atomic():
+            almacen.is_active = nuevo_estado
+            almacen.save()
+
+            estado_texto = "ACTIVADO" if nuevo_estado else "DESACTIVADO (DADO DE BAJA)"
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Inventario',
+                accion='Cambiar Estado Almacén',
+                descripcion=f'Se cambió el estado del almacén "{almacen.nombre}" (ID: {id}) a {estado_texto}.'
+            )
+        
+        messages.success(request, f"Almacén '{almacen.nombre}' {'activado' if nuevo_estado else 'desactivado'} correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al cambiar el estado del almacén: {str(e)}")
+
+    return redirect('almacen_list')

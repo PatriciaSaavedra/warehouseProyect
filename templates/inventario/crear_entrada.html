@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %} Registrar Nota de Ingreso {% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Registrar Nota de Ingreso</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Recepción y registro de compras para incrementar stock físico [28].</p>
+        </div>
+        <a href="{% url 'nota_ingreso_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+        </a>
+    </div>
+
+    <!-- FORMULARIO -->
+    <form method="POST" id="form-ingreso" class="card p-8 shadow-sm bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- NRO NOTA DE INGRESO -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Nro. de Nota de Ingreso *</label>
+                <input type="text" name="nro_nota" required placeholder="Ej. NI-00008" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition">
+            </div>
+
+            <!-- PROVEEDOR -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Proveedor *</label>
+                <div class="relative">
+                    <select name="proveedor" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] appearance-none pr-10">
+                        <option value="">-- Seleccionar Proveedor --</option>
+                        {% for p in proveedores %}
+                            <option value="{{ p.id }}">{{ p.razon_social }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <!-- ALMACEN DESTINO (Tarjeta 7) -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Almacén Destino *</label>
+                <div class="relative">
+                    <select name="almacen_destino" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] appearance-none pr-10">
+                        <option value="">-- Seleccionar Almacén --</option>
+                        {% for a in almacenes %}
+                            <option value="{{ a.id }}">{{ a.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <!-- DOCUMENTO C-31 -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Documento C-31 SIGEP</label>
+                <input type="text" name="c31" placeholder="Ej. 10450" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition">
+            </div>
+
+            <!-- FACTURA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Nro. de Factura</label>
+                <input type="text" name="factura" placeholder="Ej. F-12001" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition">
+            </div>
+
+            <!-- FECHA DE RECEPCIÓN -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Fecha de Recepción *</label>
+                <input type="date" name="fecha" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition">
+            </div>
+        </div>
+
+        <!-- AGREGADOR DE MATERIALES (Tarjeta 7) -->
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200 mb-4 font-['Outfit']">Agregar Materiales al Detalle</h3>
+            <div class="grid grid-cols-12 gap-3 items-start">
+                <div class="col-span-12 sm:col-span-6">
+                    <select id="material_select" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:ring-2 focus:ring-[#8b0000] appearance-none pr-10">
+                        <option value="">Seleccionar material del catálogo</option>
+                        {% for m in materiales %}
+                            <option value="{{ m.id }}">{{ m.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-span-6 sm:col-span-2">
+                    <input type="number" id="cantidad_input" min="1" placeholder="Cant." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:ring-2 focus:ring-[#8b0000] transition">
+                </div>
+                <div class="col-span-6 sm:col-span-2">
+                    <input type="number" id="precio_input" min="0" step="0.01" placeholder="P. Unit real" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-xs focus:ring-2 focus:ring-[#8b0000] transition">
+                </div>
+                <div class="col-span-12 sm:col-span-2">
+                    <button type="button" onclick="agregarItem()" class="w-full h-[45px] bg-gray-900 hover:bg-gray-800 text-white rounded-2xl flex items-center justify-center gap-1 transition shadow-sm cursor-pointer">
+                        <span class="material-symbols-outlined text-sm">add_circle</span>
+                        <span class="text-xs font-bold">Añadir</span>
+                    </button>
+                </div>
+            </div>
+            <div id="inputs_ocultos"></div>
+        </div>
+
+        <!-- TABLA DE MATERIALES -->
+        <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-850 text-gray-600 dark:text-gray-300">
+                    <tr>
+                        <th class="p-4 font-bold">Material</th>
+                        <th class="p-4 font-bold text-center w-28">Cantidad</th>
+                        <th class="p-4 font-bold text-center w-32">Precio Unitario (Bs.)</th>
+                        <th class="p-4 font-bold text-center w-32">Precio Total (Bs.)</th>
+                        <th class="p-4 font-bold text-center w-24">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- BOTONES -->
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'nota_ingreso_list' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer font-['Outfit']">
+                <span class="material-symbols-outlined text-[18px]">save</span> Registrar Entrada
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+let carrito = {};
+
+function agregarItem() {
+    const select = document.getElementById('material_select');
+    const cantidadInput = document.getElementById('cantidad_input');
+    const precioInput = document.getElementById('precio_input');
+
+    const id = select.value;
+    const selectedOption = select.options[select.selectedIndex];
+    const cantidad = parseInt(cantidadInput.value);
+    const precioU = parseFloat(precioInput.value);
+
+    if (!id || !selectedOption) {
+        alert("Seleccione un material válido.");
+        return;
+    }
+    if (isNaN(cantidad) || cantidad <= 0) {
+        alert("Ingrese una cantidad válida mayor a 0.");
+        return;
+    }
+    if (isNaN(precioU) || precioU < 0) {
+        alert("Ingrese un precio unitario válido mayor o igual a 0.");
+        return;
+    }
+
+    const nombre = selectedOption.text;
+
+    if (carrito[id]) {
+        carrito[id].cantidad += cantidad;
+        carrito[id].precio_unitario = precioU;
+    } else {
+        carrito[id] = {
+            nombre: nombre,
+            cantidad: cantidad,
+            precio_unitario: precioU
+        };
+    }
+
+    renderTabla();
+    renderInputs();
+    
+    select.value = '';
+    cantidadInput.value = '';
+    precioInput.value = '';
+}
+
+function renderTabla() {
+    const tabla = document.getElementById('tabla_materiales');
+    tabla.innerHTML = '';
+
+    const keys = Object.keys(carrito);
+    if (keys.length === 0) {
+        tabla.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-8 text-center text-gray-400 bg-transparent">
+                    Añada materiales desde el panel superior.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    keys.forEach(id => {
+        const item = carrito[id];
+        const total = item.cantidad * item.precio_unitario;
+        tabla.innerHTML += `
+            <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition text-gray-700 dark:text-gray-300">
+                <td class="p-4 font-semibold">${item.nombre}</td>
+                <td class="p-4 text-center font-bold">${item.cantidad}</td>
+                <td class="p-4 text-center font-mono">${item.precio_unitario.toFixed(2)}</td>
+                <td class="p-4 text-right font-mono pr-8 font-bold">Bs. ${total.toFixed(2)}</td>
+                <td class="p-4 text-center">
+                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 font-medium transition">Eliminar</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function eliminar(id) {
+    delete carrito[id];
+    renderTabla();
+    renderInputs();
+}
+
+function renderInputs() {
+    const contenedor = document.getElementById('inputs_ocultos');
+    const payload = {};
+
+    Object.keys(carrito).forEach(id => {
+        payload[id] = {
+            cantidad: carrito[id].cantidad,
+            precio_unitario: carrito[id].precio_unitario
+        };
+    });
+
+    contenedor.innerHTML = `
+        <input type="hidden" name="payload" value='${JSON.stringify(payload)}'>
+    `;
+}
+</script>
+{% endblock %}

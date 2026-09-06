@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %} Control de Existencias e Inventario {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 px-4 py-2">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-['Outfit'] tracking-tight">
+                Inventario y Existencias
+            </h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Consulta física de saldos y stock por Almacén y Subalmacenes.
+            </p>
+        </div>
+        
+        <!-- Botón de acción principal visible solo para roles autorizados -->
+        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+            <div class="flex gap-2 w-full lg:w-auto self-start lg:self-center">
+                <a 
+                    href="{% url 'nuevo_material' %}" 
+                    class="bg-[#8b0000] hover:bg-[#720000] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap active:scale-98 font-['Outfit']"
+                >
+                    <span class="material-symbols-outlined text-[20px]">add_box</span> 
+                    Registrar Material
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- PANEL DE BÚSQUEDA Y FILTRADO -->
+    <form method="GET" class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end transition-all duration-300">
+        
+        <!-- Buscador por texto -->
+        <div>
+            <label class="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-2 font-['Outfit'] uppercase tracking-wider">Buscar Material</label>
+            <input 
+                type="text" 
+                name="q" 
+                value="{{ query_busqueda }}" 
+                placeholder="Ej. Papel, lapicero..." 
+                class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 h-[46px]"
+            >
+        </div>
+
+        <!-- Filtrar por Almacén Autorizado -->
+        <div>
+            <label class="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-2 font-['Outfit'] uppercase tracking-wider">Seleccionar Almacén</label>
+            <div class="relative">
+                <select 
+                    name="almacen" 
+                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 appearance-none pr-10 cursor-pointer h-[46px]"
+                >
+                    <option value="">-- Existencia Consolidada Global --</option>
+                    {% for alm in almacenes_disponibles %}
+                        <option value="{{ alm.id }}" {% if filtro_almacen_id == alm.id|stringformat:"i" %}selected{% endif %}>{{ alm.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[20px]">keyboard_arrow_down</span>
+            </div>
+        </div>
+
+        <!-- Checkbox de materiales sin stock -->
+        <div class="flex items-center h-[46px]">
+            <label class="inline-flex items-center cursor-pointer text-xs font-bold text-slate-600 dark:text-slate-400 font-['Outfit'] uppercase tracking-wider select-none">
+                <input 
+                    type="checkbox" 
+                    name="sin_stock" 
+                    value="true" 
+                    {% if filtro_sin_stock %}checked{% endif %} 
+                    class="rounded border-slate-300 dark:border-slate-700 text-[#8b0000] focus:ring-red-500/30 mr-2.5 w-4 h-4 cursor-pointer accent-[#8b0000]"
+                >
+                Mostrar solo agotados
+            </label>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex gap-2">
+            <button 
+                type="submit" 
+                class="bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white px-5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 flex-1 h-[46px] cursor-pointer font-['Outfit'] active:scale-98"
+            >
+                <span class="material-symbols-outlined text-[18px]">search</span> 
+                Consultar Stock
+            </button>
+            <a 
+                href="{% url 'inventario_por_almacen' %}" 
+                class="border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all duration-200 h-[46px] active:scale-98" 
+                title="Limpiar Filtros"
+            >
+                <span class="material-symbols-outlined text-[18px]">restart_alt</span>
+            </a>
+        </div>
+    </form>
+
+    <!-- LISTADO DE MATERIALES -->
+    <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl shadow-sm overflow-hidden transition-all duration-300">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1050px] border-collapse text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20">
+                        <th class="px-6 py-4 w-40 whitespace-nowrap">Código</th>
+                        <th class="px-6 py-4">Descripción del Material</th>
+                        <th class="px-6 py-4 w-52">Partida</th>
+                        <th class="px-6 py-4 w-56">Ubicación / Almacén</th>
+                        <th class="px-6 py-4 text-center w-36">Stock Disponible</th>
+                        <th class="px-6 py-4 text-center w-36">Estado Stock</th>
+                        <!-- Cabecera de acciones exclusiva para roles autorizados -->
+                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                            <th class="px-6 py-4 text-right pr-8 w-32">Acciones</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80 align-middle">
+                    {% for item in page_obj %}
+                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors text-slate-700 dark:text-slate-300">
+                        
+                        <!-- CASO A: Si es consulta de Almacén Aislada (InventarioAlmacen) -->
+                        {% if almacen_seleccionado %}
+                            <td class="px-6 py-5 whitespace-nowrap">
+                                <span class="font-mono text-xs font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-lg tracking-wider">
+                                    {{ item.material.codigo }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="font-semibold text-slate-800 dark:text-slate-200 leading-snug">{{ item.material.nombre }}</div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <span class="text-xs text-slate-500 dark:text-slate-400 block max-w-xs leading-relaxed" title="{{ item.material.partida.codigo }} - {{ item.material.partida.nombre }}">
+                                    {{ item.material.partida.codigo }} - {{ item.material.partida.nombre }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 whitespace-nowrap">
+                                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 inline-flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500">store</span>
+                                    {{ item.almacen.nombre }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 text-center font-bold text-base font-mono text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                                {{ item.stock_disponible }}
+                            </td>
+                            <td class="px-6 py-5 text-center whitespace-nowrap">
+                                {% if item.stock_disponible <= 0 %}
+                                    <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30">Agotado</span>
+                                {% elif item.stock_disponible <= item.material.stock_minimo %}
+                                    <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30">Stock Bajo</span>
+                                {% else %}
+                                    <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">Normal</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Acciones de edición en fila aislada -->
+                            {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                            <td class="px-6 py-5 whitespace-nowrap text-sm text-right pr-8">
+                                <div class="flex justify-end items-center gap-2">
+                                    <a href="{% url 'editar_material' item.material.id %}" class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/20 inline-flex items-center justify-center transition-colors text-amber-600 dark:text-amber-500" title="Editar Ficha de Material">
+                                        <span class="material-symbols-outlined text-[18px]">edit</span>
+                                    </a>
+                                    <a href="{% url 'eliminar_material' item.material.id %}" class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/20 inline-flex items-center justify-center transition-colors text-rose-600 dark:text-rose-400" title="Eliminar del Catálogo" onclick="return confirm('¿Confirma que desea eliminar este material del catálogo?')">
+                                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                                    </a>
+                                </div>
+                            </td>
+                            {% endif %}
+                            
+                        <!-- CASO B: Si es consulta Consolidada (Materiales) -->
+                        {% else %}
+                            <td class="px-6 py-5 whitespace-nowrap">
+                                <span class="font-mono text-xs font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-lg tracking-wider">
+                                    {{ item.codigo }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="font-semibold text-slate-800 dark:text-slate-200 leading-snug">{{ item.nombre }}</div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <span class="text-xs text-slate-500 dark:text-slate-400 block max-w-xs leading-relaxed" title="{{ item.partida.codigo }} - {{ item.partida.nombre }}">
+                                    {{ item.partida.codigo }} - {{ item.partida.nombre }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 whitespace-nowrap">
+                                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 inline-flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500">inventory_2</span>
+                                    Consolidado (Todos)
+                                </span>
+                            </td>
+                            <td class="px-6 py-5 text-center font-bold text-base font-mono text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                                {{ item.stock_actual }}
+                            </td>
+                            <td class="px-6 py-5 text-center whitespace-nowrap">
+                                {% if item.stock_actual <= 0 %}
+                                    <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30">Agotado</span>
+                                {% elif item.stock_actual <= item.stock_minimo %}
+                                    <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30">Stock Bajo</span>
+                                {% else %}
+                                    <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">Normal</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Acciones de edición en fila consolidada -->
+                            {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                            <td class="px-6 py-5 whitespace-nowrap text-sm text-right pr-8">
+                                <div class="flex justify-end items-center gap-2">
+                                    <a href="{% url 'editar_material' item.id %}" class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/20 inline-flex items-center justify-center transition-colors text-amber-600 dark:text-amber-500" title="Editar Ficha de Material">
+                                        <span class="material-symbols-outlined text-[18px]">edit</span>
+                                    </a>
+                                    <a href="{% url 'eliminar_material' item.id %}" class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/20 inline-flex items-center justify-center transition-colors text-rose-600 dark:text-rose-400" title="Eliminar del Catálogo" onclick="return confirm('¿Confirma que desea eliminar este material del catálogo?')">
+                                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                                    </a>
+                                </div>
+                            </td>
+                            {% endif %}
+                        {% endif %}
+
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-16 text-center text-slate-400 dark:text-slate-500 font-['Outfit']">
+                            <div class="flex flex-col items-center justify-center space-y-2">
+                                <span class="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-700">inventory_2</span>
+                                <p class="text-sm">No se registran materiales con existencias para el almacén y filtros seleccionados.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

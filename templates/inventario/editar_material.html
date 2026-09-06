@@ -6,7 +6,7 @@ Editar Material
 
 {% block content %}
 
-<div class="max-w-4xl mx-auto">
+<div class="max-w-4xl mx-auto relative">
 
     <!-- CABECERA -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -15,7 +15,7 @@ Editar Material
                 Editar Material
             </h1>
             <p class="text-sm text-gray-500 mt-1">
-                Modifica la información básica y el stock mínimo del material seleccionado
+                Modifica la información básica del material seleccionado en el catálogo
             </p>
         </div>
         
@@ -95,16 +95,16 @@ Editar Material
             >{{ material.descripcion }}</textarea>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-
-            <!-- UNIDAD DE MEDIDA -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Unidad de Medida <span class="text-[#8b0000]">*</span>
-                </label>
-                <div class="relative">
+        <!-- UNIDAD DE MEDIDA CON ACCESO DIRECTO (+) -->
+        <div class="mt-6">
+            <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
+                Unidad de Medida <span class="text-[#8b0000]">*</span>
+            </label>
+            <div class="flex gap-2">
+                <div class="relative flex-1">
                     <select
                         name="unidad_medida_fk"
+                        id="unidad_medida_select"
                         class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
                         required
                     >
@@ -123,24 +123,16 @@ Editar Material
                         keyboard_arrow_down
                     </span>
                 </div>
-            </div>
-
-            <!-- STOCK MINIMO -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Stock Mínimo <span class="text-[#8b0000]">*</span>
-                </label>
-                <input
-                    type="number"
-                    name="stock_minimo"
-                    value="{{ material.stock_minimo }}"
-                    min="0"
-                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
-                    placeholder="0"
-                    required
+                <!-- Botón '+' para abrir el mini-formulario flotante (Modal) -->
+                <button 
+                    type="button" 
+                    onclick="abrirModalUnidad()"
+                    class="w-12 h-[48px] bg-gray-900 hover:bg-gray-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl flex items-center justify-center transition shadow-sm hover:shadow active:scale-95 cursor-pointer"
+                    title="Crear nueva Unidad de Medida de forma rápida"
                 >
+                    <span class="material-symbols-outlined text-[20px]">add</span>
+                </button>
             </div>
-
         </div>
 
         <!-- ACCIONES -->
@@ -167,6 +159,98 @@ Editar Material
 
     </form>
 
+    <!-- ========================================================================= -->
+    <!-- MINI FORMULARIO FLOTANTE (MODAL AJAX NATIVO EN TAILWIND) -->
+    <!-- ========================================================================= -->
+    <div id="modal_unidad" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-xs hidden transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 w-[420px] p-8 rounded-3xl shadow-xl space-y-6">
+            <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-4">
+                <span class="material-symbols-outlined text-[#8b0000] dark:text-red-500">add_box</span>
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 font-['Outfit']">Nueva Unidad de Medida</h3>
+            </div>
+
+            <!-- Mensaje de Error Interno del Modal -->
+            <div id="error_modal" class="p-3 rounded-xl text-xs bg-red-50 text-red-700 border border-red-200 hidden"></div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block mb-2 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Código / Sigla *</label>
+                    <input type="text" id="modal_codigo" placeholder="Ej. KGR o RLO" max_length="10" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition font-mono uppercase">
+                </div>
+                <div>
+                    <label class="block mb-2 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Nombre Completo *</label>
+                    <input type="text" id="modal_nombre" placeholder="Ej. Kilogramo o Rollo" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <button type="button" onclick="cerrarModalUnidad()" class="border border-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl text-xs font-semibold transition">Cancelar</button>
+                <button type="button" onclick="guardarUnidadMedida()" class="bg-gray-900 hover:bg-gray-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">Guardar Unidad</button>
+            </div>
+        </div>
+    </div>
+
 </div>
+
+<!-- SCRIPT AJAX PARA GUARDADO DINÁMICO DE UNIDADES -->
+<script>
+function abrirModalUnidad() {
+    const modal = document.getElementById('modal_unidad');
+    const errDiv = document.getElementById('error_modal');
+    errDiv.classList.add('hidden');
+    errDiv.textContent = '';
+    document.getElementById('modal_codigo').value = '';
+    document.getElementById('modal_nombre').value = '';
+    modal.classList.remove('hidden');
+}
+
+function cerrarModalUnidad() {
+    document.getElementById('modal_unidad').classList.add('hidden');
+}
+
+function guardarUnidadMedida() {
+    const codigo = document.getElementById('modal_codigo').value.trim();
+    const nombre = document.getElementById('modal_nombre').value.trim();
+    const errDiv = document.getElementById('error_modal');
+
+    if (!codigo || !nombre) {
+        errDiv.textContent = "El Código y el Nombre son requeridos.";
+        errDiv.classList.remove('hidden');
+        return;
+    }
+
+    fetch("{% url 'crear_unidad_medida_ajax' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            codigo: codigo,
+            nombre: nombre
+        })
+    })
+    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(res => {
+        if (res.status === 200 && res.body.ok) {
+            const select = document.getElementById('unidad_medida_select');
+            const option = document.createElement('option');
+            option.value = res.body.id;
+            option.textContent = `${res.body.codigo} - ${res.body.nombre}`;
+            select.appendChild(option);
+
+            select.value = res.body.id; // Deja seleccionada la nueva unidad [28]
+            cerrarModalUnidad();
+        } else {
+            errDiv.textContent = res.body.error || "Hubo un error al registrar la unidad.";
+            errDiv.classList.remove('hidden');
+        }
+    })
+    .catch(err => {
+        errDiv.textContent = "Error de red al procesar el guardado.";
+        errDiv.classList.remove('hidden');
+    });
+}
+</script>
 
 {% endblock %}

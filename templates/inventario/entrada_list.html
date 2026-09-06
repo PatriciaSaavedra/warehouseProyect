@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %} Notas de Ingreso (Entradas) {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 px-4 py-2">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-['Outfit'] tracking-tight">Notas de Ingreso (Entradas)</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Historial y registro físico de bienes adquiridos o reingresos de la Gobernación.</p>
+        </div>
+        <div class="flex gap-2 w-full lg:w-auto self-start lg:self-center">
+            <a 
+                href="{% url 'entrada_inventario' %}" 
+                class="bg-[#8b0000] hover:bg-[#720000] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap active:scale-98 font-['Outfit']"
+            >
+                <span class="material-symbols-outlined text-[20px]">add_box</span> 
+                Registrar Entrada
+            </a>
+        </div>
+    </div>
+
+    <!-- BUSCADOR -->
+    <form method="GET" class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row gap-3 max-w-xl items-end transition-all duration-300">
+        <div class="flex-1 w-full">
+            <label class="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-2 font-['Outfit'] uppercase tracking-wider">Buscar Nota de Ingreso</label>
+            <input 
+                type="text" 
+                name="q" 
+                value="{{ query|default:'' }}" 
+                placeholder="Buscar por Nro. Nota, Proveedor..." 
+                class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 h-[46px]"
+            >
+        </div>
+        <button 
+            type="submit" 
+            class="bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center h-[46px] px-5 shadow-sm cursor-pointer active:scale-98 w-full sm:w-auto"
+        >
+            <span class="material-symbols-outlined text-[18px]">search</span>
+        </button>
+    </form>
+
+    <!-- TABLA -->
+    <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl shadow-sm overflow-hidden transition-all duration-300">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[950px] border-collapse text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20">
+                        <th class="px-6 py-4 w-44">Nro. Nota</th>
+                        <th class="px-6 py-4">Proveedor</th>
+                        <th class="px-6 py-4 w-36">Doc. C-31</th>
+                        <th class="px-6 py-4 w-36 text-center">Tipo de Registro</th>
+                        <th class="px-6 py-4 w-40">Fecha Ingreso</th>
+                        <th class="px-6 py-4 w-40">Registrado Por</th>
+                        <th class="px-6 py-4 text-right pr-8 w-24">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80 align-middle">
+                    {% for nota in page_obj %}
+                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors text-slate-700 dark:text-slate-300">
+                        
+                        <!-- Nro. Nota -->
+                        <td class="px-6 py-5 whitespace-nowrap">
+                            <span class="font-mono text-xs font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-lg tracking-wider">
+                                {{ nota.nro_nota }}
+                            </span>
+                        </td>
+                        
+                        <!-- Proveedor -->
+                        <td class="px-6 py-5">
+                            <div class="font-semibold text-slate-800 dark:text-slate-200 leading-snug">
+                                {{ nota.proveedor.razon_social }}
+                            </div>
+                        </td>
+                        
+                        <!-- Doc. C-31 -->
+                        <td class="px-6 py-5 whitespace-nowrap">
+                            {% if nota.c31 %}
+                                <span class="font-mono text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 px-2 py-1 rounded">
+                                    {{ nota.c31 }}
+                                </span>
+                            {% else %}
+                                <span class="text-slate-300 dark:text-slate-700">—</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Reingreso Badge -->
+                        <td class="px-6 py-5 text-center whitespace-nowrap">
+                            {% if nota.reingreso %}
+                                <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30">Reingreso</span>
+                            {% else %}
+                                <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">Adquisición</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Fecha Ingreso -->
+                        <td class="px-6 py-5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                            {{ nota.fecha|date:"d M Y" }}
+                        </td>
+                        
+                        <!-- Registrado Por -->
+                        <td class="px-6 py-5 whitespace-nowrap">
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 px-2.5 py-1 rounded">
+                                @{{ nota.usuario.username }}
+                            </span>
+                        </td>
+                        
+                        <!-- Acciones (Ubicada de forma correcta dentro de la fila) -->
+                        <td class="px-6 py-5 whitespace-nowrap text-sm text-right pr-8">
+                            <div class="flex justify-end items-center gap-2">
+                                <a href="{% url 'detalle_nota_ingreso' nota.id %}" class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 inline-flex items-center justify-center transition-colors text-slate-600 dark:text-slate-400" title="Ver Detalle de Materiales">
+                                    <span class="material-symbols-outlined text-[18px]">visibility</span>
+                                </a>
+                            </div>
+                        </td>
+                        
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-16 text-center text-slate-400 dark:text-slate-500 font-['Outfit']">
+                            <div class="flex flex-col items-center justify-center space-y-2">
+                                <span class="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-700">receipt_long</span>
+                                <p class="text-sm">No se registran notas de ingreso con los filtros de búsqueda aplicados.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

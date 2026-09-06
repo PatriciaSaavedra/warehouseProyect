@@ -6,33 +6,19 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6">
 
     <!-- CABECERA -->
-    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
+<!-- CABECERA LIMPIA Y ENFOCADA (Sin botones redundantes) -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit'] tracking-tight">
-                Usuarios
-            </h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Administración de cuentas y asignación de roles en la Gobernación.
-            </p>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Usuarios</h1>
+            <p class="text-sm text-gray-500 mt-1">Administración de cuentas y asignación de roles en la Gobernación.</p>
         </div>
-
-        <div class="flex flex-wrap items-center gap-3">
-            <!-- Gestión de Secretarías -->
-            <a href="{% url 'secretarias_list' %}" class="inline-flex items-center gap-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">account_balance</span> 
-                Gestionar Secretarías
-            </a>
-            
-            <!-- Gestión de Unidades -->
-            <a href="{% url 'unidades_list' %}" class="inline-flex items-center gap-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">domain</span> 
-                Gestionar Unidades
-            </a>
-            
-            <!-- Crear Usuario -->
-            <a href="{% url 'crear_usuario' %}" class="bg-[#8b0000] hover:bg-[#700000] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition flex items-center gap-2 cursor-pointer">
-                <span class="material-symbols-outlined text-[18px]">person_add</span> 
-                Nuevo Usuario
+        <div class="flex gap-2 w-full sm:w-auto self-start sm:self-center">
+            <!-- Único botón necesario en esta vista -->
+            <a 
+                href="{% url 'crear_usuario' %}"  {# Reemplaza con el nombre de tu URL para crear usuario si es distinto #}
+                class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap self-start sm:self-center"
+            >
+                <span class="material-symbols-outlined text-[18px]">add</span> Nuevo Usuario
             </a>
         </div>
     </div>

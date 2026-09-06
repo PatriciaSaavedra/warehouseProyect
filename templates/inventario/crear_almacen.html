@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %} Registrar Almacén o Seccional {% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Crear Almacén</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Registrar un nuevo depósito central o subalmacén para sucursales seccionales</p>
+        </div>
+        <a href="{% url 'almacen_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="p-4 rounded-2xl text-sm border bg-red-50 text-red-700 border-red-200 mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- FORMULARIO -->
+    <form method="POST" class="card p-8 shadow-sm bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- NOMBRE -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Nombre del Almacén <span class="text-[#8b0000]">*</span></label>
+                <input type="text" name="nombre" required placeholder="Ej. Subalmacén de Salud Seccional" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition">
+            </div>
+
+            <!-- TIPO DE ALMACÉN -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Tipo de Almacén <span class="text-[#8b0000]">*</span></label>
+                <div class="relative">
+                    <select name="tipo" id="id_tipo" required onchange="toggleUnidadOrganizacional()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
+                        <option value="SUBALMACEN" selected>Subalmacén / Seccional</option>
+                        <option value="CENTRAL">Almacén Central</option>
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <!-- UNIDAD ORGANIZACIONAL (Sólo obligatoria para Subalmacenes) -->
+            <div id="div_unidad">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Unidad Organizacional Asociada</label>
+                <div class="relative">
+                    <select name="unidad_organizacional" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
+                        <option value="">-- Seleccionar Unidad (Opcional) --</option>
+                        {% for u in unidades %}
+                            <option value="{{ u.id }}">{{ u.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <!-- RESPONSABLE -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Usuario Responsable</label>
+                <div class="relative">
+                    <select name="responsable" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
+                        <option value="">-- Seleccionar Encargado (Opcional) --</option>
+                        {% for user in usuarios %}
+                            <option value="{{ user.id }}">@{{ user.username }} - {{ user.get_full_name|default:"" }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
+            <!-- DESCRIPCION -->
+            <div class="md:col-span-2">
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Descripción / Detalles de Resguardo</label>
+                <textarea name="descripcion" rows="3" placeholder="Ubicación física, dependencias o especificaciones adicionales del almacén..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition"></textarea>
+            </div>
+        </div>
+
+        <!-- BOTONES -->
+        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'almacen_list' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer font-['Outfit']">
+                <span class="material-symbols-outlined text-[18px]">save</span> Guardar Almacén
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function toggleUnidadOrganizacional() {
+    const tipo = document.getElementById('id_tipo').value;
+    const divUnidad = document.getElementById('div_unidad');
+    if (tipo === 'CENTRAL') {
+        divUnidad.classList.add('hidden'); // El almacén central es global
+    } else {
+        divUnidad.classList.remove('hidden');
+    }
+}
+</script>
+{% endblock %}
