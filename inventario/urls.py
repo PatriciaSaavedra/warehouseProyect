@@ -8,7 +8,7 @@ urlpatterns = [
     path('entrada/', views.entrada_inventario, name='entrada_inventario'),
     path('nuevo/', views.nuevo_material, name='nuevo_material'),
     path('editar/<int:id>/', views.editar_material, name='editar_material'),
-    path('eliminar/<int:id>/', views.eliminar_material, name='eliminar_material'),
+    path('toggle-material/<int:id>/', views.toggle_material, name='toggle_material'),
     path('reporte/pdf/', views.reporte_inventario, name='reporte_inventario'),
     path('kardex/pdf/<int:id>/', views.kardex_pdf, name='kardex_pdf'),
     path('salida/', views.salida_inventario, name='salida_inventario'),
@@ -27,5 +27,13 @@ urlpatterns = [
     path('unidades/crear-ajax/', views.crear_unidad_medida_ajax, name='crear_unidad_medida_ajax'),
     path('entradas/detalle/<int:id>/', views.detalle_nota_ingreso, name='detalle_nota_ingreso'),
     path('salidas/detalle/<int:id>/', views.detalle_nota_salida, name='detalle_nota_salida'),
-    
+    path('lotes/', views.lotes_list, name='lotes_list'),
+    path('entradas/pdf/<int:id>/', views.nota_recepcion_pdf, name='nota_recepcion_pdf'),       
+    path('kardex/fisico/pdf/<int:id>/', views.kardex_fisico_pdf, name='kardex_fisico_pdf'),   
+    path('reporte/inventario/pdf/', views.reporte_inventario_oficial_pdf, name='reporte_inventario_oficial_pdf'),
+    path('transferencias/', views.transferencia_list, name='transferencia_list'),
+    path('transferencias/enviar/', views.enviar_transferencia, name='enviar_transferencia'),
+    path('transferencias/<int:id>/recibir/', views.recibir_transferencia, name='recibir_transferencia'),
+    path('kardex/<int:id>/', views.kardex, name='kardex'),  
+    path('gestion/cierre/', views.cierre_conciliacion_view, name='cierre_conciliacion'),
 ]

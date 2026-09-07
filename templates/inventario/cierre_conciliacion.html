@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Cierre de Gestión y Conciliación{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+    <div class="mb-6">
+        <a href="{% url 'inventario_por_almacen' %}" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center gap-1 transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Volver a existencias
+        </a>
+    </div>
+
+    <!-- Encabezado -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            Conciliación Física y Cierre Anual
+        </h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Gestión Fiscal de Cierre: <strong>{{ gestion_actual }}</strong> &nbsp;|&nbsp; Gestión de Apertura: <strong>2027</strong>
+        </p>
+    </div>
+
+    <!-- Filtro de Selección de Almacén -->
+    <div class="card p-6 mb-8 text-sm">
+        <form method="GET" class="flex items-end gap-4">
+            <div class="flex-1">
+                <label class="block font-semibold text-gray-750 dark:text-gray-300 mb-2">Seleccione Almacén a Conciliar</label>
+                <select name="almacen" class="w-full" onchange="this.form.submit();">
+                    <option value="">-- Seleccione un Almacén --</option>
+                    {% for alm in almacenes %}
+                    <option value="{{ alm.id }}" {% if filtro_almacen_id == alm.id|stringformat:"i" %}selected{% endif %}>{{ alm.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Formulario de Conciliación Física (Tabla) -->
+    {% if almacen_seleccionado %}
+    <form method="POST" action="{% url 'cierre_conciliacion' %}">
+        {% csrf_token %}
+        <input type="hidden" name="almacen_id" value="{{ almacen_seleccionado.id }}">
+        <input type="hidden" name="gestion_cierre" value="{{ gestion_actual }}">
+
+        <div class="card overflow-hidden mb-6">
+            <div class="p-6 border-b border-gray-100 dark:border-gray-800">
+                <h3 class="text-md font-bold text-gray-900 dark:text-white">Planilla de Ajustes de Inventario: {{ almacen_seleccionado.nombre }}</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 text-left">Código SABS</th>
+                            <th class="px-6 py-3 text-left">Descripción del Material</th>
+                            <th class="px-6 py-3 text-center">Stock en Sistema</th>
+                            <th class="px-6 py-3 text-center w-48">Conteo Físico Real *</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                        {% for item in inventario %}
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/40 transition">
+                            <td class="px-6 py-4 font-mono font-semibold">{{ item.material.codigo }}</td>
+                            <td class="px-6 py-4 font-bold text-gray-900 dark:text-white">{{ item.material.nombre }}</td>
+                            <td class="px-6 py-4 text-center font-semibold">{{ item.stock_fisico }} unidades</td>
+                            <td class="px-6 py-4 text-center">
+                                <input type="number" name="real_{{ item.id }}" min="0" placeholder="Ingrese Conteo" class="w-full text-center" required>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-12 text-center text-gray-400">No hay materiales con stock físico registrado en este almacén.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if inventario %}
+        <div class="flex justify-end gap-3">
+            <a href="{% url 'inventario_por_almacen' %}" class="px-5 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl hover:bg-gray-100 dark:hover:bg-slate-900 transition font-semibold">Cancelar</a>
+            <button type="submit" class="btn-primary px-5 py-2.5 rounded-2xl font-bold cursor-pointer" onclick="return confirm('ATENCIÓN: Al procesar, el sistema registrará los ajustes correspondientes en el Kardex y generará automáticamente la apertura de la Gestión 2027. ¿Confirma realizar el cierre?');">
+                Procesar Conciliación y Cierre de Gestión {{ GESTION_ACTUAL }}
+            </button>
+        </div>
+        {% endif %}
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

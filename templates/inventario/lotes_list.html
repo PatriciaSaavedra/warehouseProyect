@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Encabezado de Página -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight font-['Outfit'] text-[var(--text-heading)]">
+                Monitoreo de Lotes Activos (PEPS)
+            </h1>
+            <p class="text-sm mt-1 text-[var(--text-muted)]">
+                Control y valuación de capas de stock con saldo disponible en la Gobernación.
+            </p>
+        </div>
+    </div>
+
+    <!-- Filtros y Búsqueda -->
+    <div class="card p-6 shadow-sm">
+        <form method="GET" action="{% url 'lotes_list' %}" class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <!-- Almacén -->
+            <div class="md:col-span-4">
+                <label for="almacen" class="block text-xs font-semibold uppercase tracking-wider mb-2 text-[var(--text-heading)] font-['Outfit']">
+                    Filtrar por Almacén
+                </label>
+                <select name="almacen" id="almacen" class="w-full" onchange="this.form.submit()">
+                    <option value="">-- Todos los Almacenes Autorizados --</option>
+                    {% for alm in almacenes_disponibles %}
+                        <option value="{{ alm.id }}" {% if filtro_almacen_id == alm.id|stringformat:"i" %}selected{% endif %}>
+                            {{ alm.nombre }} ({{ alm.get_tipo_display }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Búsqueda -->
+            <div class="md:col-span-8">
+                <label for="q" class="block text-xs font-semibold uppercase tracking-wider mb-2 text-[var(--text-heading)] font-['Outfit']">
+                    Buscar Material o Documento
+                </label>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-xl">
+                            search
+                        </span>
+                        <input type="text" name="q" id="q" class="w-full pl-10 pr-4 py-2" placeholder="Buscar por código, nombre o nro. de Nota de Ingreso..." value="{{ query_busqueda }}">
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="px-5 py-2.5 rounded-[1rem] bg-[var(--primary)] hover:opacity-90 text-white font-medium flex items-center justify-center gap-2 transition-all text-sm">
+                            <span class="material-symbols-outlined text-lg">search</span>
+                            <span>Buscar</span>
+                        </button>
+                        {% if query_busqueda or filtro_almacen_id %}
+                            <a href="{% url 'lotes_list' %}" class="px-5 py-2.5 rounded-[1rem] bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 font-medium flex items-center justify-center gap-1.5 transition-all text-sm">
+                                <span class="material-symbols-outlined text-lg">close</span>
+                                <span>Limpiar</span>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de Lotes -->
+    <div class="card overflow-hidden shadow-sm">
+        <div class="px-6 py-4 border-b border-[var(--border-color)] flex justify-between items-center bg-transparent">
+            <h3 class="text-base font-bold text-[var(--text-heading)] font-['Outfit'] flex items-center gap-2">
+                <span class="material-symbols-outlined text-[var(--primary)] text-xl">layers</span>
+                Capas de Inventario con Existencias
+            </h3>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-[var(--border-color)] text-left">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)]">Fecha Entrada</th>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)]">Material / Catálogo</th>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)]">Almacén</th>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)] text-center">Cant. Original</th>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)] text-center">Cant. Disponible</th>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)] text-right">Costo Unitario</th>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)] text-right">Valor Remanente</th>
+                        <th class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-[var(--text-heading)]">Doc. de Origen</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border-color)]">
+                    {% for lote in page_obj %}
+                    <tr class="hover:bg-neutral-500/5 transition-colors">
+                        <td class="px-6 py-4 text-sm whitespace-nowrap text-[var(--text-main)]">
+                            {{ lote.fecha|date:"d/m/Y H:i" }}
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <div class="font-bold text-[var(--text-heading)]">{{ lote.material.codigo }}</div>
+                            <div class="text-xs text-[var(--text-muted)] line-clamp-1 max-w-xs">{{ lote.material.nombre }}</div>
+                        </td>
+                        <td class="px-6 py-4 text-sm whitespace-nowrap">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                                {{ lote.almacen.nombre }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-center whitespace-nowrap text-[var(--text-main)]">
+                            {{ lote.cantidad }}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-center whitespace-nowrap">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                {{ lote.saldo_disponible_lote }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-right whitespace-nowrap text-[var(--text-main)]">
+                            {{ lote.costo_unitario }} Bs.
+                        </td>
+                        <td class="px-6 py-4 text-sm text-right font-bold text-[var(--text-heading)] whitespace-nowrap">
+                            {{ lote.valor_disponible_lote|floatformat:2 }} Bs.
+                        </td>
+                        <td class="px-6 py-4 text-sm whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1 text-xs font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2.5 py-1 rounded-lg">
+                                {{ lote.referencia }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-16 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <span class="material-symbols-outlined text-5xl text-[var(--text-muted)] opacity-50 mb-3">
+                                    inventory_2
+                                </span>
+                                <p class="text-base font-semibold text-[var(--text-heading)]">
+                                    No se encontraron lotes activos
+                                </p>
+                                <p class="text-xs text-[var(--text-muted)] mt-1">
+                                    No existen capas de inventario con saldo disponible para los criterios seleccionados.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Paginación -->
+        {% if page_obj.has_other_pages %}
+        <div class="px-6 py-4 border-t border-[var(--border-color)] bg-transparent">
+            <nav aria-label="Navegación de páginas" class="flex justify-center">
+                <ul class="flex items-center gap-1.5">
+                    {% if page_obj.has_previous %}
+                        <li>
+                            <a class="flex items-center justify-center w-9 h-9 rounded-xl border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--primary)] hover:text-white transition-all duration-150" 
+                               href="?page={{ page_obj.previous_page_number }}{% if filtro_almacen_id %}&almacen={{ filtro_almacen_id }}{% endif %}{% if query_busqueda %}&q={{ query_busqueda }}{% endif %}" 
+                               title="Anterior">
+                                <span class="material-symbols-outlined text-lg">chevron_left</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li>
+                                <span class="flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--primary)] text-white font-bold text-sm shadow-sm">
+                                    {{ num }}
+                                </span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li>
+                                <a class="flex items-center justify-center w-9 h-9 rounded-xl border border-[var(--border-color)] text-[var(--text-main)] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all duration-150 text-sm" 
+                                   href="?page={{ num }}{% if filtro_almacen_id %}&almacen={{ filtro_almacen_id }}{% endif %}{% if query_busqueda %}&q={{ query_busqueda }}{% endif %}">
+                                    {{ num }}
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li>
+                            <a class="flex items-center justify-center w-9 h-9 rounded-xl border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--primary)] hover:text-white transition-all duration-150" 
+                               href="?page={{ page_obj.next_page_number }}{% if filtro_almacen_id %}&almacen={{ filtro_almacen_id }}{% endif %}{% if query_busqueda %}&q={{ query_busqueda }}{% endif %}" 
+                               title="Siguiente">
+                                <span class="material-symbols-outlined text-lg">chevron_right</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

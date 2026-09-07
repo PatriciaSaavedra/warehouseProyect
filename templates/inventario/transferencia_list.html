@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Transferencias{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+    <!-- Encabezado de la Bandeja -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                Traspasos entre Almacenes
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Control y traslado de existencias físicas valoradas
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'enviar_transferencia' %}" class="btn-secondary px-5 py-2.5 text-sm font-semibold rounded-2xl shadow-sm inline-flex items-center gap-2">
+                <span class="material-symbols-outlined text-[20px]">local_shipping</span>
+                Nueva Transferencia
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabla de Transferencias en Tarjeta Estilo Premium -->
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-4 text-left">Código TR</th>
+                        <th class="px-6 py-4 text-left">Almacén Origen</th>
+                        <th class="px-6 py-4 text-left">Almacén Destino</th>
+                        <th class="px-6 py-4 text-center">Estado SABS</th>
+                        <th class="px-6 py-4 text-left">Fecha de Envío</th>
+                        <th class="px-6 py-4 text-center">Acciones de Conformidad</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                    {% for t in page_obj %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/40 transition">
+                        <td class="px-6 py-4 font-mono font-bold text-[#8b0000] dark:text-red-400">{{ t.nro_transferencia }}</td>
+                        <td class="px-6 py-4 font-semibold">{{ t.origen.nombre }}</td>
+                        <td class="px-6 py-4 font-semibold text-gray-600 dark:text-gray-300">{{ t.destino.nombre }}</td>
+                        <td class="px-6 py-4 text-center">
+                            {% if t.estado == 'EN_TRANSITO' %}
+                            <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-950/20 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 ring-1 ring-inset ring-amber-600/20">
+                                En Tránsito
+                            </span>
+                            {% elif t.estado == 'RECIBIDA' %}
+                            <span class="inline-flex items-center rounded-full bg-green-50 dark:bg-green-950/20 px-3 py-1 text-xs font-bold text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20">
+                                Recibida
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-950/20 px-3 py-1 text-xs font-bold text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20">
+                                Rechazada
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ t.fecha_envio|date:"d/m/Y H:i" }}</td>
+                        <td class="px-6 py-4 text-center">
+                            {% if t.estado == 'EN_TRANSITO' %}
+                            <form action="{% url 'recibir_transferencia' t.id %}" method="post" onsubmit="return confirm('¿Confirma la recepción física conforme de este inventario en el almacén destino? Se generarán los lotes de entrada correspondientes.');" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-secondary px-3.5 py-1.5 text-xs font-semibold rounded-xl shadow-sm cursor-pointer inline-flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px]">done_all</span>
+                                    Confirmar Recepción
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-xs text-gray-400 dark:text-gray-500 font-semibold inline-flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">person</span>
+                                Concluido: {{ t.usuario_recibe.username }}
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-16 text-center text-gray-400 dark:text-gray-500">
+                            <span class="material-symbols-outlined text-4xl block mb-2">local_shipping</span>
+                            No se encontraron transferencias registradas en tu jurisdicción.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Paginación con estilos de tu base -->
+            {% if page_obj.has_other_pages %}
+            <div class="bg-gray-50/50 dark:bg-slate-900/20 px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center text-xs">
+                <span class="text-gray-500 dark:text-gray-400">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                <div class="flex gap-2">
+                    {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800">Anterior</a>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800">Siguiente</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

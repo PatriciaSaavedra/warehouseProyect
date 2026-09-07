@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto p-6 max-w-6xl">
+    
+    <!-- Botón para volver atrás -->
+    <div class="mb-4">
+        <a href="{% url 'nota_salida_list' %}" class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+            ← Volver al listado de salidas
+        </a>
+    </div>
+
+    <!-- Tarjeta Principal del Acta -->
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-8">
+        
+        <!-- Encabezado Institucional -->
+        <div class="flex justify-between items-start border-b border-gray-100 pb-6 mb-6">
+            <div>
+                <h4 class="text-xs font-bold text-gray-500 tracking-wider uppercase">Gobierno Autónomo Departamental de Potosí</h4>
+                <h1 class="text-2xl font-bold text-gray-900 mt-1">NOTA DE SALIDA DE ALMACÉN</h1>
+                <p class="text-sm text-gray-500 mt-1">Acta Oficial de Despacho y Egreso Físico Valorado</p>
+            </div>
+            <div class="text-right">
+                <span class="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700 ring-1 ring-inset ring-red-600/10">
+                    {{ nota.nro_nota }}
+                </span>
+                <p class="text-xs text-gray-400 mt-1">Fecha Real: {{ nota.fecha|date:"d/m/Y" }}</p>
+            </div>
+        </div>
+
+        <!-- Bloque de Información de la Cabecera -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50 rounded-lg p-6 mb-8 text-sm">
+            <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Origen y Destino</h3>
+                <p class="mt-2 text-gray-900"><strong>Almacén Origen:</strong> {{ nota.almacen_origen.nombre }}</p>
+                <p class="mt-1 text-gray-900"><strong>Unidad Destino:</strong> {{ nota.unidad_destino.nombre }}</p>
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Trazabilidad SABS</h3>
+                <p class="mt-2 text-gray-900">
+                    <strong>Solicitud Origen:</strong> 
+                    <a href="{% url 'detalle_solicitud' nota.solicitud_origen.id %}" class="text-blue-600 hover:underline font-semibold">
+                        {{ nota.solicitud_origen.codigo }}
+                    </a>
+                </p>
+                <p class="mt-1 text-gray-500">Tipo de Requerimiento: {{ nota.solicitud_origen.get_tipo_requerimiento_display }}</p>
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Responsabilidad</h3>
+                <p class="mt-2 text-gray-900"><strong>Despachado por:</strong> {{ nota.usuario.get_full_name|default:nota.usuario.username }}</p>
+                <p class="mt-1 text-gray-500">Rol: Almacenero de Turno</p>
+            </div>
+        </div>
+
+        <!-- Tabla de Materiales Despachados con valuación PEPS -->
+        <div class="overflow-x-auto mb-8">
+            <h3 class="text-md font-semibold text-gray-800 mb-4">Detalle de Materiales y Costeo PEPS (FIFO)</h3>
+            <table class="min-w-full divide-y divide-gray-200 border border-gray-100 rounded-md overflow-hidden text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-bold text-gray-600 uppercase tracking-wider">Código SABS</th>
+                        <th class="px-4 py-3 text-left font-bold text-gray-600 uppercase tracking-wider">Descripción del Material</th>
+                        <th class="px-4 py-3 text-center font-bold text-gray-600 uppercase tracking-wider">Partida</th>
+                        <th class="px-4 py-3 text-center font-bold text-gray-600 uppercase tracking-wider">Cant. Entregada</th>
+                        <th class="px-4 py-3 text-right font-bold text-gray-600 uppercase tracking-wider">Costo Unitario Real (Bs.)</th>
+                        <th class="px-4 py-3 text-right font-bold text-gray-600 uppercase tracking-wider">Importe Total Real (Bs.)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for detalle in nota.detalles.all %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 font-mono text-gray-700">{{ detalle.material.codigo }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-900">{{ detalle.material.nombre }}</td>
+                        <td class="px-4 py-3 text-center text-gray-600">{{ detalle.material.partida.codigo }}</td>
+                        <td class="px-4 py-3 text-center font-semibold text-gray-900">{{ detalle.cantidad }}</td>
+                        <td class="px-4 py-3 text-right text-gray-700">Bs. {{ detalle.costo_unitario_real|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-900">Bs. {{ detalle.costo_total_real|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-400">No se encontraron materiales en este despacho.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bloque de Firmas para Control Físico -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mt-16 pt-8 border-t border-gray-100">
+            <div class="text-center">
+                <p class="text-gray-400">__________________________________________</p>
+                <p class="text-sm font-bold text-gray-800 mt-2">{{ nota.usuario.get_full_name|default:nota.usuario.username }}</p>
+                <p class="text-xs text-gray-500 uppercase">Firma del Almacenero que entrega</p>
+            </div>
+            <div class="text-center">
+                <p class="text-gray-400">__________________________________________</p>
+                <p class="text-sm font-bold text-gray-800 mt-2">Firma del Solicitante</p>
+                <p class="text-xs text-gray-500 uppercase">Recibido Conforme (Unidad Destinataria)</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

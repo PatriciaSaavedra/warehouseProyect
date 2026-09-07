@@ -1,5 +1,3 @@
-# --- TU ARCHIVO inventario/models.py COMPLETO Y UNIFICADO ---
-
 from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
@@ -87,7 +85,7 @@ class Material(models.Model):
         blank=True
     )
     fecha_registro = models.DateTimeField(auto_now_add=True)
-
+    is_active = models.BooleanField(default=True)
     def __str__(self):
         return self.nombre
     
@@ -156,6 +154,7 @@ class InventarioAlmacen(models.Model):
         unique_together = ('material', 'almacen')
 
 
+
 # ========================================================
 # 3. MOVIMIENTOS HISTÓRICOS (KARDEX / LOTES PEPS)
 # ========================================================
@@ -202,7 +201,12 @@ class MovimientoInventario(models.Model):
 
     def __str__(self):
         return f"{self.tipo} - {self.material.nombre} ({self.cantidad}) en {self.almacen.nombre if self.almacen else 'Global'}"
-
+    @property
+    def valor_disponible_lote(self):
+        """
+        Calcula el valor monetario del saldo remanente de este lote específico.
+        """
+        return self.saldo_disponible_lote * self.costo_unitario
 
 # ========================================================
 # 4. COMPRAS (ENTRADAS DE ALMACÉN)
@@ -359,3 +363,95 @@ class NotaSalidaDetalle(models.Model):
     class Meta:
         verbose_name = "Detalle de Nota de Salida"
         verbose_name_plural = "Detalles de Nota de Salida"
+
+class Transferencia(models.Model):
+    """
+    Tarjeta 21: Cabecera para el Traspaso/Transferencia física de stock entre almacenes.
+    """
+    ESTADOS_TRANSFERENCIA = [
+        ('EN_TRANSITO', 'En Tránsito / Enviado'),
+        ('RECIBIDA', 'Recibida / Consolidada'),
+        ('RECHAZADA', 'Rechazada / Devuelta'),
+    ]
+
+    nro_transferencia = models.CharField(
+        max_length=50, 
+        unique=True, 
+        help_text="Número correlativo oficial de transferencia (ej: TR-00001)"
+    )
+    origen = models.ForeignKey(
+        Almacen, 
+        on_delete=models.PROTECT, 
+        related_name='transferencias_enviadas',
+        help_text="Almacén despachador"
+    )
+    destino = models.ForeignKey(
+        Almacen, 
+        on_delete=models.PROTECT, 
+        related_name='transferencias_recibidas',
+        help_text="Almacén receptor"
+    )
+    estado = models.CharField(
+        max_length=20, 
+        choices=ESTADOS_TRANSFERENCIA, 
+        default='EN_TRANSITO'
+    )
+    fecha_envio = models.DateTimeField(
+        auto_now_add=True
+    )
+    fecha_recepcion = models.DateTimeField(
+        null=True, 
+        blank=True
+    )
+    usuario_envia = models.ForeignKey(
+        User, 
+        on_delete=models.PROTECT, 
+        related_name='transferencias_despachadas',
+        help_text="Almacenero que despacha del origen"
+    )
+    usuario_recibe = models.ForeignKey(
+        User, 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True, 
+        related_name='transferencias_recepcionadas',
+        help_text="Almacenero que acepta en el destino"
+    )
+
+    def __str__(self):
+        return f"Transferencia {self.nro_transferencia}: {self.origen.nombre} -> {self.destino.nombre}"
+
+    class Meta:
+        verbose_name = "Transferencia entre Almacenes"
+        verbose_name_plural = "Transferencias entre Almacenes"
+
+
+class TransferenciaDetalle(models.Model):
+    """
+    Tarjeta 21: Detalle de ítems y valuación PEPS de la transferencia.
+    """
+    transferencia = models.ForeignKey(
+        Transferencia, 
+        on_delete=models.CASCADE, 
+        related_name='detalles'
+    )
+    material = models.ForeignKey(
+        Material, 
+        on_delete=models.PROTECT
+    )
+    cantidad = models.IntegerField()
+    
+    # Registramos el costo obtenido del PEPS del origen para transferirlo con el mismo valor al destino
+    costo_unitario_transferencia = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0.00
+    )
+    costo_total_transferencia = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0.00
+    )
+
+    def __str__(self):
+        return f"{self.material.nombre} - Cantidad: {self.cantidad}"

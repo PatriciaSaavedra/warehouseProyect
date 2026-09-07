@@ -1,91 +1,104 @@
 {% extends 'base.html' %}
 
-{% block title %} Detalle de Nota de Ingreso {% endblock %}
+{% block title %}Detalle de Entrada {{ nota.nro_nota }}{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto space-y-8">
-
-    <!-- CABECERA -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-        <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Nota de Ingreso: {{ nota.nro_nota }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Registrado el: {{ nota.fecha_registro|date:"d \d\e F, Y | H:i" }} por @{{ nota.usuario.username }}</p>
-        </div>
-        <a href="{% url 'nota_ingreso_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+    <!-- Botón de retorno -->
+    <div class="mb-6">
+        <a href="{% url 'nota_ingreso_list' %}" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center gap-1 transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Volver a notas de ingreso
         </a>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <!-- Información de Cabecera (4/12) -->
-        <div class="lg:col-span-4 space-y-6">
-            <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-                <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-6 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-gray-500">info</span> Información General
-                </h3>
-                
-                <div class="space-y-4 text-xs font-['Outfit']">
-                    <div>
-                        <span class="text-gray-400 block uppercase font-bold tracking-wider mb-1">Proveedor</span>
-                        <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">{{ nota.proveedor.razon_social }}</span>
-                        <span class="text-gray-400 font-mono text-[10px]">NIT: {{ nota.proveedor.nit }}</span>
-                    </div>
-                    <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-                        <span class="text-gray-400 block uppercase font-bold tracking-wider mb-1">Documento C-31 SIGEP</span>
-                        <span class="font-mono text-gray-700 dark:text-gray-200 text-sm font-bold">{{ nota.c31|default:"No Registrado" }}</span>
-                    </div>
-                    <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-                        <span class="text-gray-400 block uppercase font-bold tracking-wider mb-1">Factura / Nota de Remisión</span>
-                        <p class="text-xs text-gray-600 dark:text-gray-400">Factura Nro: <strong class="font-mono text-gray-800 dark:text-gray-200">{{ nota.factura|default:"—" }}</strong></p>
-                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Nota Entrega: <strong class="font-mono text-gray-800 dark:text-gray-200">{{ nota.nota_entrega|default:"—" }}</strong></p>
-                    </div>
-                    <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-                        <span class="text-gray-400 block uppercase font-bold tracking-wider mb-1">Origen de Entrada</span>
-                        {% if nota.reingreso %}
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Devolución / Reingreso</span>
-                        {% else %}
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Adquisición por Compra</span>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+    <!-- Encabezado de la Ficha con Botón de Impresión -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                Nota de Ingreso Físico
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Comprobante de recepción de bienes en almacén
+            </p>
+        </div>
+        <div>
+            <!-- NUEVO: Botón oficial de Impresión (Imagen 4) -->
+            <a href="{% url 'nota_recepcion_pdf' nota.id %}" target="_blank" class="btn-secondary px-5 py-2.5 text-sm font-semibold rounded-2xl shadow-sm inline-flex items-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[20px]">print</span>
+                Imprimir Nota de Recepción (PDF)
+            </a>
+        </div>
+    </div>
+
+    <!-- Información General de la Entrada -->
+    <div class="card p-8 mb-8 text-sm">
+        <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4 mb-6">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Información de Recepción</h2>
+            <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/20 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20">
+                {{ nota.nro_nota }}
+            </span>
         </div>
 
-        <!-- Detalle de ítems (8/12) -->
-        <div class="lg:col-span-8">
-            <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-                <div class="p-6 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/40">
-                    <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit']">Detalle de Materiales Ingresados</h3>
-                </div>
-                
-                <table class="w-full text-sm text-gray-700 dark:text-gray-300">
-                    <thead class="bg-gray-100 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-gray-500 uppercase text-xs font-semibold">
-                        <tr>
-                            <th class="px-6 py-4">Código</th>
-                            <th class="px-6 py-4">Material</th>
-                            <th class="px-6 py-4 text-center">Cantidad</th>
-                            <th class="px-6 py-4 text-right">P. Unitario (Bs)</th>
-                            <th class="px-6 py-4 text-right pr-8">Total (Bs)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
-                        {% for d in nota.detalles.all %}
-                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition text-gray-700 dark:text-gray-300">
-                            <td class="px-6 py-4 font-mono font-bold">{{ d.material.codigo }}</td>
-                            <td class="px-6 py-4">
-                                <span class="font-semibold block">{{ d.material.nombre }}</span>
-                                <span class="text-[10px] text-gray-400 font-mono">Partida: {{ d.material.partida.codigo }}</span>
-                            </td>
-                            <td class="px-6 py-4 text-center font-bold">{{ d.cantidad }}</td>
-                            <td class="px-6 py-4 text-right font-mono">{{ d.precio_unitario|floatformat:2 }}</td>
-                            <td class="px-6 py-4 text-right font-mono pr-8 font-bold">{{ d.precio_total|floatformat:2 }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Datos del Proveedor</p>
+                <p class="mt-2 text-gray-900 dark:text-white font-semibold">{{ nota.proveedor.razon_social }}</p>
+                <p class="text-xs text-gray-500">NIT: {{ nota.proveedor.nit }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Documentos de Respaldo</p>
+                <p class="mt-2 text-gray-900 dark:text-white"><strong>Factura Nº:</strong> {{ nota.factura|default:"—" }}</p>
+                <p class="mt-1 text-gray-900 dark:text-white"><strong>C-31 (SIGEP):</strong> {{ nota.c31|default:"—" }}</p>
+                {% if nota.compra_menor_origen %}
+                <p class="mt-1 text-gray-900 dark:text-white"><strong>Orden de Compra:</strong> {{ nota.compra_menor_origen.nro_orden }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Detalles de Entrega</p>
+                <p class="mt-2 text-gray-900 dark:text-white"><strong>Destino:</strong> {{ nota.almacen_destino.nombre }}</p>
+                <p class="mt-1 text-gray-900 dark:text-white"><strong>Registrado por:</strong> {{ nota.usuario.get_full_name|default:nota.usuario.username }}</p>
+                <p class="mt-1 text-gray-500 text-xs">Fecha Recepción: {{ nota.fecha|date:"d/m/Y" }}</p>
             </div>
         </div>
     </div>
 
+    <!-- Detalle de Materiales Recibidos -->
+    <div class="card overflow-hidden">
+        <div class="p-6 border-b border-gray-100 dark:border-gray-800">
+            <h3 class="text-md font-bold text-gray-900 dark:text-white">Materiales Incorporados al Inventario</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 text-left">Código SABS</th>
+                        <th class="px-6 py-3 text-left">Descripción del Material</th>
+                        <th class="px-6 py-3 class text-center">Partida</th>
+                        <th class="px-6 py-3 text-center">U. Manejo</th>
+                        <th class="px-6 py-3 text-center">Cant. Ingresada</th>
+                        <th class="px-6 py-3 text-right">P. Unitario (Bs.)</th>
+                        <th class="px-6 py-3 text-right">Subtotal (Bs.)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                    {% for det in nota.detalles.all %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/40 transition">
+                        <td class="px-6 py-4 font-mono font-bold text-gray-700 dark:text-gray-300">{{ det.material.codigo }}</td>
+                        <td class="px-6 py-4 font-semibold text-gray-900 dark:text-white">{{ det.material.nombre }}</td>
+                        <td class="px-6 py-4 text-center font-semibold">{{ det.material.partida.codigo }}</td>
+                        <td class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                            {{ det.material.unidad_medida_fk.codigo|default:det.material.unidad_medida }}
+                        </td>
+                        <td class="px-6 py-4 text-center font-bold text-gray-900 dark:text-white">{{ det.cantidad }}</td>
+                        <td class="px-6 py-4 text-right text-gray-700 dark:text-gray-300">Bs. {{ det.precio_unitario|floatformat:2 }}</td>
+                        <td class="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">Bs. {{ det.precio_total|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}

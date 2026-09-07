@@ -570,7 +570,12 @@ def detalle_solicitud(request, id):
             # Los funcionarios comunes solo pueden ver los requerimientos que ellos crearon [11]
             if solicitud.solicitante != request.user:
                 return HttpResponseForbidden("No tiene autorización para ver esta solicitud.")
-
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Solicitudes',
+        accion='Visualizar Detalle Solicitud',
+        descripcion=f'El usuario visualizó en pantalla el detalle de la Solicitud Folio: {solicitud.codigo} (Estado: {solicitud.estado}).'
+    )
     return render(request, 'solicitudes/detalle.html', {
         'solicitud': solicitud,
         'rol': rol
@@ -913,12 +918,17 @@ def entregar_solicitud(request, id):
     detalles = solicitud.detalles.select_related('material__partida')
 
     # Importamos los modelos de Notas de Salida para poder instanciarlos
-    from inventario.models import NotaSalida, NotaSalidaDetalle, InventarioAlmacen
+    from inventario.models import NotaSalida, NotaSalidaDetalle
 
     try:
         with transaction.atomic():
             solicitud = Solicitud.objects.select_for_update().get(id=id)
             costos_partidas = {}
+
+            # VALIDACIÓN: Garantizar que exista el almacén de origen de la solicitud
+            almacen_origen = solicitud.almacen_origen
+            if not almacen_origen:
+                raise ValueError("No se pudo determinar el almacén de origen para esta solicitud. Verifique que exista un Almacén Central activo.")
 
             # Tarjeta 12: Generar de forma atómica la cabecera del Egreso Físico (Nota de Salida)
             ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
@@ -928,6 +938,7 @@ def entregar_solicitud(request, id):
             nota_salida = NotaSalida.objects.create(
                 nro_nota=nro_nota_salida,
                 solicitud_origen=solicitud,
+                almacen_origen=almacen_origen, # Asociamos el almacén de donde sale físicamente
                 unidad_destino=solicitud.unidad_solicitante,
                 fecha=timezone.now().date(),
                 usuario=request.user
@@ -942,14 +953,17 @@ def entregar_solicitud(request, id):
                     messages.error(request, f"Inconsistencia: Stock insuficiente en {material.nombre} para despachar la solicitud.")
                     return redirigir_despues_de_accion(request, solicitud)
 
-                # Procesar salida PEPS y registrar movimiento en Kardex (Argumentos Completos)
+                # Procesar salida PEPS y registrar movimiento en Kardex (Con firma corregida)
+                # Al pasar descontar_reserva=True, nuestro servicio PEPS se encarga de reducir la reserva automáticamente
                 mov = registrar_salida_valorada_peps(
                     material=material,
+                    almacen=almacen_origen,               # <-- PARÁMETRO CORREGIDO
                     cantidad_salida=cantidad_despacho,
                     tipo_movimiento='SALIDA',
                     referencia=f"DESPACHO: {solicitud.codigo}",
                     usuario=request.user,
-                    unidad_destino=solicitud.unidad_solicitante
+                    unidad_destino=solicitud.unidad_solicitante,
+                    descontar_reserva=True                # <-- LIBERA AUTOMÁTICAMENTE LA RESERVA FÍSICA
                 )
 
                 detalle.cantidad_entregada = cantidad_despacho
@@ -964,16 +978,9 @@ def entregar_solicitud(request, id):
                     costo_total_real=mov.costo_total
                 )
 
-                # Tarjeta 5: Actualizar el inventario físico y liberar la reserva
-                inv = InventarioAlmacen.objects.select_for_update().filter(
-                    material=material,
-                    almacen=solicitud.almacen_origen
-                ).first()
-                
-                if inv:
-                    inv.stock_fisico -= cantidad_despacho     # Sale físicamente de estantería
-                    inv.stock_reservado -= cantidad_despacho  # Se limpia la reserva
-                    inv.save()
+                # NOTA: Se eliminó el bloque manual de actualización de InventarioAlmacen 
+                # porque nuestro servicio 'registrar_salida_valorada_peps' ya realiza 
+                # la reducción de stock físico y stock reservado de manera interna y segura.
 
                 partida = material.partida
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + mov.costo_total

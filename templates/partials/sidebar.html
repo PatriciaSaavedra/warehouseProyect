@@ -1,11 +1,11 @@
-<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-white dark:bg-slate-950 border-r border-gray-100 dark:border-gray-800 shadow-sm select-none sidebar-custom transition-colors duration-200">
+<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] shadow-sm select-none sidebar-custom transition-all duration-200">
 
     <!-- LOGO (GAD Potosí Almacén Central) -->
-    <div class="p-6 flex flex-col items-center border-b border-gray-100 dark:border-gray-800 mb-4">
-        <h1 class="text-2xl font-extrabold text-[#8b0000] dark:text-red-500 font-['Outfit'] tracking-wide">
+    <div class="p-6 flex flex-col items-center border-b border-[var(--border-color)] mb-4">
+        <h1 class="text-2xl font-extrabold text-[var(--primary)] dark:text-red-500 font-['Outfit'] tracking-wide">
             Almacén Central
         </h1>
-        <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-widest mt-1">
+        <p class="text-[11px] font-bold text-[var(--secondary)] dark:text-amber-500 uppercase tracking-widest mt-1">
             Gestión Gubernamental
         </p>
     </div>
@@ -17,7 +17,7 @@
         <a 
             href="/dashboard/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/dashboard/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
+            {% if '/dashboard/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 dashboard
@@ -25,13 +25,13 @@
             Dashboard
         </a>
 
-        <!-- 2️⃣ ADMINISTRACIÓN (Tarjeta 1, 2, 3 - Exclusivo Administradores) [28] -->
+        <!-- 2️⃣ ADMINISTRACIÓN (Exclusivo Administradores) -->
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <details 
             class="group" 
             {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path %}open{% endif %}
         >
-            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white cursor-pointer transition duration-150 list-none select-none">
+            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none">
                 <div class="flex items-center">
                     <span class="material-symbols-outlined mr-3 text-[22px]">
                         settings_applications
@@ -43,42 +43,42 @@
                 </span>
             </summary>
             
-            <div class="pl-8 pr-2 mt-1.5 space-y-1">
-                <!-- Secretarías (Tarjeta 1 - Apunta a tu nueva vista y plantilla) -->
+            <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
+                <!-- Secretarías -->
                 <a 
                     href="{% url 'secretaria_list' %}" 
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/organizacion/secretarias/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/organizacion/secretarias/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">corporate_fare</span>
                     Secretarías
                 </a>
 
-                <!-- Unidades Organizacionales (Tarjeta 1 - Apunta a tu nueva vista y plantilla) -->
+                <!-- Unidades Organizacionales -->
                 <a 
                     href="{% url 'unidad_list' %}" 
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/organizacion/unidades/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/organizacion/unidades/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">account_tree</span>
                     Unidades Org.
                 </a>
 
-                <!-- Almacenes (Tarjeta 2 - Se movió de Inventario a Administración) [28] -->
+                <!-- Almacenes -->
                 <a 
                     href="{% url 'almacen_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/almacenes/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/inventario/almacenes/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">warehouse</span>
                     Almacenes
                 </a>
 
-                <!-- Usuarios (Tarjeta 3) -->
+                <!-- Usuarios -->
                 <a 
                     href="/usuarios/"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/usuarios/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/usuarios/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">group</span>
                     Usuarios
@@ -91,7 +91,7 @@
         <a 
             href="/solicitudes/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/solicitudes/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
+            {% if '/solicitudes/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 description
@@ -99,13 +99,13 @@
             Solicitudes
         </a>
 
-        <!-- 4️⃣ INVENTARIO (Desplegable estrictamente operativo) [28] -->
+        <!-- 4️⃣ INVENTARIO (Desplegable estrictamente operativo) -->
         {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'KARDISTA' %}
         <details 
             class="group" 
             {% if '/inventario/' in request.path and '/inventario/almacenes/' not in request.path or '/movimientos/' in request.path %}open{% endif %}
         >
-            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white cursor-pointer transition duration-150 list-none select-none">
+            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none">
                 <div class="flex items-center">
                     <span class="material-symbols-outlined mr-3 text-[22px]">
                         inventory_2
@@ -117,45 +117,65 @@
                 </span>
             </summary>
             
-            <div class="pl-8 pr-2 mt-1.5 space-y-1">
-                <!-- Stock por Almacén / Existencias (Tarjeta 5) -->
+            <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
+                <!-- Stock por Almacén / Existencias -->
                 <a 
                     href="{% url 'inventario_por_almacen' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/existencias/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/inventario/existencias/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">fact_check</span>
                     Existencias
                 </a>
 
-                <!-- Notas de Ingreso / Entradas (Tarjeta 7) -->
+                <!-- Notas de Ingreso / Entradas -->
                 <a 
                     href="{% url 'nota_ingreso_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/entradas/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/inventario/entradas/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">input</span>
                     Entradas (Ingresos)
                 </a>
 
-                <!-- Notas de Salida / Salidas (Tarjeta 12) -->
+                <!-- Notas de Salida / Salidas -->
                 <a 
                     href="{% url 'nota_salida_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/salidas/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/inventario/salidas/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">output</span>
                     Salidas (Egresos)
                 </a>
 
-                <!-- Historial Kardex / Movimientos (Tarjeta 16) -->
+                <!-- Transferencias entre Almacenes -->
+                <a 
+                    href="{% url 'transferencia_list' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/transferencias/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">local_shipping</span>
+                    Transferencias
+                </a>
+
+                <!-- Lotes Activos PEPS -->
+                <a 
+                    href="{% url 'lotes_list' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/lotes/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">layers</span>
+                    Lotes Activos (PEPS)
+                </a>
+
+                <!-- Historial Kardex / Movimientos -->
                 <a 
                     href="{% url 'movimientos' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/movimientos/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/movimientos/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">swap_horiz</span>
-                    Historial Kardex
+                    Movimientos
                 </a>
             </div>
         </details>
@@ -167,7 +187,7 @@
             class="group" 
             {% if '/presupuestos/' in request.path %}open{% endif %}
         >
-            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white cursor-pointer transition duration-150 list-none select-none">
+            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none">
                 <div class="flex items-center">
                     <span class="material-symbols-outlined mr-3 text-[22px]">
                         account_balance
@@ -179,22 +199,22 @@
                 </span>
             </summary>
             
-            <div class="pl-8 pr-2 mt-1.5 space-y-1">
-                <!-- Techos POA (Tarjeta 20) -->
+            <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
+                <!-- Techos POA -->
                 <a 
                     href="/presupuestos/"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/presupuestos/' in request.path and '/presupuestos/reporte-ejecucion/' not in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/presupuestos/' in request.path and '/presupuestos/reporte-ejecucion/' not in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">wallet</span>
                     Techos POA
                 </a>
 
-                <!-- Reporte de Ejecución Presupuestaria (Tarjeta 23) -->
+                <!-- Reporte de Ejecución Presupuestaria -->
                 <a 
                     href="{% url 'reporte_presupuestos' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/presupuestos/reporte-ejecucion/' in request.path %}text-[#8b0000] dark:text-red-400 font-bold bg-red-50/20 dark:bg-red-950/10{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white{% endif %}"
+                    {% if '/presupuestos/reporte-ejecucion/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
                 >
                     <span class="material-symbols-outlined mr-2 text-[16px]">query_stats</span>
                     Ejecución POA
@@ -208,7 +228,7 @@
         <a 
             href="/compras/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/compras/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
+            {% if '/compras/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 shopping_cart
@@ -222,7 +242,7 @@
         <a 
             href="/auditoria/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/auditoria/' in request.path %}sidebar-active{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white{% endif %}"
+            {% if '/auditoria/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 security
@@ -234,21 +254,44 @@
     </nav>
 
     <!-- FOOTER -->
-    <div class="p-4 border-t border-gray-100 dark:border-gray-850 bg-gray-50/50 dark:bg-slate-900/40">
+    <div class="p-4 border-t border-[var(--border-color)] bg-neutral-500/5">
 
         <!-- Info del Usuario -->
         <div class="px-4 mb-3">
-            <p class="font-bold text-gray-800 dark:text-gray-100 text-sm font-['Outfit'] truncate">
+            <!-- Nombre del Usuario -->
+            <p class="font-bold text-[var(--text-main)] text-sm font-['Outfit'] truncate">
                 {% if request.user.first_name or request.user.last_name %}
                     {{ request.user.first_name }} {{ request.user.last_name }}
                 {% else %}
                     {{ request.user.username }}
                 {% endif %}
             </p>
-            <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-wider mt-0.5">
+            
+            <!-- Rol -->
+            <p class="text-[10px] font-bold text-[var(--secondary)] dark:text-amber-500 uppercase tracking-wider mt-0.5">
                 {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
-
             </p>
+
+            <!-- Unidad Organizacional -->
+            {% if request.user.perfilusuario.unidad_organizacional %}
+                <div class="flex items-center gap-1.5 mt-1 text-[11px] text-[var(--text-muted)] truncate" title="{{ request.user.perfilusuario.unidad_organizacional.nombre }}">
+                    <span class="material-symbols-outlined text-[15px] shrink-0 text-gray-400 dark:text-neutral-500">
+                        account_tree
+                    </span>
+                    <span class="truncate font-medium">
+                        {{ request.user.perfilusuario.unidad_organizacional.nombre }}
+                    </span>
+                </div>
+            {% elif request.user.perfilusuario.unidad %}
+                <div class="flex items-center gap-1.5 mt-1 text-[11px] text-[var(--text-muted)] truncate" title="{{ request.user.perfilusuario.unidad.nombre }}">
+                    <span class="material-symbols-outlined text-[15px] shrink-0 text-gray-400 dark:text-neutral-500">
+                        account_tree
+                    </span>
+                    <span class="truncate font-medium">
+                        {{ request.user.perfilusuario.unidad.nombre }}
+                    </span>
+                </div>
+            {% endif %}
         </div>
 
         <!-- Cerrar Sesión -->
@@ -256,7 +299,7 @@
             {% csrf_token %}
             <button
                 type="submit"
-                class="w-full flex items-center px-4 py-3 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-900 dark:hover:text-red-300 rounded-2xl transition duration-150 font-semibold text-sm cursor-pointer"
+                class="w-full flex items-center px-4 py-2.5 text-red-700 dark:text-red-400 hover:bg-red-500/10 hover:text-red-900 dark:hover:text-red-300 rounded-2xl transition duration-150 font-semibold text-sm cursor-pointer"
             >
                 <span class="material-symbols-outlined mr-3 text-[22px]">
                     logout
