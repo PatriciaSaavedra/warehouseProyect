@@ -1,8 +1,13 @@
 # inventario/services.py
 
-from .models import Material, MovimientoInventario, InventarioAlmacen
+from .models import Material, MovimientoInventario, InventarioAlmacen, Almacen
 from decimal import Decimal
 from django.db import transaction
+from django.core.exceptions import ValidationError
+
+# ========================================================
+# 1. SALIDAS VALORADAS (PEPS)
+# ========================================================
 
 def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movimiento, referencia, usuario, unidad_destino=None, descontar_reserva=False):
     """
@@ -14,6 +19,9 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
     # 1. Validar cantidad de salida estrictamente mayor a cero
     if cantidad_salida <= 0:
         raise ValueError("La cantidad de salida debe ser estrictamente mayor a cero.")
+
+    # (Opcional) Validar que el usuario tenga permisos sobre este almacén
+    # validar_operacion_almacen(usuario, almacen) 
 
     # 2. Transacción atómica integral para evitar inconsistencias y bloquear lecturas concurrentes
     with transaction.atomic():
@@ -97,4 +105,64 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
             unidad_destino=unidad_destino,
         )
 
-    return movimiento   
+    return movimiento
+
+
+# ========================================================
+# 2. CONSULTAS DE INVENTARIO Y ALMACENES
+# ========================================================
+
+def obtener_inventario_por_almacen(almacen):
+    """
+    REQUERIMIENTO 5: Consultar inventario según almacén.
+    Retorna todo el stock de materiales asociado únicamente al almacén indicado.
+    """
+    return InventarioAlmacen.objects.filter(almacen=almacen).select_related('material')
+
+
+def obtener_inventario_para_unidad(unidad_organizacional):
+    """
+    REQUERIMIENTO 6: Consultar inventario según Unidad Organizacional.
+    Retorna el inventario de aquellos almacenes que tienen autorización
+    para atender (despachar) a la Unidad Organizacional dada.
+    """
+    # Filtramos almacenes que contengan a esta unidad en sus unidades_atendidas
+    almacenes_autorizados = Almacen.objects.filter(unidades_atendidas=unidad_organizacional)
+    
+    # Obtenemos el inventario de esos almacenes (evitando duplicados con distinct si fuera necesario)
+    return InventarioAlmacen.objects.filter(
+        almacen__in=almacenes_autorizados
+    ).select_related('almacen', 'material').distinct()
+
+
+# ========================================================
+# 3. VALIDACIONES DE SEGURIDAD Y PERMISOS
+# ========================================================
+
+def validar_operacion_almacen(usuario, almacen):
+    """
+    REQUERIMIENTO 9: Validar que las operaciones se realicen 
+    sobre el almacén correspondiente.
+    """
+    if not usuario.is_authenticated:
+        raise ValidationError("Debe iniciar sesión para operar el inventario.")
+
+    # Si es superusuario de Django, tiene acceso global
+    if usuario.is_superuser:
+        return True
+
+    # Comprobar si es el responsable directo del almacén
+    if almacen.responsable == usuario:
+        return True
+
+    # Comprobar el permiso en el perfil del usuario
+    if hasattr(usuario, 'perfilusuario'):
+        if not usuario.perfilusuario.tiene_acceso_almacen(almacen):
+            raise ValidationError(
+                f"No tienes autorización para procesar operaciones en el almacén: {almacen.nombre}. "
+                "Contacta al administrador si necesitas acceso."
+            )
+    else:
+        raise ValidationError("Tu usuario no tiene un perfil de roles asignado en el sistema.")
+    
+    return True

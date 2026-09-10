@@ -36,7 +36,17 @@ class Almacen(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     tipo = models.CharField(max_length=20, choices=TIPO_ALMACEN, default='SUBALMACEN')
     
-    # Vinculación del subalmacén con su Unidad Organizacional correspondiente (GAD Potosí)
+    # --- REQUERIMIENTO 10: Estructura para múltiples subalmacenes ---
+    almacen_padre = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='subalmacenes',
+        help_text="Si está en blanco, es almacén principal. Si tiene valor, depende de ese almacén."
+    )
+    
+    # --- REQUERIMIENTO 1: Asociar almacén con Unidad Organizacional (A quién pertenece) ---
     unidad_organizacional = models.ForeignKey(
         'organizacion.UnidadOrganizacional',
         on_delete=models.SET_NULL,
@@ -44,6 +54,16 @@ class Almacen(models.Model):
         blank=True,
         related_name='almacenes'
     )
+    
+    # --- REQUERIMIENTO 2: Definir unidad(es) organizacional(es) atendidas (A quiénes despacha) ---
+    unidades_atendidas = models.ManyToManyField(
+        'organizacion.UnidadOrganizacional',
+        related_name='almacenes_que_atienden',
+        blank=True,
+        help_text="Unidades a las que este almacén está autorizado a despachar materiales."
+    )
+
+    # --- REQUERIMIENTO 8: Permitir identificar el responsable del almacén ---
     responsable = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -54,17 +74,13 @@ class Almacen(models.Model):
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.nombre} ({self.get_tipo_display()})"
+        padre = f" (Sub de {self.almacen_padre.nombre})" if self.almacen_padre else ""
+        return f"{self.nombre}{padre}"
 
     class Meta:
         verbose_name = "Almacén"
         verbose_name_plural = "Almacenes"
-
-
-# ========================================================
-# 2. MODELOS DE MATERIALES E INVENTARIO FÍSICO
-# ========================================================
-
+        
 class Material(models.Model):
     partida = models.ForeignKey(
         PartidaPresupuestaria,

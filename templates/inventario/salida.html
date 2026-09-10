@@ -50,10 +50,33 @@ Salida de Inventario
 
             {% csrf_token %}
 
+            <!-- ALMACÉN DE ORIGEN (Despacho) -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2" for="almacen-origen-select">
+                    Almacén de Origen (Despacho) <span class="text-[#8b0000]">*</span>
+                </label>
+                <div class="relative">
+                    <select
+                        id="almacen-origen-select"
+                        name="almacen_origen"
+                        required
+                        class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300 transition-all duration-200 appearance-none bg-white pr-10"
+                    >
+                        <option value="">Seleccione desde qué almacén se realiza el egreso</option>
+                        {% for almacen in almacenes %}
+                            <option value="{{ almacen.id }}">{{ almacen.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                        keyboard_arrow_down
+                    </span>
+                </div>
+            </div>
+
             <!-- MATERIAL -->
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-gray-700 mb-2" for="material-select">
-                    Material
+                    Material <span class="text-[#8b0000]">*</span>
                 </label>
                 <select
                     id="material-select"
@@ -73,11 +96,12 @@ Salida de Inventario
                             selected
                         {% endif %}
                     >
-                        {{ material.codigo }} - {{ material.nombre }} (Stock: {{ material.stock_actual }})
+                        {{ material.codigo }} - {{ material.nombre }} (Stock Global: {{ material.stock_actual }})
                     </option>
                     {% endfor %}
                 </select>
             </div>
+            
             <!-- UNIDAD DESTINO -->
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-gray-700 mb-2" for="unidad-destino-select">
@@ -100,10 +124,11 @@ Salida de Inventario
                     </span>
                 </div>
             </div>
+            
             <!-- CANTIDAD -->
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-gray-700 mb-2" for="cantidad-input">
-                    Cantidad
+                    Cantidad <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
                     type="number"
@@ -116,14 +141,14 @@ Salida de Inventario
                 >
                 <!-- Indicador dinámico de stock -->
                 <p id="stock-helper" class="text-xs text-gray-500 mt-2 hidden">
-                    Stock máximo disponible: <span id="stock-disponible-val" class="font-bold text-gray-700">0</span> unidades.
+                    Stock global: <span id="stock-disponible-val" class="font-bold text-gray-700">0</span> unidades.
                 </p>
             </div>
 
             <!-- REFERENCIA -->
             <div class="mb-8">
                 <label class="block text-sm font-semibold text-gray-700 mb-2" for="referencia-input">
-                    Referencia o Justificación
+                    Referencia o Justificación <span class="text-[#8b0000]">*</span>
                 </label>
                 <input
                     type="text"
@@ -190,7 +215,7 @@ Salida de Inventario
             const currentVal = parseInt(inputCantidad.value, 10);
             
             if (maxStock && currentVal > maxStock) {
-                inputCantidad.setCustomValidity('La cantidad no puede superar el stock disponible (' + maxStock + ').');
+                inputCantidad.setCustomValidity('La cantidad no puede superar el stock global disponible (' + maxStock + ').');
                 inputCantidad.classList.add('border-red-500', 'focus:ring-red-100', 'text-red-900');
             } else {
                 inputCantidad.setCustomValidity('');

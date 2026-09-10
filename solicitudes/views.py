@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import transaction, DatabaseError
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q,Sum, F
 from django.db import transaction
 # Importaciones de ReportLab para el PDF oficial
 from reportlab.pdfgen import canvas
@@ -17,6 +17,8 @@ from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
 from django.core.paginator import Paginator
 
+from organizacion.models import UnidadOrganizacional
+from presupuestos.models import POA
 
 # Importaciones para el dibujo del código QR nativo de ReportLab [28]
 from reportlab.graphics.shapes import Drawing
@@ -24,7 +26,7 @@ from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
 
 from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD 
-from inventario.models import InventarioAlmacen, Material, MovimientoInventario, PartidaPresupuestaria, UnidadMedida
+from inventario.models import InventarioAlmacen, Material, MovimientoInventario, PartidaPresupuestaria, UnidadMedida, Almacen
 from inventario.services import registrar_salida_valorada_peps  # Importamos nuestro servicio PEPS (FIFO)
 from usuarios.decorators import tiene_rol, rol_requerido
 from presupuestos.models import POA
@@ -184,26 +186,32 @@ def solicitudes_general(request):
 @login_required
 def buscar_materiales(request):
     """
-    Busca materiales en tiempo real. Admite el parámetro opcional 'solo_con_stock'
-    para filtrar únicamente materiales disponibles en estanterías.
+    Buscador AJAX filtrado por la unidad solicitante y su POA.
     """
     q = request.GET.get('q', '').strip()
-    solo_con_stock = request.GET.get('solo_con_stock', 'false').lower() == 'true'
-    
+    unidad_id = request.GET.get('unidad_id')
+
     if not q:
         return JsonResponse([], safe=False)
 
-    query_base = Material.objects.filter(
-        Q(nombre__icontains=q) |
-        Q(codigo__icontains=q) |
-        Q(partida__codigo__icontains=q)
-    )
+    perfil = getattr(request.user, 'perfilusuario', None)
+    if unidad_id and perfil.rol == 'ADMINISTRADOR':
+        unidad = UnidadOrganizacional.objects.filter(id=unidad_id).first()
+    else:
+        unidad = perfil.unidad if perfil else None
 
-    # Si se pide desde Almacén, solo mostramos materiales con existencias
-    if solo_con_stock:
-        query_base = query_base.filter(stock_actual__gt=0)
+    partidas_poa = POA.objects.filter(
+        unidad=unidad,
+        gestion=GESTION_ACTUAL,
+        monto_disponible__gt=0
+    ).values_list('partida_id', flat=True) if unidad else []
 
-    materiales = query_base.select_related('partida')[:10]
+    query = Material.objects.filter(
+        Q(nombre__icontains=q) | Q(codigo__icontains=q),
+        partida_id__in=partidas_poa,
+        stock_actual__gt=0,
+        is_active=True
+    ).select_related('partida')[:10]
 
     data = [
         {
@@ -211,7 +219,7 @@ def buscar_materiales(request):
             'nombre': f"{m.codigo} - {m.nombre}",
             'stock': m.stock_actual
         }
-        for m in materiales
+        for m in query
     ]
     return JsonResponse(data, safe=False)
 
@@ -1648,19 +1656,48 @@ def retroceder_estado_solicitud(request, id):
 @login_required
 def nuevo_pedido_almacen(request):
     """
-    Registra solicitudes de materiales que se encuentran catalogados y con stock.
-    Sigue el Flujo Rápido de Almacén (SALIDA_ALMACEN) y no requiere cotización ni POA.
+    Registra pedidos de consumo aislando el stock físico estrictamente al almacén
+    autorizado para atender a la Unidad Solicitante (ej: Almacén Central = 20, no los 90 globales).
     """
+    perfil = getattr(request.user, 'perfilusuario', None)
+    rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+
+    # 1. Determinar la Unidad Solicitante
+    unidades_disponibles = None
+    if rol == 'ADMINISTRADOR':
+        unidades_disponibles = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
+        unidad_id = request.GET.get('unidad_id') or (request.POST.get('unidad_solicitante_id') if request.method == 'POST' else None)
+        if unidad_id:
+            unidad_solicitante = get_object_or_404(UnidadOrganizacional, id=unidad_id)
+        else:
+            unidad_solicitante = perfil.unidad or unidades_disponibles.first()
+    else:
+        unidad_solicitante = perfil.unidad
+
+    if not unidad_solicitante:
+        messages.error(request, "Su usuario no tiene asignada una Unidad Organizacional activa.")
+        return redirect('solicitudes')
+
+    # 2. IDENTIFICAR EL O LOS ALMACENES AUTORIZADOS PARA ESTA UNIDAD
+    almacenes_autorizados = Almacen.objects.filter(
+        unidades_atendidas=unidad_solicitante,
+        is_active=True
+    )
+    # Si la unidad no tiene subalmacén asignado, por norma SABS la atiende el Almacén Central
+    if not almacenes_autorizados.exists():
+        almacenes_autorizados = Almacen.objects.filter(tipo='CENTRAL', is_active=True)
+
+    # 3. PROCESAMIENTO DEL POST
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
+        justificacion = request.POST.get('justificacion', '').strip()
 
         if not payload_raw:
             messages.error(request, "No se recibió información de materiales.")
             return redirect('nuevo_pedido_almacen')
 
         payload_raw = html.unescape(payload_raw)
-
         try:
             payload = json.loads(payload_raw)
         except json.JSONDecodeError:
@@ -1668,22 +1705,14 @@ def nuevo_pedido_almacen(request):
             return redirect('nuevo_pedido_almacen')
 
         if not payload:
-            messages.error(request, "Debe agregar al menos un material.")
-            return redirect('nuevo_pedido_almacen')
-
-        justificacion = request.POST.get('justificacion', '').strip()
-        perfil = getattr(request.user, 'perfilusuario', None)
-        unidad_solicitante = perfil.unidad if perfil else None
-
-        if not unidad_solicitante:
-            messages.error(request, "Su usuario no tiene asignada una Unidad Organizacional.")
+            messages.error(request, "Debe agregar al menos un material al pedido.")
             return redirect('nuevo_pedido_almacen')
 
         try:
             with transaction.atomic():
                 ultima = Solicitud.objects.select_for_update().order_by('id').last()
                 numero = (ultima.id + 1) if ultima else 1
-                codigo = f'PED-{numero:05d}' # Prefijo distintivo para Pedido de Stock
+                codigo = f'PED-{numero:05d}'
 
                 solicitud = Solicitud.objects.create(
                     codigo=codigo,
@@ -1692,51 +1721,162 @@ def nuevo_pedido_almacen(request):
                     fecha=fecha,
                     justificacion=justificacion,
                     tipo_requerimiento='BIEN',
-                    flujo_atencion='SALIDA_ALMACEN', # Forzado directamente a salida de stock
+                    flujo_atencion='SALIDA_ALMACEN',
                     estado='REGISTRADA'
                 )
 
+                costo_acumulado_por_partida = {}
+
                 for item_key, item_data in payload.items():
                     cantidad = int(item_data.get('cantidad', 1))
-
                     if cantidad <= 0:
                         raise ValueError("La cantidad solicitada debe ser mayor a cero.")
 
-                    material = Material.objects.get(id=item_key)
-                    
-                    # Validación estricta de stock en el backend
-                    if material.stock_actual < cantidad:
-                        raise ValueError(f"No existe stock suficiente para el material: {material.nombre} (Disponible: {material.stock_actual}).")
+                    material = Material.objects.select_related('partida').get(id=item_key)
+
+                    # VALIDACIÓN DE STOCK AISLADO: Validar en los almacenes autorizados
+                    stock_almacen_autorizado = InventarioAlmacen.objects.filter(
+                        material=material,
+                        almacen__in=almacenes_autorizados
+                    ).aggregate(
+                        disponible=Sum(F('stock_fisico') - F('stock_reservado'))
+                    )['disponible'] or 0
+
+                    if stock_almacen_autorizado < cantidad:
+                        raise ValueError(
+                            f"Stock insuficiente en el almacén de despacho para '{material.nombre}'. "
+                            f"Disponible para su unidad: {stock_almacen_autorizado} UND (solicitado: {cantidad})."
+                        )
+
+                    # Costo unitario PEPS
+                    last_ent = MovimientoInventario.objects.filter(
+                        material=material, 
+                        tipo='ENTRADA',
+                        almacen__in=almacenes_autorizados
+                    ).order_by('-fecha').first()
+                    costo_unitario = last_ent.costo_unitario if last_ent else Decimal('0.00')
+                    subtotal = Decimal(cantidad) * costo_unitario
+
+                    # Validación POA
+                    partida = material.partida
+                    poa = POA.objects.select_for_update().filter(
+                        unidad=unidad_solicitante,
+                        partida=partida,
+                        gestion=GESTION_ACTUAL
+                    ).first()
+
+                    if not poa:
+                        raise ValueError(f"La unidad '{unidad_solicitante.nombre}' no tiene la partida {partida.codigo} en su POA {GESTION_ACTUAL}.")
+
+                    costo_acumulado_por_partida[poa] = costo_acumulado_por_partida.get(poa, Decimal('0.00')) + subtotal
 
                     DetalleSolicitud.objects.create(
                         solicitud=solicitud,
                         material=material,
                         cantidad_solicitada=cantidad,
-                        precio_unitario_referencial=Decimal('0.00') # No requiere cotización previa
+                        precio_unitario_referencial=costo_unitario
                     )
+
+                # Validar techo POA total
+                for poa, total_partida in costo_acumulado_por_partida.items():
+                    if poa.monto_disponible < total_partida:
+                        raise ValueError(
+                            f"Presupuesto insuficiente en la partida {poa.partida.codigo}. "
+                            f"Total pedido: {total_partida:.2f} Bs. | Saldo POA disponible: {poa.monto_disponible:.2f} Bs."
+                        )
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Solicitudes',
                     accion='Registrar Pedido Almacén',
-                    descripcion=f'Se registró el Pedido de Consumo {codigo} para la unidad {unidad_solicitante.nombre}'
+                    descripcion=f'Se registró el Pedido {codigo} para {unidad_solicitante.nombre}'
                 )
 
-            messages.success(request, f"Pedido de Almacén {codigo} registrado correctamente.")
+            messages.success(request, f"Pedido de Almacén {codigo} registrado exitosamente.")
             return redirect('solicitudes')
 
         except ValueError as e:
             messages.error(request, str(e))
-            return redirect('nuevo_pedido_almacen')
-        except DatabaseError:
-            messages.error(request, "Hubo un error al procesar el guardado en la base de datos.")
+            return redirect(f"{request.path}?unidad_id={unidad_solicitante.id}" if rol == 'ADMINISTRADOR' else request.path)
+        except Exception as e:
+            messages.error(request, f"Error al registrar el pedido: {str(e)}")
             return redirect('nuevo_pedido_almacen')
 
-    # Al ser consumo de stock, solo cargamos los materiales que tienen stock real > 0
-    materiales = Material.objects.filter(stock_actual__gt=0).values('id', 'nombre', 'stock_actual')
+    # 4. GET: CONSULTAR STOCK AISLADO POR ALMACÉN AUTORIZADO
+    poas_unidad = POA.objects.filter(
+        unidad=unidad_solicitante,
+        gestion=GESTION_ACTUAL,
+        monto_disponible__gt=0
+    ).select_related('partida')
+
+    partidas_permitidas_ids = [p.partida_id for p in poas_unidad]
+    poa_por_partida = {p.partida_id: p for p in poas_unidad}
+
+    # Traemos las existencias solo de los almacenes autorizados para esta unidad
+    inventarios_unidad = InventarioAlmacen.objects.filter(
+        almacen__in=almacenes_autorizados,
+        material__partida_id__in=partidas_permitidas_ids,
+        stock_fisico__gt=0
+    ).select_related('material', 'material__partida', 'material__unidad_medida_fk', 'almacen')
+
+    # Consolidar stock disponible por material dentro del ámbito de esta unidad
+    stock_por_material = {}
+    for inv in inventarios_unidad:
+        mat_id = inv.material_id
+        disp = max(0, inv.stock_fisico - inv.stock_reservado)
+        if disp > 0:
+            if mat_id not in stock_por_material:
+                stock_por_material[mat_id] = {
+                    'material': inv.material,
+                    'stock_autorizado': 0,
+                    'almacen_nombre': inv.almacen.nombre
+                }
+            stock_por_material[mat_id]['stock_autorizado'] += disp
+
+    materiales_filtrados = []
+    for mat_id, data_item in stock_por_material.items():
+        mat = data_item['material']
+        stock_autorizado = data_item['stock_autorizado']
+        poa = poa_por_partida.get(mat.partida_id)
+
+        last_ent = MovimientoInventario.objects.filter(
+            material=mat,
+            tipo='ENTRADA',
+            almacen__in=almacenes_autorizados
+        ).order_by('-fecha').first()
+        costo_u = last_ent.costo_unitario if last_ent else Decimal('0.00')
+
+        if costo_u > 0 and poa:
+            cupo_max_poa = int(poa.monto_disponible // costo_u)
+        else:
+            cupo_max_poa = stock_autorizado
+
+        # El tope es el menor entre el presupuesto POA y el stock físico de SU almacén
+        max_solicitable = min(cupo_max_poa, stock_autorizado)
+
+        if max_solicitable > 0:
+            materiales_filtrados.append({
+                'id': mat.id,
+                'nombre': mat.nombre,
+                'codigo': mat.codigo,
+                'partida_codigo': mat.partida.codigo,
+                'partida_nombre': mat.partida.nombre,
+                'unidad_medida': mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
+                'stock_almacen': stock_autorizado,  # Mostrará 20 (Almacén Central), NO 90
+                'costo_unitario': float(costo_u),
+                'saldo_poa': float(poa.monto_disponible) if poa else 0.0,
+                'cupo_poa': cupo_max_poa,
+                'max_solicitable': max_solicitable,
+                'almacen_despacho': data_item['almacen_nombre']
+            })
+
     return render(request, 'solicitudes/nuevo_pedido_almacen.html', {
-        'materiales': materiales
+        'materiales': materiales_filtrados,
+        'unidad_solicitante': unidad_solicitante,
+        'unidades_disponibles': unidades_disponibles,
+        'rol': rol
     })
+
 
 def redirigir_despues_de_accion(request, solicitud):
     """

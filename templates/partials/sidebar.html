@@ -22,7 +22,7 @@
             <span class="material-symbols-outlined mr-3 text-[22px]">
                 dashboard
             </span>
-            Dashboard
+            Panel de control
         </a>
 
         <!-- 2️⃣ ADMINISTRACIÓN (Exclusivo Administradores) -->
@@ -127,6 +127,12 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">fact_check</span>
                     Existencias
                 </a>
+                
+                <a href="{% url 'inventario_por_unidad' %}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-[#8b0000] hover:bg-red-50 rounded-lg transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">domain</span>
+                    Stock por Unidad
+                </a>
+                
 
                 <!-- Notas de Ingreso / Entradas -->
                 <a 

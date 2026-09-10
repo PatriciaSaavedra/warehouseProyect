@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block title %} Stock Designado por Unidad y Secretaría {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- CABECERA -->
+    <div class="mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Stock por Estructura Organizacional</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Consulte los materiales disponibles en los almacenes autorizados para cada Secretaría y Unidad.</p>
+        </div>
+        <a href="{% url 'inventario' %}" class="btn-secondary px-4 py-2 text-sm rounded-xl border flex items-center gap-2 hover:bg-gray-50 transition w-fit">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver a Existencias
+        </a>
+    </div>
+
+    <!-- TARJETAS DE INDICADORES (KPIS) -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="card p-4 rounded-2xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-[#8b0000] flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">inventory_2</span>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400 font-semibold uppercase">Materiales Catalogados</div>
+                <div class="text-xl font-extrabold text-gray-800 dark:text-gray-100">{{ total_materiales }}</div>
+            </div>
+        </div>
+        <div class="card p-4 rounded-2xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-green-50 dark:bg-green-950/30 text-green-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">layers</span>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400 font-semibold uppercase">Total Unidades Físicas</div>
+                <div class="text-xl font-extrabold text-gray-800 dark:text-gray-100">{{ total_stock_fisico }}</div>
+            </div>
+        </div>
+        <div class="card p-4 rounded-2xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">warehouse</span>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400 font-semibold uppercase">Almacenes Involucrados</div>
+                <div class="text-xl font-extrabold text-gray-800 dark:text-gray-100">{{ total_almacenes }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL DE FILTROS EN CASCADA (SECRETARÍA -> UNIDAD) -->
+    <div class="card p-6 rounded-2xl mb-8 border border-gray-200 dark:border-gray-800">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <!-- 1. FILTRO SECRETARÍA -->
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">1. Filtrar por Secretaría</label>
+                <div class="relative">
+                    <select 
+                        id="select-secretaria" 
+                        name="secretaria_id" 
+                        onchange="filtrarUnidadesPorSecretaria(this.value); this.form.submit();"
+                        class="w-full border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 text-sm focus:ring-[#8b0000]"
+                    >
+                        <option value="">-- Todas las Secretarías --</option>
+                        {% for sec in secretarias %}
+                            <option value="{{ sec.id }}" {% if filtro_secretaria_id == sec.id|stringformat:"s" %}selected{% endif %}>
+                                {{ sec.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- 2. FILTRO UNIDAD ORGANIZACIONAL -->
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">2. Unidad Organizacional</label>
+                <div class="relative">
+                    <select 
+                        id="select-unidad" 
+                        name="unidad_id" 
+                        onchange="this.form.submit();"
+                        class="w-full border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 text-sm focus:ring-[#8b0000]"
+                    >
+                        <option value="">-- Todas las Unidades --</option>
+                        {% for u in unidades %}
+                            <option 
+                                value="{{ u.id }}" 
+                                data-secretaria="{{ u.secretaria_id|default:'' }}"
+                                {% if filtro_unidad_id == u.id|stringformat:"s" %}selected{% endif %}
+                            >
+                                {{ u.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- BOTONES DE ACCIÓN RÁPIDA -->
+            <div class="flex items-center gap-2">
+                <button type="submit" class="btn-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 flex-1 h-[42px] cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt</span> Aplicar Filtro
+                </button>
+                {% if filtro_secretaria_id or filtro_unidad_id %}
+                    <a href="{% url 'inventario_por_unidad' %}" class="border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 px-3 py-2.5 rounded-xl text-xs font-semibold h-[42px] flex items-center justify-center text-gray-600 dark:text-gray-300" title="Restablecer filtros">
+                        <span class="material-symbols-outlined text-[18px]">close</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- RESULTADOS (SIEMPRE VISIBLES) -->
+    <div class="card rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+        <div class="p-4 bg-gray-50/70 dark:bg-slate-900/50 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+                <h2 class="text-base font-bold text-gray-800 dark:text-gray-200">
+                    {% if unidad_seleccionada %}
+                        Stock asignado a: <span class="text-[#8b0000] dark:text-red-400">{{ unidad_seleccionada.nombre }}</span>
+                    {% elif secretaria_seleccionada %}
+                        Stock designado a la Secretaría: <span class="text-[#8b0000] dark:text-red-400">{{ secretaria_seleccionada.nombre }}</span>
+                    {% else %}
+                        Consolidado General de Existencias por Dependencia
+                    {% endif %}
+                </h2>
+                <p class="text-xs text-gray-500 mt-0.5">Mostrando existencias físicas en almacenes autorizados para despachar a estas dependencias.</p>
+            </div>
+            <span class="px-3 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300 shrink-0 w-fit">
+                {{ inventario|length }} registros
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-gray-500 uppercase bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 font-bold">
+                    <tr>
+                        <th class="px-6 py-4">Código / Material</th>
+                        <th class="px-6 py-4">Partida Presupuestaria</th>
+                        <th class="px-6 py-4">Almacén Origen</th>
+                        <th class="px-6 py-4">Dependencia Responsable</th>
+                        <th class="px-6 py-4 text-center">Stock Físico</th>
+                        <th class="px-6 py-4 text-center">Stock Disponible</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    {% for inv in inventario %}
+                    <tr class="hover:bg-gray-50/60 dark:hover:bg-slate-900/30 transition">
+                        <td class="px-6 py-4">
+                            <span class="text-[#8b0000] dark:text-red-400 font-bold font-mono">{{ inv.material.codigo }}</span>
+                            <div class="text-gray-800 dark:text-gray-200 font-semibold">{{ inv.material.nombre }}</div>
+                            <span class="text-[11px] text-gray-400">{{ inv.material.unidad_medida_fk.nombre }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-xs">
+                            <span class="px-2 py-0.5 rounded-full font-semibold badge-info">{{ inv.material.partida.codigo }}</span>
+                            <div class="text-gray-400 mt-0.5 text-[11px] truncate max-w-[180px]" title="{{ inv.material.partida.nombre }}">{{ inv.material.partida.nombre }}</div>
+                        </td>
+                        <td class="px-6 py-4 text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            📍 {{ inv.almacen.nombre }}
+                            <div class="text-[10px] text-gray-400">{{ inv.almacen.get_tipo_display }}</div>
+                        </td>
+                        <td class="px-6 py-4 text-xs">
+                            {% if inv.almacen.unidad_organizacional %}
+                                <div class="font-bold text-gray-700 dark:text-gray-300">{{ inv.almacen.unidad_organizacional.nombre }}</div>
+                                {% if inv.almacen.unidad_organizacional.secretaria %}
+                                    <div class="text-[10px] text-gray-400">🏛️ {{ inv.almacen.unidad_organizacional.secretaria.nombre }}</div>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-gray-400 italic">Almacén Central Gobernación</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-base font-extrabold text-gray-800 dark:text-gray-100 bg-gray-100 dark:bg-slate-800 px-3 py-1 rounded-xl">
+                                {{ inv.stock_fisico }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-sm font-bold text-green-700 bg-green-50 dark:bg-green-950/20 px-3 py-1 rounded-xl border border-green-200 dark:border-green-900/30">
+                                {{ inv.stock_disponible }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">inventory_2</span>
+                            <p class="font-medium text-gray-600 dark:text-gray-300">No se encontró stock en los almacenes autorizados para esta consulta.</p>
+                            <p class="text-xs text-gray-400 mt-1">Compruebe la asignación de unidades atendidas en la configuración de Almacenes.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Filtro interactivo en cliente para depurar las Unidades según la Secretaría seleccionada
+    function filtrarUnidadesPorSecretaria(secretariaId) {
+        const selectUnidad = document.getElementById('select-unidad');
+        if (!selectUnidad) return;
+
+        const options = selectUnidad.querySelectorAll('option');
+        options.forEach(opt => {
+            if (opt.value === "") return;
+            const sec = opt.getAttribute('data-secretaria');
+            if (!secretariaId || sec === secretariaId) {
+                opt.style.display = "";
+            } else {
+                opt.style.display = "none";
+            }
+        });
+    }
+
+    // Inicializar al cargar
+    document.addEventListener('DOMContentLoaded', function() {
+        const secVal = document.getElementById('select-secretaria')?.value;
+        if (secVal) {
+            filtrarUnidadesPorSecretaria(secVal);
+        }
+    });
+</script>
+{% endblock %}

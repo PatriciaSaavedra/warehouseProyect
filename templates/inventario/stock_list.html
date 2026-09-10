@@ -8,12 +8,26 @@
     <!-- CABECERA -->
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
         <div>
-            <h1 class="text-3xl font-extrabold text-[var(--text-heading)] font-['Outfit'] tracking-tight">
-                Inventario y Existencias
-            </h1>
-            <p class="text-sm text-[var(--text-muted)] mt-1">
-                Consulta física de saldos y stock por Almacén y Subalmacenes.
-            </p>
+            <!-- En tu archivo stock_list.html -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+                <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Catálogo de Existencias</h1>
+                <p class="text-sm text-gray-500 mt-1">Gestión de inventario físico y consolidado.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <!-- BOTÓN NUEVO (Ir a Stock por Unidad) -->
+                <a href="{% url 'inventario_por_unidad' %}" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm font-['Outfit']">
+                    <span class="material-symbols-outlined text-[18px]">domain</span> Ver Stock por Unidad
+                </a>
+
+                <!-- Tus otros botones (Nuevo Material, etc) -->
+                {% if rol == 'ADMINISTRADOR' %}
+                <a href="{% url 'nuevo_material' %}" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm font-['Outfit']">
+                    <span class="material-symbols-outlined text-[18px]">add_box</span> Nuevo Material
+                </a>
+                {% endif %}
+            </div>
+        </div>
         </div>
         
         <!-- Bloque de Acciones Principales -->

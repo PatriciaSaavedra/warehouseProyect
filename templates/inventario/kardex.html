@@ -1,115 +1,173 @@
 {% extends 'base.html' %}
 
-{% block title %}Kardex {{ material.codigo }}{% endblock %}
+{% block title %} Kardex de Existencias {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    
-    <!-- Botón de retorno -->
-    <div class="mb-6">
-        <a href="{% url 'inventario_por_almacen' %}" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center gap-1 transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
-            Volver a existencias
+<div class="max-w-7xl mx-auto">
+    <!-- CABECERA -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+            <a href="{% url 'inventario_por_almacen' %}" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2 transition font-['Outfit']">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a existencias
+            </a>
+            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Kardex de Control de Existencias</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ material.nombre }} | Código: <span class="text-[#8b0000] font-bold">{{ material.codigo }}</span></p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{% url 'kardex_fisico_pdf' material.id %}" target="_blank" class="bg-[#d97706] hover:bg-[#b45309] text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm font-['Outfit']">
+                <span class="material-symbols-outlined text-[18px]">print</span> Imprimir Kardex Físico
+            </a>
+            <a href="{% url 'kardex_pdf' material.id %}" target="_blank" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm font-['Outfit']">
+                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Kardex Valorado (PDF)
+            </a>
+        </div>
+    </div>
+
+    <!-- TARJETAS DE INFORMACIÓN Y DESGLOSE POR ALMACÉN -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+        
+        <!-- Partida -->
+        <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Partida Presupuestaria</p>
+            <p class="text-sm font-semibold text-gray-800">{{ material.partida.codigo }} - {{ material.partida.nombre|truncatechars:25 }}</p>
+        </div>
+        
+        <!-- Unidad -->
+        <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Unidad de Manejo</p>
+            <p class="text-sm font-semibold text-gray-800">{{ material.unidad_medida }}</p>
+        </div>
+        
+        <!-- Stock Global -->
+        <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Existencia Global (Gobernación)</p>
+            <p class="text-lg font-extrabold text-[#8b0000]">{{ material.stock_actual }} <span class="text-xs font-normal text-gray-500">Unidades</span></p>
+        </div>
+        
+        <!-- Desglose por Almacén -->
+        <div class="border-l border-gray-100 pl-4">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Desglose de Stock Físico</p>
+            <div class="flex flex-col gap-1.5 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                {% for inv in material.inventarios_almacen.all %}
+                    <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-1 last:border-0 last:pb-0">
+                        <span class="font-medium text-gray-600 truncate mr-2" title="{{ inv.almacen.nombre }}">📍 {{ inv.almacen.nombre|truncatechars:18 }}</span>
+                        <span class="font-bold {% if inv.stock_fisico > 0 %}text-green-700 bg-green-50{% else %}text-red-700 bg-red-50{% endif %} px-2 py-0.5 rounded-md border {% if inv.stock_fisico > 0 %}border-green-200{% else %}border-red-200{% endif %}">
+                            {{ inv.stock_fisico }}
+                        </span>
+                    </div>
+                {% empty %}
+                    <span class="text-xs text-gray-400 italic">No hay stock distribuido</span>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- BARRA DE FILTROS INTERACTIVA -->
+    <form method="GET" class="bg-gray-50 p-4 rounded-2xl border border-gray-200 mb-6 flex flex-wrap gap-3 items-end">
+        
+        <div class="flex-1 min-w-[220px]">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Aislar por Almacén</label>
+            <select name="almacen" class="w-full border border-gray-300 bg-white rounded-xl text-sm py-2 px-3 focus:ring-[#8b0000] focus:border-[#8b0000]">
+                <option value="">-- Todos mis almacenes autorizados --</option>
+                {% for a in almacenes_disponibles %}
+                    <option value="{{ a.id }}" {% if filtro_almacen_id|stringformat:"s" == a.id|stringformat:"s" %}selected{% endif %}>{{ a.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="w-[120px]">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Gestión</label>
+            <select name="gestion" class="w-full border border-gray-300 bg-white rounded-xl text-sm py-2 px-3 focus:ring-[#8b0000] focus:border-[#8b0000]">
+                <option value="2026" {% if filtro_gestion == '2026' %}selected{% endif %}>2026</option>
+                <option value="2027" {% if filtro_gestion == '2027' %}selected{% endif %}>2027</option>
+            </select>
+        </div>
+
+        <button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-xl text-sm font-semibold transition font-['Outfit']">
+            Filtrar Kardex
+        </button>
+        
+        {% if filtro_almacen_id %}
+        <a href="{% url 'kardex' material.id %}" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold transition font-['Outfit']">
+            Limpiar
         </a>
-    </div>
+        {% endif %}
+    </form>
 
-    <!-- Encabezado con los dos botones de impresión oficial SABS -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <div>
-            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                Kardex de Control de Existencias
-            </h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 font-semibold">
-                {{ material.nombre }} &nbsp;|&nbsp; Código: <span class="font-mono text-[#8b0000] dark:text-red-400">{{ material.codigo }}</span>
-            </p>
+    <!-- TABLA DE MOVIMIENTOS -->
+    <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        
+        <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+            <h2 class="font-bold text-gray-800 font-['Outfit']">Movimientos Cronológicos Registrados</h2>
+            {% if filtro_almacen_id %}
+                <span class="text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
+                    Mostrando historial aislado de 1 almacén
+                </span>
+            {% else %}
+                <span class="text-xs bg-gray-200 text-gray-700 font-bold px-3 py-1 rounded-full">
+                    Mostrando historial global (Mezclado)
+                </span>
+            {% endif %}
         </div>
-        <div class="flex flex-wrap gap-2.5">
-            <!-- NUEVO: Botón de Kardex Físico (Ficha de Cartón Amarilla - Imagen 3) -->
-            <a href="{% url 'kardex_fisico_pdf' material.id %}" target="_blank" class="btn-secondary px-4 py-2.5 text-xs font-bold rounded-2xl shadow-sm inline-flex items-center gap-2 cursor-pointer">
-                <span class="material-symbols-outlined text-[18px]">print</span>
-                Imprimir Kardex Físico
-            </a>
 
-            <!-- Botón de Kardex Valorado (Contabilidad - Existente) -->
-            <a href="{% url 'kardex_pdf' material.id %}" target="_blank" class="btn-primary px-4 py-2.5 text-xs font-bold rounded-2xl shadow-sm inline-flex items-center gap-2 cursor-pointer">
-                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                Kardex Valorado (PDF)
-            </a>
-        </div>
-    </div>
-
-    <!-- Ficha Técnica del Artículo -->
-    <div class="card p-6 mb-8 text-sm grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div>
-            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider block">Partida Presupuestaria</span>
-            <span class="text-sm font-semibold text-gray-900 dark:text-white mt-1 block">
-                {{ material.partida.codigo }} - {{ material.partida.nombre|slice:":30" }}...
-            </span>
-        </div>
-        <div>
-            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider block">Unidad de Manejo</span>
-            <span class="text-sm font-semibold text-gray-900 dark:text-white mt-1 block">
-                {{ material.unidad_medida_fk.nombre|default:material.unidad_medida }}
-            </span>
-        </div>
-        <div>
-            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider block">Existencia Consolidada</span>
-            <span class="text-sm font-bold text-[#8b0000] dark:text-red-400 mt-1 block">
-                {{ material.stock_actual }} Unidades
-            </span>
-        </div>
-        <div>
-            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider block">Stock de Seguridad Mínimo</span>
-            <span class="text-sm font-semibold text-gray-900 dark:text-white mt-1 block">
-                {{ material.stock_minimo }} Unidades
-            </span>
-        </div>
-    </div>
-
-    <!-- Tabla Histórica de Movimientos -->
-    <div class="card overflow-hidden">
-        <div class="p-6 border-b border-gray-100 dark:border-gray-800">
-            <h3 class="text-md font-bold text-gray-900 dark:text-white">Movimientos Cronológicos Registrados</h3>
-        </div>
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
-                <thead>
+            <table class="w-full text-sm text-left">
+                <thead class="text-[10px] text-gray-500 uppercase bg-white border-b border-gray-200 text-center font-bold">
                     <tr>
-                        <th class="px-6 py-3 text-center">Fecha</th>
-                        <th class="px-6 py-3 text-left">Detalle / Unidad de Trámite</th>
-                        <th class="px-6 py-3 text-center">Tipo</th>
-                        <th class="px-6 py-3 text-center">Cant. Entrada</th>
-                        <th class="px-6 py-3 text-center">Cant. Salida</th>
-                        <th class="px-6 py-3 text-center">Saldo Físico</th>
-                        <th class="px-6 py-3 text-right">P. Unitario</th>
-                        <th class="px-6 py-3 text-right">Saldo Valorado</th>
+                        <th class="px-4 py-4 w-28">Fecha</th>
+                        <th class="px-4 py-4 w-32">Almacén Origen/Dest.</th>
+                        <th class="px-4 py-4 text-left">Detalle / Trámite</th>
+                        <th class="px-4 py-4 w-24">Tipo</th>
+                        <th class="px-2 py-4 w-20">Entrada</th>
+                        <th class="px-2 py-4 w-20">Salida</th>
+                        <th class="px-2 py-4 w-24 bg-gray-50">Saldo Físico</th>
+                        <th class="px-4 py-4 w-28">P. Unitario</th>
+                        <th class="px-4 py-4 w-32 bg-gray-50">Saldo Valorado</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-                    {% for m in movimientos %}
-                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/40 transition">
-                        <td class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">{{ m.fecha|date:"d/m/Y H:i" }}</td>
-                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ m.detalle }}</td>
-                        <td class="px-6 py-4 text-center">
-                            {% if m.entrada_cant > 0 %}
-                            <span class="inline-flex items-center rounded-full bg-green-50 dark:bg-green-950/20 px-2 py-0.5 text-xs font-bold text-green-700 dark:text-green-400">
-                                Entrada
-                            </span>
+                <tbody class="text-gray-700 text-center">
+                    <!-- Fila de Saldo Inicial -->
+                    {% if saldo_inicial_cant > 0 or saldo_inicial_val > 0 %}
+                    <tr class="border-b border-gray-100 bg-yellow-50/30">
+                        <td class="px-4 py-3 text-xs text-gray-500 font-medium">Arrastre</td>
+                        <td class="px-4 py-3">—</td>
+                        <td class="px-4 py-3 text-left font-bold text-gray-600">SALDO ANTERIOR</td>
+                        <td class="px-4 py-3">—</td>
+                        <td class="px-2 py-3">—</td>
+                        <td class="px-2 py-3">—</td>
+                        <td class="px-2 py-3 font-bold text-gray-800 bg-gray-50">{{ saldo_inicial_cant }}</td>
+                        <td class="px-4 py-3">—</td>
+                        <td class="px-4 py-3 font-bold text-gray-800 bg-gray-50">Bs. {{ saldo_inicial_val|floatformat:2 }}</td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Filas Dinámicas -->
+                    {% for mov in movimientos %}
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ mov.fecha|date:"d/m/Y H:i" }}</td>
+                        <td class="px-4 py-3 text-xs font-semibold text-gray-600">{{ mov.almacen|truncatechars:15 }}</td>
+                        <td class="px-4 py-3 text-left">
+                            <span class="block truncate max-w-[200px] font-medium" title="{{ mov.detalle }}">{{ mov.detalle }}</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if mov.entrada_cant > 0 %}
+                                <span class="text-[10px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-md border border-green-200">Entrada</span>
                             {% else %}
-                            <span class="inline-flex items-center rounded-full bg-red-50 dark:bg-red-950/20 px-2 py-0.5 text-xs font-bold text-red-700 dark:text-red-400">
-                                Salida
-                            </span>
+                                <span class="text-[10px] font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-md border border-red-200">Salida</span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-center text-green-600 font-semibold">{% if m.entrada_cant > 0 %}{{ m.entrada_cant }}{% else %}—{% endif %}</td>
-                        <td class="px-6 py-4 text-center text-red-600 font-semibold">{% if m.salida_cant > 0 %}{{ m.salida_cant }}{% else %}—{% endif %}</td>
-                        <td class="px-6 py-4 text-center font-bold text-gray-900 dark:text-white">{{ m.saldo_cant }}</td>
-                        <td class="px-6 py-4 text-right text-gray-700 dark:text-gray-300">Bs. {{ m.precio_unitario|floatformat:2 }}</td>
-                        <td class="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">Bs. {{ m.saldo_importe|floatformat:2 }}</td>
+                        <td class="px-2 py-3 font-medium text-green-700">{% if mov.entrada_cant > 0 %}{{ mov.entrada_cant }}{% else %}—{% endif %}</td>
+                        <td class="px-2 py-3 font-medium text-red-700">{% if mov.salida_cant > 0 %}{{ mov.salida_cant }}{% else %}—{% endif %}</td>
+                        <td class="px-2 py-3 font-extrabold text-gray-800 bg-gray-50">{{ mov.saldo_cant }}</td>
+                        <td class="px-4 py-3 text-xs">Bs. {{ mov.precio_unitario|floatformat:2 }}</td>
+                        <td class="px-4 py-3 font-bold text-gray-800 bg-gray-50 whitespace-nowrap">Bs. {{ mov.saldo_importe|floatformat:2 }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">Este subartículo aún no cuenta con registros históricos.</td>
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                            No se encontraron movimientos registrados con los filtros aplicados.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -1,125 +1,89 @@
 {% extends 'base.html' %}
 
-{% block title %}
-Inventario
-{% endblock %}
+{% block title %}Inventario{% endblock %}
 
 {% block content %}
-
 <div class="max-w-7xl mx-auto">
 
-    <!-- CABECERA (Textos adaptados) -->
+    <!-- CABECERA -->
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6 mb-8">
-    
-        <!-- TÍTULO Y DESCRIPCIÓN -->
         <div class="min-w-0">
             <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
                 Inventario
             </h1>
-            <p class="text-sm text-gray-505 dark:text-gray-400 mt-1 max-w-xl">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xl">
                 Monitoreo, control de stock y catálogo de materiales disponibles en almacén
             </p>
         </div>
 
-        <!-- GRUPO DE BOTONES DE ACCIÓN (Bordes, fondos y textos adaptables) -->
+        <!-- GRUPO DE BOTONES DE ACCIÓN -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[640px]">    
-            
             {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                <!-- Nuevo Material -->
-                <a
-                    href="{% url 'nuevo_material' %}"
-                    class="btn-primary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-                >
-                    <span class="material-symbols-outlined text-[18px]">
-                        add_box
-                    </span>
+                <a href="{% url 'nuevo_material' %}" class="btn-primary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[18px]">add_box</span>
                     <span>Nuevo Material</span>
                 </a>
 
-                <!-- Nueva Entrada -->
-                <a
-                    href="{% url 'entrada_inventario' %}"
-                    class="btn-secondary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-                >
-                    <span class="material-symbols-outlined text-[18px]">
-                        archive
-                    </span>
+                <a href="{% url 'entrada_inventario' %}" class="btn-secondary px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[18px]">archive</span>
                     <span>Nueva Entrada</span>
                 </a>
 
-                <!-- Nueva Salida (Adaptación roja de salida) -->
-                <a
-                    href="{% url 'salida_inventario' %}"
-                    class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-                >
-                    <span class="material-symbols-outlined text-[18px]">
-                        logout
-                    </span>
+                <a href="{% url 'salida_inventario' %}" class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[18px]">logout</span>
                     <span>Nueva Salida</span>
                 </a>
             {% else %}
                 <div class="hidden lg:block lg:col-span-2"></div>
             {% endif %}
 
-            <!-- Movimientos -->
-            <a
-                href="{% url 'movimientos' %}"
-                class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap"
-            >
-                <span class="material-symbols-outlined text-[18px]">
-                    swap_horiz
-                </span>
+            <a href="{% url 'movimientos' %}" class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">swap_horiz</span>
                 <span>Movimientos</span>
             </a>
-
-
         </div>
-
     </div>
 
-    <!-- SECCIÓN DE FILTRADO Y EXPORTACIÓN (Simplificado para usar tu clase .card adaptable) -->
-    <div class="card p-6 mb-8 rounded-2xl">
-        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit'] mb-4 flex items-center gap-2">
-            <span class="material-symbols-outlined text-gray-500 dark:text-gray-450">date_range</span>
-            Exportación de Inventario Físico Valorado
-        </h3>
-        
-        <form method="GET" action="{% url 'reporte_inventario' %}" target="_blank" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <!-- Fecha de Inicio (Adaptación de inputs nativos) -->
-            <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha de Inicio</label>
-                <input 
-                    type="date" 
-                    name="desde" 
-                    value="2026-01-01" 
-                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
-                    required
-                >
-            </div>
+    <!-- TARJETAS SUPERIORES: EXPORTACIÓN + ACCESO DIRECTO A STOCK POR UNIDAD (CORREGIDO DE RAÍZ) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Tarjeta 1: Exportar Reporte Valorado (2 Columnas) -->
+        <div class="card p-6 rounded-2xl lg:col-span-2 flex flex-col justify-between">
+            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit'] mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-500">date_range</span>
+                Exportación de Inventario Físico Valorado
+            </h3>
+            
+            <form method="GET" action="{% url 'reporte_inventario' %}" target="_blank" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha de Inicio</label>
+                    <input type="date" name="desde" value="2026-01-01" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-[#8b0000]" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha de Fin</label>
+                    <input type="date" name="hasta" value="2026-12-31" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-[#8b0000]" required>
+                </div>
+                <div>
+                    <button type="submit" class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 text-[#8b0000] dark:text-red-400 px-4 py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full h-[42px]">
+                        <span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                        <span>Generar PDF</span>
+                    </button>
+                </div>
+            </form>
+        </div>
 
-            <!-- Fecha de Cierre -->
-            <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha de Fin</label>
-                <input 
-                    type="date" 
-                    name="hasta" 
-                    value="2026-12-31" 
-                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition"
-                    required
-                >
+        <!-- Tarjeta 2: Acceso Directo a Stock por Dependencia (1 Columna armonizada) -->
+        <a href="{% url 'inventario_por_unidad' %}" class="card p-6 rounded-2xl flex items-center gap-4 hover:border-[#8b0000]/40 transition group cursor-pointer">
+            <div class="w-14 h-14 bg-red-50 dark:bg-red-950/30 text-[#8b0000] dark:text-red-400 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-3xl">account_tree</span>
             </div>
-
-            <!-- Botón de Envío PDF (Adaptación roja traslúcida) -->
             <div>
-                <button 
-                    type="submit" 
-                    class="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-[#8b0000] dark:text-red-400 px-6 py-3 rounded-2xl text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer w-full h-[48px]"
-                >
-                    <span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
-                    <span>Generar Inventario Valorado</span>
-                </button>
+                <h3 class="text-base font-bold text-gray-800 dark:text-gray-200 font-['Outfit'] flex items-center gap-1.5">
+                    Stock por Unidad
+                    <span class="material-symbols-outlined text-[18px] text-gray-400 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Consulte materiales por Secretaría y Unidades Organizacionales.</p>
             </div>
-        </form>
+        </a>
     </div>
 
     <!-- MENSAJES DE ALERTA -->
@@ -133,17 +97,18 @@ Inventario
         </div>
     {% endif %}
 
-    <!-- CARD PRINCIPAL DE LA TABLA -->
-    <div class="card overflow-hidden">
+    <!-- TABLA PRINCIPAL DE EXISTENCIAS CON ACORDEÓN DRILL-DOWN -->
+    <div class="card overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
         <div class="overflow-x-auto">
             <table class="w-full min-w-[950px]">
                 <thead class="bg-gray-50 dark:bg-slate-900/50 border-b border-gray-100 dark:border-gray-800">
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th class="w-12 px-4 py-4 text-center"></th>
                         <th class="px-6 py-4 font-semibold">Código</th>
                         <th class="px-6 py-4 font-semibold">Partida Presupuestaria</th>
                         <th class="px-6 py-4 font-semibold">Material</th>
                         <th class="px-6 py-4 font-semibold">Unidad</th>
-                        <th class="px-6 py-4 font-semibold text-center">Stock Actual</th>
+                        <th class="px-6 py-4 font-semibold text-center">Stock Consolidado</th>
                         <th class="px-6 py-4 font-semibold text-center">Stock Mínimo</th>
                         <th class="px-6 py-4 font-semibold text-center">Estado</th>
                         <th class="px-6 py-4 font-semibold text-right pr-8">Acciones</th>
@@ -151,18 +116,47 @@ Inventario
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     {% for material in materiales %}
-                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition duration-150">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800 dark:text-gray-200">{{ material.codigo }}</td>
+                    <!-- FILA PRINCIPAL DEL MATERIAL -->
+                    <tr class="hover:bg-gray-50/70 dark:hover:bg-slate-900/40 transition duration-150 group">
+                        <!-- BOTÓN DESPLEGABLE ACORDEÓN -->
+                        <td class="px-4 py-4 text-center">
+                            <button 
+                                type="button"
+                                onclick="toggleDistribucion('row-dist-{{ material.id }}', 'icon-{{ material.id }}')"
+                                title="Ver distribución física por Almacén / Unidad"
+                                class="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-200 text-gray-500 hover:text-[#8b0000] flex items-center justify-center transition"
+                            >
+                                <span id="icon-{{ material.id }}" class="material-symbols-outlined text-[18px] transition-transform duration-200">
+                                    expand_more
+                                </span>
+                            </button>
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-200">
+                            {{ material.codigo }}
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <span class="px-2.5 py-1 rounded-full text-xs font-semibold badge-info">{{ material.partida.codigo }}</span>
-                            <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-1 font-medium max-w-[200px] truncate" title="{{ material.partida.nombre }}">{{ material.partida.nombre }}</div>
+                            <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-1 font-medium max-w-[200px] truncate" title="{{ material.partida.nombre }}">
+                                {{ material.partida.nombre }}
+                            </div>
                         </td>
-                        <td class="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-200">{{ material.nombre }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{{ material.unidad_medida_fk.codigo }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-gray-800 dark:text-gray-155">{{ material.stock_actual }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500 dark:text-gray-400">{{ material.stock_minimo }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-gray-200">
+                            {{ material.nombre }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                            {{ material.unidad_medida_fk.codigo }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-extrabold text-gray-800 dark:text-gray-100">
+                            <span class="inline-block px-3 py-1 bg-gray-100 dark:bg-slate-800 rounded-xl">
+                                {{ material.stock_actual }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500 dark:text-gray-400">
+                            {{ material.stock_minimo }}
+                        </td>
                         
-                        <!-- ESTADOS DE STOCK (Adaptación estética de badges) -->
+                        <!-- ESTADO BADGE -->
                         <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                             {% if material.stock_actual == 0 %}
                                 <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30">Agotado</span>
@@ -173,41 +167,97 @@ Inventario
                             {% endif %}
                         </td>
                         
-                        <!-- BOTONES DE ACCIÓN (Bordes, fondos y colores de hover adaptados) -->
+                        <!-- ACCIONES -->
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
                             <div class="flex items-center justify-end gap-2">
-                                {% if not material.tiene_movimientos %}
-                                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                        <a title="Establecer Saldo Inicial" href="{% url 'establecer_saldo_inicial' material.id %}" class="w-9 h-9 rounded-xl border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition">
-                                            <span class="material-symbols-outlined text-green-700 dark:text-green-450 text-[20px]">input</span>
-                                        </a>
-                                    {% endif %}
-                                {% endif %}
-                                {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                    <a title="Registrar salida" href="{% url 'salida_inventario' %}?material={{ material.id }}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-red-50 dark:hover:bg-red-950/25 hover:border-red-200 dark:hover:border-red-900/40 flex items-center justify-center transition">
-                                        <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-[20px]">output</span>
+                                {% if not material.tiene_movimientos and request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR' %}
+                                    <a title="Establecer Saldo Inicial" href="{% url 'establecer_saldo_inicial' material.id %}" class="w-9 h-9 rounded-xl border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 flex items-center justify-center transition">
+                                        <span class="material-symbols-outlined text-green-700 text-[20px]">input</span>
                                     </a>
                                 {% endif %}
-                                <a title="Ver Kardex" href="{% url 'kardex' material.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-blue-50 dark:hover:bg-blue-950/25 hover:border-blue-200 dark:hover:border-blue-900/40 flex items-center justify-center transition">
-                                    <span class="material-symbols-outlined text-blue-600 dark:text-blue-450 text-[20px]">assignment</span>
+                                {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR' %}
+                                    <a title="Registrar salida" href="{% url 'salida_inventario' %}?material={{ material.id }}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-red-50 text-red-600 flex items-center justify-center transition">
+                                        <span class="material-symbols-outlined text-[20px]">output</span>
+                                    </a>
+                                {% endif %}
+                                <a title="Ver Kardex" href="{% url 'kardex' material.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-blue-50 text-blue-600 flex items-center justify-center transition">
+                                    <span class="material-symbols-outlined text-[20px]">assignment</span>
                                 </a>
-                                {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                    <a title="Editar material" href="{% url 'editar_material' material.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-amber-50 dark:hover:bg-amber-950/25 hover:border-amber-200 dark:hover:border-amber-900/40 flex items-center justify-center transition">
-                                        <span class="material-symbols-outlined text-[#d97706] dark:text-amber-500 text-[20px]">edit</span>
+                                {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR' %}
+                                    <a title="Editar material" href="{% url 'editar_material' material.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-amber-50 text-[#d97706] flex items-center justify-center transition">
+                                        <span class="material-symbols-outlined text-[20px]">edit</span>
                                     </a>
                                 {% endif %}
                                 {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                    <a title="Eliminar material" href="{% url 'eliminar_material' material.id %}" onclick="return confirm('¿Está seguro de eliminar este material?')" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-red-50 dark:hover:bg-red-950/25 hover:border-red-200 dark:hover:border-red-900/40 flex items-center justify-center transition cursor-pointer">
-                                        <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-[20px]">delete</span>
+                                    <a title="Dar de baja" href="{% url 'toggle_material' material.id %}" onclick="return confirm('¿Está seguro de dar de baja este material?')" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-red-50 text-red-600 flex items-center justify-center transition">
+                                        <span class="material-symbols-outlined text-[20px]">delete</span>
                                     </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- FILA ACORDEÓN: DISTRIBUCIÓN POR ALMACÉN / SECRETARÍA / UNIDAD -->
+                    <tr id="row-dist-{{ material.id }}" class="hidden bg-slate-50/80 dark:bg-slate-900/60 border-b border-gray-200 dark:border-gray-800">
+                        <td colspan="9" class="p-4 sm:p-6 pl-12 sm:pl-16">
+                            <div class="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm max-w-4xl">
+                                <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-800">
+                                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[16px] text-[#8b0000]">warehouse</span>
+                                        Ubicación y existencias físicas de: <strong class="text-gray-800 dark:text-gray-100 font-semibold">{{ material.nombre }}</strong>
+                                    </span>
+                                    <span class="text-xs text-gray-400">Total en almacenes: <strong>{{ material.stock_actual }} {{ material.unidad_medida_fk.codigo }}</strong></span>
+                                </div>
+
+                                {% if material.inventarios_almacen.all %}
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {% for inv in material.inventarios_almacen.all %}
+                                        <div class="flex items-start justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-800/40">
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs font-bold text-gray-800 dark:text-gray-100">
+                                                        📍 {{ inv.almacen.nombre }}
+                                                    </span>
+                                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-md {% if inv.almacen.tipo == 'CENTRAL' %}bg-purple-50 text-purple-700 border border-purple-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+                                                        {{ inv.almacen.get_tipo_display }}
+                                                    </span>
+                                                </div>
+                                                <div class="text-[11px] text-gray-500 mt-1">
+                                                    {% if inv.almacen.unidad_organizacional %}
+                                                        <span class="font-medium text-gray-700 dark:text-gray-300">{{ inv.almacen.unidad_organizacional.nombre }}</span>
+                                                        {% if inv.almacen.unidad_organizacional.secretaria %}
+                                                            <div class="text-[10px] text-gray-400">🏛️ {{ inv.almacen.unidad_organizacional.secretaria.nombre }}</div>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <span class="text-gray-400 italic">Sin unidad asignada directa</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+
+                                            <div class="text-right shrink-0">
+                                                <div class="text-base font-extrabold text-[#8b0000] dark:text-red-400">
+                                                    {{ inv.stock_fisico }} <span class="text-xs font-normal text-gray-500">{{ material.unidad_medida_fk.codigo }}</span>
+                                                </div>
+                                                <div class="text-[10px] text-gray-400">
+                                                    Disp: <span class="text-green-600 font-bold">{{ inv.stock_disponible }}</span>
+                                                    {% if inv.stock_reservado > 0 %} | Res: <span class="text-amber-600 font-bold">{{ inv.stock_reservado }}</span>{% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="py-3 text-center text-xs text-gray-400 italic">
+                                        No hay existencias físicas registradas en subalmacenes para este material.
+                                    </div>
                                 {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                            <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-655 mb-2 block">inventory_2</span>
+                        <td colspan="9" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">inventory_2</span>
                             No existen materiales registrados en el inventario.
                         </td>
                     </tr>
@@ -216,7 +266,21 @@ Inventario
             </table>
         </div>
     </div>
-
 </div>
 
+<script>
+    function toggleDistribucion(rowId, iconId) {
+        const row = document.getElementById(rowId);
+        const icon = document.getElementById(iconId);
+        if (!row) return;
+
+        if (row.classList.contains('hidden')) {
+            row.classList.remove('hidden');
+            if (icon) icon.classList.add('rotate-180');
+        } else {
+            row.classList.add('hidden');
+            if (icon) icon.classList.remove('rotate-180');
+        }
+    }
+</script>
 {% endblock %}

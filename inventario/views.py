@@ -24,7 +24,11 @@ from usuarios.decorators import rol_requerido
 from .services import registrar_salida_valorada_peps
 
 from django.contrib.auth.models import User
+from .services import registrar_salida_valorada_peps, validar_operacion_almacen, obtener_inventario_para_unidad
+from organizacion.models import Secretaria, UnidadOrganizacional
+from django.db.models import Prefetch
 
+from django.core.exceptions import ValidationError
 from compras.models import CompraMenor
 
 from .models import (
@@ -44,9 +48,29 @@ from .models import (
     'ADMINISTRADOR'
 ])
 
+@login_required
+@rol_requerido([
+    'ALMACENERO',
+    'KARDISTA',
+    'ADMINISTRADOR'
+])
 def inventario_view(request):
-
-    materiales = Material.objects.all()
+    """
+    Vista principal de existencias. Optimiza la carga con prefetch de inventarios por almacén
+    y la estructura organizacional (Secretaría/Unidad) para alimentar el acordeón interactivo.
+    """
+    materiales = Material.objects.filter(is_active=True).select_related(
+        'partida', 'unidad_medida_fk'
+    ).prefetch_related(
+        Prefetch(
+            'inventarios_almacen',
+            queryset=InventarioAlmacen.objects.select_related(
+                'almacen', 
+                'almacen__unidad_organizacional', 
+                'almacen__unidad_organizacional__secretaria'
+            ).filter(stock_fisico__gt=0)
+        )
+    ).order_by('codigo')
 
     return render(
         request,
@@ -61,9 +85,14 @@ def inventario_view(request):
 def almacen_list(request):
     """
     Tarjeta 2: Muestra la lista de Almacenes (Central y Subalmacenes) de la Gobernación.
+    Optimizado con prefetch de unidades atendidas y secretarías.
     """
     query = request.GET.get('q', '').strip()
-    almacenes = Almacen.objects.select_related('unidad_organizacional', 'responsable').all()
+    almacenes = Almacen.objects.select_related(
+        'unidad_organizacional', 'responsable'
+    ).prefetch_related(
+        'unidades_atendidas__secretaria'
+    ).all()
 
     if query:
         almacenes = almacenes.filter(
@@ -84,15 +113,16 @@ def almacen_list(request):
         'query': query
     })
 
-
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def crear_almacen(request):
     """
-    Tarjeta 2: Registra un nuevo almacén o subalmacén, vinculándolo con su Unidad y Responsable [28].
+    Tarjeta 2: Registra un nuevo almacén o subalmacén, vinculándolo con su Unidad y Responsable.
+    REQUERIMIENTO: Permite definir un Almacén Padre y Múltiples Unidades Atendidas.
     """
     unidades = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
     usuarios = User.objects.filter(is_active=True).order_by('username')
+    almacenes_padre = Almacen.objects.filter(is_active=True).order_by('nombre')
 
     if request.method == 'POST':
         nombre = request.POST.get('nombre', '').strip()
@@ -100,6 +130,10 @@ def crear_almacen(request):
         tipo = request.POST.get('tipo', 'SUBALMACEN')
         unidad_id = request.POST.get('unidad_organizacional')
         responsable_id = request.POST.get('responsable')
+        
+        # Nuevos campos capturados
+        almacen_padre_id = request.POST.get('almacen_padre')
+        unidades_atendidas_ids = request.POST.getlist('unidades_atendidas')
 
         if not nombre or not tipo:
             messages.error(request, "El Nombre y el Tipo de Almacén son campos obligatorios.")
@@ -111,22 +145,28 @@ def crear_almacen(request):
 
         unidad = get_object_or_404(UnidadOrganizacional, id=unidad_id) if unidad_id else None
         responsable = get_object_or_404(User, id=responsable_id) if responsable_id else None
+        padre = get_object_or_404(Almacen, id=almacen_padre_id) if almacen_padre_id else None
 
         try:
             with transaction.atomic():
-                Almacen.objects.create(
+                almacen = Almacen.objects.create(
                     nombre=nombre,
                     descripcion=descripcion,
                     tipo=tipo,
+                    almacen_padre=padre,
                     unidad_organizacional=unidad,
                     responsable=responsable,
                     is_active=True
                 )
+                # Asignar las unidades a las que puede despachar
+                if unidades_atendidas_ids:
+                    almacen.unidades_atendidas.set(unidades_atendidas_ids)
+                    
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
                     accion='Crear Almacén',
-                    descripcion=f'Se creó el almacén "{nombre}" de tipo {tipo} en la base de datos.'
+                    descripcion=f'Se creó el almacén "{nombre}" de tipo {tipo}.'
                 )
             messages.success(request, f"Almacén '{nombre}' registrado correctamente.")
             return redirect('almacen_list')
@@ -137,7 +177,8 @@ def crear_almacen(request):
 
     return render(request, 'inventario/crear_almacen.html', {
         'unidades': unidades,
-        'usuarios': usuarios
+        'usuarios': usuarios,
+        'almacenes_padre': almacenes_padre
     })
 
 
@@ -145,11 +186,12 @@ def crear_almacen(request):
 @rol_requerido(['ADMINISTRADOR'])
 def editar_almacen(request, id):
     """
-    Tarjeta 2: Permite modificar el responsable, la unidad o dar de baja lógica a un almacén [28].
+    Tarjeta 2: Modifica el almacén, incluyendo su jerarquía (Subalmacén) y a quiénes atiende.
     """
     almacen = get_object_or_404(Almacen, id=id)
     unidades = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
     usuarios = User.objects.filter(is_active=True).order_by('username')
+    almacenes_padre = Almacen.objects.filter(is_active=True).exclude(id=almacen.id).order_by('nombre')
 
     if request.method == 'POST':
         nombre = request.POST.get('nombre', '').strip()
@@ -157,42 +199,46 @@ def editar_almacen(request, id):
         tipo = request.POST.get('tipo', 'SUBALMACEN')
         unidad_id = request.POST.get('unidad_organizacional')
         responsable_id = request.POST.get('responsable')
+        almacen_padre_id = request.POST.get('almacen_padre')
+        unidades_atendidas_ids = request.POST.getlist('unidades_atendidas')
         is_active = request.POST.get('is_active') == 'true'
 
         if not nombre or not tipo:
-            messages.error(request, "El Nombre y el Tipo de Almacén son obligatorios.")
+            messages.error(request, "El Nombre y el Tipo son obligatorios.")
             return redirect('editar_almacen', id=almacen.id)
-
-        unidad = get_object_or_404(UnidadOrganizacional, id=unidad_id) if unidad_id else None
-        responsable = get_object_or_404(User, id=responsable_id) if responsable_id else None
 
         try:
             with transaction.atomic():
                 almacen.nombre = nombre
                 almacen.descripcion = descripcion
                 almacen.tipo = tipo
-                almacen.unidad_organizacional = unidad
-                almacen.responsable = responsable
+                almacen.unidad_organizacional = get_object_or_404(UnidadOrganizacional, id=unidad_id) if unidad_id else None
+                almacen.responsable = get_object_or_404(User, id=responsable_id) if responsable_id else None
+                almacen.almacen_padre = get_object_or_404(Almacen, id=almacen_padre_id) if almacen_padre_id else None
                 almacen.is_active = is_active
                 almacen.save()
+
+                if unidades_atendidas_ids is not None:
+                    almacen.unidades_atendidas.set(unidades_atendidas_ids)
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
                     accion='Editar Almacén',
-                    descripcion=f'Se modificaron los datos del almacén "{nombre}" (ID: {almacen.id})'
+                    descripcion=f'Se modificaron los datos del almacén "{nombre}".'
                 )
             messages.success(request, f"Almacén '{nombre}' actualizado correctamente.")
             return redirect('almacen_list')
 
         except Exception as e:
-            messages.error(request, f"Error al actualizar el almacén: {str(e)}")
+            messages.error(request, f"Error al actualizar: {str(e)}")
             return redirect('editar_almacen', id=almacen.id)
 
     return render(request, 'inventario/editar_almacen.html', {
         'almacen': almacen,
         'unidades': unidades,
-        'usuarios': usuarios
+        'usuarios': usuarios,
+        'almacenes_padre': almacenes_padre
     })
 @login_required
 @rol_requerido([
@@ -518,72 +564,73 @@ def movimientos(request):
         }
     )
 
-# FILE: inventario/views.py (Reemplazar la función kardex)
-@login_required
-@rol_requerido([
-    'ALMACENERO',
-    'KARDISTA',
-    'ADMINISTRADOR'
-])
 # inventario/views.py
 
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
 def kardex(request, id):
     """
-    Tarjetas 18 y 19: Calcula, filtra y consulta el Kardex de Existencias Valorado 
-    de forma aislada por Almacén, rango de fechas, mes, gestión y tipo de movimiento.
+    Tarjetas 18 y 19: Calcula y consulta el Kardex de Existencias Valorado.
+    Aplica aislamiento estricto: El Almacenero seccional SOLO ve su almacén asignado
+    y no el consolidado global ni almacenes ajenos.
     """
     material = get_object_or_404(Material, id=id)
     perfil = request.user.perfilusuario
     rol = perfil.rol
 
-    # 1. Cargar almacenes disponibles según permisos
+    # 1. Determinar almacenes permitidos para este usuario
     if rol == 'ADMINISTRADOR':
         almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
     else:
         almacenes_disponibles = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
 
-    # 2. Capturar filtros de la Tarjeta 19
+    if not almacenes_disponibles.exists() and rol != 'ADMINISTRADOR':
+        messages.error(request, "No tiene ningún almacén asignado bajo su responsabilidad.")
+        return redirect('inventario')
+
+    # 2. Capturar o Forzar Almacén
     filtro_almacen_id = request.GET.get('almacen', '').strip()
+
+    # REGLA CLAVE DE AISLAMIENTO:
+    # Si es ALMACENERO y no filtró nada (o solo tiene un almacén), forzar directamente su almacén
+    if not filtro_almacen_id and rol == 'ALMACENERO':
+        almacen_seleccionado = almacenes_disponibles.first()
+        filtro_almacen_id = str(almacen_seleccionado.id)
+    elif filtro_almacen_id:
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
+        if not perfil.tiene_acceso_almacen(almacen_seleccionado):
+            messages.error(request, f"Violación de Seguridad: No tiene autorización para auditar el almacén: {almacen_seleccionado.nombre}")
+            return redirect('kardex', id=material.id)
+    else:
+        # Administradores o Kardistas centrales pueden ver consolidado si lo desean
+        almacen_seleccionado = None
+
     desde_str = request.GET.get('desde', '').strip()
     hasta_str = request.GET.get('hasta', '').strip()
     filtro_mes = request.GET.get('mes', '').strip()
-    filtro_gestion = request.GET.get('gestion', '2026').strip()  # Gestión por defecto
+    filtro_gestion = request.GET.get('gestion', '2026').strip()
     filtro_tipo = request.GET.get('tipo_movimiento', '').strip()
 
-    # Base de consulta para el material específico
+    # 3. Base de consulta para movimientos
     movimientos_query = MovimientoInventario.objects.filter(material=material)
 
-    # Filtrado obligatorio por Almacén (Tarjeta 18)
-    almacen_seleccionado = None
-    if filtro_almacen_id:
-        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
-        if not perfil.tiene_acceso_almacen(almacen_seleccionado):
-            messages.error(request, f"No tiene autorización para auditar el Kardex en: {almacen_seleccionado.nombre}")
-            return redirect('inventario_por_almacen')
+    if almacen_seleccionado:
         movimientos_query = movimientos_query.filter(almacen=almacen_seleccionado)
     else:
-        # Si no se selecciona, forzar al almacenero a ver solo sus almacenes autorizados
-        if rol != 'ADMINISTRADOR':
-            movimientos_query = movimientos_query.filter(almacen__in=almacenes_disponibles)
+        movimientos_query = movimientos_query.filter(almacen__in=almacenes_disponibles)
 
-    # Filtrado por Gestión Fiscal
     try:
         gestion_ano = int(filtro_gestion)
         movimientos_query = movimientos_query.filter(fecha__year=gestion_ano)
     except ValueError:
         gestion_ano = 2026
 
-    # Filtrar por Mes
     if filtro_mes:
         try:
-            mes_num = int(filtro_mes)
-            movimientos_query = movimientos_query.filter(fecha__month=mes_num)
+            movimientos_query = movimientos_query.filter(fecha__month=int(filtro_mes))
         except ValueError:
             pass
 
-    # Filtrar por rango de fechas (Dentro de la gestión)
     fecha_limite_inicial = None
     if desde_str:
         fecha_limite_inicial = parse_date(desde_str)
@@ -595,15 +642,17 @@ def kardex(request, id):
         if hasta_date:
             movimientos_query = movimientos_query.filter(fecha__date__lte=hasta_date)
 
-    # Filtrar por Tipo de Movimiento (ENTRADA / SALIDA)
     if filtro_tipo:
         movimientos_query = movimientos_query.filter(tipo=filtro_tipo)
 
-    # 3. CÁLCULO DEL SALDO ANTERIOR (Arraste de periodos previos)
-    # Se calculan todos los movimientos ocurridos antes de la fecha inicial del filtro
+    # 4. CÁLCULO DEL SALDO ANTERIOR (Aislado al almacén del usuario)
     query_previos = MovimientoInventario.objects.filter(material=material, fecha__year=gestion_ano)
+    
     if almacen_seleccionado:
         query_previos = query_previos.filter(almacen=almacen_seleccionado)
+    else:
+        query_previos = query_previos.filter(almacen__in=almacenes_disponibles)
+
     if fecha_limite_inicial:
         query_previos = query_previos.filter(fecha__date__lt=fecha_limite_inicial)
     elif filtro_mes:
@@ -612,16 +661,16 @@ def kardex(request, id):
     saldo_inicial_fisico = 0
     saldo_inicial_valorado = Decimal('0.00')
 
-    for m in query_previos.order_by('fecha'):
+    for m in query_previos.order_by('fecha', 'id'):
         if m.tipo == 'ENTRADA':
             saldo_inicial_fisico += m.cantidad
-            saldo_inicial_valorado += m.costo_total
+            saldo_inicial_valorado += (m.costo_total or Decimal('0.00'))
         else:
             saldo_inicial_fisico -= m.cantidad
-            saldo_inicial_valorado -= m.costo_total
+            saldo_inicial_valorado -= (m.costo_total or Decimal('0.00'))
 
-    # 4. PROCESAR MOVIMIENTOS FILTRADOS
-    movimientos_db = movimientos_query.order_by('fecha')
+    # 5. PROCESAR MOVIMIENTOS
+    movimientos_db = movimientos_query.order_by('fecha', 'id')
     movimientos_valorados = []
     
     saldo_fisico = saldo_inicial_fisico
@@ -630,18 +679,19 @@ def kardex(request, id):
     for mov in movimientos_db:
         if mov.tipo == 'ENTRADA':
             saldo_fisico += mov.cantidad
-            saldo_valorado += mov.costo_total
+            saldo_valorado += (mov.costo_total or Decimal('0.00'))
             entrada_cant, salida_cant = mov.cantidad, 0
-            entrada_imp, salida_imp = mov.costo_total, Decimal('0.00')
+            entrada_imp, salida_imp = (mov.costo_total or Decimal('0.00')), Decimal('0.00')
         else:
             saldo_fisico -= mov.cantidad
-            saldo_valorado -= mov.costo_total
+            saldo_valorado -= (mov.costo_total or Decimal('0.00'))
             entrada_cant, salida_cant = 0, mov.cantidad
-            entrada_imp, salida_imp = Decimal('0.00'), mov.costo_total
+            entrada_imp, salida_imp = Decimal('0.00'), (mov.costo_total or Decimal('0.00'))
 
         movimientos_valorados.append({
             'fecha': mov.fecha,
             'detalle': mov.unidad_destino.nombre if mov.unidad_destino else mov.referencia,
+            'almacen': mov.almacen.nombre if mov.almacen else 'Global',
             'usuario': mov.usuario.username,
             'entrada_cant': entrada_cant,
             'salida_cant': salida_cant,
@@ -652,21 +702,21 @@ def kardex(request, id):
             'saldo_importe': saldo_valorado,
         })
 
-    # Mostrar del más nuevo al más antiguo en pantalla
     movimientos_valorados.reverse()
 
-    # Lista de meses oficiales para el filtro
+    # Stock físico real actual en el almacén auditado
+    if almacen_seleccionado:
+        inv_almacen = InventarioAlmacen.objects.filter(material=material, almacen=almacen_seleccionado).first()
+        stock_custodia = inv_almacen.stock_fisico if inv_almacen else 0
+    else:
+        stock_custodia = material.stock_actual
+
     meses_lista = [
         (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'), (4, 'Abril'),
         (5, 'Mayo'), (6, 'Junio'), (7, 'Julio'), (8, 'Agosto'),
         (9, 'Septiembre'), (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre')
     ]
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Inventario',
-        accion='Visualizar Kardex',
-        descripcion=f'El usuario visualizó en pantalla el Kardex Valorado interactivo de {material.nombre} (Cód: {material.codigo}).'
-    )
+
     return render(
         request,
         'inventario/kardex.html',
@@ -674,18 +724,121 @@ def kardex(request, id):
             'material': material,
             'movimientos': movimientos_valorados,
             'almacenes_disponibles': almacenes_disponibles,
+            'almacen_seleccionado': almacen_seleccionado,
             'filtro_almacen_id': filtro_almacen_id,
+            'stock_custodia': stock_custodia,  # <-- Stock exacto del almacén auditado
             'desde': desde_str,
             'hasta': hasta_str,
             'filtro_mes': filtro_mes,
             'filtro_gestion': filtro_gestion,
             'filtro_tipo': filtro_tipo,
             'meses': meses_lista,
-            # Variables de Saldo Inicial para pintar en la cabecera
             'saldo_inicial_cant': saldo_inicial_fisico,
             'saldo_inicial_val': saldo_inicial_valorado,
+            'rol': rol,
         }
     )
+
+def obtener_almacenes_usuario(user):
+    """
+    Función auxiliar: Retorna los almacenes que el usuario tiene derecho a operar/auditar.
+    Busca por 3 vías: Superadmin, Responsable directo, Unidad vinculada o Permiso explícito.
+    """
+    perfil = getattr(user, 'perfilusuario', None)
+    if not perfil:
+        return Almacen.objects.none()
+
+    if perfil.rol == 'ADMINISTRADOR' or user.is_superuser:
+        return Almacen.objects.filter(is_active=True)
+
+    # Buscar por Responsable directo (@spedro0609), por almacenes autorizados o por su Unidad
+    filtro_almacenes = Q(responsable=user) | Q(id__in=perfil.almacenes_autorizados.all())
+    if perfil.unidad:
+        filtro_almacenes |= Q(unidad_organizacional=perfil.unidad)
+
+    return Almacen.objects.filter(filtro_almacenes, is_active=True).distinct()
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+def inventario_por_unidad(request):
+    """
+    REQUERIMIENTO 6 (Blindado con detección inteligente de almacén):
+    - Almacenero Central / Administrador: Visión global de toda la Gobernación.
+    - Almacenero de Subalmacén (Pedro en UNASBA): Solo ve los materiales de UNASBA.
+    """
+    perfil = request.user.perfilusuario
+    rol = perfil.rol
+
+    # 1. Obtener los almacenes asignados a este usuario
+    almacenes_usuario = obtener_almacenes_usuario(request.user)
+
+    # Es central si es Administrador o si está a cargo de un almacén de tipo 'CENTRAL'
+    es_central = (
+        rol == 'ADMINISTRADOR' or 
+        almacenes_usuario.filter(tipo='CENTRAL').exists()
+    )
+
+    if es_central:
+        almacenes_visibles = Almacen.objects.filter(is_active=True)
+    else:
+        # Pedro Sánchez: queda restringido estrictamente a UNASBA
+        almacenes_visibles = almacenes_usuario
+
+    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
+    unidades_query = UnidadOrganizacional.objects.filter(is_active=True).select_related('secretaria').order_by('nombre')
+
+    filtro_secretaria_id = request.GET.get('secretaria_id', '').strip()
+    filtro_unidad_id = request.GET.get('unidad_id', '').strip()
+
+    secretaria_seleccionada = None
+    unidad_seleccionada = None
+
+    # 2. Filtrar existencias aisladas a los almacenes que el usuario puede ver
+    inventario_qs = InventarioAlmacen.objects.filter(
+        almacen__in=almacenes_visibles,
+        stock_fisico__gt=0
+    )
+
+    if filtro_unidad_id:
+        unidad_seleccionada = get_object_or_404(UnidadOrganizacional, id=filtro_unidad_id)
+        secretaria_seleccionada = unidad_seleccionada.secretaria
+        almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas=unidad_seleccionada)
+        inventario_qs = inventario_qs.filter(almacen__in=almacenes_atendidos)
+
+    elif filtro_secretaria_id:
+        secretaria_seleccionada = get_object_or_404(Secretaria, id=filtro_secretaria_id)
+        unidades_sec = unidades_query.filter(secretaria=secretaria_seleccionada)
+        almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas__in=unidades_sec)
+        inventario_qs = inventario_qs.filter(almacen__in=almacenes_atendidos)
+
+    # 3. KPIs calculados únicamente sobre los datos visibles del usuario
+    total_materiales = inventario_qs.values('material_id').distinct().count()
+    total_almacenes = inventario_qs.values('almacen_id').distinct().count()
+    total_stock_fisico = inventario_qs.aggregate(total=Sum('stock_fisico'))['total'] or 0
+
+    inventario = inventario_qs.select_related(
+        'almacen', 
+        'almacen__unidad_organizacional',
+        'almacen__unidad_organizacional__secretaria', 
+        'material', 
+        'material__partida', 
+        'material__unidad_medida_fk'
+    ).order_by('material__nombre')
+
+    return render(request, 'inventario/stock_por_unidad.html', {
+        'secretarias': secretarias,
+        'unidades': unidades_query,
+        'secretaria_seleccionada': secretaria_seleccionada,
+        'unidad_seleccionada': unidad_seleccionada,
+        'filtro_secretaria_id': filtro_secretaria_id,
+        'filtro_unidad_id': filtro_unidad_id,
+        'inventario': inventario,
+        'total_materiales': total_materiales,
+        'total_stock_fisico': total_stock_fisico,
+        'total_almacenes': total_almacenes,
+        'es_central': es_central,
+    })
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def entrada_inventario(request):
@@ -827,37 +980,49 @@ def entrada_inventario(request):
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def salida_inventario(request):
     materiales = Material.objects.filter(stock_actual__gt=0)
-    unidades = UnidadOrganizacional.objects.all().order_by('nombre')  # <-- OBTENER UNIDADES
+    unidades = UnidadOrganizacional.objects.all().order_by('nombre')
+    
+    # Cargar almacenes que este usuario puede operar
+    perfil = getattr(request.user, 'perfilusuario', None)
+    if perfil and perfil.rol == 'ADMINISTRADOR':
+        almacenes_disponibles = Almacen.objects.filter(is_active=True)
+    else:
+        almacenes_disponibles = perfil.almacenes_autorizados.filter(is_active=True)
+        
     material_preseleccionado = request.GET.get('material')
     
     if request.method == 'POST':
         material_id = request.POST.get('material')
         cantidad = int(request.POST.get('cantidad', 0))
         referencia = request.POST.get('referencia', '').strip()
-        unidad_destino_id = request.POST.get('unidad_destino')  # <-- CAPTURAR UNIDAD
+        unidad_destino_id = request.POST.get('unidad_destino')
+        almacen_origen_id = request.POST.get('almacen_origen') # NUEVO CAMPO DEL FORM
 
-        if not material_id or not unidad_destino_id or cantidad <= 0:
+        if not material_id or not unidad_destino_id or not almacen_origen_id or cantidad <= 0:
             messages.error(request, 'Debe completar todos los campos obligatorios.')
             return redirect('salida_inventario')
 
         material = get_object_or_404(Material, id=material_id)
         unidad_destino = get_object_or_404(UnidadOrganizacional, id=unidad_destino_id)
+        almacen = get_object_or_404(Almacen, id=almacen_origen_id)
 
-        if cantidad > material.stock_actual:
-            messages.error(request, 'No existe stock suficiente disponible para este despacho.')
+        # 1. Validar permiso operativo
+        try:
+            validar_operacion_almacen(request.user, almacen)
+        except ValidationError as e:
+            messages.error(request, str(e))
             return redirect('salida_inventario')
 
-        # 1. Obtener almacén de despacho por defecto (Almacén Central)
-        almacen = Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
-        if not almacen:
-            messages.error(request, 'No se ha configurado un Almacén Central activo en el sistema.')
-            return redirect('salida_inventario')
+        # 2. Validar que el almacén tenga autorizada la atención a esa unidad
+        if not request.user.is_superuser:
+            if not almacen.unidades_atendidas.filter(id=unidad_destino.id).exists():
+                messages.error(request, f"Violación de Regla: El almacén '{almacen.nombre}' no está autorizado para despachar materiales a la unidad '{unidad_destino.nombre}'.")
+                return redirect('salida_inventario')
 
         try:
-            # Procesar el egreso valorado PEPS asociándolo al Almacén Central y a la unidad destino
             registrar_salida_valorada_peps(
                 material=material,
-                almacen=almacen,                  # <-- PARÁMETRO DE ALMACÉN CENTRAL AGREGADO
+                almacen=almacen,
                 cantidad_salida=cantidad,
                 tipo_movimiento='SALIDA',
                 referencia=referencia,
@@ -869,27 +1034,22 @@ def salida_inventario(request):
                 usuario=request.user,
                 modulo='Inventario',
                 accion='Registrar Salida de Material',
-                descripcion=f'Despacho de {cantidad} u. de {material.nombre} a la unidad: {unidad_destino.nombre} desde {almacen.nombre}. Ref: {referencia}'
+                descripcion=f'Despacho de {cantidad} u. de {material.nombre} a {unidad_destino.nombre} desde {almacen.nombre}.'
             )
 
-            messages.success(request, f'Salida de {cantidad} unidades a {unidad_destino.nombre} procesada correctamente.')
+            messages.success(request, f'Salida procesada correctamente desde {almacen.nombre}.')
             return redirect('inventario')
 
         except Exception as e:
-            messages.error(request, f'Error al procesar la salida PEPS: {str(e)}')
+            messages.error(request, f'Error al procesar la salida: {str(e)}')
             return redirect('salida_inventario')
 
-    return render(
-        request,
-        'inventario/salida.html',
-        {
-            'materiales': materiales,
-            'unidades': unidades,  # <-- ENVIAR A LA PLANTILLA
-            'material_preseleccionado': material_preseleccionado
-        }
-    )
-
-
+    return render(request, 'inventario/salida.html', {
+        'materiales': materiales,
+        'unidades': unidades,
+        'almacenes': almacenes_disponibles, # PASAR AL TEMPLATE
+        'material_preseleccionado': material_preseleccionado
+    })
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def registrar_baja(request):

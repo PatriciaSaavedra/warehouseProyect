@@ -36,4 +36,6 @@ urlpatterns = [
     path('transferencias/<int:id>/recibir/', views.recibir_transferencia, name='recibir_transferencia'),
     path('kardex/<int:id>/', views.kardex, name='kardex'),  
     path('gestion/cierre/', views.cierre_conciliacion_view, name='cierre_conciliacion'),
+    path('stock-unidad/', views.inventario_por_unidad, name='inventario_por_unidad'),
+
 ]

@@ -12,88 +12,158 @@
                 Pedido de Almacén
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Solicitud de materiales existentes en stock para consumo interno inmediato [11]
+                Solicitud de materiales en stock según techos autorizados en su POA {{ GESTION_ACTUAL|default:"2026" }}
             </p>
         </div>
         <a href="{% url 'solicitudes' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
-            Volver
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
         </a>
     </div>
 
+    <!-- SELECTOR DE UNIDAD (SOLO SI ES ADMINISTRADOR) -->
+    {% if rol == 'ADMINISTRADOR' %}
+    <div class="card p-4 rounded-2xl mb-6 border border-amber-200 bg-amber-50/50 dark:bg-slate-900 dark:border-amber-900/40">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-600">manage_accounts</span>
+                <span class="text-xs font-bold uppercase text-amber-800 dark:text-amber-400">Modo Administrador: Tramitar pedido para</span>
+            </div>
+            <select 
+                onchange="window.location.href='?unidad_id=' + this.value;"
+                class="border border-amber-300 rounded-xl px-3 py-1.5 text-sm bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 font-medium focus:ring-amber-500"
+            >
+                {% for u in unidades_disponibles %}
+                    <option value="{{ u.id }}" {% if unidad_solicitante.id == u.id %}selected{% endif %}>
+                        {{ u.nombre }} {% if u.secretaria %}({{ u.secretaria.nombre }}){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- FORMULARIO -->
-    <form method="POST" id="form-solicitud" class="card p-8 shadow-sm">
+    <form method="POST" id="form-solicitud" class="card p-8 shadow-sm rounded-2xl">
         {% csrf_token %}
+        <input type="hidden" name="unidad_solicitante_id" value="{{ unidad_solicitante.id }}">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- UNIDAD SOLICITANTE ACTIVA -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Unidad Solicitante</label>
+                <div class="p-3 border border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-slate-900/50 text-sm font-bold text-[#8b0000] dark:text-red-400 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
+                    {{ unidad_solicitante.nombre }}
+                </div>
+            </div>
+
             <!-- FECHA -->
             <div>
                 <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Fecha de Solicitud</label>
-                <input type="text" value="{% now 'd/m/Y' %}" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none font-medium focus:outline-none" readonly>
+                <input type="text" value="{% now 'd/m/Y' %}" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-500 font-medium focus:outline-none" readonly>
                 <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
             </div>
 
-            <!-- TIPO FIJO (Desactivado para el usuario) -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-400 dark:text-gray-500 font-['Outfit']">Tipo de Requerimiento</label>
-                <input type="text" value="Consumo de Almacén (BIEN)" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-100 dark:bg-slate-900/40 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none font-medium focus:outline-none" readonly>
-            </div>
-
-            <!-- BUSCADOR DE ARTÍCULOS -->
+            <!-- SELECTOR DE ARTÍCULOS CON CONTROL POA -->
             <div class="md:col-span-2">
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Artículos en Existencia</label>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                    Artículos Disponibles en Almacén (Autorizados en su POA)
+                </label>
+
                 <div class="grid grid-cols-12 gap-3 items-start">
-                    
                     <div class="col-span-12 sm:col-span-7">
-                        <select id="material_select" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 transition appearance-none pr-10" onchange="document.getElementById('buscador_material').value = '';">
-                            <option value="">Seleccionar material con stock</option>
-                            {% for material in materiales %}
-                            <option value="{{ material.id }}" data-stock="{{ material.stock_actual }}">
-                                {{ material.nombre }} (Stock: {{ material.stock_actual }})
+                        <select 
+                            id="material_select" 
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] text-sm"
+                            onchange="actualizarInfoMaterial(this)"
+                        >
+                            <option value="">-- Seleccione un material con saldo POA --</option>
+                            {% for m in materiales %}
+                            <option 
+                                value="{{ m.id }}" 
+                                data-nombre="{{ m.nombre }}"
+                                data-codigo="{{ m.codigo }}"
+                                data-unidad="{{ m.unidad_medida }}"
+                                data-stock="{{ m.stock_almacen }}"
+                                data-partida="{{ m.partida_codigo }} - {{ m.partida_nombre }}"
+                                data-costo="{{ m.costo_unitario }}"
+                                data-saldopoa="{{ m.saldo_poa }}"
+                                data-max="{{ m.max_solicitable }}"
+                            >
+                                {{ m.nombre }} (Tu tope: {{ m.max_solicitable }} {{ m.unidad_medida }} | Almacén: {{ m.stock_almacen }})
                             </option>
+                            {% empty %}
+                            <option value="" disabled>No hay materiales disponibles con saldo en su POA 2026</option>
                             {% endfor %}
                         </select>
-
-                        <div class="mt-2 relative">
-                            <input type="text" id="buscador_material" placeholder="Escribe el nombre del artículo para buscar..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 transition" onkeyup="buscarMateriales()">
-                            <div id="resultados_busqueda" class="absolute bg-white dark:bg-[#151010] w-full border border-gray-100 dark:border-gray-800 rounded-xl mt-1 shadow-lg z-50 hidden"></div>
-                        </div>                        
                     </div>
 
                     <div class="col-span-8 sm:col-span-3">
-                        <input type="number" id="cantidad_input" min="1" placeholder="Cantidad" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 transition">
+                        <input 
+                            type="number" 
+                            id="cantidad_input" 
+                            min="1" 
+                            placeholder="Cantidad" 
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000]"
+                        >
                     </div>
 
                     <div class="col-span-4 sm:col-span-2">
-                        <button type="button" onclick="agregarMaterial()" class="w-full h-[50px] bg-gray-900 dark:bg-slate-800 hover:bg-gray-800 dark:hover:bg-slate-700 text-white rounded-2xl flex items-center justify-center gap-1 transition shadow-sm cursor-pointer">
+                        <button 
+                            type="button" 
+                            onclick="agregarMaterial()" 
+                            class="w-full h-[46px] bg-gray-900 dark:bg-slate-800 hover:bg-gray-800 text-white rounded-2xl flex items-center justify-center gap-1 transition shadow-sm cursor-pointer"
+                        >
                             <span class="material-symbols-outlined text-[18px]">add_circle</span>
                             <span class="text-xs font-bold font-['Outfit']">Añadir</span>
                         </button>
                     </div>
                 </div>
+
+                <!-- PANEL DINÁMICO DE VALIDACIÓN POA EN TIEMPO REAL -->
+                <div id="panel-info-poa" class="hidden mt-3 p-4 rounded-xl border border-blue-100 dark:border-slate-800 bg-blue-50/50 dark:bg-slate-900/60 text-xs">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Partida Afectada</span>
+                            <span id="info-partida" class="font-semibold text-gray-800 dark:text-gray-200 truncate block"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Saldo POA Unidad</span>
+                            <span id="info-saldopoa" class="font-bold text-blue-700 dark:text-blue-400"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Stock en Almacén</span>
+                            <span id="info-stock" class="font-semibold text-gray-700 dark:text-gray-300"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Máximo a Solicitar</span>
+                            <span id="info-max" class="font-extrabold text-[#8b0000] dark:text-red-400"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="inputs_ocultos"></div>
             </div>
         </div>
 
-        <!-- LISTADO DE MATERIALES -->
+        <!-- LISTADO DE MATERIALES EN CARRITO -->
         <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-850 text-gray-600 dark:text-gray-300">
+                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase">
                     <tr>
                         <th class="p-4 font-bold">Material</th>
-                        <th class="p-4 font-bold text-center w-36">Cantidad Requerida</th>
+                        <th class="p-4 font-bold text-center w-36">Cantidad</th>
                         <th class="p-4 font-bold text-center w-24">Acción</th>
                     </tr>
                 </thead>
-                <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
-                </tbody>
+                <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent"></tbody>
             </table>
         </div>
 
-        <!-- JUSTIFICACION -->
+        <!-- JUSTIFICACIÓN -->
         <div class="mt-6">
             <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Justificación <span class="text-[#8b0000]">*</span></label>
-            <textarea name="justificacion" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 transition" rows="4" placeholder="Justifique el uso institucional de estos materiales..." required></textarea>
+            <textarea name="justificacion" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] text-sm" rows="3" placeholder="Indique la justificación y destino de los materiales para las labores de la oficina..." required></textarea>
         </div>
 
         <!-- BOTONES -->
@@ -110,51 +180,70 @@
 <script>
 let carrito = {};
 
-document.addEventListener('DOMContentLoaded', () => {
-    renderTabla();
-    renderInputs();
-});
+function actualizarInfoMaterial(select) {
+    const panel = document.getElementById('panel-info-poa');
+    const cantidadInput = document.getElementById('cantidad_input');
+    const opt = select.options[select.selectedIndex];
+
+    if (!select.value || !opt) {
+        panel.classList.add('hidden');
+        cantidadInput.removeAttribute('max');
+        return;
+    }
+
+    const partida = opt.getAttribute('data-partida');
+    const saldoPoa = parseFloat(opt.getAttribute('data-saldopoa') || 0).toFixed(2);
+    const stock = opt.getAttribute('data-stock');
+    const unidad = opt.getAttribute('data-unidad');
+    const max = opt.getAttribute('data-max');
+
+    document.getElementById('info-partida').innerText = partida;
+    document.getElementById('info-saldopoa').innerText = `${saldoPoa} Bs.`;
+    document.getElementById('info-stock').innerText = `${stock} ${unidad}`;
+    document.getElementById('info-max').innerText = `${max} ${unidad}`;
+
+    cantidadInput.max = max;
+    cantidadInput.placeholder = `Máx: ${max}`;
+    panel.classList.remove('hidden');
+}
 
 function agregarMaterial() {
     const select = document.getElementById('material_select');
     const cantidadInput = document.getElementById('cantidad_input');
-    const buscador = document.getElementById('buscador_material');
-
     const materialId = select.value;
-    const selectedOption = select.options[select.selectedIndex];
+    const opt = select.options[select.selectedIndex];
     const cantidad = parseInt(cantidadInput.value);
 
-    if (!materialId || !selectedOption) {
-        alert("Por favor, seleccione un material de la lista con stock.");
+    if (!materialId || !opt) {
+        alert("Seleccione un material de la lista autorizada.");
         return;
     }
 
     if (isNaN(cantidad) || cantidad <= 0) {
-        alert("Defina una cantidad válida mayor a 0.");
+        alert("Ingrese una cantidad válida mayor a 0.");
         return;
     }
 
-    const materialNombre = selectedOption.text.split(' (Stock:')[0];
-    const stockActual = parseInt(selectedOption.getAttribute('data-stock')) || 0;
+    const nombre = opt.getAttribute('data-nombre');
+    const maxPermitido = parseInt(opt.getAttribute('data-max')) || 0;
 
-    if (cantidad > stockActual) {
-        alert(`No hay stock suficiente. Máximo disponible: ${stockActual}`);
+    if (cantidad > maxPermitido) {
+        alert(`No puede solicitar ${cantidad}. El límite máximo según su presupuesto POA y existencia es de ${maxPermitido}.`);
         return;
     }
 
     if (carrito[materialId]) {
-        const nuevaCantidad = carrito[materialId].cantidad + cantidad;
-        if (nuevaCantidad > stockActual) {
-            alert(`La cantidad total acumulada (${nuevaCantidad}) supera las existencias físicas (${stockActual}).`);
+        const total = carrito[materialId].cantidad + cantidad;
+        if (total > maxPermitido) {
+            alert(`El total acumulado (${total}) supera el tope permitido (${maxPermitido}).`);
             return;
         }
-        carrito[materialId].cantidad = nuevaCantidad;
+        carrito[materialId].cantidad = total;
     } else {
         carrito[materialId] = {
-            nombre: materialNombre,
+            nombre: nombre,
             cantidad: cantidad,
-            stock: stockActual,
-            es_nuevo: false
+            max: maxPermitido
         };
     }
 
@@ -162,20 +251,20 @@ function agregarMaterial() {
     renderInputs();
 
     select.value = '';
-    buscador.value = '';
+    actualizarInfoMaterial(select);
     cantidadInput.value = '';
 }
 
 function renderTabla() {
     const tabla = document.getElementById('tabla_materiales');
     tabla.innerHTML = '';
-
     const keys = Object.keys(carrito);
+
     if (keys.length === 0) {
         tabla.innerHTML = `
             <tr>
-                <td colspan="3" class="p-8 text-center text-gray-400 dark:text-gray-500 bg-transparent">
-                    Añada consumibles desde el buscador superior.
+                <td colspan="3" class="p-8 text-center text-gray-400 dark:text-gray-500">
+                    Añada artículos autorizados usando el selector superior.
                 </td>
             </tr>
         `;
@@ -188,29 +277,32 @@ function renderTabla() {
             <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
                 <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">${item.nombre}</td>
                 <td class="p-4 text-center">
-                    <input type="number" value="${item.cantidad}" min="1" max="${item.stock}" onchange="editarCantidad('${id}', this)" class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-24 text-center focus:ring-1 focus:ring-red-500 focus:outline-none">
+                    <input 
+                        type="number" 
+                        value="${item.cantidad}" 
+                        min="1" 
+                        max="${item.max}" 
+                        onchange="editarCantidad('${id}', this)" 
+                        class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-24 text-center focus:ring-1 focus:ring-[#8b0000]"
+                    >
                 </td>
                 <td class="p-4 text-center">
-                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 dark:text-red-400 hover:text-red-800 font-medium transition">Eliminar</button>
+                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 hover:text-red-800 font-medium text-xs">Eliminar</button>
                 </td>
             </tr>
         `;
     });
 }
 
-function editarCantidad(id, inputElement) {
-    let nuevaCantidad = parseInt(inputElement.value) || 1;
-    if (nuevaCantidad < 1) nuevaCantidad = 1;
-
+function editarCantidad(id, input) {
+    let cant = parseInt(input.value) || 1;
     const item = carrito[id];
-    if (item) {
-        if (nuevaCantidad > item.stock) {
-            alert(`Límite físico de existencias alcanzado (${item.stock}).`);
-            nuevaCantidad = item.stock;
-        }
-        item.cantidad = nuevaCantidad;
-        inputElement.value = nuevaCantidad;
+    if (cant > item.max) {
+        alert(`Supera el límite autorizado (${item.max}).`);
+        cant = item.max;
     }
+    item.cantidad = cant;
+    input.value = cant;
     renderInputs();
 }
 
@@ -223,76 +315,12 @@ function eliminar(id) {
 function renderInputs() {
     const contenedor = document.getElementById('inputs_ocultos');
     const payload = {};
-
     Object.keys(carrito).forEach(id => {
-        payload[id] = {
-            cantidad: carrito[id].cantidad,
-            es_nuevo: false,
-            nombre: carrito[id].nombre,
-            precio_referencial: 0.00
-        };
+        payload[id] = { cantidad: carrito[id].cantidad };
     });
-
-    contenedor.innerHTML = `
-        <input type="hidden" name="payload" value='${JSON.stringify(payload)}'>
-    `;
+    contenedor.innerHTML = `<input type="hidden" name="payload" value='${JSON.stringify(payload)}'>`;
 }
 
-function buscarMateriales() {
-    const query = document.getElementById('buscador_material').value;
-    const resultados = document.getElementById('resultados_busqueda');
-
-    if (query.length < 2) {
-        resultados.innerHTML = '';
-        resultados.classList.add('hidden');
-        return;
-    }
-
-    // Pasamos el parámetro 'solo_con_stock=true' al buscador
-    fetch(`/solicitudes/buscar-materiales/?q=${query}&solo_con_stock=true`)
-        .then(response => response.json())
-        .then(data => {
-            resultados.innerHTML = '';
-            if (data.length === 0) {
-                resultados.innerHTML = '<div class="p-3 text-gray-500 text-sm text-center">Sin stock en almacén</div>';
-            } else {
-                data.forEach(material => {
-                    const div = document.createElement('div');
-                    div.className = "p-3 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-sm border-b border-gray-100 last:border-none";
-                    div.innerHTML = `
-                        <span class="font-medium text-gray-800 dark:text-gray-200">${material.nombre}</span>
-                        <span class="text-xs text-gray-400 block mt-0.5">(Disponible: ${material.stock})</span>
-                    `;
-                    div.addEventListener('click', () => seleccionarMaterial(material.id, material.nombre, material.stock));
-                    resultados.appendChild(div);
-                });
-            }
-            resultados.classList.remove('hidden');
-        });
-}
-
-function seleccionarMaterial(id, nombre, stock) {
-    const select = document.getElementById('material_select');
-    let option = select.querySelector(`option[value="${id}"]`);
-    if (!option) {
-        option = document.createElement('option');
-        option.value = id;
-        option.textContent = `${nombre} (Stock: ${stock})`;
-        option.setAttribute('data-stock', stock);
-        select.appendChild(option);
-    }
-    select.value = id;
-    document.getElementById('cantidad_input').focus();
-    document.getElementById('buscador_material').value = nombre;
-    document.getElementById('resultados_busqueda').classList.add('hidden');
-}
-
-document.addEventListener('click', (e) => {
-    const buscador = document.getElementById('buscador_material');
-    const resultados = document.getElementById('resultados_busqueda');
-    if (buscador && resultados && !buscador.contains(e.target) && !resultados.contains(e.target)) {
-        resultados.classList.add('hidden');
-    }
-});
+document.addEventListener('DOMContentLoaded', renderTabla);
 </script>
 {% endblock %}

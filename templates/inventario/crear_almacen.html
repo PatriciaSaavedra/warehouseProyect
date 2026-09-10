@@ -47,7 +47,7 @@
                 </div>
             </div>
 
-            <!-- UNIDAD ORGANIZACIONAL (Sólo obligatoria para Subalmacenes) -->
+            <!-- UNIDAD ORGANIZACIONAL (A quién pertenece físicamente) -->
             <div id="div_unidad">
                 <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Unidad Organizacional Asociada</label>
                 <div class="relative">
@@ -75,10 +75,35 @@
                 </div>
             </div>
 
+            <!-- ALMACÉN PADRE -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Almacén Padre / Principal</label>
+                <div class="relative">
+                    <select name="almacen_padre" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
+                        <option value="">-- Ninguno (Es Almacén Principal) --</option>
+                        {% for padre in almacenes_padre %}
+                            <option value="{{ padre.id }}">{{ padre.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+            </div>
+
             <!-- DESCRIPCION -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Descripción / Detalles</label>
+                <textarea name="descripcion" rows="1" placeholder="Ubicación física..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition"></textarea>
+            </div>
+
+            <!-- UNIDADES ATENDIDAS (Multi-Select) -->
             <div class="md:col-span-2">
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Descripción / Detalles de Resguardo</label>
-                <textarea name="descripcion" rows="3" placeholder="Ubicación física, dependencias o especificaciones adicionales del almacén..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition"></textarea>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Unidades Organizacionales a las que atiende</label>
+                <p class="text-xs text-gray-500 mb-2">Mantén presionado Ctrl (o Cmd en Mac) para seleccionar varias unidades. Estas son las únicas unidades a las que este almacén podrá despachar material.</p>
+                <select name="unidades_atendidas" multiple class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000] transition h-32">
+                    {% for u in unidades %}
+                        <option value="{{ u.id }}">{{ u.nombre }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
 
@@ -97,7 +122,7 @@ function toggleUnidadOrganizacional() {
     const tipo = document.getElementById('id_tipo').value;
     const divUnidad = document.getElementById('div_unidad');
     if (tipo === 'CENTRAL') {
-        divUnidad.classList.add('hidden'); // El almacén central es global
+        divUnidad.classList.add('hidden'); 
     } else {
         divUnidad.classList.remove('hidden');
     }
