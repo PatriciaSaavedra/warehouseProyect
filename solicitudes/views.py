@@ -1,84 +1,74 @@
 import json
 import html
 from decimal import Decimal, InvalidOperation
+import datetime
 from django.utils import timezone 
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden # <-- CORREGIDO: Se eliminó el import de 'request'
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import transaction, DatabaseError
 from django.contrib import messages
-from django.db.models import Q,Sum, F
-from django.db import transaction
-# Importaciones de ReportLab para el PDF oficial
+from django.db.models import Q, Sum, F
+from django.core.paginator import Paginator
+
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
-from django.core.paginator import Paginator
-
-from organizacion.models import UnidadOrganizacional
-from presupuestos.models import POA
-
-# Importaciones para el dibujo del código QR nativo de ReportLab [28]
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
 
-from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD 
-from inventario.models import InventarioAlmacen, Material, MovimientoInventario, PartidaPresupuestaria, UnidadMedida, Almacen
-from inventario.services import registrar_salida_valorada_peps  # Importamos nuestro servicio PEPS (FIFO)
-from usuarios.decorators import tiene_rol, rol_requerido
+from organizacion.models import UnidadOrganizacional
 from presupuestos.models import POA
 from auditoria.models import Bitacora
 
-# Gestión fiscal actual de la Gobernación de Potosí
+from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD, FLUJOS_ATENCION
+from inventario.models import (
+    InventarioAlmacen, Material, MovimientoInventario, 
+    PartidaPresupuestaria, UnidadMedida, Almacen
+)
+from inventario.services import registrar_salida_valorada_peps
+from usuarios.decorators import tiene_rol, rol_requerido
+
 GESTION_ACTUAL = 2026
 
 
 # ========================================================
-# FUNCIÓN AUXILIAR DE REDIRECCIÓN INTELIGENTE (UX) [28]
+# REDIRECCIÓN INTELIGENTE
 # ========================================================
 def redirigir_despues_de_accion(request, solicitud):
-    """
-    Determina de forma dinámica adónde redirigir al usuario para no perder su contexto (UX) [28].
-    Garantiza que los revisores se mantengan en la Bandeja de Gestión y los solicitantes en sus pedidos [28].
-    """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
     
-    # Definimos el destino de retorno según el rol del usuario que interactúa [28]
     if rol == 'UNIDAD_SOLICITANTE':
-        destino_default = 'solicitudes'          # Pestaña personal: Mis Solicitudes
+        destino_default = 'solicitudes'
     else:
-        destino_default = 'solicitudes_general'  # Pestaña administrativa: Bandeja de Gestión [28]
+        destino_default = 'solicitudes_general'
 
     referer = request.META.get('HTTP_REFERER', '')
-    
-    # Si viene desde el detalle, o de los formularios de revisión/rechazo, lo mantiene en el detalle del folio [28]
     if 'detalle' in referer or 'revisar' in referer or 'rechazar' in referer:
         return redirect('detalle_solicitud', id=solicitud.id)
         
-    # Si opera desde la tabla, lo mantiene en la misma vista (respetando sus filtros y paginación) [28]
     return redirect(referer if referer else destino_default)
 
+
 # ========================================================
-# VISTAS OPERATIVAS DEL MÓDULO DE SOLICITUDES
+# VISTAS DE SOLICITUDES
 # ========================================================
 
 @login_required
 def solicitudes(request):
     """
-    Pestaña Personal: Muestra estrictamente las solicitudes creadas por el usuario autenticado [11, 28].
+    Pestaña Personal: Mis Solicitudes creadas por el usuario autenticado.
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     if not perfil:
         return render(request, 'solicitudes/index_propias.html', {'solicitudes': []})
 
-    # Filtramos estrictamente por el usuario creador
     solicitudes_query = Solicitud.objects.filter(solicitante=request.user)
 
-    # Buscador y rango de fechas básico para uso personal
     query = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
     desde_str = request.GET.get('desde', '').strip()
@@ -111,26 +101,28 @@ def solicitudes(request):
 
 
 @login_required
-@rol_requerido(['JEFE_INMEDIATO', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'RPA', 'JEFE_ADMINISTRATIVO', 'ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+@rol_requerido([
+    'JEFE_INMEDIATO', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'RPA', 
+    'JEFE_ADMINISTRATIVO', 'ALMACENERO', 'KARDISTA', 'ADMINISTRADOR',
+    'ADMIN_ALMACENES'
+])
 def solicitudes_general(request):
     """
-    Pestaña General / Bandeja de Gestión: Muestra y filtra todos los folios bajo norma SABS [28].
+    Bandeja de Gestión: Permite a los revisores y a los encargados de almacén auditar folios.
     """
     perfil = request.user.perfilusuario
     rol = perfil.rol
     unidad = perfil.unidad
 
-    # Consulta base según el rol del revisor [28]
-    if rol == 'ADMINISTRADOR' or rol in ['ALMACENERO', 'KARDISTA']:
+    # Acceso global para administradores y personal de almacenes
+    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO', 'KARDISTA']:
         solicitudes_query = Solicitud.objects.all()
     else:
-        # Los jefes de unidad solo auditan las solicitudes pertenecientes a su oficina [11]
         solicitudes_query = Solicitud.objects.filter(unidad_solicitante=unidad)
 
-    # Capturar parámetros de filtros avanzados
     query = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
-    filtro_flujo = request.GET.get('flujo', '').strip()  # <-- NUEVO FILTRO PARA TARJETA 4
+    filtro_flujo = request.GET.get('flujo', '').strip()
     desde_str = request.GET.get('desde', '').strip()
     hasta_str = request.GET.get('hasta', '').strip()
 
@@ -143,7 +135,7 @@ def solicitudes_general(request):
         )
     if filtro_estado:
         solicitudes_query = solicitudes_query.filter(estado=filtro_estado)
-    if filtro_flujo:  # <-- NUEVO FILTRO APLICADO
+    if filtro_flujo:
         solicitudes_query = solicitudes_query.filter(flujo_atencion=filtro_flujo)
     if desde_str:
         solicitudes_query = solicitudes_query.filter(fecha__gte=desde_str)
@@ -152,7 +144,6 @@ def solicitudes_general(request):
 
     solicitudes_query = solicitudes_query.select_related('solicitante', 'unidad_solicitante').order_by('-id')
 
-    # KPIs superiores del Almacén [28]
     hoy = timezone.now().date()
     primer_dia_mes = hoy.replace(day=1)
     
@@ -165,9 +156,6 @@ def solicitudes_general(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Importamos las tuplas oficiales de flujo para pasarlas al template
-    from .models import FLUJOS_ATENCION
-
     return render(request, 'solicitudes/index_general.html', {
         'solicitudes': page_obj, 
         'rol': rol,
@@ -177,17 +165,16 @@ def solicitudes_general(request):
         'kpi_total_folios': total_folios_count,
         'query': query,
         'filtro_estado': filtro_estado,
-        'filtro_flujo': filtro_flujo,  # <-- PASAR A LA PLANTILLA
+        'filtro_flujo': filtro_flujo,
         'desde': desde_str,
         'hasta': hasta_str,
         'estados': ESTADOS_SOLICITUD,
-        'flujos': FLUJOS_ATENCION  # <-- PASAR A LA PLANTILLA
+        'flujos': FLUJOS_ATENCION
     })
+
+
 @login_required
 def buscar_materiales(request):
-    """
-    Buscador AJAX filtrado por la unidad solicitante y su POA.
-    """
     q = request.GET.get('q', '').strip()
     unidad_id = request.GET.get('unidad_id')
 
@@ -195,7 +182,7 @@ def buscar_materiales(request):
         return JsonResponse([], safe=False)
 
     perfil = getattr(request.user, 'perfilusuario', None)
-    if unidad_id and perfil.rol == 'ADMINISTRADOR':
+    if unidad_id and perfil.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
         unidad = UnidadOrganizacional.objects.filter(id=unidad_id).first()
     else:
         unidad = perfil.unidad if perfil else None
@@ -223,18 +210,14 @@ def buscar_materiales(request):
     ]
     return JsonResponse(data, safe=False)
 
+
 @login_required
 def nueva_solicitud(request):
-    """
-    Registra solicitudes soportando materiales existentes y nuevas adquisiciones no catalogadas,
-    almacenando el tipo de requerimiento y los precios referenciales unitarios.
-    """
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
-        
-        # Tarjeta 1: Obtener y validar tipo de requerimiento
         tipo_requerimiento = request.POST.get('tipo_requerimiento', '').strip()
+        
         if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
             messages.error(request, "Debe seleccionar un Tipo de Requerimiento válido (Bien o Servicio).")
             return redirect('nueva_solicitud')
@@ -244,7 +227,6 @@ def nueva_solicitud(request):
             return redirect('nueva_solicitud')
 
         payload_raw = html.unescape(payload_raw)
-
         try:
             payload = json.loads(payload_raw)
         except json.JSONDecodeError:
@@ -269,7 +251,6 @@ def nueva_solicitud(request):
                 numero = (ultima.id + 1) if ultima else 1
                 codigo = f'SOL-{numero:05d}'
 
-                # Tarjeta 1: Guardar tipo de requerimiento
                 solicitud = Solicitud.objects.create(
                     codigo=codigo,
                     unidad_solicitante=unidad_solicitante,
@@ -283,8 +264,6 @@ def nueva_solicitud(request):
                 for item_key, item_data in payload.items():
                     cantidad = int(item_data.get('cantidad', 1))
                     es_nuevo = item_data.get('es_nuevo', False)
-                    
-                    # Tarjeta 2: Obtener y validar el precio referencial (>= 0)
                     precio_ref_raw = item_data.get('precio_referencial', 0)
                     try:
                         precio_ref = Decimal(str(precio_ref_raw))
@@ -293,11 +272,9 @@ def nueva_solicitud(request):
 
                     if cantidad <= 0:
                         raise ValueError("La cantidad solicitada debe ser mayor a cero.")
-                        
                     if precio_ref < 0:
                         raise ValueError("El precio unitario referencial debe ser mayor o igual a 0.")
 
-                    # Tarjeta 2: Registrar el precio referencial proporcionado por la Unidad Solicitante
                     if es_nuevo:
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
@@ -336,15 +313,11 @@ def nueva_solicitud(request):
             return redirect('nueva_solicitud')
 
     materiales = Material.objects.all().values('id', 'nombre', 'stock_actual')
-    return render(request, 'solicitudes/nueva.html', {
-        'materiales': materiales
-    })
+    return render(request, 'solicitudes/nueva.html', {'materiales': materiales})
+
+
 @login_required
 def nueva_solicitud_compra(request):
-    """
-    Registra solicitudes de adquisición de nuevos bienes (sin stock o no catalogados) 
-    o de contratación de servicios.
-    """
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
@@ -359,7 +332,6 @@ def nueva_solicitud_compra(request):
             return redirect('nueva_solicitud_compra')
 
         payload_raw = html.unescape(payload_raw)
-
         try:
             payload = json.loads(payload_raw)
         except json.JSONDecodeError:
@@ -405,12 +377,8 @@ def nueva_solicitud_compra(request):
                     cantidad = int(item_data.get('cantidad', 1))
                     es_nuevo = item_data.get('es_nuevo', False)
                     precio_ref_raw = item_data.get('precio_referencial', 0)
-                    
-                    # Tarjeta 8: Recuperar partida asignada para ítems no catalogados o servicios
                     partida_id = item_data.get('partida_id')
-                    partida_obj = None
-                    if partida_id:
-                        partida_obj = PartidaPresupuestaria.objects.get(id=partida_id)
+                    partida_obj = PartidaPresupuestaria.objects.get(id=partida_id) if partida_id else None
 
                     try:
                         precio_ref = Decimal(str(precio_ref_raw))
@@ -423,7 +391,6 @@ def nueva_solicitud_compra(request):
                         raise ValueError("El precio unitario referencial debe ser mayor o igual a 0.")
 
                     if es_nuevo:
-                        # Se registra asignándole la partida presupuestaria de adquisición/servicio
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
                             material=None,
@@ -438,7 +405,7 @@ def nueva_solicitud_compra(request):
                         DetalleSolicitud.objects.create(
                             solicitud=solicitud,
                             material=material,
-                            partida=None, # Obtiene la partida del material
+                            partida=None,
                             cantidad_solicitada=cantidad,
                             precio_unitario_referencial=precio_ref
                         )
@@ -461,7 +428,6 @@ def nueva_solicitud_compra(request):
             return redirect('nueva_solicitud_compra')
 
     materiales = Material.objects.all().values('id', 'nombre', 'stock_actual')
-    # Tarjeta 8: Pasar las partidas presupuestarias existentes al contexto del formulario de compras
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
     return render(request, 'solicitudes/nueva_solicitud_compra.html', {
         'materiales': materiales,
@@ -470,11 +436,8 @@ def nueva_solicitud_compra(request):
 
 
 @login_required
-@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def catalogar_item_pendiente(request, detalle_id):
-    """
-    Permite al Almacenero codificar oficialmente un material no catalogado solicitado (Inciso b) [28].
-    """
     detalle = get_object_or_404(DetalleSolicitud, id=detalle_id)
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
     unidades = UnidadMedida.objects.all().order_by('nombre')
@@ -490,7 +453,6 @@ def catalogar_item_pendiente(request, detalle_id):
 
         partida = get_object_or_404(PartidaPresupuestaria, id=partida_id)
         unidad = get_object_or_404(UnidadMedida, id=unidad_id)
-
         nombre = detalle.descripcion_material_no_catalogado
 
         materiales_partida = Material.objects.filter(partida=partida).order_by('codigo')
@@ -537,30 +499,22 @@ def catalogar_item_pendiente(request, detalle_id):
             messages.error(request, f'Error al catalogar el material: {str(e)}')
             return redirect('catalogar_item_pendiente', detalle_id=detalle_id)
 
-    return render(
-        request, 
-        'inventario/catalogar_pendiente.html', 
-        {
-            'detalle': detalle,
-            'partidas': partidas,
-            'unidades': unidades
-        }
-    )
+    return render(request, 'inventario/catalogar_pendiente.html', {
+        'detalle': detalle,
+        'partidas': partidas,
+        'unidades': unidades
+    })
 
 
 @login_required
 def detalle_solicitud(request, id):
-    """
-    Controla el acceso al detalle de la solicitud basándose en el rol del usuario [11, 28].
-    Garantiza que el Almacenero y los revisores SABS tengan acceso global para operar [28].
-    """
     solicitud = get_object_or_404(Solicitud, id=id)
     perfil = request.user.perfilusuario
     rol = perfil.rol
 
-    # 1. Definimos los roles que requieren acceso global al detalle para cumplir sus funciones SABS [28]
     roles_globales = [
         'ADMINISTRADOR', 
+        'ADMIN_ALMACENES',
         'ALMACENERO', 
         'KARDISTA', 
         'SECRETARIO_SAF', 
@@ -571,13 +525,12 @@ def detalle_solicitud(request, id):
 
     if rol not in roles_globales:
         if rol == 'JEFE_INMEDIATO':
-            # Los jefes de unidad solo auditan las solicitudes de su propia oficina [11]
             if solicitud.unidad_solicitante != perfil.unidad:
                 return HttpResponseForbidden("No tiene autorización para ver solicitudes de otras unidades.")
         else:
-            # Los funcionarios comunes solo pueden ver los requerimientos que ellos crearon [11]
             if solicitud.solicitante != request.user:
                 return HttpResponseForbidden("No tiene autorización para ver esta solicitud.")
+
     Bitacora.objects.create(
         usuario=request.user,
         modulo='Solicitudes',
@@ -589,13 +542,10 @@ def detalle_solicitud(request, id):
         'rol': rol
     })
 
+
 @login_required
 def revisar_solicitud(request, id):
-    """
-    Paso 2 (Tarjeta 5): El Jefe Inmediato revisa y autoriza las cantidades.
-    Aplica la reserva de existencias físicas de forma segura y compatible con SQLite/Postgres.
-    """
-    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR']):
+    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
         return HttpResponseForbidden("No autorizado.")
 
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
@@ -610,12 +560,9 @@ def revisar_solicitud(request, id):
 
     detalles = solicitud.detalles.select_related('material')
 
-    from inventario.models import InventarioAlmacen
-
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                # NUEVO CONTROL DE ROBUSTEZ: Validar que el almacén de origen esté registrado
                 almacen_origen = solicitud.almacen_origen
                 if not almacen_origen:
                     raise ValueError(
@@ -632,9 +579,7 @@ def revisar_solicitud(request, id):
                     detalle.cantidad_aprobada = aprobada
                     detalle.save()
 
-                    # Tarjeta 5: Reservar stock físico en el Almacén de origen
                     if solicitud.flujo_atencion == 'SALIDA_ALMACEN' and detalle.material:
-                        # Ahora pasamos el almacen_origen ya validado y seguro
                         inv, created = InventarioAlmacen.objects.get_or_create(
                             material=detalle.material,
                             almacen=almacen_origen,
@@ -671,8 +616,6 @@ def revisar_solicitud(request, id):
             messages.error(request, str(e))
             return redirigir_despues_de_accion(request, solicitud)
         except DatabaseError as e:
-            # Imprime el error real en tu consola del servidor para depuración
-            print(f"DatabaseError real: {str(e)}")
             messages.error(request, "Error de base de datos al procesar la revisión de la solicitud.")
             return redirigir_despues_de_accion(request, solicitud)
 
@@ -680,13 +623,16 @@ def revisar_solicitud(request, id):
         'solicitud': solicitud,
         'detalles': detalles
     })
+
+
 @login_required
-@rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR'])
+@rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def validar_saf(request, id):
-    """
-    Paso 3: El Secretario de la SAF valida la solicitud (Estado: VALIDADA_SAF) [28].
-    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+
+    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+        messages.warning(request, "Las solicitudes con stock disponible pasan directamente de Autorización de Unidad a Preparación en Almacén.")
+        return redirigir_despues_de_accion(request, solicitud)
 
     if solicitud.estado != 'REVISADA':
         messages.error(request, "La solicitud aún no ha sido revisada ni autorizada por su Jefe de Unidad.")
@@ -716,10 +662,6 @@ def validar_saf(request, id):
 @login_required
 @rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
 def aprobar_solicitud(request, id):
-    """
-    Paso 4 (Tarjeta 8 y 9): Validación presupuestaria de adquisiciones y servicios.
-    Controla el saldo disponible en el POA y reserva (compromete) el presupuesto estimado.
-    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
@@ -742,7 +684,6 @@ def aprobar_solicitud(request, id):
             
             for detalle in detalles:
                 partida = detalle.partida_afectada
-                
                 if not partida:
                     messages.error(
                         request, 
@@ -753,7 +694,6 @@ def aprobar_solicitud(request, id):
                 costo_estimado = detalle.subtotal_referencial
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + costo_estimado
 
-            # Verificar saldo disponible y ejecutar la reserva en el POA
             for partida, costo in costos_partidas.items():
                 poa = POA.objects.select_for_update().filter(
                     unidad=solicitud.unidad_solicitante,
@@ -776,7 +716,6 @@ def aprobar_solicitud(request, id):
                     )
                     return redirigir_despues_de_accion(request, solicitud)
 
-                # Tarjeta 9: Comprometer (reservar) presupuesto automáticamente
                 poa.monto_comprometido += costo
                 poa.monto_disponible -= costo
                 poa.save()
@@ -802,13 +741,13 @@ def aprobar_solicitud(request, id):
     except DatabaseError:
         messages.error(request, "Error de base de datos al realizar el control presupuestario.")
         return redirigir_despues_de_accion(request, solicitud)
-    
+
+
 @login_required
 @rol_requerido(['RPA', 'ADMINISTRADOR'])
 def validar_rpa(request, id):
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    # Tarjeta 3: No intervenir en stock
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
         messages.warning(request, "Las solicitudes con stock no requieren validación del RPA.")
         return redirigir_despues_de_accion(request, solicitud)
@@ -839,7 +778,6 @@ def validar_rpa(request, id):
 def validar_jefatura(request, id):
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
 
-    # Tarjeta 3: No intervenir en stock
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
         messages.warning(request, "Las solicitudes con stock no requieren aprobación de Jefatura Administrativa.")
         return redirigir_despues_de_accion(request, solicitud)
@@ -866,21 +804,14 @@ def validar_jefatura(request, id):
 
 
 @login_required
-@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def preparar_solicitud(request, id):
-    """
-    Paso 7 (Tarjeta 3 y 5): El Almacenero alista los paquetes físicamente en el depósito [28].
-    Distingue la ruta de preparación inmediata para stock de la ruta de compras/servicios.
-    """
     solicitud = get_object_or_404(Solicitud, id=id)
 
-    # Tarjeta 3 y 5: Permitir preparación inmediata para bienes con stock
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-        # Se admite REVISADA (flujo simplificado directo) y VALIDADA_JEFATURA (salvavidas de consistencia)
         permitido = (solicitud.estado in ['REVISADA', 'VALIDADA_JEFATURA'])
         mensaje_error = "Para solicitudes con stock, se requiere primero la autorización del Jefe de Unidad (Estado: Revisada)."
     else:
-        # Requerimientos sin stock o servicios requieren validación completa hasta la Jefatura
         permitido = (solicitud.estado == 'VALIDADA_JEFATURA')
         mensaje_error = "Solo solicitudes validadas administrativamente por la Jefatura Administrativa pueden prepararse."
 
@@ -903,14 +834,10 @@ def preparar_solicitud(request, id):
     messages.success(request, f"La solicitud {solicitud.codigo} ha sido marcada como PREPARADA para su despacho.")
     return redirigir_despues_de_accion(request, solicitud)
 
+
 @login_required
 def entregar_solicitud(request, id):
-    """
-    Paso 8 (Tarjeta 9, 12 y 21): Entrega física de materiales. 
-    Descuenta stock por PEPS, genera la Nota de Salida (Egreso físico) 
-    y consolida la ejecución real en el POA.
-    """
-    if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR']):
+    if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
         return HttpResponseForbidden("No autorizado.")
 
     solicitud = get_object_or_404(Solicitud, id=id)
@@ -924,8 +851,6 @@ def entregar_solicitud(request, id):
         return redirigir_despues_de_accion(request, solicitud)
 
     detalles = solicitud.detalles.select_related('material__partida')
-
-    # Importamos los modelos de Notas de Salida para poder instanciarlos
     from inventario.models import NotaSalida, NotaSalidaDetalle
 
     try:
@@ -933,12 +858,10 @@ def entregar_solicitud(request, id):
             solicitud = Solicitud.objects.select_for_update().get(id=id)
             costos_partidas = {}
 
-            # VALIDACIÓN: Garantizar que exista el almacén de origen de la solicitud
             almacen_origen = solicitud.almacen_origen
             if not almacen_origen:
                 raise ValueError("No se pudo determinar el almacén de origen para esta solicitud. Verifique que exista un Almacén Central activo.")
 
-            # Tarjeta 12: Generar de forma atómica la cabecera del Egreso Físico (Nota de Salida)
             ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
             nro_salida_num = (ultima_salida.id + 1) if ultima_salida else 1
             nro_nota_salida = f"NS-{nro_salida_num:05d}"
@@ -946,13 +869,12 @@ def entregar_solicitud(request, id):
             nota_salida = NotaSalida.objects.create(
                 nro_nota=nro_nota_salida,
                 solicitud_origen=solicitud,
-                almacen_origen=almacen_origen, # Asociamos el almacén de donde sale físicamente
+                almacen_origen=almacen_origen,
                 unidad_destino=solicitud.unidad_solicitante,
                 fecha=timezone.now().date(),
                 usuario=request.user
             )
 
-            # Descontar stock usando PEPS y registrar ítems en el documento de salida
             for detalle in detalles:
                 material = Material.objects.get(id=detalle.material.id)
                 cantidad_despacho = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
@@ -961,39 +883,31 @@ def entregar_solicitud(request, id):
                     messages.error(request, f"Inconsistencia: Stock insuficiente en {material.nombre} para despachar la solicitud.")
                     return redirigir_despues_de_accion(request, solicitud)
 
-                # Procesar salida PEPS y registrar movimiento en Kardex (Con firma corregida)
-                # Al pasar descontar_reserva=True, nuestro servicio PEPS se encarga de reducir la reserva automáticamente
                 mov = registrar_salida_valorada_peps(
                     material=material,
-                    almacen=almacen_origen,               # <-- PARÁMETRO CORREGIDO
+                    almacen=almacen_origen,
                     cantidad_salida=cantidad_despacho,
                     tipo_movimiento='SALIDA',
                     referencia=f"DESPACHO: {solicitud.codigo}",
                     usuario=request.user,
                     unidad_destino=solicitud.unidad_solicitante,
-                    descontar_reserva=True                # <-- LIBERA AUTOMÁTICAMENTE LA RESERVA FÍSICA
+                    descontar_reserva=True
                 )
 
                 detalle.cantidad_entregada = cantidad_despacho
                 detalle.save()
 
-                # Tarjeta 12: Registrar la salida física del ítem en la Nota de Salida Detallada
                 NotaSalidaDetalle.objects.create(
                     nota_salida=nota_salida,
                     material=material,
                     cantidad=cantidad_despacho,
-                    costo_unitario_real=mov.costo_unitario,  # Costo obtenido por PEPS
+                    costo_unitario_real=mov.costo_unitario,
                     costo_total_real=mov.costo_total
                 )
-
-                # NOTA: Se eliminó el bloque manual de actualización de InventarioAlmacen 
-                # porque nuestro servicio 'registrar_salida_valorada_peps' ya realiza 
-                # la reducción de stock físico y stock reservado de manera interna y segura.
 
                 partida = material.partida
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + mov.costo_total
 
-            # Ejecutar presupuesto real y liberar compromisos en el POA
             for partida, costo_real in costos_partidas.items():
                 poa = POA.objects.select_for_update().get(
                     unidad=solicitud.unidad_solicitante,
@@ -1002,11 +916,9 @@ def entregar_solicitud(request, id):
                 )
                 
                 if solicitud.flujo_atencion == 'ADQUISICION':
-                    # Sumamos el costo referencial originalmente reservado para esta partida
                     costo_estimado_partida = sum(
                         d.subtotal_referencial for d in detalles if d.partida_afectada == partida
                     )
-                    
                     poa.monto_comprometido -= costo_estimado_partida
                     poa.monto_ejecutado += costo_real
                     poa.monto_disponible += (costo_estimado_partida - costo_real)
@@ -1033,13 +945,12 @@ def entregar_solicitud(request, id):
 
     except Exception as e:
         messages.error(request, f"Error al procesar el despacho PEPS/POA: {str(e)}")
-        return redirigir_despues_de_accion(request, solicitud)    
+        return redirigir_despues_de_accion(request, solicitud)
+
+
 @login_required
 def cerrar_solicitud(request, id):
-    """
-    Paso 9: Concluye administrativamente la carpeta de solicitud (Pasa de 'ENTREGADA' a 'CERRADA').
-    """
-    if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR']):
+    if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
         return HttpResponseForbidden("No autorizado.")
 
     solicitud = get_object_or_404(Solicitud, id=id)
@@ -1064,18 +975,12 @@ def cerrar_solicitud(request, id):
     return redirigir_despues_de_accion(request, solicitud)
 
 
-# --- EN TU ARCHIVO views.py ---
-
 @login_required
 def editar_solicitud(request, id):
-    """
-    Permite modificar una solicitud existente únicamente si se encuentra en 'REGISTRADA',
-    actualizando tipo de requerimiento, materiales y precios unitarios referenciales.
-    """
     solicitud = get_object_or_404(Solicitud, id=id)
     perfil = request.user.perfilusuario
 
-    if perfil.rol != 'ADMINISTRADOR':
+    if perfil.rol not in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
         if solicitud.unidad_solicitante != perfil.unidad:
             return HttpResponseForbidden("No tiene permisos para modificar solicitudes de otra unidad.")
 
@@ -1084,8 +989,6 @@ def editar_solicitud(request, id):
 
     if request.method == "GET":
         detalles = solicitud.detalles.select_related('material')
-
-        # Tarjeta 2: Exportar el precio referencial para que se muestre en el formulario frontend
         detalles_json = json.dumps([
             {
                 "id": d.material.id if d.material else d.id,
@@ -1107,31 +1010,21 @@ def editar_solicitud(request, id):
         data = json.loads(request.body.decode("utf-8"))
         payload = data.get("payload", {})
         justificacion = data.get("justificacion", "")
-        
-        # Tarjeta 1: Recibir tipo de requerimiento
         tipo_requerimiento = data.get("tipo_requerimiento", "BIEN")
 
         if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
-            return JsonResponse({
-                "ok": False,
-                "error": "Debe seleccionar un tipo de requerimiento válido (Bien o Servicio)."
-            }, status=400)
+            return JsonResponse({"ok": False, "error": "Debe seleccionar un tipo de requerimiento válido (Bien o Servicio)."}, status=400)
 
         if not payload:
-            return JsonResponse({
-                "ok": False,
-                "error": "Debe agregar al menos un material a la solicitud"
-            }, status=400)
+            return JsonResponse({"ok": False, "error": "Debe agregar al menos un material a la solicitud"}, status=400)
 
         with transaction.atomic():
             solicitud.justificacion = justificacion
             solicitud.tipo_requerimiento = tipo_requerimiento
             solicitud.save()
-
             solicitud.detalles.all().delete()
 
             for material_id, item_data in payload.items():
-                # Soportamos tanto el formato estructurado de diccionario como valores planos
                 if isinstance(item_data, dict):
                     cantidad = int(item_data.get('cantidad', 1))
                     precio_ref_raw = item_data.get('precio_referencial', 0)
@@ -1149,16 +1042,10 @@ def editar_solicitud(request, id):
                     precio_ref = Decimal('0.00')
 
                 if cantidad <= 0:
-                    return JsonResponse({
-                        "ok": False,
-                        "error": "La cantidad de los ítems debe ser mayor a cero."
-                    }, status=400)
+                    return JsonResponse({"ok": False, "error": "La cantidad de los ítems debe ser mayor a cero."}, status=400)
 
                 if precio_ref < 0:
-                    return JsonResponse({
-                        "ok": False,
-                        "error": "El precio referencial no puede ser negativo."
-                    }, status=400)
+                    return JsonResponse({"ok": False, "error": "El precio referencial no puede ser negativo."}, status=400)
 
                 if es_nuevo or not str(material_id).isdigit():
                     DetalleSolicitud.objects.create(
@@ -1190,24 +1077,19 @@ def editar_solicitud(request, id):
         return JsonResponse({"ok": True})
 
     except json.JSONDecodeError:
-        return JsonResponse({
-            "ok": False,
-            "error": "Formato de datos JSON inválido"
-        }, status=400)
+        return JsonResponse({"ok": False, "error": "Formato de datos JSON inválido"}, status=400)
+
 
 @login_required
 def rechazar_solicitud(request, id):
-    """
-    Permite a cualquier rol revisor de la cadena SABS rechazar y archivar el requerimiento.
-    Tarjeta 9: Devuelve los recursos comprometidos al saldo disponible del POA si el trámite se anula.
-    """
     roles_revisores = [
         'JEFE_INMEDIATO', 
         'SECRETARIO_SAF', 
         'PRESUPUESTOS', 
         'RPA', 
         'JEFE_ADMINISTRATIVO', 
-        'ADMINISTRADOR'
+        'ADMINISTRADOR',
+        'ADMIN_ALMACENES'
     ]
     
     if not tiene_rol(request.user, roles_revisores):
@@ -1236,9 +1118,7 @@ def rechazar_solicitud(request, id):
                                 inv.stock_reservado -= cantidad_reserva
                                 inv.save()
                 
-                # Tarjeta 9: Si la solicitud ya contaba con reserva presupuestaria, liberamos los recursos
                 estados_con_reserva = ['VALIDADA_PRESUPUESTOS', 'VALIDADA_RPA', 'VALIDADA_JEFATURA', 'PREPARADA']
-                
                 if solicitud.estado in estados_con_reserva and solicitud.flujo_atencion in ['ADQUISICION', 'CONTRATACION_SERVICIO']:
                     for detalle in solicitud.detalles.all():
                         partida = detalle.partida_afectada
@@ -1251,7 +1131,6 @@ def rechazar_solicitud(request, id):
                             
                             if poa:
                                 costo_estimado = detalle.subtotal_referencial
-                                # Devolvemos de comprometido a disponible
                                 poa.monto_comprometido -= costo_estimado
                                 poa.monto_disponible += costo_estimado
                                 poa.save()
@@ -1277,9 +1156,10 @@ def rechazar_solicitud(request, id):
 
     return render(request, 'solicitudes/rechazar.html', {'solicitud': solicitud})
 
+
 @login_required
 def reabrir_solicitud(request, id):
-    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR']):
+    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
         return HttpResponseForbidden("No tiene permisos para realizar esta acción.")
 
     solicitud = get_object_or_404(Solicitud, id=id)
@@ -1296,9 +1176,6 @@ def reabrir_solicitud(request, id):
 
 @login_required
 def solicitud_pdf(request, id):
-    """
-    Genera el reporte PDF del "Pedido de Materiales y/o Bienes" oficial de la Gobernación (Pág. 9) [28].
-    """
     solicitud = get_object_or_404(
         Solicitud.objects.prefetch_related('detalles__material__partida'),
         id=id
@@ -1310,7 +1187,7 @@ def solicitud_pdf(request, id):
     pdf = canvas.Canvas(response, pagesize=landscape(letter))
     width, height = landscape(letter)
     
-    pdf.setTitle(f"Pedido de Material {solicitud.codigo}")  # <-- ESTA LÍNEA NOMBRA TU PESTAÑA AUTOMÁTICAMENTE [28]
+    pdf.setTitle(f"Pedido de Material {solicitud.codigo}")
     pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
     pdf.setAuthor("Sistema de Gestión de Almacenes")
 
@@ -1382,18 +1259,14 @@ def solicitud_pdf(request, id):
         ('SPAN', (3, 0), (4, 0)),  
         ('SPAN', (5, 0), (5, 1)),  
         ('SPAN', (6, 0), (7, 0)),  
-
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 2), (1, -1), 'LEFT'),
         ('ALIGN', (6, 2), (-1, -1), 'RIGHT'),
-
         ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 1), 8),
         ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
-
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
         ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
-
         ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 2), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -1406,7 +1279,6 @@ def solicitud_pdf(request, id):
     t.drawOn(pdf, 50, height - 150 - table_height)
 
     pdf.setFont("Helvetica", 7.5)
-    
     y_firma_1 = 90
     pdf.drawString(50, y_firma_1, "___________________________")
     pdf.drawString(50, y_firma_1 - 10, "Pedido por:")
@@ -1450,167 +1322,44 @@ def solicitud_pdf(request, id):
     fecha_salida = solicitud.fecha_entrega.strftime('%d / %m / %Y') if solicitud.fecha_entrega else "__ / __ / ____"
     pdf.drawString(540, y_firma_2, f"Fecha de salida física: {fecha_salida}")
 
-    # =========================================================================
-    # --- SISTEMA DE VALIDACIÓN QR DINÁMICO (Autenticidad Documental SABS) [28] ---
-    # =========================================================================
-    from reportlab.graphics.barcode import qr
-    from reportlab.graphics.shapes import Drawing
-    from reportlab.graphics import renderPDF
-
-    # Si la solicitud completó la entrega física o se cerró, activamos el QR y el Hash [11, 28]
     if solicitud.estado in ['ENTREGADA', 'CERRADA']:
-        # APUNTA EL QR A LA RUTA PÚBLICA (Usa tu IP local para la prueba) [2]
         qr_url = f"http://10.153.101.3:8000/solicitudes/verificar/{solicitud.codigo}/"
-        qr_code = qr.QrCodeWidget(qr_url)
-        
-        # Calculamos dimensiones del gráfico en ReportLab
+        qr_code = QrCodeWidget(qr_url)
         bounds = qr_code.getBounds()
         width_qr = bounds[2] - bounds[0]
         height_qr = bounds[3] - bounds[1]
         
-        # Creamos un bloque de dibujo de 55x55 puntos para colocar en la esquina inferior derecha
         d = Drawing(55, 55, transform=[55./width_qr, 0, 0, 55./height_qr, 0, 0])
         d.add(qr_code)
-        
-        # Pintamos el QR en las coordenadas de la esquina derecha (x=700, y=10)
         renderPDF.draw(d, pdf, 710, 15)
         
-        # Pintamos el código Hash de Verificación al lado del QR
         pdf.setFont("Helvetica-Bold", 6.5)
-        pdf.setFillColor(colors.HexColor('#16A34A')) # Verde éxito
+        pdf.setFillColor(colors.HexColor('#16A34A'))
         pdf.drawString(540, 15, f"CÓDIGO DE VALIDACIÓN: {solicitud.codigo}-2026-SABS-OK")
         pdf.setFillColor(colors.black)
     else:
-        # Si está en trámite, no hay QR y mostramos una advertencia en rojo
         pdf.setFont("Helvetica-Bold", 8)
-        pdf.setFillColor(colors.HexColor('#DC2626')) # Rojo advertencia
+        pdf.setFillColor(colors.HexColor('#DC2626'))
         pdf.drawString(540, 15, "DOCUMENTO EN TRÁMITE - SIN VALOR OFICIAL")
         pdf.setFillColor(colors.black)
 
-    # Guardar cambios y cerrar PDF
     pdf.save()
     return response
 
-@login_required
-@rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR'])
-def validar_saf(request, id):
-    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
-
-    # Tarjeta 3 y Tarjeta 7: No intervenir en solicitudes de bienes con stock
-    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-        messages.warning(request, "Las solicitudes con stock disponible pasan directamente de Autorización de Unidad a Preparación en Almacén.")
-        return redirigir_despues_de_accion(request, solicitud)
-
-    if solicitud.estado != 'REVISADA':
-        messages.error(request, "La solicitud aún no ha sido revisada ni autorizada por su Jefe de Unidad.")
-        return redirigir_despues_de_accion(request, solicitud)
-
-    try:
-        with transaction.atomic():
-            solicitud.estado = 'VALIDADA_SAF'
-            solicitud.saf_por = request.user
-            solicitud.fecha_saf = timezone.now()
-            solicitud.save()
-
-            Bitacora.objects.create(
-                usuario=request.user,
-                modulo='Solicitudes',
-                accion='Validación SAF',
-                descripcion=f'El Secretario SAF validó la solicitud {solicitud.codigo}'
-            )
-
-        messages.success(request, f"Solicitud {solicitud.codigo} validada por la SAF.")
-    except Exception as e:
-        messages.error(request, f"Error al procesar validación SAF: {str(e)}")
-
-    return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
-
-@login_required
-@rol_requerido(['RPA', 'ADMINISTRADOR'])
-def validar_rpa(request, id):
-    """
-    Paso 4: El Responsable del Proceso de Contratación (RPA) aprueba (Estado: VALIDADA_RPA) [28].
-    """
-    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
-
-    if solicitud.estado != 'VALIDADA_PRESUPUESTOS':
-        messages.error(request, "Esta solicitud aún no cuenta con la aprobación presupuestaria.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
-
-    try:
-        with transaction.atomic():
-            solicitud.estado = 'VALIDADA_RPA'
-            solicitud.rpa_por = request.user
-            solicitud.fecha_rpa = timezone.now()
-            solicitud.save()
-
-            Bitacora.objects.create(
-                usuario=request.user,
-                modulo='Solicitudes',
-                accion='Aprobación RPA',
-                descripcion=f'El RPA aprobó la solicitud {solicitud.codigo}'
-            )
-
-        messages.success(request, f"Solicitud {solicitud.codigo} aprobada por el RPA.")
-    except Exception as e:
-        messages.error(request, f"Error al procesar aprobación RPA: {str(e)}")
-
-    return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
-
-
-@login_required
-@rol_requerido(['JEFE_ADMINISTRATIVO', 'ADMINISTRADOR'])
-def validar_jefatura(request, id):
-    """
-    Paso 5: El Jefe Administrativo aprueba (Estado: VALIDADA_JEFATURA) [28].
-    """
-    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
-
-    if solicitud.estado != 'VALIDADA_RPA':
-        messages.error(request, "Esta solicitud aún no cuenta con la aprobación del RPA.")
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
-
-    try:
-        with transaction.atomic():
-            solicitud.estado = 'VALIDADA_JEFATURA'
-            solicitud.jefatura_por = request.user
-            solicitud.fecha_jefatura = timezone.now()
-            solicitud.save()
-
-            Bitacora.objects.create(
-                usuario=request.user,
-                modulo='Solicitudes',
-                accion='Aprobación Jefatura Administrativa',
-                descripcion=f'El Jefe Administrativo aprobó la solicitud {solicitud.codigo}'
-            )
-
-        messages.success(request, f"Solicitud {solicitud.codigo} aprobada por la Jefatura Administrativa.")
-    except Exception as e:
-        messages.error(request, f"Error al procesar aprobación de la Jefatura: {str(e)}")
-
-    return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
-# --- EN TU ARCHIVO views.py (Reemplazar retroceder_estado_solicitud) ---
 
 @transaction.atomic
 @login_required
-@rol_requerido(['ADMINISTRADOR'])
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def retroceder_estado_solicitud(request, id):
-    """
-    Permite únicamente al Administrador revertir de forma segura el estado de una solicitud 
-    al paso inmediato anterior, adaptando la ruta según el flujo de stock o adquisición [28].
-    """
     solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
     estado_actual = solicitud.estado
 
-    # Tarjeta 4: Mapa de retroceso dinámico según el flujo asignado
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-        # Flujo simplificado de Almacén (5 Pasos)
         map_retroceso = {
             'REVISADA': ('REGISTRADA', 'revisado_por', 'fecha_revision'),
             'PREPARADA': ('REVISADA', 'preparado_por', 'fecha_preparado'),
         }
     else:
-        # Flujo completo del SABS de Adquisiciones y Servicios (8 Pasos)
         map_retroceso = {
             'REVISADA': ('REGISTRADA', 'revisado_por', 'fecha_revision'),
             'VALIDADA_SAF': ('REVISADA', 'saf_por', 'fecha_saf'),
@@ -1648,23 +1397,23 @@ def retroceder_estado_solicitud(request, id):
             )
 
         messages.success(request, f"Se ha revertido con éxito el estado de la solicitud {solicitud.codigo} a '{solicitud.get_estado_display()}'.")
-    
     except Exception as e:
         messages.error(request, f"Error al procesar la reversión del estado: {str(e)}")
 
     return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+
+
 @login_required
 def nuevo_pedido_almacen(request):
     """
     Registra pedidos de consumo aislando el stock físico estrictamente al almacén
-    autorizado para atender a la Unidad Solicitante (ej: Almacén Central = 20, no los 90 globales).
+    autorizado para atender a la Unidad Solicitante.
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
 
-    # 1. Determinar la Unidad Solicitante
     unidades_disponibles = None
-    if rol == 'ADMINISTRADOR':
+    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
         unidades_disponibles = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
         unidad_id = request.GET.get('unidad_id') or (request.POST.get('unidad_solicitante_id') if request.method == 'POST' else None)
         if unidad_id:
@@ -1678,16 +1427,13 @@ def nuevo_pedido_almacen(request):
         messages.error(request, "Su usuario no tiene asignada una Unidad Organizacional activa.")
         return redirect('solicitudes')
 
-    # 2. IDENTIFICAR EL O LOS ALMACENES AUTORIZADOS PARA ESTA UNIDAD
     almacenes_autorizados = Almacen.objects.filter(
         unidades_atendidas=unidad_solicitante,
         is_active=True
     )
-    # Si la unidad no tiene subalmacén asignado, por norma SABS la atiende el Almacén Central
     if not almacenes_autorizados.exists():
         almacenes_autorizados = Almacen.objects.filter(tipo='CENTRAL', is_active=True)
 
-    # 3. PROCESAMIENTO DEL POST
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
@@ -1734,7 +1480,6 @@ def nuevo_pedido_almacen(request):
 
                     material = Material.objects.select_related('partida').get(id=item_key)
 
-                    # VALIDACIÓN DE STOCK AISLADO: Validar en los almacenes autorizados
                     stock_almacen_autorizado = InventarioAlmacen.objects.filter(
                         material=material,
                         almacen__in=almacenes_autorizados
@@ -1748,7 +1493,6 @@ def nuevo_pedido_almacen(request):
                             f"Disponible para su unidad: {stock_almacen_autorizado} UND (solicitado: {cantidad})."
                         )
 
-                    # Costo unitario PEPS
                     last_ent = MovimientoInventario.objects.filter(
                         material=material, 
                         tipo='ENTRADA',
@@ -1757,8 +1501,10 @@ def nuevo_pedido_almacen(request):
                     costo_unitario = last_ent.costo_unitario if last_ent else Decimal('0.00')
                     subtotal = Decimal(cantidad) * costo_unitario
 
-                    # Validación POA
                     partida = material.partida
+                    if not partida:
+                        raise ValueError(f"El material '{material.nombre}' no tiene partida presupuestaria vinculada.")
+
                     poa = POA.objects.select_for_update().filter(
                         unidad=unidad_solicitante,
                         partida=partida,
@@ -1777,7 +1523,6 @@ def nuevo_pedido_almacen(request):
                         precio_unitario_referencial=costo_unitario
                     )
 
-                # Validar techo POA total
                 for poa, total_partida in costo_acumulado_por_partida.items():
                     if poa.monto_disponible < total_partida:
                         raise ValueError(
@@ -1797,12 +1542,11 @@ def nuevo_pedido_almacen(request):
 
         except ValueError as e:
             messages.error(request, str(e))
-            return redirect(f"{request.path}?unidad_id={unidad_solicitante.id}" if rol == 'ADMINISTRADOR' else request.path)
+            return redirect(f"{request.path}?unidad_id={unidad_solicitante.id}" if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] else request.path)
         except Exception as e:
             messages.error(request, f"Error al registrar el pedido: {str(e)}")
             return redirect('nuevo_pedido_almacen')
 
-    # 4. GET: CONSULTAR STOCK AISLADO POR ALMACÉN AUTORIZADO
     poas_unidad = POA.objects.filter(
         unidad=unidad_solicitante,
         gestion=GESTION_ACTUAL,
@@ -1812,14 +1556,12 @@ def nuevo_pedido_almacen(request):
     partidas_permitidas_ids = [p.partida_id for p in poas_unidad]
     poa_por_partida = {p.partida_id: p for p in poas_unidad}
 
-    # Traemos las existencias solo de los almacenes autorizados para esta unidad
     inventarios_unidad = InventarioAlmacen.objects.filter(
         almacen__in=almacenes_autorizados,
         material__partida_id__in=partidas_permitidas_ids,
         stock_fisico__gt=0
     ).select_related('material', 'material__partida', 'material__unidad_medida_fk', 'almacen')
 
-    # Consolidar stock disponible por material dentro del ámbito de esta unidad
     stock_por_material = {}
     for inv in inventarios_unidad:
         mat_id = inv.material_id
@@ -1851,7 +1593,6 @@ def nuevo_pedido_almacen(request):
         else:
             cupo_max_poa = stock_autorizado
 
-        # El tope es el menor entre el presupuesto POA y el stock físico de SU almacén
         max_solicitable = min(cupo_max_poa, stock_autorizado)
 
         if max_solicitable > 0:
@@ -1862,7 +1603,7 @@ def nuevo_pedido_almacen(request):
                 'partida_codigo': mat.partida.codigo,
                 'partida_nombre': mat.partida.nombre,
                 'unidad_medida': mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
-                'stock_almacen': stock_autorizado,  # Mostrará 20 (Almacén Central), NO 90
+                'stock_almacen': stock_autorizado,
                 'costo_unitario': float(costo_u),
                 'saldo_poa': float(poa.monto_disponible) if poa else 0.0,
                 'cupo_poa': cupo_max_poa,
@@ -1878,38 +1619,13 @@ def nuevo_pedido_almacen(request):
     })
 
 
-def redirigir_despues_de_accion(request, solicitud):
-    """
-    Determina de forma dinámica adónde redirigir al usuario para no perder su contexto (UX) [28].
-    Garantiza que si opera dentro de un folio, permanezca dentro de ese folio [28].
-    """
-    referer = request.META.get('HTTP_REFERER', '')
-    
-    # Si viene desde el detalle, o de los formularios de revisión/rechazo, lo mantiene en el detalle del folio [28]
-    if 'detalle' in referer or 'revisar' in referer or 'rechazar' in referer:
-        return redirect('detalle_solicitud', id=solicitud.id)
-        
-    # Si opera desde el listado principal, lo mantiene en la misma página del listado [28]
-    return redirect(referer if referer else 'solicitudes')
-
 def verificar_documento_publico(request, codigo):
-    """
-    Vista pública sin autenticación para verificar la validez de un documento impreso 
-    escaneando el código QR (Garantiza autenticidad sin firma digital con token) [28].
-    """
     solicitud = get_object_or_404(
         Solicitud.objects.prefetch_related('detalles__material'),
         codigo=codigo
     )
 
-    # Control de seguridad: solo es verificable públicamente si ya concluyó el trámite [28]
     if solicitud.estado not in ['ENTREGADA', 'CERRADA']:
         return HttpResponseForbidden("Este documento se encuentra en trámite y no cuenta con certificación de verificación pública aún.")
 
-    return render(
-        request, 
-        'solicitudes/verificar_publico.html', 
-        {
-            'solicitud': solicitud
-        }
-    )
+    return render(request, 'solicitudes/verificar_publico.html', {'solicitud': solicitud})

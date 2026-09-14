@@ -25,8 +25,8 @@
             Panel de control
         </a>
 
-        <!-- 2️⃣ ADMINISTRACIÓN (Exclusivo Administradores) -->
-        {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+        <!-- 2️⃣ ADMINISTRACIÓN (Acceso para Administrador de TI y Administrador de Almacenes) -->
+        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES' %}
         <details 
             class="group" 
             {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path %}open{% endif %}
@@ -64,7 +64,7 @@
                     Unidades Org.
                 </a>
 
-                <!-- Almacenes -->
+                <!-- Almacenes (Ambos pueden gestionar almacenes) -->
                 <a 
                     href="{% url 'almacen_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -74,7 +74,8 @@
                     Almacenes
                 </a>
 
-                <!-- Usuarios -->
+                <!-- Usuarios (Solo Administrador de TI / Sistema) -->
+                {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
                 <a 
                     href="/usuarios/"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -83,11 +84,12 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">group</span>
                     Usuarios
                 </a>
+                {% endif %}
             </div>
         </details>
         {% endif %}
 
-        <!-- 3️⃣ SOLICITUDES -->
+        <!-- 3️⃣ SOLICITUDES (Visible para todos los usuarios) -->
         <a 
             href="/solicitudes/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
@@ -99,8 +101,8 @@
             Solicitudes
         </a>
 
-        <!-- 4️⃣ INVENTARIO (Desplegable estrictamente operativo) -->
-        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'KARDISTA' %}
+        <!-- 4️⃣ INVENTARIO (Visible para Almacenero, Kardista, Admin Almacenes y Superadmin) -->
+        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,KARDISTA' %}
         <details 
             class="group" 
             {% if '/inventario/' in request.path and '/inventario/almacenes/' not in request.path or '/movimientos/' in request.path %}open{% endif %}
@@ -128,11 +130,15 @@
                     Existencias
                 </a>
                 
-                <a href="{% url 'inventario_por_unidad' %}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-[#8b0000] hover:bg-red-50 rounded-lg transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">domain</span>
+                <!-- Stock por Dependencia / Unidad -->
+                <a 
+                    href="{% url 'inventario_por_unidad' %}" 
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/stock-unidad/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">domain</span>
                     Stock por Unidad
                 </a>
-                
 
                 <!-- Notas de Ingreso / Entradas -->
                 <a 
@@ -188,7 +194,7 @@
         {% endif %}
 
         <!-- 5️⃣ PRESUPUESTOS (POA) -->
-        {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+        {% if request.user.perfilusuario.rol in 'PRESUPUESTOS,ADMINISTRADOR,ADMIN_ALMACENES' %}
         <details 
             class="group" 
             {% if '/presupuestos/' in request.path %}open{% endif %}
@@ -230,7 +236,7 @@
         {% endif %}
 
         <!-- 6️⃣ COMPRAS / BIENES Y SERVICIOS -->
-        {% if request.user.perfilusuario.rol == 'BIENES_SERVICIOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+        {% if request.user.perfilusuario.rol in 'BIENES_SERVICIOS,ADMINISTRADOR,ADMIN_ALMACENES' %}
         <a 
             href="/compras/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
@@ -243,7 +249,7 @@
         </a>
         {% endif %}
 
-        <!-- 7️⃣ AUDITORÍA -->
+        <!-- 7️⃣ AUDITORÍA (Solo Superadmin) -->
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <a 
             href="/auditoria/"
