@@ -921,11 +921,17 @@ def registrar_baja(request):
             messages.error(request, 'No puede dar de baja una cantidad superior al stock actual disponible en almacén.')
             return redirect('registrar_baja')
 
-        almacen = Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
-        if not almacen:
-            messages.error(request, 'No se ha configurado un Almacén Central activo en el sistema.')
-            return redirect('registrar_baja')
+        almacenes_user = obtener_almacenes_usuario(request.user)
+        almacen_id_form = request.POST.get('almacen')
 
+        if almacen_id_form:
+            almacen = get_object_or_404(Almacen, id=almacen_id_form)
+        else:
+            almacen = almacenes_user.first()
+
+        if not almacen:
+            messages.error(request, 'No tiene ningún almacén asignado para procesar bajas de inventario.')
+            return redirect('registrar_baja')
         try:
             registrar_salida_valorada_peps(
                 material=material,

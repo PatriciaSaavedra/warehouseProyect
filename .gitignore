@@ -31,4 +31,4 @@ Thumbs.db
 htmlcov/
 
 # Jupyter
-.ipynb_checkpoints/
+.ipynb_checkpoints/*.lnk

@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from usuarios.views import perfil_usuario_view
-
+from django.views.generic import RedirectView
 urlpatterns = [
 
     path('admin/', admin.site.urls),
@@ -16,6 +16,7 @@ urlpatterns = [
     #     ),
     #     name='logout'
     # ),
+    
     path('dashboard/', include('dashboard.urls')),
 
     path('inventario/', include('inventario.urls')),
@@ -25,9 +26,10 @@ urlpatterns = [
     path('compras/', include('compras.urls')),
 
     path('presupuestos/', include('presupuestos.urls')),
-    path('perfil/', perfil_usuario_view, name='perfil'),
     path('usuarios/', include('usuarios.urls')),
 
     path('auditoria/', include('auditoria.urls')),
+    
+    path('perfil/', RedirectView.as_view(url='/usuarios/perfil/', permanent=False)),
 
 ]

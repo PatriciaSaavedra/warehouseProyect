@@ -32,8 +32,7 @@ from inventario.models import (
 from inventario.services import registrar_salida_valorada_peps
 from usuarios.decorators import tiene_rol, rol_requerido
 
-GESTION_ACTUAL = 2026
-
+GESTION_ACTUAL = timezone.now().year
 
 # ========================================================
 # REDIRECCIÓN INTELIGENTE
