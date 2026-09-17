@@ -625,6 +625,14 @@ def kardex(request, id):
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def inventario_por_unidad(request):
+    """
+    REQUERIMIENTO 6 (Filtrado estricto por POA de la Unidad):
+    Muestra únicamente los materiales cuyas Partidas Presupuestarias están inscritas
+    en el POA 2026 de la Secretaría o Unidad seleccionada.
+    """
+    from presupuestos.models import POA
+    gestion_actual = timezone.now().year
+
     perfil = request.user.perfilusuario
     rol = perfil.rol
 
@@ -649,23 +657,54 @@ def inventario_por_unidad(request):
     secretaria_seleccionada = None
     unidad_seleccionada = None
 
+    # Base: existencias físicas en almacenes autorizados
     inventario_qs = InventarioAlmacen.objects.filter(
         almacen__in=almacenes_visibles,
         stock_fisico__gt=0
     )
 
+    poa_map = {}  # Mapeo partida_id -> objeto POA
+
     if filtro_unidad_id:
         unidad_seleccionada = get_object_or_404(UnidadOrganizacional, id=filtro_unidad_id)
         secretaria_seleccionada = unidad_seleccionada.secretaria
+
+        # 1. Almacenes autorizados para esta unidad
         almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas=unidad_seleccionada)
+        if not almacenes_atendidos.exists():
+            almacenes_atendidos = almacenes_visibles.filter(tipo='CENTRAL')
         inventario_qs = inventario_qs.filter(almacen__in=almacenes_atendidos)
+
+        # 2. FILTRAR POR PARTIDAS DEL POA DE ESTA UNIDAD ESPECÍFICA (AQUÍ ESTÁ LA CORRECCIÓN)
+        poas_unidad = POA.objects.filter(
+            unidad=unidad_seleccionada,
+            gestion=gestion_actual
+        ).select_related('partida')
+
+        partidas_permitidas_ids = list(poas_unidad.values_list('partida_id', flat=True))
+        poa_map = {p.partida_id: p for p in poas_unidad}
+
+        # Solo mostramos materiales que correspondan a las partidas aprobadas en su POA
+        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_permitidas_ids)
 
     elif filtro_secretaria_id:
         secretaria_seleccionada = get_object_or_404(Secretaria, id=filtro_secretaria_id)
         unidades_sec = unidades_query.filter(secretaria=secretaria_seleccionada)
+
         almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas__in=unidades_sec)
+        if not almacenes_atendidos.exists():
+            almacenes_atendidos = almacenes_visibles.filter(tipo='CENTRAL')
         inventario_qs = inventario_qs.filter(almacen__in=almacenes_atendidos)
 
+        # Partidas del POA de las unidades que pertenecen a esta Secretaría
+        partidas_sec_ids = POA.objects.filter(
+            unidad__in=unidades_sec,
+            gestion=gestion_actual
+        ).values_list('partida_id', flat=True)
+
+        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_sec_ids)
+
+    # Métricas superiores
     total_materiales = inventario_qs.values('material_id').distinct().count()
     total_almacenes = inventario_qs.values('almacen_id').distinct().count()
     total_stock_fisico = inventario_qs.aggregate(total=Sum('stock_fisico'))['total'] or 0
@@ -679,6 +718,15 @@ def inventario_por_unidad(request):
         'material__unidad_medida_fk'
     ).order_by('material__nombre')
 
+    # Si hay una unidad seleccionada, le asociamos su saldo POA a cada fila
+    items_con_poa = []
+    for inv in inventario:
+        poa_obj = poa_map.get(inv.material.partida_id) if unidad_seleccionada else None
+        items_con_poa.append({
+            'inv': inv,
+            'poa': poa_obj
+        })
+
     return render(request, 'inventario/stock_por_unidad.html', {
         'secretarias': secretarias,
         'unidades': unidades_query,
@@ -687,12 +735,12 @@ def inventario_por_unidad(request):
         'filtro_secretaria_id': filtro_secretaria_id,
         'filtro_unidad_id': filtro_unidad_id,
         'inventario': inventario,
+        'items_con_poa': items_con_poa,
         'total_materiales': total_materiales,
         'total_stock_fisico': total_stock_fisico,
         'total_almacenes': total_almacenes,
         'es_central': es_central,
     })
-
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])

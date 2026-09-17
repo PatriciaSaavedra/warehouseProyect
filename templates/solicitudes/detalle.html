@@ -144,14 +144,11 @@
                     {% endif %}
 
                 {% elif solicitud.estado == 'PREPARADA' %}
-                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <form method="POST" action="{% url 'entregar_solicitud' solicitud.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">local_shipping</span> Confirmar Entrega
-                            </button>
-                        </form>
-                    {% endif %}
+                {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR,ADMIN_ALMACENES' %}
+                    <a href="{% url 'entregar_solicitud' solicitud.id %}" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">local_shipping</span> Confirmar Entrega
+                    </a>
+                {% endif %}
 
                 {% elif solicitud.estado == 'ENTREGADA' %}
                     {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
@@ -369,9 +366,11 @@
                             <td class="px-4 py-4 text-right font-bold text-gray-800 dark:text-gray-100 font-mono">
                                 {{ d.subtotal_referencial|floatformat:2 }}
                             </td>
-
+                           <!-- PONER ESTO (SOLO LECTURA): -->
                             <td class="px-4 py-4 text-center">
-                                <input type="number" value="{{ d.cantidad_aprobada|default:d.cantidad_solicitada }}" class="border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-200 rounded-xl p-1 w-14 text-center font-semibold focus:outline-none" readonly>
+                                <span class="inline-block border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-slate-900 text-gray-700 dark:text-gray-200 rounded-xl py-1 px-3 text-center font-bold text-xs">
+                                    {{ d.cantidad_aprobada|default:d.cantidad_solicitada }}
+                                </span>
                             </td>
                             <td class="px-4 py-4 text-center flex items-center justify-center gap-2">
                                 {% if d.es_nueva_adquisicion %}
@@ -647,6 +646,7 @@
         {% endif %}
     </div>
 </div>
+
 <script>
     document.querySelectorAll('.progress-bar-line').forEach(el => el.style.width = el.getAttribute('data-width') + '%');
 </script>

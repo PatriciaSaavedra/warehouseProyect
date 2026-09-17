@@ -471,3 +471,48 @@ class TransferenciaDetalle(models.Model):
 
     def __str__(self):
         return f"{self.material.nombre} - Cantidad: {self.cantidad}"
+# ========================================================
+# 6. ASIGNACIÓN DE CUOTA FÍSICA POR UNIDAD (PROGRAMACIÓN ANUAL)
+# ========================================================
+
+class AsignacionMaterialUnidad(models.Model):
+    """
+    Control de Cuota Física Programada por Unidad Organizacional.
+    Si una unidad tiene un registro aquí, el sistema aplica la modalidad CUOTA FÍSICA.
+    Si no tiene registro, el sistema aplica BOLSA COMÚN contra el saldo de su POA.
+    """
+    unidad = models.ForeignKey(
+        'organizacion.UnidadOrganizacional',
+        on_delete=models.CASCADE,
+        related_name='cuotas_materiales'
+    )
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.CASCADE,
+        related_name='cuotas_unidades'
+    )
+    gestion = models.IntegerField(
+        default=2026,
+        help_text="Gestión fiscal de la asignación"
+    )
+    cantidad_asignada = models.IntegerField(
+        default=0,
+        help_text="Cupo físico máximo autorizado para la gestión"
+    )
+    cantidad_consumida = models.IntegerField(
+        default=0,
+        help_text="Cantidad física retirada formalmente hasta la fecha"
+    )
+
+    @property
+    def saldo_disponible(self):
+        """Retorna la cantidad física que aún le queda por retirar a la oficina."""
+        return max(0, self.cantidad_asignada - self.cantidad_consumida)
+
+    def __str__(self):
+        return f"{self.unidad.nombre} - {self.material.nombre}: {self.saldo_disponible}/{self.cantidad_asignada} ({self.gestion})"
+
+    class Meta:
+        verbose_name = "Asignación de Material por Unidad"
+        verbose_name_plural = "Asignaciones de Material por Unidad"
+        unique_together = ('unidad', 'material', 'gestion')

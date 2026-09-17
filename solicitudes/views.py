@@ -2,8 +2,9 @@ import json
 import html
 from decimal import Decimal, InvalidOperation
 import datetime
+from django.urls import reverse
 from django.utils import timezone 
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, request
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -27,8 +28,12 @@ from auditoria.models import Bitacora
 from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD, FLUJOS_ATENCION
 from inventario.models import (
     InventarioAlmacen, Material, MovimientoInventario, 
-    PartidaPresupuestaria, UnidadMedida, Almacen
+    PartidaPresupuestaria, UnidadMedida, Almacen, AsignacionMaterialUnidad  
 )
+try:
+    from inventario.models import AsignacionMaterialUnidad
+except ImportError:
+    AsignacionMaterialUnidad = None
 from inventario.services import registrar_salida_valorada_peps
 from usuarios.decorators import tiene_rol, rol_requerido
 
@@ -836,20 +841,108 @@ def preparar_solicitud(request, id):
 
 @login_required
 def entregar_solicitud(request, id):
+    """
+    Paso 8 (Paso ③ y ④ de la Boleta Oficial GADP):
+    - Permite al Almacenero ajustar la 'Cantidad Entregada' físicamente.
+    - Muestra la Unidad de Manejo y valida conformidad con el POA / Cuota.
+    - Descuenta existencias por PEPS según lo efectivamente entregado.
+    - Libera reservas de ítems no entregados y ejecuta presupuesto POA real.
+    """
     if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
-        return HttpResponseForbidden("No autorizado.")
+        return HttpResponseForbidden("No tiene autorización para realizar entregas físicas de almacén.")
 
     solicitud = get_object_or_404(Solicitud, id=id)
 
     if solicitud.flujo_atencion == 'CONTRATACION_SERVICIO':
-        messages.error(request, "Error: Un requerimiento de tipo SERVICIO no puede ser procesado para entrega física de inventario.")
+        messages.error(request, "Error: Los requerimientos de SERVICIO no generan salida física de inventario.")
         return redirigir_despues_de_accion(request, solicitud)
 
     if solicitud.estado != 'PREPARADA':
-        messages.error(request, "Solo solicitudes en estado PREPARADA pueden entregarse físicamente.")
+        messages.error(request, "Solo solicitudes en estado PREPARADA pueden ser despachadas físicamente.")
         return redirigir_despues_de_accion(request, solicitud)
 
-    detalles = solicitud.detalles.select_related('material__partida')
+    almacen_origen = solicitud.almacen_origen
+    if not almacen_origen:
+        messages.error(request, "No se pudo determinar el almacén de despacho para esta solicitud.")
+        return redirigir_despues_de_accion(request, solicitud)
+
+    detalles = solicitud.detalles.select_related('material', 'material__partida', 'material__unidad_medida_fk')
+
+    # ========================================================
+    # FASE 1: MOSTRAR PANTALLA DE DESPACHO (GET)
+    # ========================================================
+    if request.method == 'GET':
+        items_despacho = []
+        for d in detalles:
+            material = d.material
+            cant_sugerida = d.cantidad_aprobada if d.cantidad_aprobada is not None else d.cantidad_solicitada
+
+            # Stock físico disponible en este almacén
+            inv = InventarioAlmacen.objects.filter(material=material, almacen=almacen_origen).first()
+            stock_disponible = inv.stock_disponible if inv else 0
+
+            # Costo unitario referencial PEPS
+            last_ent = MovimientoInventario.objects.filter(
+                material=material, tipo='ENTRADA', almacen=almacen_origen
+            ).order_by('-fecha').first()
+            costo_unitario = last_ent.costo_unitario if last_ent else Decimal('0.00')
+
+            # Definir el año de la solicitud primero:
+            gestion_solicitud = solicitud.fecha.year if solicitud.fecha else GESTION_ACTUAL
+
+            # 1. Verificar Cuota Física
+            asignacion = None
+            if AsignacionMaterialUnidad:
+                asignacion = AsignacionMaterialUnidad.objects.filter(
+                    unidad=solicitud.unidad_solicitante, 
+                    material=material,
+                    gestion=gestion_solicitud
+                ).first()
+
+            # 2. Verificar POA
+            partida = d.partida_afectada
+            poa = POA.objects.filter(
+                unidad=solicitud.unidad_solicitante, 
+                partida=partida,
+                gestion=gestion_solicitud
+            ).first()
+
+            if asignacion:
+                saldo_cuota = max(0, asignacion.cantidad_asignada - asignacion.cantidad_consumida)
+                conforme_poa = cant_sugerida <= saldo_cuota
+                mensaje_poa = f"Cuota Asignada (Saldo: {saldo_cuota})"
+                modalidad = "CUOTA_FISICA"
+            elif poa:
+                costo_estimado = Decimal(cant_sugerida) * costo_unitario
+                conforme_poa = poa.monto_disponible >= costo_estimado
+                mensaje_poa = f"POA Partida {partida.codigo} (Saldo: Bs. {poa.monto_disponible:.2f})"
+                modalidad = "BOLSA_COMUN"
+            else:
+                conforme_poa = False
+                mensaje_poa = "Sin presupuesto en POA ni Cuota"
+                modalidad = "SIN_RESPALDO"
+
+            items_despacho.append({
+                'detalle': d,
+                'material': material,
+                'unidad_manejo': material.unidad_medida_fk.codigo if material.unidad_medida_fk else material.unidad_medida,
+                'cant_sugerida': cant_sugerida,
+                'stock_disponible': stock_disponible,
+                'costo_unitario': costo_unitario,
+                'conforme_poa': conforme_poa,
+                'mensaje_poa': mensaje_poa,
+                'modalidad': modalidad,
+            })
+
+        return render(request, 'solicitudes/entregar.html', {
+            'solicitud': solicitud,
+            'almacen': almacen_origen,
+            'items_despacho': items_despacho,
+        })
+
+    # ========================================================
+    # FASE 2: PROCESAR ENTREGA FÍSICA Y NOTA DE SALIDA (POST)
+    # ========================================================
     from inventario.models import NotaSalida, NotaSalidaDetalle
 
     try:
@@ -857,10 +950,7 @@ def entregar_solicitud(request, id):
             solicitud = Solicitud.objects.select_for_update().get(id=id)
             costos_partidas = {}
 
-            almacen_origen = solicitud.almacen_origen
-            if not almacen_origen:
-                raise ValueError("No se pudo determinar el almacén de origen para esta solicitud. Verifique que exista un Almacén Central activo.")
-
+            # Crear cabecera oficial de Nota de Salida
             ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
             nro_salida_num = (ultima_salida.id + 1) if ultima_salida else 1
             nro_nota_salida = f"NS-{nro_salida_num:05d}"
@@ -876,12 +966,30 @@ def entregar_solicitud(request, id):
 
             for detalle in detalles:
                 material = Material.objects.get(id=detalle.material.id)
-                cantidad_despacho = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
+                
+                # El almacenero envía la cantidad que realmente entrega
+                cant_input = request.POST.get(f"entregado_{detalle.id}")
+                try:
+                    cantidad_despacho = int(cant_input) if cant_input is not None else detalle.cantidad_solicitada
+                except ValueError:
+                    cantidad_despacho = 0
 
-                if material.stock_actual < cantidad_despacho:
-                    messages.error(request, f"Inconsistencia: Stock insuficiente en {material.nombre} para despachar la solicitud.")
-                    return redirigir_despues_de_accion(request, solicitud)
+                if cantidad_despacho <= 0:
+                    continue  # Si no entregó nada de este ítem, no genera movimiento
 
+                # Validar existencia física real
+                inv = InventarioAlmacen.objects.select_for_update().filter(material=material, almacen=almacen_origen).first()
+                if not inv or inv.stock_fisico < cantidad_despacho:
+                    raise ValueError(f"Stock insuficiente en almacén para despachar '{material.nombre}'.")
+
+                # Liberar reserva si entregó menos de lo que estaba reservado
+                cant_reservada_previa = detalle.cantidad_aprobada or detalle.cantidad_solicitada
+                if cant_reservada_previa > cantidad_despacho:
+                    diferencia_no_entregada = cant_reservada_previa - cantidad_despacho
+                    inv.stock_reservado = max(0, inv.stock_reservado - diferencia_no_entregada)
+                    inv.save()
+
+                # Descontar stock por PEPS (Kardex Valorado)
                 mov = registrar_salida_valorada_peps(
                     material=material,
                     almacen=almacen_origen,
@@ -893,9 +1001,11 @@ def entregar_solicitud(request, id):
                     descontar_reserva=True
                 )
 
+                # Registrar cantidad entregada formalmente
                 detalle.cantidad_entregada = cantidad_despacho
                 detalle.save()
 
+                # Guardar detalle de la Nota de Salida
                 NotaSalidaDetalle.objects.create(
                     nota_salida=nota_salida,
                     material=material,
@@ -904,28 +1014,33 @@ def entregar_solicitud(request, id):
                     costo_total_real=mov.costo_total
                 )
 
+                # Actualizar cuota física si correspondía
+                try:
+                    q_asig = AsignacionMaterialUnidad.objects.filter(
+                        unidad=solicitud.unidad_solicitante, 
+                        material=material,
+                        gestion=GESTION_ACTUAL
+                    ).first() if AsignacionMaterialUnidad else None
+                    if q_asig:
+                        q_asig.cantidad_consumida += cantidad_despacho
+                        q_asig.save()
+                except Exception:
+                    pass
+
                 partida = material.partida
                 costos_partidas[partida] = costos_partidas.get(partida, Decimal('0.00')) + mov.costo_total
 
+            # Ejecutar presupuesto real en el POA
             for partida, costo_real in costos_partidas.items():
-                poa = POA.objects.select_for_update().get(
+                poa = POA.objects.select_for_update().filter(
                     unidad=solicitud.unidad_solicitante,
                     partida=partida,
                     gestion=GESTION_ACTUAL
-                )
-                
-                if solicitud.flujo_atencion == 'ADQUISICION':
-                    costo_estimado_partida = sum(
-                        d.subtotal_referencial for d in detalles if d.partida_afectada == partida
-                    )
-                    poa.monto_comprometido -= costo_estimado_partida
-                    poa.monto_ejecutado += costo_real
-                    poa.monto_disponible += (costo_estimado_partida - costo_real)
-                else:
+                ).first()
+                if poa:
                     poa.monto_disponible -= costo_real
                     poa.monto_ejecutado += costo_real
-                
-                poa.save()
+                    poa.save()
 
             solicitud.estado = 'ENTREGADA'
             solicitud.entregado_por = request.user
@@ -934,19 +1049,21 @@ def entregar_solicitud(request, id):
 
             Bitacora.objects.create(
                 usuario=request.user,
-                modulo='Presupuestos',
-                accion='Ejecución Presupuestaria Consolidada',
-                descripcion=f'Se consolidó el gasto real de la solicitud {solicitud.codigo} en el POA de la unidad.'
+                modulo='Solicitudes',
+                accion='Entrega Física Almacén',
+                descripcion=f'Se despachó físicamente la Solicitud {solicitud.codigo} mediante Nota de Salida {nro_nota_salida}'
             )
 
-        messages.success(request, f"Entrega física procesada y Nota de Salida {nro_nota_salida} generada con éxito.")
-        return redirigir_despues_de_accion(request, solicitud)
+        messages.success(request, f"Despacho físico completado y Nota de Salida {nro_nota_salida} generada exitosamente.")
+        return redirect('detalle_solicitud', id=solicitud.id)
 
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect('entregar_solicitud', id=solicitud.id)
     except Exception as e:
-        messages.error(request, f"Error al procesar el despacho PEPS/POA: {str(e)}")
-        return redirigir_despues_de_accion(request, solicitud)
-
-
+        messages.error(request, f"Error al procesar el despacho físico: {str(e)}")
+        return redirect('entregar_solicitud', id=solicitud.id)
+    
 @login_required
 def cerrar_solicitud(request, id):
     if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
@@ -1322,7 +1439,7 @@ def solicitud_pdf(request, id):
     pdf.drawString(540, y_firma_2, f"Fecha de salida física: {fecha_salida}")
 
     if solicitud.estado in ['ENTREGADA', 'CERRADA']:
-        qr_url = f"http://10.153.101.3:8000/solicitudes/verificar/{solicitud.codigo}/"
+        qr_url = request.build_absolute_uri(reverse('verificar_documento_publico', args=[solicitud.codigo]))
         qr_code = QrCodeWidget(qr_url)
         bounds = qr_code.getBounds()
         width_qr = bounds[2] - bounds[0]
@@ -1401,16 +1518,20 @@ def retroceder_estado_solicitud(request, id):
 
     return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
 
-
 @login_required
 def nuevo_pedido_almacen(request):
     """
-    Registra pedidos de consumo aislando el stock físico estrictamente al almacén
-    autorizado para atender a la Unidad Solicitante.
+    Registra pedidos de consumo aplicando:
+    1. Aislamiento físico: Solo descuenta del almacén autorizado para la Unidad Solicitante.
+    2. Regla Híbrida (Tarjeta 1): Modo CUOTA FÍSICA si existe asignación previa, o BOLSA COMÚN (POA).
+    3. Precio Referencial (Tarjeta 2): Guarda la estimación unitaria referencial para control del POA.
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
 
+    # ========================================================
+    # 1. RESOLVER LA UNIDAD SOLICITANTE
+    # ========================================================
     unidades_disponibles = None
     if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
         unidades_disponibles = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
@@ -1426,6 +1547,9 @@ def nuevo_pedido_almacen(request):
         messages.error(request, "Su usuario no tiene asignada una Unidad Organizacional activa.")
         return redirect('solicitudes')
 
+    # ========================================================
+    # 2. IDENTIFICAR ALMACENES AUTORIZADOS DE DESPACHO
+    # ========================================================
     almacenes_autorizados = Almacen.objects.filter(
         unidades_atendidas=unidad_solicitante,
         is_active=True
@@ -1433,6 +1557,9 @@ def nuevo_pedido_almacen(request):
     if not almacenes_autorizados.exists():
         almacenes_autorizados = Almacen.objects.filter(tipo='CENTRAL', is_active=True)
 
+    # ========================================================
+    # 3. PROCESAMIENTO DEL POST (CREACIÓN DEL PEDIDO)
+    # ========================================================
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
@@ -1479,6 +1606,15 @@ def nuevo_pedido_almacen(request):
 
                     material = Material.objects.select_related('partida').get(id=item_key)
 
+                    # 1. Costo referencial interno para control de POA (el usuario no lo escribe)
+                    last_ent = MovimientoInventario.objects.filter(
+                        material=material, 
+                        tipo='ENTRADA',
+                        almacen__in=almacenes_autorizados
+                    ).order_by('-fecha').first()
+                    costo_referencial = last_ent.costo_unitario if last_ent else Decimal('0.00')
+
+                    # 2. Validación física en el almacén
                     stock_almacen_autorizado = InventarioAlmacen.objects.filter(
                         material=material,
                         almacen__in=almacenes_autorizados
@@ -1488,45 +1624,51 @@ def nuevo_pedido_almacen(request):
 
                     if stock_almacen_autorizado < cantidad:
                         raise ValueError(
-                            f"Stock insuficiente en el almacén de despacho para '{material.nombre}'. "
-                            f"Disponible para su unidad: {stock_almacen_autorizado} UND (solicitado: {cantidad})."
+                            f"Stock insuficiente en el almacén para '{material.nombre}'. "
+                            f"Disponible: {stock_almacen_autorizado} | Solicitado: {cantidad}."
                         )
 
-                    last_ent = MovimientoInventario.objects.filter(
-                        material=material, 
-                        tipo='ENTRADA',
-                        almacen__in=almacenes_autorizados
-                    ).order_by('-fecha').first()
-                    costo_unitario = last_ent.costo_unitario if last_ent else Decimal('0.00')
-                    subtotal = Decimal(cantidad) * costo_unitario
-
-                    partida = material.partida
-                    if not partida:
-                        raise ValueError(f"El material '{material.nombre}' no tiene partida presupuestaria vinculada.")
-
-                    poa = POA.objects.select_for_update().filter(
-                        unidad=unidad_solicitante,
-                        partida=partida,
+                    # 3. Validación de Cuota vs Bolsa Común
+                    asignacion = AsignacionMaterialUnidad.objects.filter(
+                        unidad=unidad_solicitante, 
+                        material=material,
                         gestion=GESTION_ACTUAL
-                    ).first()
+                    ).first() if AsignacionMaterialUnidad else None
 
-                    if not poa:
-                        raise ValueError(f"La unidad '{unidad_solicitante.nombre}' no tiene la partida {partida.codigo} en su POA {GESTION_ACTUAL}.")
+                    if asignacion:
+                        saldo_cuota = max(0, asignacion.cantidad_asignada - asignacion.cantidad_consumida)
+                        if cantidad > saldo_cuota:
+                            raise ValueError(f"Supera la cuota autorizada ({saldo_cuota} disp.) para '{material.nombre}'.")
+                    else:
+                        partida = material.partida
+                        if not partida:
+                            raise ValueError(f"El material '{material.nombre}' no tiene partida presupuestaria.")
+                        
+                        poa = POA.objects.select_for_update().filter(
+                            unidad=unidad_solicitante,
+                            partida=partida,
+                            gestion=GESTION_ACTUAL
+                        ).first()
 
-                    costo_acumulado_por_partida[poa] = costo_acumulado_por_partida.get(poa, Decimal('0.00')) + subtotal
+                        if not poa:
+                            raise ValueError(f"La unidad no tiene la partida {partida.codigo} en su POA {GESTION_ACTUAL}.")
 
+                        subtotal_estimado = Decimal(cantidad) * costo_referencial
+                        costo_acumulado_por_partida[poa] = costo_acumulado_por_partida.get(poa, Decimal('0.00')) + subtotal_estimado
+
+                    # 4. Guardar Detalle (Paso ①: Cantidad solicitada)
                     DetalleSolicitud.objects.create(
                         solicitud=solicitud,
                         material=material,
                         cantidad_solicitada=cantidad,
-                        precio_unitario_referencial=costo_unitario
+                        precio_unitario_referencial=costo_referencial
                     )
-
+                # C. Validar techos financieros para los ítems que consumen Bolsa Común
                 for poa, total_partida in costo_acumulado_por_partida.items():
                     if poa.monto_disponible < total_partida:
                         raise ValueError(
                             f"Presupuesto insuficiente en la partida {poa.partida.codigo}. "
-                            f"Total pedido: {total_partida:.2f} Bs. | Saldo POA disponible: {poa.monto_disponible:.2f} Bs."
+                            f"Total requerido: {total_partida:.2f} Bs. | Saldo POA disponible: {poa.monto_disponible:.2f} Bs."
                         )
 
                 Bitacora.objects.create(
@@ -1546,18 +1688,41 @@ def nuevo_pedido_almacen(request):
             messages.error(request, f"Error al registrar el pedido: {str(e)}")
             return redirect('nuevo_pedido_almacen')
 
+    # ========================================================
+    # 4. CARGA DEL FORMULARIO (GET)
+    # ========================================================
     poas_unidad = POA.objects.filter(
         unidad=unidad_solicitante,
         gestion=GESTION_ACTUAL,
         monto_disponible__gt=0
     ).select_related('partida')
 
-    partidas_permitidas_ids = [p.partida_id for p in poas_unidad]
+    partidas_permitidas_ids = list(poas_unidad.values_list('partida_id', flat=True))
     poa_por_partida = {p.partida_id: p for p in poas_unidad}
 
+    # Cargar cuotas físicas programadas
+    cuotas_unidad = {}
+    try:
+        q_cuotas = AsignacionMaterialUnidad.objects.filter(unidad=unidad_solicitante)
+        if hasattr(AsignacionMaterialUnidad, 'gestion'):
+            q_cuotas = q_cuotas.filter(gestion=GESTION_ACTUAL)
+        for asig in q_cuotas:
+            cant_asig = getattr(asig, 'cantidad_asignada', getattr(asig, 'cantidad', 0))
+            cant_cons = getattr(asig, 'cantidad_consumida', 0)
+            cuotas_unidad[asig.material_id] = {
+                'asignada': cant_asig,
+                'consumida': cant_cons,
+                'saldo': max(0, cant_asig - cant_cons)
+            }
+    except Exception:
+        cuotas_unidad = {}
+
+    materiales_con_cuota_ids = list(cuotas_unidad.keys())
+
+    # Traer existencias de almacenes autorizados
     inventarios_unidad = InventarioAlmacen.objects.filter(
+        Q(material__partida_id__in=partidas_permitidas_ids) | Q(material_id__in=materiales_con_cuota_ids),
         almacen__in=almacenes_autorizados,
-        material__partida_id__in=partidas_permitidas_ids,
         stock_fisico__gt=0
     ).select_related('material', 'material__partida', 'material__unidad_medida_fk', 'almacen')
 
@@ -1580,6 +1745,7 @@ def nuevo_pedido_almacen(request):
         stock_autorizado = data_item['stock_autorizado']
         poa = poa_por_partida.get(mat.partida_id)
 
+        # Precio referencial sugerido (último PEPS de entrada)
         last_ent = MovimientoInventario.objects.filter(
             material=mat,
             tipo='ENTRADA',
@@ -1587,27 +1753,44 @@ def nuevo_pedido_almacen(request):
         ).order_by('-fecha').first()
         costo_u = last_ent.costo_unitario if last_ent else Decimal('0.00')
 
-        if costo_u > 0 and poa:
-            cupo_max_poa = int(poa.monto_disponible // costo_u)
+        # Evaluación de Modalidad (Tarjeta 1)
+        if mat_id in cuotas_unidad:
+            modalidad = 'CUOTA_FISICA'
+            modalidad_label = 'Cuota Asignada'
+            saldo_cuota = cuotas_unidad[mat_id]['saldo']
+            cuota_asig = cuotas_unidad[mat_id]['asignada']
+            cuota_cons = cuotas_unidad[mat_id]['consumida']
+            max_solicitable = min(saldo_cuota, stock_autorizado)
         else:
-            cupo_max_poa = stock_autorizado
-
-        max_solicitable = min(cupo_max_poa, stock_autorizado)
+            modalidad = 'BOLSA_COMUN'
+            modalidad_label = 'Bolsa Común'
+            saldo_cuota = 0
+            cuota_asig = 0
+            cuota_cons = 0
+            if costo_u > 0 and poa:
+                cupo_max_poa = int(poa.monto_disponible // costo_u)
+            else:
+                cupo_max_poa = stock_autorizado
+            max_solicitable = min(cupo_max_poa, stock_autorizado)
 
         if max_solicitable > 0:
             materiales_filtrados.append({
                 'id': mat.id,
                 'nombre': mat.nombre,
                 'codigo': mat.codigo,
-                'partida_codigo': mat.partida.codigo,
-                'partida_nombre': mat.partida.nombre,
+                'partida_codigo': mat.partida.codigo if mat.partida else '—',
+                'partida_nombre': mat.partida.nombre if mat.partida else 'Sin partida',
                 'unidad_medida': mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
                 'stock_almacen': stock_autorizado,
                 'costo_unitario': float(costo_u),
                 'saldo_poa': float(poa.monto_disponible) if poa else 0.0,
-                'cupo_poa': cupo_max_poa,
                 'max_solicitable': max_solicitable,
-                'almacen_despacho': data_item['almacen_nombre']
+                'almacen_despacho': data_item['almacen_nombre'],
+                'modalidad': modalidad,
+                'modalidad_label': modalidad_label,
+                'cuota_asignada': cuota_asig,
+                'cuota_consumida': cuota_cons,
+                'cuota_saldo': saldo_cuota,
             })
 
     return render(request, 'solicitudes/nuevo_pedido_almacen.html', {
@@ -1616,8 +1799,6 @@ def nuevo_pedido_almacen(request):
         'unidades_disponibles': unidades_disponibles,
         'rol': rol
     })
-
-
 def verificar_documento_publico(request, codigo):
     solicitud = get_object_or_404(
         Solicitud.objects.prefetch_related('detalles__material'),
