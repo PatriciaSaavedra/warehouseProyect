@@ -213,24 +213,12 @@
         </div>
     </form>
 </div>
+<!-- 1. Django genera el JSON seguro fuera del script -->
+{{ materiales|json_script:"catalogo-materiales-data" }}
 
+<!-- 2. Tu script lee el JSON de forma 100% estándar (0 errores en VS Code) -->
 <script>
-// Base de datos de materiales en memoria del cliente para búsqueda ultrarrápida
-const catalogoMateriales = [
-    {% for m in materiales %}
-    {
-        id: "{{ m.id }}",
-        codigo: "{{ m.codigo|escapejs }}",
-        nombre: "{{ m.nombre|escapejs }}",
-        unidad: "{{ m.unidad_medida|escapejs }}",
-        stock: {{ m.stock_almacen }},
-        max: {{ m.max_solicitable }},
-        modalidad: "{{ m.modalidad }}",
-        modalidad_label: "{{ m.modalidad_label|escapejs }}",
-        cuota_saldo: "{{ m.cuota_saldo }}"
-    },
-    {% endfor %}
-];
+const catalogoMateriales = JSON.parse(document.getElementById('catalogo-materiales-data').textContent);
 
 let carrito = {};
 
@@ -277,9 +265,9 @@ function filtrarMaterialesEnVivo(termino) {
                 </div>
                 <div class="text-right shrink-0">
                     <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 block">
-                        ${m.unidad}
+                        ${m.unidad_medida}
                     </span>
-                    <span class="text-[10px] text-gray-400 block mt-0.5">Disp: <strong>${m.max}</strong></span>
+                    <span class="text-[10px] text-gray-400 block mt-0.5">Disp: <strong>${m.max_solicitable}</strong></span>
                 </div>
             </div>
         `).join('');
@@ -289,25 +277,22 @@ function filtrarMaterialesEnVivo(termino) {
 }
 
 function seleccionarMaterialDesdeCombobox(materialId) {
-    const mat = catalogoMateriales.find(m => m.id === materialId);
+    // Usamos == para comparar string con número de forma segura
+    const mat = catalogoMateriales.find(m => String(m.id) === String(materialId));
     if (!mat) return;
 
-    // Sincronizar select nativo oculto
     const select = document.getElementById('material_select');
     select.value = mat.id;
 
-    // Actualizar input visible con texto elegante
     const inputBuscador = document.getElementById('input_buscador_material');
-    inputBuscador.value = `${mat.codigo} — ${mat.nombre} (${mat.unidad})`;
+    inputBuscador.value = `${mat.codigo} — ${mat.nombre} (${mat.unidad_medida})`;
 
-    // Ocultar dropdown
     document.getElementById('menu_resultados_combobox').classList.add('hidden');
     document.getElementById('btn_limpiar_buscador').classList.remove('hidden');
 
-    // Actualizar panel de información técnica
     document.getElementById('info-codigo').innerText = mat.codigo;
-    document.getElementById('info-unidad').innerText = mat.unidad;
-    document.getElementById('info-max').innerText = `${mat.max} ${mat.unidad}`;
+    document.getElementById('info-unidad').innerText = mat.unidad_medida;
+    document.getElementById('info-max').innerText = `${mat.max_solicitable} ${mat.unidad_medida}`;
 
     const badge = document.getElementById('badge-modalidad');
     if (mat.modalidad === 'CUOTA_FISICA') {
@@ -319,11 +304,10 @@ function seleccionarMaterialDesdeCombobox(materialId) {
     }
 
     const cantidadInput = document.getElementById('cantidad_input');
-    cantidadInput.max = mat.max;
-    cantidadInput.placeholder = `Máx: ${mat.max}`;
+    cantidadInput.max = mat.max_solicitable;
+    cantidadInput.placeholder = `Máx: ${mat.max_solicitable}`;
     document.getElementById('panel-info-poa').classList.remove('hidden');
 
-    // Foco directo al input de cantidad
     cantidadInput.focus();
 }
 
@@ -343,7 +327,6 @@ function limpiarSeleccionMaterial() {
     inputBuscador.focus();
 }
 
-// Cerrar combobox al hacer clic afuera
 document.addEventListener('click', (e) => {
     const combobox = document.getElementById('menu_resultados_combobox');
     const input = document.getElementById('input_buscador_material');
@@ -352,14 +335,11 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// -------------------------------------------------------------
-// GESTIÓN DEL CARRITO DE MATERIALES
-// -------------------------------------------------------------
 function agregarMaterial() {
     const select = document.getElementById('material_select');
     const cantidadInput = document.getElementById('cantidad_input');
     const materialId = select.value;
-    const mat = catalogoMateriales.find(m => m.id === materialId);
+    const mat = catalogoMateriales.find(m => String(m.id) === String(materialId));
     const cantidad = parseInt(cantidadInput.value);
 
     if (!materialId || !mat) {
@@ -374,16 +354,16 @@ function agregarMaterial() {
         return;
     }
 
-    if (cantidad > mat.max) {
-        alert(`La cantidad pedida (${cantidad}) supera el tope permitido (${mat.max} ${mat.unidad}).`);
-        cantidadInput.value = mat.max;
+    if (cantidad > mat.max_solicitable) {
+        alert(`La cantidad pedida (${cantidad}) supera el tope permitido (${mat.max_solicitable} ${mat.unidad_medida}).`);
+        cantidadInput.value = mat.max_solicitable;
         return;
     }
 
     if (carrito[materialId]) {
         const total = carrito[materialId].cantidad + cantidad;
-        if (total > mat.max) {
-            alert(`El total acumulado (${total}) supera el tope permitido (${mat.max} ${mat.unidad}).`);
+        if (total > mat.max_solicitable) {
+            alert(`El total acumulado (${total}) supera el tope permitido (${mat.max_solicitable} ${mat.unidad_medida}).`);
             return;
         }
         carrito[materialId].cantidad = total;
@@ -391,16 +371,15 @@ function agregarMaterial() {
         carrito[materialId] = {
             codigo: mat.codigo,
             nombre: mat.nombre,
-            unidad: mat.unidad,
+            unidad: mat.unidad_medida,
             cantidad: cantidad,
-            max: mat.max
+            max: mat.max_solicitable
         };
     }
 
     renderTabla();
     renderInputs();
 
-    // Limpiar buscador para el próximo ítem
     limpiarSeleccionMaterial();
     document.getElementById('menu_resultados_combobox').classList.add('hidden');
 }
