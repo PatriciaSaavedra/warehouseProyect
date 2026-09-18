@@ -34,6 +34,7 @@
                         <th class="px-6 py-4 text-left">Almacén Destino</th>
                         <th class="px-6 py-4 text-center">Estado SABS</th>
                         <th class="px-6 py-4 text-left">Fecha de Envío</th>
+                        <th class="px-6 py-4 text-left">Materiales</th>
                         <th class="px-6 py-4 text-center">Acciones de Conformidad</th>
                     </tr>
                 </thead>
@@ -59,26 +60,53 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ t.fecha_envio|date:"d/m/Y H:i" }}</td>
+                        <td class="px-6 py-4">
+                            <details class="group text-xs">
+                                <summary class="cursor-pointer font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white list-none inline-flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                                    Ver ítems ({{ t.detalles.all|length }})
+                                </summary>
+                                <ul class="mt-2 space-y-1.5 pl-1 border-l-2 border-gray-200 dark:border-gray-700 ml-2">
+                                    {% for d in t.detalles.all %}
+                                    <li class="pl-2">
+                                        <div class="font-semibold text-gray-800 dark:text-gray-100">{{ d.material.nombre }}</div>
+                                        <div class="text-[11px] text-gray-500 dark:text-gray-400">
+                                            Enviado / a confirmar: {{ d.cantidad }}
+                                            · Costo unit.: {{ d.costo_unitario_transferencia|floatformat:2 }}
+                                            · Total: {{ d.costo_total_transferencia|floatformat:2 }}
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                        </td>
                         <td class="px-6 py-4 text-center">
-                            {% if t.estado == 'EN_TRANSITO' %}
+                            {% if t.estado == 'EN_TRANSITO' and t.destino_id in almacenes_recepcion_ids %}
                             <form action="{% url 'recibir_transferencia' t.id %}" method="post" onsubmit="return confirm('¿Confirma la recepción física conforme de este inventario en el almacén destino? Se generarán los lotes de entrada correspondientes.');" class="inline">
                                 {% csrf_token %}
                                 <button type="submit" class="btn-secondary px-3.5 py-1.5 text-xs font-semibold rounded-xl shadow-sm cursor-pointer inline-flex items-center gap-1">
                                     <span class="material-symbols-outlined text-[14px]">done_all</span>
-                                    Confirmar Recepción
+                                    Confirmar Recepción Conforme
                                 </button>
                             </form>
-                            {% else %}
+                            {% elif t.estado == 'RECIBIDA' %}
                             <span class="text-xs text-gray-400 dark:text-gray-500 font-semibold inline-flex items-center gap-1">
                                 <span class="material-symbols-outlined text-[14px]">person</span>
                                 Concluido: {{ t.usuario_recibe.username }}
                             </span>
+                            {% elif t.estado == 'RECHAZADA' %}
+                            <span class="text-xs text-red-400 dark:text-red-500 font-semibold inline-flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">block</span>
+                                Rechazada
+                            </span>
+                            {% else %}
+                            <span class="text-xs text-gray-300 dark:text-gray-600">—</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="px-6 py-16 text-center text-gray-400 dark:text-gray-500">
+                        <td colspan="7" class="px-6 py-16 text-center text-gray-400 dark:text-gray-500">
                             <span class="material-symbols-outlined text-4xl block mb-2">local_shipping</span>
                             No se encontraron transferencias registradas en tu jurisdicción.
                         </td>

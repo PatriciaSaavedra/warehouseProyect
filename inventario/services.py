@@ -202,3 +202,110 @@ def validar_operacion_almacen(usuario, almacen):
         raise ValidationError("Tu usuario no tiene un perfil de roles asignado en el sistema.")
     
     return True
+
+
+# ========================================================
+# 4. TARJETA 4: RECEPCIÓN CONFORME DE TRANSFERENCIAS
+# ========================================================
+
+def confirmar_recepcion_transferencia(transferencia_id, usuario):
+    """
+    Tarjeta 4: Recepción CONFORME de una transferencia dirigida a un subalmacén.
+
+    Significado funcional de "Conforme": se confirma que las cantidades recibidas
+    coinciden exactamente con las cantidades enviadas (detalle.cantidad). NO admite
+    recepción parcial ni discrepancias (el modelo no dispone de cantidad_recibida).
+
+    Invariancias:
+    - Solo recepciona desde el estado real EN_TRANSITO; el estado final real es RECIBIDA.
+    - Atómica: bloquea la transferencia (select_for_update) y REVALIDA el estado después
+      de adquirir el bloqueo, cerrando la ventana de doble recepción concurrente.
+    - NO toca el stock del origen: Central ya descontó al emitir (enviar_transferencia).
+    - Aumenta únicamente InventarioAlmacen del destino.
+    - Cada detalle genera su lote PEPS (MovimientoInventario ENTRADA con saldo_disponible_lote).
+    - Conserva el costo proveniente del Central: costo_unitario_transferencia del detalle.
+    - Registra fecha (timezone-aware) y usuario receptor en la transferencia.
+    - Cualquier excepción revierte TODO el bloque (rollback completo).
+    """
+    from django.utils import timezone
+    from auditoria.models import Bitacora
+    from .models import Transferencia, InventarioAlmacen, MovimientoInventario
+
+    with transaction.atomic():
+        transferencia = Transferencia.objects.select_for_update().select_related(
+            'origen', 'destino'
+        ).get(id=transferencia_id)
+
+        # Revalidación AUTORITATIVA dentro del bloqueo: impide recibir dos veces,
+        # incluso si dos requests concurrentes leyeron EN_TRANSITO antes del lock.
+        if transferencia.estado != 'EN_TRANSITO':
+            raise ValueError(
+                f"La transferencia {transferencia.nro_transferencia} no está en tránsito "
+                f"(estado actual: {transferencia.get_estado_display()})."
+            )
+
+        detalles = list(transferencia.detalles.select_related('material').all())
+        if not detalles:
+            raise ValueError("La transferencia no posee ítems para consolidar en el destino.")
+
+        for detalle in detalles:
+            # Validación de cantidades y costos: no se consolida una transferencia corrupta.
+            if detalle.cantidad is None or detalle.cantidad <= 0:
+                raise ValueError(
+                    f"Cantidad inválida para '{detalle.material.nombre}': {detalle.cantidad}. "
+                    "No se puede recibir una transferencia corrupta."
+                )
+            if detalle.costo_unitario_transferencia is None or detalle.costo_unitario_transferencia < 0:
+                raise ValueError(
+                    f"Costo unitario inválido para '{detalle.material.nombre}': "
+                    f"{detalle.costo_unitario_transferencia}."
+                )
+
+            # Mismo motor multi-almacén existente: InventarioAlmacen del DESTINO.
+            inventario_destino, _ = InventarioAlmacen.objects.get_or_create(
+                material=detalle.material,
+                almacen=transferencia.destino,
+                defaults={'stock_fisico': 0, 'stock_reservado': 0},
+            )
+            # Bloquear la fila de existencias del destino para evitar pérdidas de
+            # actualización entre recepciones concurrentes al mismo material/almacén.
+            inventario_destino = InventarioAlmacen.objects.select_for_update().get(
+                pk=inventario_destino.pk
+            )
+
+            stock_anterior = inventario_destino.stock_fisico
+            inventario_destino.stock_fisico += detalle.cantidad
+            inventario_destino.save()
+
+            # Lote de entrada PEPS con el costo proveniente del Central.
+            MovimientoInventario.objects.create(
+                material=detalle.material,
+                almacen=transferencia.destino,
+                tipo='ENTRADA',
+                cantidad=detalle.cantidad,
+                costo_unitario=detalle.costo_unitario_transferencia,
+                costo_total=detalle.costo_total_transferencia,
+                stock_anterior=stock_anterior,
+                stock_resultante=inventario_destino.stock_fisico,
+                referencia=f"TRANSFERENCIA RECIBIDA {transferencia.nro_transferencia}",
+                usuario=usuario,
+                saldo_disponible_lote=detalle.cantidad,
+            )
+
+        # El estado cambia SOLO al final: si algo falló antes, ninguna escritura persiste.
+        transferencia.estado = 'RECIBIDA'
+        transferencia.fecha_recepcion = timezone.now()
+        transferencia.usuario_recibe = usuario
+        transferencia.save(update_fields=['estado', 'fecha_recepcion', 'usuario_recibe'])
+
+        Bitacora.objects.create(
+            usuario=usuario,
+            modulo='Inventario',
+            accion='Recibir Transferencia',
+            descripcion=(
+                f'Se recepcionó conforme la transferencia {transferencia.nro_transferencia} '
+                f'en el almacén {transferencia.destino.nombre}'
+            ),
+        )
+
+    return transferencia

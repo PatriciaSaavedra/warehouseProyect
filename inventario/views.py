@@ -24,7 +24,7 @@ from compras.models import CompraMenor
 from django.core.exceptions import ValidationError
 
 from usuarios.decorators import rol_requerido
-from .services import registrar_salida_valorada_peps, validar_operacion_almacen, obtener_inventario_para_unidad, unidades_ya_asignadas
+from .services import registrar_salida_valorada_peps, validar_operacion_almacen, obtener_inventario_para_unidad, unidades_ya_asignadas, confirmar_recepcion_transferencia
 
 from .models import (
     Material,
@@ -1494,19 +1494,29 @@ def transferencia_list(request):
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
     
     if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
-        transferencias = Transferencia.objects.select_related('origen', 'destino', 'usuario_envia', 'usuario_recibe').all()
+        transferencias = Transferencia.objects.select_related('origen', 'destino', 'usuario_envia', 'usuario_recibe').prefetch_related('detalles__material').all()
     else:
         almacenes_user = perfil.almacenes_autorizados.all()
         transferencias = Transferencia.objects.filter(
             Q(origen__in=almacenes_user) | Q(destino__in=almacenes_user)
-        ).select_related('origen', 'destino', 'usuario_envia', 'usuario_recibe')
+        ).select_related('origen', 'destino', 'usuario_envia', 'usuario_recibe').prefetch_related('detalles__material')
 
     transferencias = transferencias.order_by('-id')
     paginator = Paginator(transferencias, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    return render(request, 'inventario/transferencia_list.html', {'page_obj': page_obj})
+    # Almacenes donde ESTE usuario puede CONFIRMAR la recepción (presentación del botón).
+    # La invariancia se vuelve a validar en recibir_transferencia/el servicio.
+    if rol in ['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'] and perfil is not None:
+        almacenes_recepcion_ids = set(perfil.get_almacenes_operables().values_list('id', flat=True))
+    else:
+        almacenes_recepcion_ids = set()
+
+    return render(request, 'inventario/transferencia_list.html', {
+        'page_obj': page_obj,
+        'almacenes_recepcion_ids': almacenes_recepcion_ids,
+    })
 
 
 @login_required
@@ -1612,60 +1622,45 @@ def enviar_transferencia(request):
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def recibir_transferencia(request, id):
-    transferencia = get_object_or_404(Transferencia, id=id)
-    perfil = getattr(request.user, 'perfilusuario', None)
-
-    if transferencia.estado != 'EN_TRANSITO':
-        messages.error(request, "Esta transferencia ya ha sido procesada o cancelada.")
+    # La recepción es una operación destructiva: SOLO vía POST (nunca GET).
+    if request.method != 'POST':
+        messages.warning(request, "La recepción de transferencias debe confirmarse mediante el botón correspondiente.")
         return redirect('transferencia_list')
 
-    if not perfil.tiene_acceso_almacen(transferencia.destino):
-        messages.error(request, f"No tiene autorización para recibir inventario en el almacén: {transferencia.destino.nombre}")
+    perfil = getattr(request.user, 'perfilusuario', None)
+
+    transferencia = Transferencia.objects.select_related('destino').filter(id=id).first()
+    if transferencia is None:
+        messages.error(request, "La transferencia solicitada no existe.")
+        return redirect('transferencia_list')
+
+    # Fast-fail amigable: una transferencia fuera de tránsito jamás vuelve a procesarse.
+    if transferencia.estado != 'EN_TRANSITO':
+        messages.warning(
+            request,
+            f"La transferencia {transferencia.nro_transferencia} ya fue procesada "
+            f"(estado: {transferencia.get_estado_display()})."
+        )
+        return redirect('transferencia_list')
+
+    # Invariancia de la recepción: el destino debe ser un almacén que el usuario
+    # puede operar (impide POST manipulados hacia almacenes ajenos al subalmacén
+    # autorizado). El servicio revalida dentro de la transacción.
+    if not perfil or not perfil.tiene_acceso_almacen(transferencia.destino):
+        messages.error(
+            request,
+            f"No tiene autorización para recibir inventario en el almacén: {transferencia.destino.nombre}"
+        )
         return redirect('transferencia_list')
 
     try:
-        with transaction.atomic():
-            transferencia = Transferencia.objects.select_for_update().get(id=id)
-            detalles = transferencia.detalles.all()
-
-            for det in detalles:
-                inv_destino, created = InventarioAlmacen.objects.get_or_create(
-                    material=det.material,
-                    almacen=transferencia.destino,
-                    defaults={'stock_fisico': 0, 'stock_reservado': 0}
-                )
-                stock_anterior = inv_destino.stock_fisico
-                inv_destino.stock_fisico += det.cantidad
-                inv_destino.save()
-
-                MovimientoInventario.objects.create(
-                    material=det.material,
-                    almacen=transferencia.destino,
-                    tipo='ENTRADA',
-                    cantidad=det.cantidad,
-                    costo_unitario=det.costo_unitario_transferencia,
-                    costo_total=det.costo_total_transferencia,
-                    stock_anterior=stock_anterior,
-                    stock_resultante=inv_destino.stock_fisico,
-                    referencia=f"TRANSFERENCIA RECIBIDA {transferencia.nro_transferencia}",
-                    usuario=request.user,
-                    saldo_disponible_lote=det.cantidad
-                )
-
-            transferencia.estado = 'RECIBIDA'
-            transferencia.fecha_recepcion = timezone.now()
-            transferencia.usuario_recibe = request.user
-            transferencia.save()
-
-            Bitacora.objects.create(
-                usuario=request.user,
-                modulo='Inventario',
-                accion='Recibir Transferencia',
-                descripcion=f'Se recepcionó conforme la transferencia {transferencia.nro_transferencia} en el almacén {transferencia.destino.nombre}'
-            )
-
-        messages.success(request, f"Transferencia {transferencia.nro_transferencia} recibida y consolidada en stock con éxito.")
+        confirmar_recepcion_transferencia(transferencia.id, request.user)
+        messages.success(
+            request,
+            f"Transferencia {transferencia.nro_transferencia} recibida y consolidada en stock con éxito."
+        )
     except Exception as e:
+        # El bloque del servicio es atómico: si falló, no quedó stock/lote/movimiento parcial.
         messages.error(request, f"Error al procesar la recepción física de la transferencia: {str(e)}")
 
     return redirect('transferencia_list')
