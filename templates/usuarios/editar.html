@@ -114,7 +114,7 @@ Editar Usuario
                         {% for value, label in roles %}
                             <option
                                 value="{{ value }}"
-                                {% if perfil.rol == value %}selected{% endif %}
+                                {% if valores.rol == value or perfil.rol == value %}selected{% endif %}
                             >
                                 {{ label }}
                             </option>

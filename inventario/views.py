@@ -24,7 +24,7 @@ from compras.models import CompraMenor
 from django.core.exceptions import ValidationError
 
 from usuarios.decorators import rol_requerido
-from .services import registrar_salida_valorada_peps, validar_operacion_almacen, obtener_inventario_para_unidad
+from .services import registrar_salida_valorada_peps, validar_operacion_almacen, obtener_inventario_para_unidad, unidades_ya_asignadas
 
 from .models import (
     Material,
@@ -136,6 +136,22 @@ def crear_almacen(request):
             messages.error(request, f"Ya existe un almacén registrado con el nombre '{nombre}'.")
             return redirect('crear_almacen')
 
+        # Tarjeta 2: solo unidades activas y regla de un único almacén por unidad
+        unidades_seleccionadas = UnidadOrganizacional.objects.filter(
+            id__in=unidades_atendidas_ids, is_active=True
+        ) if unidades_atendidas_ids else UnidadOrganizacional.objects.none()
+
+        conflictos = unidades_ya_asignadas(list(unidades_seleccionadas.values_list('id', flat=True)))
+        if conflictos:
+            detalle = '; '.join(f'"{nombre_u}" ya está asignada a "{nombre_a}"' for nombre_u, nombre_a in conflictos.values())
+            messages.error(
+                request,
+                f'No se puede registrar el almacén: {detalle}. '
+                'Una Unidad Organizacional solo puede ser atendida por UN almacén a la vez. '
+                'Retire primero la unidad del almacén actual si desea cambiarla.'
+            )
+            return redirect('crear_almacen')
+
         unidad = get_object_or_404(UnidadOrganizacional, id=unidad_id) if unidad_id else None
         responsable = get_object_or_404(User, id=responsable_id) if responsable_id else None
         padre = get_object_or_404(Almacen, id=almacen_padre_id) if almacen_padre_id else None
@@ -152,8 +168,8 @@ def crear_almacen(request):
                     is_active=True
                 )
                 if unidades_atendidas_ids:
-                    almacen.unidades_atendidas.set(unidades_atendidas_ids)
-                    
+                    almacen.unidades_atendidas.set(unidades_seleccionadas)
+
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
@@ -196,6 +212,28 @@ def editar_almacen(request, id):
             messages.error(request, "El Nombre y el Tipo son obligatorios.")
             return redirect('editar_almacen', id=almacen.id)
 
+        # Tarjeta 2: solo unidades ACTIVAS son administrables desde el formulario.
+        # Las asociaciones preexistentes a unidades INACTIVAS se conservan: el formulario
+        # no las muestra, por lo que un .set() directo borraría la relación silenciosamente.
+        unidades_seleccionadas = UnidadOrganizacional.objects.filter(
+            id__in=unidades_atendidas_ids, is_active=True
+        ) if unidades_atendidas_ids else UnidadOrganizacional.objects.none()
+        inactivas_preexistentes = almacen.unidades_atendidas.filter(is_active=False)
+
+        conflictos = unidades_ya_asignadas(
+            list(unidades_seleccionadas.values_list('id', flat=True)),
+            almacen_excluir_id=almacen.id,
+        )
+        if conflictos:
+            detalle = '; '.join(f'"{nombre_u}" ya está asignada a "{nombre_a}"' for nombre_u, nombre_a in conflictos.values())
+            messages.error(
+                request,
+                f'No se puede actualizar el almacén: {detalle}. '
+                'Una Unidad Organizacional solo puede ser atendida por UN almacén a la vez. '
+                'Retire primero la unidad del almacén actual si desea cambiarla.'
+            )
+            return redirect('editar_almacen', id=almacen.id)
+
         try:
             with transaction.atomic():
                 almacen.nombre = nombre
@@ -208,7 +246,10 @@ def editar_almacen(request, id):
                 almacen.save()
 
                 if unidades_atendidas_ids is not None:
-                    almacen.unidades_atendidas.set(unidades_atendidas_ids)
+                    # Preserva las relaciones preexistentes con unidades inactivas
+                    ids_finales = list(unidades_seleccionadas.values_list('id', flat=True))
+                    ids_finales += list(inactivas_preexistentes.values_list('id', flat=True))
+                    almacen.unidades_atendidas.set(ids_finales)
 
                 Bitacora.objects.create(
                     usuario=request.user,
@@ -226,6 +267,7 @@ def editar_almacen(request, id):
     return render(request, 'inventario/editar_almacen.html', {
         'almacen': almacen,
         'unidades': unidades,
+        'unidades_inactivas_asignadas': almacen.unidades_atendidas.filter(is_active=False).order_by('nombre'),
         'usuarios': usuarios,
         'almacenes_padre': almacenes_padre
     })

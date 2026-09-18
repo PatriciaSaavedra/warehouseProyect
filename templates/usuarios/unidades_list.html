@@ -58,6 +58,7 @@
                         <th class="p-4 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Nombre de la Unidad</th>
                         <th class="p-4 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Secretaría de Dependencia</th>
                         <th class="p-4 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-center">Código SIGEP</th>
+                        <th class="p-4 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Almacén que atiende</th>
                         <th class="p-4 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Estado</th>
                         <th class="p-4 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-center">Acciones</th>
                     </tr>
@@ -81,6 +82,26 @@
                                 {% else %}
                                     <span class="text-gray-300 dark:text-gray-600">-</span>
                                 {% endif %}
+                            </td>
+                            <td class="p-4 text-sm">
+                                {% with almacenes=u.almacenes_que_atienden.all %}
+                                    {% if almacenes %}
+                                        {% for a in almacenes %}
+                                            {% if a.is_active %}
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 rounded-full border border-blue-200/50 dark:border-blue-900/30">
+                                                    <span class="material-symbols-outlined text-[15px]">warehouse</span>
+                                                    {{ a.nombre }}
+                                                </span>
+                                            {% else %}
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-full border border-gray-200 dark:border-gray-700">
+                                                    {{ a.nombre }} <span class="text-[10px]">(inactivo)</span>
+                                                </span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-gray-400 dark:text-gray-500 italic">No asignado</span>
+                                    {% endif %}
+                                {% endwith %}
                             </td>
                             <td class="p-4 text-sm">
                                 {% if u.is_active %}
@@ -117,7 +138,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="5" class="p-12 text-center">
+                            <td colspan="6" class="p-12 text-center">
                                 <div class="flex flex-col items-center justify-center gap-2 text-gray-400">
                                     <span class="material-symbols-outlined text-4xl">folder_open</span>
                                     <p class="text-sm font-medium">No se encontraron Unidades Administrativas registradas en el sistema.</p>

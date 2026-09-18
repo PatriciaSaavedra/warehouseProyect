@@ -101,35 +101,59 @@
                     <label class="profile-form-label">Nombre de Usuario</label>
                     <input type="text" class="profile-form-control" value="{{ usuario_obj.username }}" disabled>
                 </div>
-                
+
                 <div>
                     <label class="profile-form-label">Rol asignado</label>
-                    <input type="text" class="profile-form-control" value="{{ perfil.rol }}" disabled>
+                    <input type="text" class="profile-form-control" value="{{ perfil.get_rol_display|default:'No asignado' }}" disabled>
                 </div>
 
                 <!-- Información Personal -->
                 <div>
                     <label class="profile-form-label">Nombre</label>
-                    <input type="text" class="profile-form-control" value="{{ usuario_obj.first_name }}" disabled>
+                    <input type="text" class="profile-form-control" value="{{ usuario_obj.first_name|default:'No asignado' }}" disabled>
                 </div>
-                
+
                 <div>
                     <label class="profile-form-label">Apellido</label>
-                    <input type="text" class="profile-form-control" value="{{ usuario_obj.last_name }}" disabled>
+                    <input type="text" class="profile-form-control" value="{{ usuario_obj.last_name|default:'No asignado' }}" disabled>
                 </div>
 
-                <!-- Correo y Unidad Organizacional -->
-                <div class="{% if not perfil.unidad %}profile-full-width{% endif %}">
+                <div>
                     <label class="profile-form-label">Correo Electrónico</label>
-                    <input type="text" class="profile-form-control" value="{{ usuario_obj.email }}" disabled>
+                    <input type="text" class="profile-form-control" value="{{ usuario_obj.email|default:'No asignado' }}" disabled>
                 </div>
 
-                {% if perfil.unidad %}
+                <div>
+                    <label class="profile-form-label">Secretaría Departamental</label>
+                    <input type="text" class="profile-form-control" value="{{ perfil.secretaria.nombre|default:'No asignado' }}" disabled>
+                </div>
+
                 <div>
                     <label class="profile-form-label">Unidad Organizacional</label>
-                    <input type="text" class="profile-form-control" value="{{ perfil.unidad.nombre }}" disabled>
+                    <input type="text" class="profile-form-control" value="{{ perfil.unidad.nombre|default:'No asignado' }}" disabled>
                 </div>
-                {% endif %}
+
+                <!-- Almacenes autorizados -->
+                <div class="profile-full-width">
+                    <label class="profile-form-label">Almacenes autorizados</label>
+                    {% if perfil.almacenes_autorizados.all %}
+                        <div class="space-y-2 pt-1">
+                            {% for alm in perfil.almacenes_autorizados.all %}
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-[#800000]"></span>
+                                    <span class="text-sm text-gray-700">
+                                        {{ alm.nombre }}
+                                        <span class="text-xs text-gray-400 uppercase">
+                                            ({% if alm.tipo == 'CENTRAL' %}Almacén Central{% else %}Subalmacén{% endif %})
+                                        </span>
+                                    </span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <input type="text" class="profile-form-control" value="No asignado" disabled>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>

@@ -1,9 +1,45 @@
 # inventario/services.py
 
-from .models import Material, MovimientoInventario, InventarioAlmacen, Almacen
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import Prefetch
 from django.core.exceptions import ValidationError
+
+from .models import Material, MovimientoInventario, InventarioAlmacen, Almacen
+from organizacion.models import UnidadOrganizacional
+
+# ========================================================
+# TARJETA 2: Regla funcional de asignación Unidad → Almacén
+# ========================================================
+
+def unidades_ya_asignadas(unidades_atendidas_ids, almacen_excluir_id=None):
+    """
+    Tarjeta 2: Regla funcional "una Unidad Organizacional solo puede ser atendida
+    por UN almacén a la vez". Devuelve {unidad_id: (nombre_unidad, almacen_asignado)}
+    para las unidades seleccionadas que ya estén asignadas a otro almacén.
+    Se centraliza aquí para que vistas y Django Admin compartan la misma validación.
+    """
+    conflictos = {}
+    ids = [int(i) for i in unidades_atendidas_ids if str(i).isdigit()]
+    if not ids:
+        return conflictos
+
+    prefetch_unidades = Prefetch(
+        'unidades_atendidas',
+        queryset=UnidadOrganizacional.objects.filter(id__in=ids)
+    )
+    otros_almacenes = Almacen.objects.exclude(id=almacen_excluir_id) if almacen_excluir_id else Almacen.objects.all()
+    otros_almacenes = (
+        otros_almacenes
+        .filter(unidades_atendidas__id__in=ids)
+        .prefetch_related(prefetch_unidades)
+        .distinct()
+    )
+
+    for almacen in otros_almacenes:
+        for unidad in almacen.unidades_atendidas.all():
+            conflictos.setdefault(unidad.id, (unidad.nombre, almacen.nombre))
+    return conflictos
 
 # ========================================================
 # 1. SALIDAS VALORADAS (PEPS)

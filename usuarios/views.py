@@ -42,7 +42,7 @@ def capitalizar_nombre_propio(texto):
             palabras_formateadas.append(pal.capitalize())
     return " ".join(palabras_formateadas)
 
-def validar_datos_usuario(datos, es_creacion=False, user_id=None):
+def validar_datos_usuario(datos, es_creacion=False, user_id=None, almacenes=None):
     """
     Valida y normaliza de forma exhaustiva todos los campos de un usuario.
     
@@ -209,6 +209,15 @@ def validar_datos_usuario(datos, es_creacion=False, user_id=None):
     elif rol not in roles_validos:
         errores.append("El rol seleccionado no es válido en el sistema.")
 
+    # ==========================================
+    # 6.1. VALIDACIÓN DE ALMACENES SEGÚN EL ROL
+    # ==========================================
+    almacenes = almacenes or []
+    if rol == 'ALMACENERO' and not almacenes:
+        errores.append(
+            "Un usuario con rol Almacenero debe tener al menos un almacén o subalmacén asignado."
+        )
+
 
     # ==========================================
     # 7. VALIDACIÓN DE RELACIÓN SECRETARÍA -> UNIDAD
@@ -251,6 +260,7 @@ def validar_datos_usuario(datos, es_creacion=False, user_id=None):
         'rol': rol,
         'secretaria_id': secretaria_id if secretaria_id else None,
         'unidad_id': unidad_id if unidad_id else None,
+        'almacenes': almacenes,
     }
     if es_creacion:
         datos_normalizados['password'] = password
@@ -330,8 +340,8 @@ def crear_usuario_view(request):
     almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')  # <--- Obtener almacenes activos
 
     if request.method == 'POST':
-        datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=True)
         almacenes_seleccionados = request.POST.getlist('almacenes')  # <--- Capturar IDs de almacenes
+        datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=True, almacenes=almacenes_seleccionados)
 
         if errores:
             for error in errores:
@@ -344,6 +354,7 @@ def crear_usuario_view(request):
                     'unidades': unidades,
                     'secretarias': secretarias,
                     'almacenes': almacenes,  # <--- Pasar al contexto de error
+                    'almacenes_autorizados_ids': [int(x) for x in almacenes_seleccionados],
                     'valores': request.POST
                 }
             )
@@ -389,6 +400,7 @@ def crear_usuario_view(request):
                     'unidades': unidades,
                     'secretarias': secretarias,
                     'almacenes': almacenes,
+                    'almacenes_autorizados_ids': [int(x) for x in almacenes_seleccionados],
                     'valores': request.POST
                 }
             )
@@ -403,7 +415,8 @@ def crear_usuario_view(request):
             'roles': ROLES,
             'unidades': unidades,
             'secretarias': secretarias,
-            'almacenes': almacenes  # <--- Pasar al formulario GET
+            'almacenes': almacenes,  # <--- Pasar al formulario GET
+            'almacenes_autorizados_ids': []
         }
     )
 # VISTA DE EDICIÓN
@@ -411,12 +424,21 @@ def crear_usuario_view(request):
 @rol_requerido(['ADMINISTRADOR'])
 def editar_usuario_view(request, user_id):
     usuario = get_object_or_404(User, id=user_id)
-    perfil = usuario.perfilusuario
+    # Asegurar que el usuario siempre tenga un perfil asociado
+    try:
+        perfil = usuario.perfilusuario
+    except PerfilUsuario.DoesNotExist:
+        perfil = PerfilUsuario.objects.create(user=usuario)
     unidades = UnidadAdministrativa.objects.all()
     secretarias = Secretaria.objects.all()
+    almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
 
     if request.method == 'POST':
-        datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=False, user_id=user_id)
+        almacenes_seleccionados = request.POST.getlist('almacenes')
+        datos_normalizados, errores = validar_datos_usuario(
+            request.POST, es_creacion=False, user_id=user_id,
+            almacenes=almacenes_seleccionados
+        )
 
         if errores:
             for error in errores:
@@ -430,6 +452,8 @@ def editar_usuario_view(request, user_id):
                     'roles': ROLES,
                     'unidades': unidades,
                     'secretarias': secretarias,
+                    'almacenes': almacenes,
+                    'almacenes_autorizados_ids': [int(x) for x in almacenes_seleccionados],
                     'valores': request.POST
                 }
             )
@@ -446,6 +470,11 @@ def editar_usuario_view(request, user_id):
                 perfil.secretaria_id = datos_normalizados['secretaria_id']
                 perfil.unidad_id = datos_normalizados['unidad_id']
                 perfil.save()
+
+                # Guardar los almacenes autorizados seleccionados.
+                # Para ADMINISTRADOR/superusuario se conservan los existentes (acceso global).
+                if datos_normalizados['rol'] != 'ADMINISTRADOR' and not usuario.is_superuser:
+                    perfil.almacenes_autorizados.set(almacenes_seleccionados)
 
                 Bitacora.objects.create(
                     usuario=request.user,
@@ -468,6 +497,8 @@ def editar_usuario_view(request, user_id):
                     'roles': ROLES,
                     'unidades': unidades,
                     'secretarias': secretarias,
+                    'almacenes': almacenes,
+                    'almacenes_autorizados_ids': [int(x) for x in almacenes_seleccionados],
                     'valores': request.POST
                 }
             )
@@ -483,7 +514,9 @@ def editar_usuario_view(request, user_id):
             'perfil': perfil,
             'roles': ROLES,
             'unidades': unidades,
-            'secretarias': secretarias
+            'secretarias': secretarias,
+            'almacenes': almacenes,
+            'almacenes_autorizados_ids': list(perfil.almacenes_autorizados.values_list('id', flat=True))
         }
     )
 
@@ -577,7 +610,10 @@ def reset_password_view(request, user_id):
 @login_required
 def perfil_usuario_view(request):
     usuario = request.user
-    perfil = getattr(usuario, 'perfilusuario', None)
+    try:
+        perfil = usuario.perfilusuario
+    except PerfilUsuario.DoesNotExist:
+        perfil = None
 
     if request.method == 'POST':
         first_name = capitalizar_nombre_propio(normalizar_espacios(request.POST.get('first_name', '')))
@@ -663,7 +699,7 @@ def perfil_usuario_view(request):
 @rol_requerido(['ADMINISTRADOR'])
 def unidades_list_view(request):
     query = request.GET.get('q', '').strip()
-    unidades = UnidadOrganizacional.objects.all()
+    unidades = UnidadOrganizacional.objects.prefetch_related('almacenes_que_atienden')
 
     if query:
         unidades = unidades.filter(

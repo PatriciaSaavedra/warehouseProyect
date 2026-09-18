@@ -1,11 +1,15 @@
 # --- TU ARCHIVO inventario/tests.py CORREGIDO ---
 
 from decimal import Decimal
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.contrib.auth.models import User
+from django.urls import reverse
 from django.utils import timezone  # <-- CORREGIDO: Importación añadida para pruebas de fecha
-from organizacion.models import UnidadOrganizacional
+from organizacion.models import Secretaria, UnidadOrganizacional
 from inventario.models import Almacen
+from usuarios.models import PerfilUsuario
+from inventario.services import unidades_ya_asignadas
+from inventario.admin import AlmacenAdminForm
 
 class AlmacenBaseTestCase(TestCase):
 
@@ -184,3 +188,233 @@ class AlmacenBaseTestCase(TestCase):
         lote = MovimientoInventario.objects.get(material=material, almacen=almacen_central, tipo='ENTRADA')
         self.assertEqual(lote.saldo_disponible_lote, 50)
         self.assertEqual(lote.costo_unitario, Decimal('2.00'))
+
+
+class Tarjeta2VistaAlmacenTest(TestCase):
+    """
+    Tarjeta 2: el formulario de Almacenes guarda la relación Unidad → Almacén,
+    bloquea asignaciones duplicadas (una unidad = UN almacén) y solo acepta
+    unidades activas. NO se reutiliza ni modifica PerfilUsuario.almacenes_autorizados.
+    """
+
+    def setUp(self):
+        self.secretaria = Secretaria.objects.create(nombre="Secretaría de Salud")
+        self.unidad_a = UnidadOrganizacional.objects.create(nombre="Unidad A", secretaria=self.secretaria)
+        self.unidad_b = UnidadOrganizacional.objects.create(nombre="Unidad B", secretaria=self.secretaria)
+        self.central = Almacen.objects.create(nombre="Almacén Central", tipo="CENTRAL")
+        self.unasba = Almacen.objects.create(nombre="Subalmacén UNASBA", tipo="SUBALMACEN")
+
+        self.admin = User.objects.create_superuser(
+            username="admin_tarjeta2",
+            password="Admin1234",
+            email="admin2@test.gob.bo",
+        )
+        PerfilUsuario.objects.create(user=self.admin, rol="ADMINISTRADOR")
+        self.client = Client()
+        self.client.force_login(self.admin)
+
+    def _datos_almacen(self, unidades_atendidas, **extras):
+        datos = {
+            'nombre': 'Subalmacén Nuevo',
+            'descripcion': '',
+            'tipo': 'SUBALMACEN',
+            'unidad_organizacional': '',
+            'responsable': '',
+            'almacen_padre': '',
+            'is_active': 'true',
+            'unidades_atendidas': [str(u.id) for u in unidades_atendidas],
+        }
+        datos.update(extras)
+        return datos
+
+    def test_crear_almacen_guarda_unidades_atendidas(self):
+        respuesta = self.client.post(
+            reverse('crear_almacen'),
+            self._datos_almacen([self.unidad_a], nombre='Subalmacén Registrado'),
+        )
+        self.assertRedirects(respuesta, reverse('almacen_list'))
+
+        almacen = Almacen.objects.get(nombre='Subalmacén Registrado')
+        self.assertEqual(list(almacen.unidades_atendidas.all()), [self.unidad_a])
+        self.assertEqual(list(self.unidad_a.almacenes_que_atienden.all()), [almacen])
+
+    def test_editar_almacen_guarda_unidades_atendidas(self):
+        respuesta = self.client.post(
+            reverse('editar_almacen', args=[self.unasba.id]),
+            self._datos_almacen([self.unidad_b], nombre=self.unasba.nombre),
+        )
+        self.assertRedirects(respuesta, reverse('almacen_list'))
+
+        self.unasba.refresh_from_db()
+        self.assertEqual(list(self.unasba.unidades_atendidas.all()), [self.unidad_b])
+        self.assertEqual(list(self.unidad_b.almacenes_que_atienden.all()), [self.unasba])
+
+    def test_bloquea_unidad_ya_asignada_a_otro_almacen(self):
+        self.central.unidades_atendidas.add(self.unidad_a)
+
+        respuesta = self.client.post(
+            reverse('crear_almacen'),
+            self._datos_almacen([self.unidad_a]),
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertFalse(Almacen.objects.filter(nombre='Subalmacén Nuevo').exists())
+        self.assertEqual(list(self.unidad_a.almacenes_que_atienden.all()), [self.central])
+
+    def test_cambio_de_almacen_reemplaza_sin_duplicar(self):
+        self.central.unidades_atendidas.add(self.unidad_a)
+
+        # Intentar asignar también al Subalmacén UNASBA: bloqueado (una unidad = un almacén)
+        self.client.post(
+            reverse('editar_almacen', args=[self.unasba.id]),
+            self._datos_almacen([self.unidad_a], nombre=self.unasba.nombre),
+        )
+        self.unasba.refresh_from_db()
+        self.assertEqual(self.unasba.unidades_atendidas.count(), 0)
+
+        # Cambiar de almacén: retirar del Central y asignar a UNASBA
+        self.central.unidades_atendidas.remove(self.unidad_a)
+        self.client.post(
+            reverse('editar_almacen', args=[self.unasba.id]),
+            self._datos_almacen([self.unidad_a], nombre=self.unasba.nombre),
+        )
+        self.unasba.refresh_from_db()
+        self.central.refresh_from_db()
+        self.assertEqual(list(self.unidad_a.almacenes_que_atienden.all()), [self.unasba])
+        self.assertEqual(self.central.unidades_atendidas.count(), 0)
+
+    def test_solo_acepta_unidades_activas(self):
+        inactiva = UnidadOrganizacional.objects.create(
+            nombre="Unidad Inactiva", secretaria=self.secretaria, is_active=False
+        )
+        respuesta = self.client.post(
+            reverse('crear_almacen'),
+            self._datos_almacen([self.unidad_a, inactiva]),
+        )
+        self.assertRedirects(respuesta, reverse('almacen_list'))
+
+        almacen = Almacen.objects.get(nombre='Subalmacén Nuevo')
+        self.assertEqual(list(almacen.unidades_atendidas.all()), [self.unidad_a])
+
+    def test_vista_almacen_muestra_unidades_atendidas(self):
+        self.central.unidades_atendidas.add(self.unidad_a)
+        respuesta = self.client.get(reverse('almacen_list'))
+        self.assertContains(respuesta, 'Almacén Central')
+        self.assertContains(respuesta, 'Unidad A')
+
+    def test_editar_almacen_conserva_relacion_a_unidad_inactiva(self):
+        # Escenario reportado: asignar → desactivar → editar el almacén sin tocar la asociación.
+        # El formulario no muestra unidades inactivas, por lo que el POST llega sin ellas.
+        self.central.unidades_atendidas.add(self.unidad_a)
+        self.unidad_a.is_active = False
+        self.unidad_a.save()
+
+        respuesta = self.client.post(
+            reverse('editar_almacen', args=[self.central.id]),
+            self._datos_almacen([], nombre=self.central.nombre, tipo='CENTRAL'),
+        )
+        self.assertRedirects(respuesta, reverse('almacen_list'))
+
+        self.central.refresh_from_db()
+        self.assertEqual(list(self.central.unidades_atendidas.all()), [self.unidad_a])
+        self.assertEqual(list(self.unidad_a.almacenes_que_atienden.all()), [self.central])
+
+    def test_editar_almacen_quitar_activa_conserva_inactiva(self):
+        self.central.unidades_atendidas.add(self.unidad_a, self.unidad_b)
+        self.unidad_b.is_active = False
+        self.unidad_b.save()
+
+        # Se deselecciona la única unidad activa; la inactiva no aparece en el formulario
+        self.client.post(
+            reverse('editar_almacen', args=[self.central.id]),
+            self._datos_almacen([], nombre=self.central.nombre, tipo='CENTRAL'),
+        )
+        self.central.refresh_from_db()
+        self.assertEqual(list(self.central.unidades_atendidas.all()), [self.unidad_b])
+
+    def test_editar_almacen_conserva_inactiva_y_actualiza_activas(self):
+        self.central.unidades_atendidas.add(self.unidad_a, self.unidad_b)
+        self.unidad_a.is_active = False
+        self.unidad_a.save()
+
+        self.client.post(
+            reverse('editar_almacen', args=[self.central.id]),
+            self._datos_almacen([self.unidad_b], nombre=self.central.nombre, tipo='CENTRAL'),
+        )
+        self.central.refresh_from_db()
+        self.assertCountEqual(
+            list(self.central.unidades_atendidas.values_list('id', flat=True)),
+            [self.unidad_a.id, self.unidad_b.id],
+        )
+
+    def test_editar_almacen_no_asigna_unidad_inactiva_nueva(self):
+        self.unidad_b.is_active = False
+        self.unidad_b.save()
+
+        self.client.post(
+            reverse('editar_almacen', args=[self.unasba.id]),
+            self._datos_almacen([self.unidad_b], nombre=self.unasba.nombre),
+        )
+        self.unasba.refresh_from_db()
+        self.assertEqual(self.unasba.unidades_atendidas.count(), 0)
+
+    def test_editar_almacen_muestra_aviso_unidad_inactiva(self):
+        self.central.unidades_atendidas.add(self.unidad_a)
+        self.unidad_a.is_active = False
+        self.unidad_a.save()
+
+        respuesta = self.client.get(reverse('editar_almacen', args=[self.central.id]))
+        self.assertContains(respuesta, 'inactiva')
+        self.assertContains(respuesta, 'Unidad A')
+
+
+class Tarjeta2AuditoriaEscrituraTest(TestCase):
+    """
+    Tarjeta 2 - Auditoría: la validación (una Unidad = UN almacén) está centralizada
+    en inventario.services.unidades_ya_asignadas y se reutiliza en vistas y Django Admin.
+    """
+
+    def setUp(self):
+        self.secretaria = Secretaria.objects.create(nombre="Secretaría de Salud")
+        self.unidad_a = UnidadOrganizacional.objects.create(nombre="Unidad A", secretaria=self.secretaria)
+        self.unidad_b = UnidadOrganizacional.objects.create(nombre="Unidad B", secretaria=self.secretaria)
+        self.central = Almacen.objects.create(nombre="Almacén Central", tipo="CENTRAL")
+        self.unasba = Almacen.objects.create(nombre="Subalmacén UNASBA", tipo="SUBALMACEN")
+        self.central.unidades_atendidas.add(self.unidad_a)
+
+    def test_servicio_centralizado_detecta_conflicto(self):
+        conflictos = unidades_ya_asignadas([self.unidad_b.id])
+        self.assertEqual(conflictos, {})
+        conflictos = unidades_ya_asignadas([self.unidad_a.id])
+        self.assertEqual(conflictos[self.unidad_a.id], (self.unidad_a.nombre, self.central.nombre))
+
+    def test_servicio_centralizado_excluye_almacen_en_edicion(self):
+        # Para un almacén que YA contiene la unidad, no debe reportarse conflicto consigo mismo
+        conflictos = unidades_ya_asignadas([self.unidad_a.id], almacen_excluir_id=self.central.id)
+        self.assertEqual(conflictos, {})
+
+    def test_django_admin_bloquea_doble_asignacion(self):
+        # La misma regla se aplica al formulario de Django Admin (AlmacenAdminForm)
+        form_add = AlmacenAdminForm(data={
+            'nombre': 'Almacén Nuevo Admin',
+            'tipo': 'SUBALMACEN',
+            'unidades_atendidas': [self.unidad_a.id],  # ya está en Central
+        })
+        self.assertFalse(form_add.is_valid())
+        self.assertIn('unidades_atendidas', form_add.errors)
+        self.assertIn('solo puede ser atendida por UN almacén', form_add.errors.as_text())
+
+        # Asignando una unidad libre: válido
+        form_ok = AlmacenAdminForm(data={
+            'nombre': 'Almacén Nuevo Admin',
+            'tipo': 'SUBALMACEN',
+            'unidades_atendidas': [self.unidad_b.id],
+        })
+        self.assertTrue(form_ok.is_valid())
+
+        # En edición del almacén que ya la posee: válido (se excluye a sí mismo)
+        form_edit = AlmacenAdminForm(data={
+            'nombre': self.central.nombre,
+            'tipo': 'CENTRAL',
+            'unidades_atendidas': [self.unidad_a.id],
+        }, instance=self.central)
+        self.assertTrue(form_edit.is_valid())

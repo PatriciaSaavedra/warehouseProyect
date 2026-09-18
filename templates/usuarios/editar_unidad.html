@@ -17,6 +17,27 @@
 
     <form method="POST" class="card p-8 shadow-sm space-y-6">
         {% csrf_token %}
+        <!-- TARJETA 2: Almacén que atiende (solo lectura, se administra desde el módulo de Almacenes) -->
+        <div class="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl p-4">
+            <p class="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider mb-2">
+                Almacén que atiende esta unidad
+            </p>
+            {% with almacenes=unidad.almacenes_que_atienden.all %}
+                {% if almacenes %}
+                    {% for a in almacenes %}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 rounded-full border border-blue-200/50 dark:border-blue-900/30">
+                            <span class="material-symbols-outlined text-[15px]">warehouse</span>
+                            {{ a.nombre }}
+                        </span>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-sm text-gray-500 dark:text-gray-400 italic">No asignado</p>
+                {% endif %}
+            {% endwith %}
+            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
+                Esta asignación se administra desde el módulo de Almacenes (Almacén → Unidades a las que atiende).
+            </p>
+        </div>
         <div class="space-y-6">
             <!-- SELECTOR DE SECRETARÍA EN editar_unidad.html -->
             <div class="mb-4">

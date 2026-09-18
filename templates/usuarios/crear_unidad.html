@@ -18,6 +18,15 @@
 
     <form method="POST" class="card p-8 shadow-sm space-y-6">
         {% csrf_token %}
+        <!-- TARJETA 2: Nota sobre el almacén que atiende (se asigna desde el módulo de Almacenes) -->
+        <div class="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl p-4">
+            <p class="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider mb-1">
+                Almacén que atiende esta unidad
+            </p>
+            <p class="text-sm text-gray-600 dark:text-gray-300">
+                Se asignará posteriormente desde el módulo de Almacenes (Almacén → Unidades a las que atiende).
+            </p>
+        </div>
         <div class="space-y-6">
             <!-- SELECTOR DE SECRETARÍA EN crear_unidad.html -->
             <div class="mb-4">
