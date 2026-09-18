@@ -13,6 +13,9 @@
     <!-- MENU -->
     <nav class="flex-1 px-4 space-y-1.5 overflow-y-auto">
 
+        {% if request.user.is_authenticated %}
+        {% with perfil=request.user.perfilusuario %}
+
         <!-- 1️⃣ DASHBOARD -->
         <a 
             href="/dashboard/"
@@ -25,8 +28,8 @@
             Panel de control
         </a>
 
-        <!-- 2️⃣ ADMINISTRACIÓN (Acceso para Administrador de TI y Administrador de Almacenes) -->
-        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES' %}
+        <!-- 2️⃣ ADMINISTRACIÓN (Acceso para Administrador del Sistema y Administrador de Almacenes) -->
+        {% if perfil.es_administrador or perfil.es_admin_almacenes %}
         <details 
             class="group" 
             {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path %}open{% endif %}
@@ -44,7 +47,8 @@
             </summary>
             
             <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <!-- Secretarías -->
+                <!-- Secretarías (Solo Admin del Sistema) -->
+                {% if perfil.es_administrador %}
                 <a 
                     href="{% url 'secretaria_list' %}" 
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -53,8 +57,10 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">corporate_fare</span>
                     Secretarías
                 </a>
+                {% endif %}
 
-                <!-- Unidades Organizacionales -->
+                <!-- Unidades Organizacionales (Solo Admin del Sistema) -->
+                {% if perfil.es_administrador %}
                 <a 
                     href="{% url 'unidad_list' %}" 
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -63,8 +69,10 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">account_tree</span>
                     Unidades Org.
                 </a>
+                {% endif %}
 
-                <!-- Almacenes (Ambos pueden gestionar almacenes) -->
+                <!-- Almacenes (Admin del Sistema y Admin de Almacenes gestionan almacenes) -->
+                {% if perfil.es_administrador or perfil.es_admin_almacenes %}
                 <a 
                     href="{% url 'almacen_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -73,9 +81,10 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">warehouse</span>
                     Almacenes
                 </a>
+                {% endif %}
 
-                <!-- Usuarios (Solo Administrador de TI / Sistema) -->
-                {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+                <!-- Usuarios (Solo Administrador del Sistema) -->
+                {% if perfil.es_administrador %}
                 <a 
                     href="/usuarios/"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -101,8 +110,8 @@
             Solicitudes
         </a>
 
-        <!-- 4️⃣ INVENTARIO (Visible para Almacenero, Kardista, Admin Almacenes y Superadmin) -->
-        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,KARDISTA' %}
+        <!-- 4️⃣ INVENTARIO (Visible para Almacenero, Kardista, Admin Almacenes y Administrador) -->
+        {% if perfil.es_rol_inventario %}
         <details 
             class="group" 
             {% if '/inventario/' in request.path and '/inventario/almacenes/' not in request.path or '/movimientos/' in request.path %}open{% endif %}
@@ -130,7 +139,8 @@
                     Existencias
                 </a>
                 
-                <!-- Stock por Dependencia / Unidad -->
+                <!-- Stock por Dependencia / Unidad (Solo personal operativo) -->
+                {% if perfil.es_rol_operativo_almacen %}
                 <a 
                     href="{% url 'inventario_por_unidad' %}" 
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -139,8 +149,10 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">domain</span>
                     Stock por Unidad
                 </a>
+                {% endif %}
 
-                <!-- Notas de Ingreso / Entradas -->
+                <!-- Notas de Ingreso / Entradas (Solo personal operativo) -->
+                {% if perfil.es_rol_operativo_almacen %}
                 <a 
                     href="{% url 'nota_ingreso_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -149,8 +161,10 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">input</span>
                     Entradas (Ingresos)
                 </a>
+                {% endif %}
 
-                <!-- Notas de Salida / Salidas -->
+                <!-- Notas de Salida / Salidas (Solo personal operativo) -->
+                {% if perfil.es_rol_operativo_almacen %}
                 <a 
                     href="{% url 'nota_salida_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -159,8 +173,10 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">output</span>
                     Salidas (Egresos)
                 </a>
+                {% endif %}
 
-                <!-- Transferencias entre Almacenes -->
+                <!-- Transferencias entre Almacenes (Solo personal operativo) -->
+                {% if perfil.es_rol_operativo_almacen %}
                 <a 
                     href="{% url 'transferencia_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -169,6 +185,7 @@
                     <span class="material-symbols-outlined mr-2 text-[16px]">local_shipping</span>
                     Transferencias
                 </a>
+                {% endif %}
 
                 <!-- Lotes Activos PEPS -->
                 <a 
@@ -180,7 +197,7 @@
                     Lotes Activos (PEPS)
                 </a>
 
-                <!-- Historial Kardex / Movimientos -->
+                <!-- Movimientos: historial global (el Kardex es por material y se abre desde Existencias) -->
                 <a 
                     href="{% url 'movimientos' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -193,8 +210,60 @@
         </details>
         {% endif %}
 
+        <!-- REPORTES (Solo Administrador del Sistema y Administrador de Almacenes) -->
+        {% if perfil.es_administrador or perfil.es_admin_almacenes %}
+        <details 
+            class="group" 
+            {% if '/inventario/reporte/' in request.path %}open{% endif %}
+        >
+            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none">
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined mr-3 text-[22px]">
+                        summarize
+                    </span>
+                    Reportes
+                </div>
+                <span class="material-symbols-outlined text-[18px] transition duration-200 group-open:rotate-180 text-gray-400">
+                    expand_more
+                </span>
+            </summary>
+            
+            <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
+                <!-- Consumo por Unidad Organizacional -->
+                <a 
+                    href="{% url 'reporte_consumo_unidades' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/reporte/consumo/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">groups</span>
+                    Consumo por Unidad
+                </a>
+
+                <!-- Inventario Físico Valorado (PDF) -->
+                <a 
+                    href="{% url 'reporte_inventario' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/reporte/pdf/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">table_chart</span>
+                    Inventario Valorado
+                </a>
+
+                <!-- Inventario Físico Valorado Oficial (PDF) -->
+                <a 
+                    href="{% url 'reporte_inventario_oficial_pdf' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/inventario/reporte/inventario/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[16px]">picture_as_pdf</span>
+                    Inventario Oficial (PDF)
+                </a>
+            </div>
+        </details>
+        {% endif %}
+
         <!-- 5️⃣ PRESUPUESTOS (POA) -->
-        {% if request.user.perfilusuario.rol in 'PRESUPUESTOS,ADMINISTRADOR,ADMIN_ALMACENES' %}
+        {% if perfil.rol == 'PRESUPUESTOS' or perfil.es_administrador %}
         <details 
             class="group" 
             {% if '/presupuestos/' in request.path %}open{% endif %}
@@ -236,7 +305,7 @@
         {% endif %}
 
         <!-- 6️⃣ COMPRAS / BIENES Y SERVICIOS -->
-        {% if request.user.perfilusuario.rol in 'BIENES_SERVICIOS,ADMINISTRADOR,ADMIN_ALMACENES' %}
+        {% if perfil.rol == 'BIENES_SERVICIOS' or perfil.es_administrador %}
         <a 
             href="/compras/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
@@ -249,8 +318,8 @@
         </a>
         {% endif %}
 
-        <!-- 7️⃣ AUDITORÍA (Solo Superadmin) -->
-        {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
+        <!-- 7️⃣ AUDITORÍA (Solo Administrador del Sistema) -->
+        {% if perfil.es_administrador %}
         <a 
             href="/auditoria/"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
@@ -261,6 +330,9 @@
             </span>
             Auditoría
         </a>
+        {% endif %}
+
+    {% endwith %}
         {% endif %}
 
     </nav>

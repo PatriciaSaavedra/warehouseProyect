@@ -153,5 +153,48 @@ class PerfilUsuario(models.Model):
     def es_admin_almacen_o_superior(self):
         return self.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or self.user.is_superuser
 
+    # ---------------------------------------------------------
+    # PROPIEDADES READ-ONLY PARA VISIBILIDAD DEL SIDEBAR (TARJETA 3)
+    # ---------------------------------------------------------
+    # Solo controlan QUÉ opciones ve el usuario en el menú.
+    # NO constituyen seguridad de URLs ni modifican permisos reales.
+
+    @property
+    def es_administrador(self):
+        """Administrador global del sistema."""
+        return self.rol == 'ADMINISTRADOR' or self.user.is_superuser
+
+    @property
+    def es_admin_almacenes(self):
+        """Administrador operativo de almacenes."""
+        return self.rol == 'ADMIN_ALMACENES'
+
+    @property
+    def es_almacenero(self):
+        return self.rol == 'ALMACENERO'
+
+    @property
+    def es_kardista(self):
+        return self.rol == 'KARDISTA'
+
+    @property
+    def es_unidad_solicitante(self):
+        return self.rol == 'UNIDAD_SOLICITANTE'
+
+    @property
+    def es_personal_almacen(self):
+        """Roles que trabajan dentro del almacén (Almacenero, Kardista, Admin de Almacenes)."""
+        return self.rol in ['ALMACENERO', 'KARDISTA', 'ADMIN_ALMACENES']
+
+    @property
+    def es_rol_inventario(self):
+        """Puede consultar la sección Inventario: Existencias/Materiales, Lotes y Movimientos (historial global). El Kardex es por material y se abre desde Existencias ('Ver Kardex'), no es lo mismo que 'Movimientos'."""
+        return self.es_administrador or self.es_personal_almacen
+
+    @property
+    def es_rol_operativo_almacen(self):
+        """Puede registrar operaciones físicas: Entradas, Salidas, Transferencias, Stock por Unidad."""
+        return self.es_administrador or self.rol in ['ALMACENERO', 'ADMIN_ALMACENES']
+
     def __str__(self):
         return self.user.get_full_name() or self.user.username

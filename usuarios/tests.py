@@ -300,3 +300,349 @@ class Tarjeta2ListaUnidadesTest(TestCase):
         self.assertRedirects(respuesta, reverse('unidades_list'))
         unidad_c.refresh_from_db()
         self.assertEqual(unidad_c.nombre, 'Unidad C Actualizada')
+
+
+class SidebarVisibilidadTestCase(TestCase):
+    """
+    Tarjeta 3: El Sidebar muestra solo las opciones de navegación apropiadas
+    según el rol real del usuario. Solo controla visibilidad, NO seguridad de URLs.
+    Todas las verificaciones se hacen sobre href reales generados en el render
+    para evitar falsos positivos por texto repetido en la página.
+
+    Criterio de aceptación (acceso a Kardex): se considera cumplido si
+    ALMACENERO y KARDISTA pueden acceder a Existencias/Materiales y desde allí
+    existe el flujo real "Ver Kardex" por material (URL `kardex/<id>/`).
+
+    "Movimientos" (/inventario/movimientos/) es el historial GLOBAL de
+    movimientos y se mantiene como opción funcional independiente; NO es
+    sinónimo de Kardex, que es por material y requiere <id>.
+    """
+
+    HREFS = {
+        'panel': '/dashboard/',
+        'solicitudes': '/solicitudes/',
+        'secretarias': '/usuarios/secretarias/lista-singular/',
+        'unidades': '/usuarios/unidades/lista-singular/',
+        'almacenes': '/inventario/almacenes/',
+        'usuarios': '/usuarios/',
+        'existencias': '/inventario/existencias/',
+        'stock_unidad': '/inventario/stock-unidad/',
+        'entradas': '/inventario/entradas/',
+        'salidas': '/inventario/salidas/',
+        'transferencias': '/inventario/transferencias/',
+        'lotes': '/inventario/lotes/',
+        'movimientos': '/inventario/movimientos/',
+        'poa': '/presupuestos/',
+        'ejecucion_poa': '/presupuestos/reporte-ejecucion/',
+        'compras': '/compras/',
+        'auditoria': '/auditoria/',
+        'reporte_consumo': '/inventario/reporte/consumo/',
+        'reporte_inventario': '/inventario/reporte/pdf/',
+        'reporte_inventario_pdf': '/inventario/reporte/inventario/pdf/',
+    }
+
+    # Hrefs de la sección Reportes (matriz Tarjeta 3: solo ADMINISTRADOR y ADMIN_ALMACENES)
+    REPORTES = ['reporte_consumo', 'reporte_inventario', 'reporte_inventario_pdf']
+
+    # Hrefs que jamás debe ver un rol sin administración global
+    RAICES_NO_ADMIN = [
+        'secretarias', 'unidades', 'usuarios', 'poa', 'compras', 'auditoria',
+    ]
+
+    def setUp(self):
+        self.central = Almacen.objects.create(nombre="Almacén Central", tipo="CENTRAL")
+        self.unasba = Almacen.objects.create(nombre="Subalmacén UNASBA", tipo="SUBALMACEN")
+        self.farmacia = Almacen.objects.create(nombre="Subalmacén Farmacia", tipo="SUBALMACEN")
+        self.client = Client()
+
+    def _crear_usuario(self, username, rol, almacenes=()):
+        user = User.objects.create_user(username=username, password="password123")
+        perfil = PerfilUsuario.objects.create(user=user, rol=rol)
+        for almacen in almacenes:
+            perfil.almacenes_autorizados.add(almacen)
+        return user
+
+    def _get_dashboard(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse('dashboard'))
+
+    def _verificar(self, user, esperados=(), no_esperados=()):
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        for nombre in esperados:
+            self.assertContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+                msg_prefix=f"{user.username} debe ver '{nombre}'",
+            )
+        for nombre in no_esperados:
+            self.assertNotContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+                msg_prefix=f"{user.username} NO debe ver '{nombre}'",
+            )
+        return respuesta
+
+    # ---------------------------------------------------------
+    # CASO 9 — Todas las URLs reales del menú resuelven
+    # ---------------------------------------------------------
+    def test_urls_reales_del_sidebar_resuelven(self):
+        nombres = [
+            'dashboard', 'solicitudes', 'secretaria_list', 'unidad_list',
+            'almacen_list', 'inventario_por_almacen', 'inventario_por_unidad',
+            'nota_ingreso_list', 'nota_salida_list', 'transferencia_list',
+            'lotes_list', 'movimientos', 'reporte_presupuestos', 'logout',
+            'reporte_consumo_unidades', 'reporte_inventario',
+            'reporte_inventario_oficial_pdf',
+        ]
+        for nombre in nombres:
+            with self.subTest(nombre=nombre):
+                ruta = reverse(nombre)
+                self.assertTrue(ruta.startswith('/'))
+
+    # ---------------------------------------------------------
+    # CASO 1 — Unidad Solicitante: solo Panel + Solicitudes
+    # ---------------------------------------------------------
+    def test_caso1_unidad_solicitante_solo_panel_y_solicitudes(self):
+        user = self._crear_usuario('unidad_solicitante', 'UNIDAD_SOLICITANTE')
+        no_ver = self.RAICES_NO_ADMIN + [
+            'almacenes', 'existencias', 'stock_unidad', 'entradas',
+            'salidas', 'transferencias', 'lotes', 'movimientos',
+        ]
+        self._verificar(
+            user,
+            esperados=['panel', 'solicitudes'],
+            no_esperados=no_ver,
+        )
+
+    # ---------------------------------------------------------
+    # CASO 2 — Almacenero de Subalmacén: menú operativo local
+    # ---------------------------------------------------------
+    def test_caso2_almacenero_subalmacen_menú_operativo(self):
+        user = self._crear_usuario('pedro_almacenero', 'ALMACENERO', almacenes=[self.unasba])
+        respuesta = self._verificar(
+            user,
+            esperados=[
+                'panel', 'solicitudes', 'existencias', 'stock_unidad',
+                'entradas', 'salidas', 'transferencias', 'lotes', 'movimientos',
+            ],
+            no_esperados=self.RAICES_NO_ADMIN + ['almacenes'],
+        )
+        # Menú Inventario sigue siendo colapsable (<details>) para almacenero
+        self.assertContains(respuesta, '<details')
+        self.assertContains(respuesta, 'expand_more')
+
+    # ---------------------------------------------------------
+    # CASO 3 — KARDISTA: menú técnico (Existencias, Lotes, Movimientos).
+    # El Kardex es por material y se abre desde Existencias ("Ver Kardex").
+    # ---------------------------------------------------------
+    def test_caso3_kardista_menú_técnico(self):
+        user = self._crear_usuario('kardista', 'KARDISTA', almacenes=[self.unasba])
+        respuesta = self._verificar(
+            user,
+            esperados=['panel', 'solicitudes', 'existencias', 'lotes', 'movimientos'],
+            no_esperados=self.RAICES_NO_ADMIN + [
+                'almacenes', 'stock_unidad', 'entradas', 'salidas', 'transferencias',
+            ],
+        )
+        self.assertContains(respuesta, '<details')
+
+    # ---------------------------------------------------------
+    # CASO 4 — ADMIN_ALMACENES: administración operativa multi-almacén
+    # ---------------------------------------------------------
+    def test_caso4_admin_almacenes_menú_operativo_multi_almacen(self):
+        user = self._crear_usuario('admin_almacenes', 'ADMIN_ALMACENES', almacenes=[self.central])
+        respuesta = self._verificar(
+            user,
+            esperados=[
+                'panel', 'solicitudes', 'almacenes', 'existencias', 'stock_unidad',
+                'entradas', 'salidas', 'transferencias', 'lotes', 'movimientos',
+                'reporte_consumo', 'reporte_inventario', 'reporte_inventario_pdf',
+            ],
+            no_esperados=['secretarias', 'unidades', 'usuarios', 'poa', 'compras', 'auditoria'],
+        )
+        self.assertContains(respuesta, '<details')
+
+    # ---------------------------------------------------------
+    # CASO 5 — ADMINISTRADOR: conserva menú administrativo global
+    # ---------------------------------------------------------
+    def test_caso5_administrador_conserva_menú_global(self):
+        user = self._crear_usuario('administrador', 'ADMINISTRADOR')
+        self._verificar(
+            user,
+            esperados=[
+                'panel', 'solicitudes', 'secretarias', 'unidades', 'almacenes',
+                'usuarios', 'existencias', 'stock_unidad', 'entradas', 'salidas',
+                'transferencias', 'lotes', 'movimientos', 'poa', 'ejecucion_poa',
+                'compras', 'auditoria',
+                'reporte_consumo', 'reporte_inventario', 'reporte_inventario_pdf',
+            ],
+        )
+
+    # ---------------------------------------------------------
+    # REPORTES — sección del Sidebar (matriz Tarjeta 3):
+    # ADMINISTRADOR y ADMIN_ALMACENES => SÍ; resto de roles => NO.
+    # ---------------------------------------------------------
+    def test_reportes_admin_almacenes_ve_seccion_y_3_urls(self):
+        user = self._crear_usuario('adm_alm_reporte', 'ADMIN_ALMACENES', almacenes=[self.central])
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        for nombre in self.REPORTES:
+            self.assertContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+                msg_prefix=f"ADMIN_ALMACENES debe ver Reporte '{nombre}'",
+            )
+        # La sección no aparece vacía: exactamente 3 enlaces reales de reportes
+        self.assertEqual(respuesta.content.decode().count('/inventario/reporte/'), 3)
+
+    def test_reportes_administrador_ve_seccion(self):
+        user = self._crear_usuario('admin_reporte', 'ADMINISTRADOR')
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        for nombre in self.REPORTES:
+            self.assertContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+                msg_prefix=f"ADMINISTRADOR debe ver Reporte '{nombre}'",
+            )
+
+    def test_reportes_almacenero_no_ve_seccion(self):
+        user = self._crear_usuario('alm_reporte', 'ALMACENERO', almacenes=[self.unasba])
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        for nombre in self.REPORTES:
+            self.assertNotContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+                msg_prefix=f"ALMACENERO NO debe ver Reporte '{nombre}'",
+            )
+
+    def test_reportes_kardista_no_ve_seccion(self):
+        user = self._crear_usuario('kard_reporte', 'KARDISTA', almacenes=[self.unasba])
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        for nombre in self.REPORTES:
+            self.assertNotContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+                msg_prefix=f"KARDISTA NO debe ver Reporte '{nombre}'",
+            )
+
+    def test_reportes_unidad_solicitante_no_ve_seccion(self):
+        user = self._crear_usuario('sole_reporte', 'UNIDAD_SOLICITANTE')
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        for nombre in self.REPORTES:
+            self.assertNotContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+                msg_prefix=f"UNIDAD_SOLICITANTE NO debe ver Reporte '{nombre}'",
+            )
+
+    # ---------------------------------------------------------
+    # Las 3 URLs reales de Reportes resuelven con reverse() sin NoReverseMatch
+    # y el Sidebar de ADMIN_ALMACENES las renderiza sin error.
+    # ---------------------------------------------------------
+    def test_reportes_urls_resuelven_con_reverse(self):
+        nombres = [
+            'reporte_consumo_unidades', 'reporte_inventario',
+            'reporte_inventario_oficial_pdf',
+        ]
+        for nombre in nombres:
+            with self.subTest(nombre=nombre):
+                ruta = reverse(nombre)
+                self.assertTrue(ruta.startswith('/'))
+        # El render del Sidebar no genera NoReverseMatch en ningún rol de Reportes
+        user = self._crear_usuario('adm_alm_rev', 'ADMIN_ALMACENES', almacenes=[self.central])
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        for nombre in self.REPORTES:
+            self.assertContains(
+                respuesta,
+                f'href="{self.HREFS[nombre]}"',
+            )
+
+    # ---------------------------------------------------------
+    # CASO 6 — Usuario autenticado sin PerfilUsuario: sin 500 ni privilegios
+    # ---------------------------------------------------------
+    def test_caso6_usuario_sin_perfil_renderiza_sin_error(self):
+        user = User.objects.create_user(username='sin_perfil', password="password123")
+        respuesta = self._get_dashboard(user)
+        self.assertEqual(respuesta.status_code, 200)
+        # Solo ve Panel y Solicitudes, ninguna opción privilegiada
+        self.assertContains(respuesta, 'href="/dashboard/"')
+        self.assertContains(respuesta, 'href="/solicitudes/"')
+        self.assertNotContains(respuesta, '<details')
+        for nombre in self.RAICES_NO_ADMIN + ['almacenes', 'existencias']:
+            self.assertNotContains(respuesta, f'href="{self.HREFS[nombre]}"')
+
+    # ---------------------------------------------------------
+    # CASO 7 — Almacenero con múltiples subalmacenes autorizados
+    # ---------------------------------------------------------
+    def test_caso7_almacenero_multiple_subalmacenes_no_rompe_menu(self):
+        user = self._crear_usuario(
+            'pedro_multi',
+            'ALMACENERO',
+            almacenes=[self.unasba, self.farmacia],
+        )
+        self._verificar(
+            user,
+            esperados=[
+                'panel', 'solicitudes', 'existencias', 'stock_unidad',
+                'entradas', 'salidas', 'transferencias', 'lotes', 'movimientos',
+            ],
+            no_esperados=self.RAICES_NO_ADMIN + ['almacenes'],
+        )
+
+    # ---------------------------------------------------------
+    # CASO 8 — Almacenero Central conserva su menú operativo
+    # ---------------------------------------------------------
+    def test_caso8_almacenero_central_no_se_rompe(self):
+        user = self._crear_usuario('almacenero_central', 'ALMACENERO', almacenes=[self.central])
+        self._verificar(
+            user,
+            esperados=[
+                'panel', 'solicitudes', 'existencias', 'stock_unidad',
+                'entradas', 'salidas', 'transferencias', 'lotes', 'movimientos',
+            ],
+            no_esperados=self.RAICES_NO_ADMIN + ['almacenes'],
+        )
+
+    # ---------------------------------------------------------
+    # CASO 10 — Colapsables: solo existen <details> para roles con secciones
+    # ---------------------------------------------------------
+    def test_caso10_unidad_solicitante_sin_menus_colapsables(self):
+        user = self._crear_usuario('usol_sin_collapse', 'UNIDAD_SOLICITANTE')
+        respuesta = self._get_dashboard(user)
+        self.assertNotContains(respuesta, '<details')
+
+    # ---------------------------------------------------------
+    # Propiedades read-only de PerfilUsuario usadas por el Sidebar
+    # ---------------------------------------------------------
+    def test_propiedades_rol_perfilusuario(self):
+        admin = self._crear_usuario('admin_props', 'ADMINISTRADOR')
+        sole = self._crear_usuario('sole_props', 'UNIDAD_SOLICITANTE')
+        alm = self._crear_usuario('alm_props', 'ALMACENERO', almacenes=[self.unasba])
+        kard = self._crear_usuario('kard_props', 'KARDISTA', almacenes=[self.unasba])
+        adm_alm = self._crear_usuario('adm_alm_props', 'ADMIN_ALMACENES', almacenes=[self.central])
+
+        self.assertTrue(admin.perfilusuario.es_administrador)
+        self.assertTrue(admin.perfilusuario.es_rol_inventario)
+        self.assertTrue(admin.perfilusuario.es_rol_operativo_almacen)
+
+        self.assertTrue(sole.perfilusuario.es_unidad_solicitante)
+        self.assertFalse(sole.perfilusuario.es_rol_inventario)
+        self.assertFalse(sole.perfilusuario.es_rol_operativo_almacen)
+
+        self.assertTrue(alm.perfilusuario.es_almacenero)
+        self.assertTrue(alm.perfilusuario.es_rol_inventario)
+        self.assertTrue(alm.perfilusuario.es_rol_operativo_almacen)
+
+        self.assertTrue(kard.perfilusuario.es_kardista)
+        self.assertTrue(kard.perfilusuario.es_rol_inventario)
+        self.assertFalse(kard.perfilusuario.es_rol_operativo_almacen)
+
+        self.assertTrue(adm_alm.perfilusuario.es_admin_almacenes)
+        self.assertTrue(adm_alm.perfilusuario.es_rol_inventario)
+        self.assertTrue(adm_alm.perfilusuario.es_rol_operativo_almacen)
