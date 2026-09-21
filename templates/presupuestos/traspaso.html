@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block title %} Traspaso Presupuestario Intrainstitucional {% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
+                <span class="material-symbols-outlined text-[#8b0000] text-3xl">swap_horiz</span>
+                Traspaso Presupuestario Intrainstitucional
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Transferencia legal de techos presupuestarios entre partidas de la misma Unidad Organizacional (Gestión {{ gestion_actual }})
+            </p>
+        </div>
+        <a href="{% url 'poa_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver a Techos
+        </a>
+    </div>
+
+    <!-- MENSAJES -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="p-4 mb-6 rounded-2xl text-sm border {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- FORMULARIO -->
+    <form method="POST" class="card p-8 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-slate-900 space-y-6">
+        {% csrf_token %}
+
+        <!-- 1. UNIDAD SOLICITANTE -->
+        <div>
+            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                Unidad Organizacional <span class="text-[#8b0000]">*</span>
+            </label>
+            <select name="unidad" id="unidad_select" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000]" onchange="cargarPartidasUnidad(this.value)">
+                <option value="">-- Seleccione la Unidad u Oficina --</option>
+                {% for u in unidades %}
+                    <option value="{{ u.id }}">{{ u.nombre }} {% if u.secretaria %}({{ u.secretaria.nombre }}){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 2. PARTIDA CEDENTE (ORIGEN) -->
+            <div class="p-5 rounded-2xl bg-red-50/50 dark:bg-red-950/10 border border-red-100 dark:border-red-900/30">
+                <span class="text-xs font-bold text-red-800 dark:text-red-400 uppercase tracking-wider block mb-2">
+                    Partida Cedente (Disminuye Saldo) *
+                </span>
+                <select name="partida_origen" id="partida_origen" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-red-500" onchange="actualizarSaldoDisponible()">
+                    <option value="">-- Seleccione primero una unidad --</option>
+                </select>
+                <div id="saldo_origen_badge" class="mt-2 text-xs text-gray-600 dark:text-gray-400 font-bold">
+                    Saldo Disponible: <span class="text-[#8b0000] font-mono text-sm" id="saldo_disponible_texto">Bs. 0.00</span>
+                </div>
+            </div>
+
+            <!-- 3. PARTIDA RECEPTORA (DESTINO) -->
+            <div class="p-5 rounded-2xl bg-green-50/50 dark:bg-green-950/10 border border-green-100 dark:border-green-900/30">
+                <span class="text-xs font-bold text-green-800 dark:text-green-400 uppercase tracking-wider block mb-2">
+                    Partida Receptora (Recibe Fondos) *
+                </span>
+                <select name="partida_destino" id="partida_destino" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-green-500">
+                    <option value="">-- Seleccione partida receptora --</option>
+                    {% for p in partidas %}
+                        <option value="{{ p.id }}">{{ p.codigo }} - {{ p.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-[11px] text-gray-400 mt-2">Puede recibir cualquier partida habilitada para la gestión.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 4. MONTO -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                    Monto a Transferir (Bs.) <span class="text-[#8b0000]">*</span>
+                </label>
+                <input type="number" step="0.01" min="0.01" name="monto" id="monto_input" placeholder="0.00" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-2xl p-3 text-sm font-mono font-bold focus:ring-2 focus:ring-[#8b0000]">
+            </div>
+
+            <!-- 5. RESOLUCIÓN / RESPALDO LEGAL -->
+            <div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                    N° de Resolución / Cite de Aprobación <span class="text-[#8b0000]">*</span>
+                </label>
+                <input type="text" name="nro_resolucion" placeholder="Ej: R.A. SAF-POA N° 042/2026" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000]">
+            </div>
+        </div>
+
+        <!-- 6. JUSTIFICACIÓN -->
+        <div>
+            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                Justificación Técnica del Traspaso <span class="text-[#8b0000]">*</span>
+            </label>
+            <textarea name="justificacion" rows="3" required placeholder="Explique las razones técnicas e institucionales por las que se transfieren recursos entre partidas..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000]"></textarea>
+        </div>
+
+        <!-- BOTONES -->
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+            <a href="{% url 'poa_list' %}" class="px-6 py-3 rounded-2xl border border-gray-300 text-sm font-semibold hover:bg-gray-50 transition">Cancelar</a>
+            <button type="submit" onclick="return confirm('¿Confirma la ejecución legal del traspaso presupuestario intrainstitucional?')" class="btn-primary px-6 py-3 rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">verified</span>
+                Ejecutar Traspaso Presupuestario
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+let partidasDisponiblesData = {};
+
+function cargarPartidasUnidad(unidadId) {
+    const selectOrigen = document.getElementById('partida_origen');
+    selectOrigen.innerHTML = '<option value="">Cargando partidas del POA...</option>';
+    document.getElementById('saldo_disponible_texto').innerText = 'Bs. 0.00';
+
+    if (!unidadId) {
+        selectOrigen.innerHTML = '<option value="">-- Seleccione primero una unidad --</option>';
+        return;
+    }
+
+    fetch(`/presupuestos/api/partidas-unidad/${unidadId}/`)
+        .then(response => response.json())
+        .then(data => {
+            selectOrigen.innerHTML = '<option value="">-- Seleccione partida cedente con saldo --</option>';
+            partidasDisponiblesData = {};
+
+            if (data.length === 0) {
+                selectOrigen.innerHTML = '<option value="" disabled>Esta unidad no tiene partidas registradas en su POA</option>';
+                return;
+            }
+
+            data.forEach(item => {
+                partidasDisponiblesData[item.partida_id] = item.disponible;
+                const opt = document.createElement('option');
+                opt.value = item.partida_id;
+                opt.textContent = `${item.codigo} - ${item.nombre} (Disp: Bs. ${item.disponible.toFixed(2)})`;
+                selectOrigen.appendChild(opt);
+            });
+        })
+        .catch(err => {
+            selectOrigen.innerHTML = '<option value="">Error al cargar partidas</option>';
+        });
+}
+
+function actualizarSaldoDisponible() {
+    const selectOrigen = document.getElementById('partida_origen');
+    const partidaId = selectOrigen.value;
+    const saldo = partidasDisponiblesData[partidaId] || 0.00;
+    
+    document.getElementById('saldo_disponible_texto').innerText = `Bs. ${saldo.toFixed(2)}`;
+    
+    const inputMonto = document.getElementById('monto_input');
+    inputMonto.max = saldo;
+}
+</script>
+{% endblock %}

@@ -1,128 +1,295 @@
 {% extends 'base.html' %}
 
-{% block title %} Asignar POA {% endblock %}
+{% block title %} Formulario 005 - Asignar Presupuesto POA {% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 sm:px-6">
-    <!-- NAVEGACIÓN SECUNDARIA / BREADCRUMB -->
-    <div class="flex items-center gap-2 mb-3">
-        <a href="{% url 'poa_list' %}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-[#8b0000] dark:text-gray-400 dark:hover:text-red-400 transition">
-            <span class="material-symbols-outlined text-[16px] align-middle">arrow_back</span>
-            Volver al listado POA
-        </a>
-    </div>
+<div class="max-w-6xl mx-auto space-y-6">
 
     <!-- CABECERA -->
-    <div class="mb-6">
-        <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit'] tracking-tight">Asignar Presupuesto POA</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Asigne los techos de gasto iniciales por unidad y partida presupuestaria.</p>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <a href="{% url 'poa_list' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition mb-2 font-['Outfit']">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a listado POA
+            </a>
+            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit']">
+                Formulario 005: Requerimiento POA
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-['Outfit']">
+                Determinación de Requerimiento de Materiales y Suministros por Partida Presupuestaria
+            </p>
+        </div>
     </div>
 
-    <!-- NOTIFICACIONES DE DJANGO -->
+    <!-- MENSAJES -->
     {% if messages %}
-        <div class="mb-6 space-y-2">
+        <div>
             {% for message in messages %}
-                <div class="p-4 rounded-xl text-sm border flex items-center gap-2.5 transition-all
-                    {% if message.tags == 'success' %}
-                        bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200/50 dark:border-green-800/30
-                    {% elif message.tags == 'error' or message.tags == 'danger' %}
-                        bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200/50 dark:border-red-800/30
-                    {% else %}
-                        bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-800/30
-                    {% endif %}">
-                    
-                    <span class="material-symbols-outlined text-[20px] shrink-0">
-                        {% if message.tags == 'success' %}check_circle{% elif message.tags == 'error' or message.tags == 'danger' %}error{% else %}info{% endif %}
-                    </span>
-                    <span class="font-medium">{{ message }}</span>
+                <div class="p-4 rounded-2xl text-sm border {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+                    {{ message }}
                 </div>
             {% endfor %}
         </div>
     {% endif %}
 
-    <!-- FORMULARIO DE ASIGNACIÓN -->
-    <form method="POST" class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+    <!-- FORMULARIO -->
+    <form method="POST" id="form-poa" class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm space-y-6">
         {% csrf_token %}
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <!-- UNIDAD SOLICITANTE -->
-            <div>
-                <label class="block mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-['Outfit']">
-                    Unidad Organizacional <span class="text-[#8b0000] dark:text-red-500">*</span>
+
+        <!-- METADATOS FORMULARIO 005 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-gray-50/70 dark:bg-slate-800/40 border border-gray-200/80 dark:border-gray-800">
+            <!-- Unidad Organizacional -->
+            <div class="lg:col-span-2">
+                <label class="block mb-1 text-xs font-bold text-gray-700 dark:text-gray-200 uppercase font-['Outfit']">
+                    Unidad Organizacional <span class="text-[#8b0000]">*</span>
                 </label>
-                <div class="relative">
-                    <select name="unidad" class="w-full border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-sm bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10" required>
-                        <option value="">Seleccione una unidad</option>
-                        {% for uni in unidades %}
-                            <option value="{{ uni.id }}">{{ uni.nombre }}</option>
-                        {% endfor %}
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-[20px]">keyboard_arrow_down</span>
-                </div>
+                <select name="unidad" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-gray-800 dark:text-gray-200 font-medium focus:ring-2 focus:ring-[#8b0000]">
+                    <option value="">-- Seleccione Unidad --</option>
+                    {% for u in unidades %}
+                        <option value="{{ u.id }}">{{ u.nombre }} {% if u.secretaria %}({{ u.secretaria.nombre }}){% endif %}</option>
+                    {% endfor %}
+                </select>
             </div>
 
-            <!-- PARTIDA PRESUPUESTARIA -->
+            <!-- Partida Presupuestaria -->
             <div>
-                <label class="block mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-['Outfit']">
-                    Partida Presupuestaria <span class="text-[#8b0000] dark:text-red-500">*</span>
+                <label class="block mb-1 text-xs font-bold text-gray-700 dark:text-gray-200 uppercase font-['Outfit']">
+                    Partida Presupuestaria <span class="text-[#8b0000]">*</span>
                 </label>
-                <div class="relative">
-                    <select name="partida" class="w-full border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-sm bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition appearance-none pr-10" required>
-                        <option value="">Seleccione una partida</option>
-                        {% for part in partidas %}
-                            <option value="{{ part.id }}">{{ part.codigo }} - {{ part.nombre }}</option>
-                        {% endfor %}
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-[20px]">keyboard_arrow_down</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <!-- GESTIÓN FISCAL -->
-            <div>
-                <label class="block mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-['Outfit']">
-                    Gestión Fiscal <span class="text-[#8b0000] dark:text-red-500">*</span>
-                </label>
-                <input 
-                    type="number" 
-                    name="gestion" 
-                    value="{{ gestion_default }}" 
-                    class="w-full border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-sm bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition" 
-                    required
-                >
+                <select name="partida" id="partida_select" required onchange="cargarCatalogoPartida(this.value)" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-gray-800 dark:text-gray-200 font-medium focus:ring-2 focus:ring-[#8b0000]">
+                    <option value="">-- Seleccione Partida --</option>
+                    {% for p in partidas %}
+                        <option value="{{ p.id }}">{{ p.codigo }} - {{ p.nombre }}</option>
+                    {% endfor %}
+                </select>
             </div>
 
-            <!-- MONTO INICIAL -->
+            <!-- Gestión Fiscal -->
             <div>
-                <label class="block mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-['Outfit']">
-                    Presupuesto Asignado <span class="text-[#8b0000] dark:text-red-500">*</span>
-                </label>
-                <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 font-semibold text-xs select-none">Bs.</span>
-                    <input 
-                        type="number" 
-                        name="monto_inicial" 
-                        step="0.01" 
-                        min="0" 
-                        class="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition" 
-                        placeholder="0.00" 
-                        required
-                    >
-                </div>
+                <label class="block mb-1 text-xs font-bold text-gray-700 dark:text-gray-200 uppercase font-['Outfit']">Gestión Fiscal *</label>
+                <input type="number" name="gestion" value="{{ gestion_default }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs font-bold font-mono focus:ring-2 focus:ring-[#8b0000]">
+                <input type="hidden" name="categoria_programatica" value="13 0 0 002">
             </div>
         </div>
 
-        <!-- ACCIONES -->
-        <div class="pt-6 border-t border-gray-100 dark:border-gray-700/50 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
-            <a href="{% url 'poa_list' %}" class="text-center border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-xl font-semibold text-sm transition">
-                Cancelar
-            </a>
-            <button type="submit" class="bg-[#8b0000] hover:bg-[#700000] text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition flex items-center justify-center gap-2 cursor-pointer">
-                <span class="material-symbols-outlined text-[18px]">save</span> 
-                Asignar Presupuesto
+        <!-- SECCIÓN DE DESGLOSE DE SUBPARTIDAS / MATERIALES (TABLA FORM. 005) -->
+        <div class="space-y-3">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-gray-500 text-[18px]">table_rows</span>
+                        Desglose de Materiales y Suministros Demandados
+                    </h3>
+                    <p class="text-[11px] text-gray-400">Agregue los insumos, actividades y cantidades anuales para computar el techo presupuestario.</p>
+                </div>
+            </div>
+
+            <!-- FILA PARA AGREGAR MATERIAL -->
+            <div class="grid grid-cols-12 gap-2 p-4 rounded-xl bg-blue-50/40 dark:bg-slate-800/60 border border-blue-100 dark:border-gray-800 items-end">
+                <div class="col-span-12 sm:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase">Cód. Actividad POA</label>
+                    <input type="text" id="temp_actividad" value="13.1 - 13.4" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2 text-xs font-mono">
+                </div>
+
+                <div class="col-span-12 sm:col-span-4">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase">Material / Insumo *</label>
+                    <select id="temp_material" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2 text-xs" onchange="asignarUnidadTemp(this)">
+                        <option value="">-- Primero elija una partida arriba --</option>
+                    </select>
+                </div>
+
+                <div class="col-span-4 sm:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase">Cantidad *</label>
+                    <input type="number" id="temp_cantidad" min="1" placeholder="Ej: 75" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2 text-xs font-bold text-center">
+                </div>
+
+                <div class="col-span-4 sm:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase">P. Unitario (Bs.) *</label>
+                    <input type="number" step="0.01" min="0.01" id="temp_precio" placeholder="Ej: 40.00" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2 text-xs font-bold text-right font-mono">
+                </div>
+
+                <div class="col-span-4 sm:col-span-2">
+                    <button type="button" onclick="agregarFilaMaterial()" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition shadow-sm h-[34px] cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">add_circle</span> Añadir Fila
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABLA DE DETALLES DEL FORMULARIO 005 -->
+            <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                            <th class="p-3 w-28 text-center">Código POA</th>
+                            <th class="p-3">Material Demandado</th>
+                            <th class="p-3 text-center w-24">U. Medida</th>
+                            <th class="p-3 text-center w-24">Cantidad</th>
+                            <th class="p-3 text-right w-28">P. Unitario (Bs.)</th>
+                            <th class="p-3 text-right w-32">Total Monto (Bs.)</th>
+                            <th class="p-3 text-center w-16">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla_items_poa" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-slate-900 font-['Outfit']">
+                        <tr>
+                            <td colspan="7" class="p-6 text-center text-gray-400">
+                                Sin ítems agregados. Seleccione la partida arriba y cargue los materiales programados de su Formulario 005.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TOTAL GENERAL AUTO-CALCULADO -->
+        <div class="p-5 rounded-2xl bg-gray-50/80 dark:bg-slate-800/50 border border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <span class="text-xs font-bold uppercase tracking-wider text-gray-400 block font-['Outfit']">Presupuesto Asignado a la Partida (Techo Total)</span>
+                <span class="text-[11px] text-gray-500">Calculado exactamente a partir de la suma de los requerimientos programados.</span>
+            </div>
+            <div class="text-right">
+                <span class="text-3xl font-black text-[#8b0000] dark:text-red-400 font-mono" id="label_total_techo">Bs. 0.00</span>
+            </div>
+        </div>
+
+        <input type="hidden" name="payload_items" id="payload_items" value="[]">
+
+        <!-- BOTONES DE ACCIÓN -->
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+            <a href="{% url 'poa_list' %}" class="px-6 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-8 py-3 rounded-2xl font-bold text-xs shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">save</span>
+                Asignar Presupuesto POA
             </button>
         </div>
     </form>
 </div>
+
+<script>
+let catalogoPartida = {};
+let listaItems = [];
+
+function cargarCatalogoPartida(partidaId) {
+    const selectMat = document.getElementById('temp_material');
+    selectMat.innerHTML = '<option value="">Cargando catálogo...</option>';
+    catalogoPartida = {};
+
+    if (!partidaId) {
+        selectMat.innerHTML = '<option value="">-- Primero elija una partida arriba --</option>';
+        return;
+    }
+
+    fetch(`/presupuestos/api/materiales-partida/${partidaId}/`)
+        .then(res => res.json())
+        .then(data => {
+            selectMat.innerHTML = '<option value="">-- Seleccionar material del catálogo --</option>';
+            if (data.length === 0) {
+                selectMat.innerHTML = '<option value="" disabled>No hay materiales catalogados en esta partida</option>';
+                return;
+            }
+            data.forEach(m => {
+                catalogoPartida[m.id] = m;
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = `${m.codigo} - ${m.nombre} (${m.unidad})`;
+                selectMat.appendChild(opt);
+            });
+        })
+        .catch(err => {
+            selectMat.innerHTML = '<option value="">Error al cargar catálogo</option>';
+        });
+}
+
+function agregarFilaMaterial() {
+    const matSelect = document.getElementById('temp_material');
+    const matId = matSelect.value;
+    const actividad = document.getElementById('temp_actividad').value.trim() || '13.1 - 13.4';
+    const cant = parseInt(document.getElementById('temp_cantidad').value) || 0;
+    const precio = parseFloat(document.getElementById('temp_precio').value) || 0.00;
+
+    if (!matId || !catalogoPartida[matId]) {
+        alert("Seleccione un material válido del catálogo.");
+        return;
+    }
+    if (cant <= 0) {
+        alert("La cantidad debe ser mayor a 0.");
+        return;
+    }
+    if (precio <= 0) {
+        alert("El precio unitario referencial debe ser mayor a 0.");
+        return;
+    }
+
+    const materialObj = catalogoPartida[matId];
+    const subtotal = cant * precio;
+
+    listaItems.push({
+        material_id: matId,
+        codigo_material: materialObj.codigo,
+        nombre_material: materialObj.nombre,
+        unidad: materialObj.unidad,
+        codigo_actividad: actividad,
+        cantidad: cant,
+        precio_unitario: precio,
+        subtotal: subtotal
+    });
+
+    renderTablaItems();
+
+    // Limpiar campos temporales
+    document.getElementById('temp_cantidad').value = '';
+    document.getElementById('temp_precio').value = '';
+    matSelect.value = '';
+}
+
+function eliminarFila(index) {
+    listaItems.splice(index, 1);
+    renderTablaItems();
+}
+
+function renderTablaItems() {
+    const tbody = document.getElementById('tabla_items_poa');
+    const labelTotal = document.getElementById('label_total_techo');
+    const payloadInput = document.getElementById('payload_items');
+
+    tbody.innerHTML = '';
+    let totalGeneral = 0.0;
+
+    if (listaItems.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="p-6 text-center text-gray-400">
+                    Sin ítems agregados. Seleccione la partida arriba y cargue los materiales programados de su Formulario 005.
+                </td>
+            </tr>
+        `;
+        labelTotal.innerText = 'Bs. 0.00';
+        payloadInput.value = '[]';
+        return;
+    }
+
+    listaItems.forEach((it, idx) => {
+        totalGeneral += it.subtotal;
+        tbody.innerHTML += `
+            <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                <td class="p-3 text-center font-mono font-bold text-gray-600 dark:text-gray-300">${it.codigo_actividad}</td>
+                <td class="p-3 font-semibold text-gray-800 dark:text-gray-200">
+                    <div>${it.nombre_material}</div>
+                    <span class="text-[10px] text-gray-400 font-mono">${it.codigo_material}</span>
+                </td>
+                <td class="p-3 text-center text-gray-600 dark:text-gray-300 font-bold">${it.unidad}</td>
+                <td class="p-3 text-center font-bold text-gray-800 dark:text-gray-100 font-mono">${it.cantidad}</td>
+                <td class="p-3 text-right font-mono">${it.precio_unitario.toFixed(2)}</td>
+                <td class="p-3 text-right font-mono font-bold text-[#8b0000] dark:text-red-400">Bs. ${it.subtotal.toFixed(2)}</td>
+                <td class="p-3 text-center">
+                    <button type="button" onclick="eliminarFila(${idx})" class="text-red-500 hover:text-red-700 p-1">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    labelTotal.innerText = `Bs. ${totalGeneral.toFixed(2)}`;
+    payloadInput.value = JSON.stringify(listaItems);
+}
+</script>
 {% endblock %}

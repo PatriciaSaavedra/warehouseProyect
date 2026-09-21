@@ -470,32 +470,35 @@ def movimientos(request):
     movimientos = MovimientoInventario.objects.all().order_by('-id')
     return render(request, 'inventario/movimientos.html', {'movimientos': movimientos})
 
-
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
 def kardex(request, id):
+    """
+    Tarjetas 18 y 19: Calcula y consulta el Kardex de Existencias Valorado.
+    CORREGIDO: El saldo anterior solo arrastra si hay filtro de fecha o mes;
+    si se consulta todo el año sin fechas de corte, arranca estrictamente en 0.
+    """
     material = get_object_or_404(Material, id=id)
     perfil = request.user.perfilusuario
     rol = perfil.rol
 
-    almacenes_disponibles = obtener_almacenes_usuario(request.user)
+    # 1. Almacenes disponibles
+    if rol == 'ADMINISTRADOR':
+        almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+    else:
+        almacenes_disponibles = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
 
-    if not almacenes_disponibles.exists() and rol not in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
+    if not almacenes_disponibles.exists() and rol != 'ADMINISTRADOR':
         messages.error(request, "No tiene ningún almacén asignado bajo su responsabilidad.")
         return redirect('inventario')
 
     filtro_almacen_id = request.GET.get('almacen', '').strip()
-
-    if not filtro_almacen_id and rol == 'ALMACENERO':
-        almacen_seleccionado = almacenes_disponibles.first()
-        filtro_almacen_id = str(almacen_seleccionado.id) if almacen_seleccionado else ''
-    elif filtro_almacen_id:
+    almacen_seleccionado = None
+    if filtro_almacen_id:
         almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
         if not perfil.tiene_acceso_almacen(almacen_seleccionado):
-            messages.error(request, f"Violación de Seguridad: No tiene autorización para auditar el almacén: {almacen_seleccionado.nombre}")
+            messages.error(request, f"Violación de Seguridad: No tiene autorización para auditar: {almacen_seleccionado.nombre}")
             return redirect('kardex', id=material.id)
-    else:
-        almacen_seleccionado = None
 
     desde_str = request.GET.get('desde', '').strip()
     hasta_str = request.GET.get('hasta', '').strip()
@@ -503,30 +506,70 @@ def kardex(request, id):
     filtro_gestion = request.GET.get('gestion', '2026').strip()
     filtro_tipo = request.GET.get('tipo_movimiento', '').strip()
 
-    movimientos_query = MovimientoInventario.objects.filter(material=material)
-
-    if almacen_seleccionado:
-        movimientos_query = movimientos_query.filter(almacen=almacen_seleccionado)
-    else:
-        movimientos_query = movimientos_query.filter(almacen__in=almacenes_disponibles)
-
     try:
         gestion_ano = int(filtro_gestion)
-        movimientos_query = movimientos_query.filter(fecha__year=gestion_ano)
     except ValueError:
         gestion_ano = 2026
 
-    if filtro_mes:
-        try:
-            movimientos_query = movimientos_query.filter(fecha__month=int(filtro_mes))
-        except ValueError:
-            pass
+    # ========================================================
+    # 2. CÁLCULO EXACTO DEL SALDO ANTERIOR (ARRASTRE PREVIO)
+    # ========================================================
+    fecha_limite_inicial = parse_date(desde_str) if desde_str else None
 
-    fecha_limite_inicial = None
-    if desde_str:
-        fecha_limite_inicial = parse_date(desde_str)
-        if fecha_limite_inicial:
-            movimientos_query = movimientos_query.filter(fecha__date__gte=fecha_limite_inicial)
+    # REGLA CLAVE: Solo se buscan movimientos previos si el usuario aplicó
+    # un filtro de fecha inicial, filtro de mes, o si existen años anteriores.
+    if fecha_limite_inicial:
+        query_previos = MovimientoInventario.objects.filter(
+            material=material,
+            fecha__date__lt=fecha_limite_inicial
+        )
+    elif filtro_mes:
+        query_previos = MovimientoInventario.objects.filter(
+            material=material,
+            fecha__year=gestion_ano,
+            fecha__month__lt=int(filtro_mes)
+        )
+    else:
+        # Sin filtros de corte: El saldo anterior SOLO son movimientos de años pasados (< 2026)
+        query_previos = MovimientoInventario.objects.filter(
+            material=material,
+            fecha__year__lt=gestion_ano
+        )
+
+    if almacen_seleccionado:
+        query_previos = query_previos.filter(almacen=almacen_seleccionado)
+    elif rol != 'ADMINISTRADOR':
+        query_previos = query_previos.filter(almacen__in=almacenes_disponibles)
+
+    saldo_inicial_fisico = 0
+    saldo_inicial_valorado = Decimal('0.00')
+
+    # Si hay movimientos antes de la fecha de corte, los sumamos/restamos
+    for m in query_previos.order_by('fecha', 'id'):
+        if m.tipo == 'ENTRADA':
+            saldo_inicial_fisico += m.cantidad
+            saldo_inicial_valorado += (m.costo_total or Decimal('0.00'))
+        else:
+            saldo_inicial_fisico -= m.cantidad
+            saldo_inicial_valorado -= (m.costo_total or Decimal('0.00'))
+
+    # ========================================================
+    # 3. MOVIMIENTOS A MOSTRAR EN LA TABLA
+    # ========================================================
+    movimientos_query = MovimientoInventario.objects.filter(
+        material=material,
+        fecha__year=gestion_ano
+    )
+
+    if almacen_seleccionado:
+        movimientos_query = movimientos_query.filter(almacen=almacen_seleccionado)
+    elif rol != 'ADMINISTRADOR':
+        movimientos_query = movimientos_query.filter(almacen__in=almacenes_disponibles)
+
+    if fecha_limite_inicial:
+        movimientos_query = movimientos_query.filter(fecha__date__gte=fecha_limite_inicial)
+    elif filtro_mes:
+        movimientos_query = movimientos_query.filter(fecha__month=int(filtro_mes))
 
     if hasta_str:
         hasta_date = parse_date(hasta_str)
@@ -536,30 +579,10 @@ def kardex(request, id):
     if filtro_tipo:
         movimientos_query = movimientos_query.filter(tipo=filtro_tipo)
 
-    query_previos = MovimientoInventario.objects.filter(material=material, fecha__year=gestion_ano)
-    if almacen_seleccionado:
-        query_previos = query_previos.filter(almacen=almacen_seleccionado)
-    else:
-        query_previos = query_previos.filter(almacen__in=almacenes_disponibles)
-
-    if fecha_limite_inicial:
-        query_previos = query_previos.filter(fecha__date__lt=fecha_limite_inicial)
-    elif filtro_mes:
-        query_previos = query_previos.filter(fecha__month__lt=int(filtro_mes))
-
-    saldo_inicial_fisico = 0
-    saldo_inicial_valorado = Decimal('0.00')
-
-    for m in query_previos.order_by('fecha', 'id'):
-        if m.tipo == 'ENTRADA':
-            saldo_inicial_fisico += m.cantidad
-            saldo_inicial_valorado += (m.costo_total or Decimal('0.00'))
-        else:
-            saldo_inicial_fisico -= m.cantidad
-            saldo_inicial_valorado -= (m.costo_total or Decimal('0.00'))
-
+    # 4. PROCESAMIENTO CRONOLÓGICO REAL
     movimientos_db = movimientos_query.order_by('fecha', 'id')
     movimientos_valorados = []
+
     saldo_fisico = saldo_inicial_fisico
     saldo_valorado = saldo_inicial_valorado
 
@@ -589,6 +612,7 @@ def kardex(request, id):
             'saldo_importe': saldo_valorado,
         })
 
+    # Mostrar del más nuevo al más antiguo en pantalla
     movimientos_valorados.reverse()
 
     if almacen_seleccionado:
@@ -620,33 +644,22 @@ def kardex(request, id):
         'saldo_inicial_val': saldo_inicial_valorado,
         'rol': rol,
     })
-
-
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
 def inventario_por_unidad(request):
     """
-    REQUERIMIENTO 6 (Filtrado estricto por POA de la Unidad):
-    Muestra únicamente los materiales cuyas Partidas Presupuestarias están inscritas
-    en el POA 2026 de la Secretaría o Unidad seleccionada.
+    Tarjeta 4.5: Consulta de existencias físicas cruzadas con la programación anual del Formulario 005.
+    Filtra estrictamente los materiales autorizados según el POA de la Unidad seleccionada.
     """
-    from presupuestos.models import POA
-    gestion_actual = timezone.now().year
+    from presupuestos.models import POA, DetalleProgramacionPOA
 
     perfil = request.user.perfilusuario
     rol = perfil.rol
 
+    # Almacenes que el usuario tiene derecho a ver
     almacenes_usuario = obtener_almacenes_usuario(request.user)
-
-    es_central = (
-        rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or 
-        almacenes_usuario.filter(tipo='CENTRAL').exists()
-    )
-
-    if es_central:
-        almacenes_visibles = Almacen.objects.filter(is_active=True)
-    else:
-        almacenes_visibles = almacenes_usuario
+    es_central = (rol == 'ADMINISTRADOR' or almacenes_usuario.filter(tipo='CENTRAL').exists())
+    almacenes_visibles = Almacen.objects.filter(is_active=True) if es_central else almacenes_usuario
 
     secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
     unidades_query = UnidadOrganizacional.objects.filter(is_active=True).select_related('secretaria').order_by('nombre')
@@ -657,74 +670,115 @@ def inventario_por_unidad(request):
     secretaria_seleccionada = None
     unidad_seleccionada = None
 
-    # Base: existencias físicas en almacenes autorizados
     inventario_qs = InventarioAlmacen.objects.filter(
         almacen__in=almacenes_visibles,
         stock_fisico__gt=0
     )
 
-    poa_map = {}  # Mapeo partida_id -> objeto POA
-
+    # ========================================================
+    # FILTRADO INTELIGENTE POR UNIDAD Y POA (LEY 1178)
+    # ========================================================
     if filtro_unidad_id:
         unidad_seleccionada = get_object_or_404(UnidadOrganizacional, id=filtro_unidad_id)
         secretaria_seleccionada = unidad_seleccionada.secretaria
-
+        
         # 1. Almacenes autorizados para esta unidad
         almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas=unidad_seleccionada)
         if not almacenes_atendidos.exists():
             almacenes_atendidos = almacenes_visibles.filter(tipo='CENTRAL')
-        inventario_qs = inventario_qs.filter(almacen__in=almacenes_atendidos)
 
-        # 2. FILTRAR POR PARTIDAS DEL POA DE ESTA UNIDAD ESPECÍFICA (AQUÍ ESTÁ LA CORRECCIÓN)
-        poas_unidad = POA.objects.filter(
+        # 2. Partidas presupuestarias que esta unidad tiene en su POA 2026
+        partidas_poa_ids = POA.objects.filter(
             unidad=unidad_seleccionada,
-            gestion=gestion_actual
-        ).select_related('partida')
+            gestion=2026
+        ).values_list('partida_id', flat=True)
 
-        partidas_permitidas_ids = list(poas_unidad.values_list('partida_id', flat=True))
-        poa_map = {p.partida_id: p for p in poas_unidad}
-
-        # Solo mostramos materiales que correspondan a las partidas aprobadas en su POA
-        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_permitidas_ids)
+        # 3. FILTRO ESTRICTO: Solo materiales en sus almacenes autorizados Y de sus partidas POA
+        inventario_qs = inventario_qs.filter(
+            almacen__in=almacenes_atendidos,
+            material__partida_id__in=partidas_poa_ids  # <-- ESTA LÍNEA ELIMINA LOS MATERIALES NO AUTORIZADOS
+        )
 
     elif filtro_secretaria_id:
         secretaria_seleccionada = get_object_or_404(Secretaria, id=filtro_secretaria_id)
         unidades_sec = unidades_query.filter(secretaria=secretaria_seleccionada)
-
+        
         almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas__in=unidades_sec)
         if not almacenes_atendidos.exists():
             almacenes_atendidos = almacenes_visibles.filter(tipo='CENTRAL')
-        inventario_qs = inventario_qs.filter(almacen__in=almacenes_atendidos)
-
-        # Partidas del POA de las unidades que pertenecen a esta Secretaría
-        partidas_sec_ids = POA.objects.filter(
+            
+        partidas_poa_sec = POA.objects.filter(
             unidad__in=unidades_sec,
-            gestion=gestion_actual
+            gestion=2026
         ).values_list('partida_id', flat=True)
 
-        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_sec_ids)
+        inventario_qs = inventario_qs.filter(
+            almacen__in=almacenes_atendidos,
+            material__partida_id__in=partidas_poa_sec
+        )
 
-    # Métricas superiores
+    # Métricas superiores calculadas sobre los materiales filtrados
     total_materiales = inventario_qs.values('material_id').distinct().count()
     total_almacenes = inventario_qs.values('almacen_id').distinct().count()
     total_stock_fisico = inventario_qs.aggregate(total=Sum('stock_fisico'))['total'] or 0
 
-    inventario = inventario_qs.select_related(
-        'almacen', 
-        'almacen__unidad_organizacional',
-        'almacen__unidad_organizacional__secretaria', 
-        'material', 
-        'material__partida', 
-        'material__unidad_medida_fk'
+    registros_inventario = inventario_qs.select_related(
+        'almacen', 'material', 'material__partida', 'material__unidad_medida_fk'
     ).order_by('material__nombre')
 
-    # Si hay una unidad seleccionada, le asociamos su saldo POA a cada fila
-    items_con_poa = []
-    for inv in inventario:
-        poa_obj = poa_map.get(inv.material.partida_id) if unidad_seleccionada else None
-        items_con_poa.append({
-            'inv': inv,
-            'poa': poa_obj
+    # Cruce de existencias con el Formulario 005
+    items_cruzados = []
+    for inv in registros_inventario:
+        mat = inv.material
+        
+        item_005 = None
+        poa_partida = None
+        if unidad_seleccionada:
+            item_005 = DetalleProgramacionPOA.objects.filter(
+                poa__unidad=unidad_seleccionada,
+                poa__gestion=2026,
+                material=mat
+            ).first()
+
+            poa_partida = POA.objects.filter(
+                unidad=unidad_seleccionada,
+                partida=mat.partida,
+                gestion=2026
+            ).first()
+
+        # Costo unitario PEPS del lote activo más antiguo
+        lote_activo = MovimientoInventario.objects.filter(
+            material=mat,
+            almacen=inv.almacen,
+            tipo='ENTRADA',
+            saldo_disponible_lote__gt=0
+        ).order_by('fecha', 'id').first()
+        costo_ref = lote_activo.costo_unitario if lote_activo else Decimal('0.00')
+
+        stock_disp = inv.stock_disponible
+        if item_005:
+            saldo_cuota = item_005.cantidad_disponible
+            tope_permitido = min(stock_disp, saldo_cuota)
+            tiene_cuota = True
+        else:
+            saldo_cuota = None
+            tope_permitido = stock_disp
+            tiene_cuota = False
+
+        items_cruzados.append({
+            'inventario': inv,
+            'material': mat,
+            'almacen': inv.almacen,
+            'stock_fisico': inv.stock_fisico,
+            'stock_disponible': stock_disp,
+            'item_005': item_005,
+            'tiene_cuota': tiene_cuota,
+            'cuota_programada': item_005.cantidad_programada if item_005 else None,
+            'cuota_consumida': item_005.cantidad_consumida if item_005 else 0,
+            'saldo_cuota': saldo_cuota,
+            'tope_permitido': tope_permitido,
+            'costo_referencial': costo_ref,
+            'saldo_poa': poa_partida.monto_disponible if poa_partida else None
         })
 
     return render(request, 'inventario/stock_por_unidad.html', {
@@ -734,14 +788,12 @@ def inventario_por_unidad(request):
         'unidad_seleccionada': unidad_seleccionada,
         'filtro_secretaria_id': filtro_secretaria_id,
         'filtro_unidad_id': filtro_unidad_id,
-        'inventario': inventario,
-        'items_con_poa': items_con_poa,
+        'items_cruzados': items_cruzados,
         'total_materiales': total_materiales,
         'total_stock_fisico': total_stock_fisico,
         'total_almacenes': total_almacenes,
         'es_central': es_central,
     })
-
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def entrada_inventario(request):

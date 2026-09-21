@@ -3,103 +3,227 @@
 {% block title %} Techos Presupuestarios POA {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto space-y-6">
     
-    <!-- CABECERA -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <!-- CABECERA PRINCIPAL -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Asignación Presupuestaria POA</h1>
-            <p class="text-sm text-gray-500 mt-1">Control de techos financieros por Unidad Organizacional y Partidas de la gestión actual [28].</p>
+            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit'] tracking-tight">
+                Asignación Presupuestaria POA
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 font-['Outfit']">
+                Control y monitoreo de techos financieros, modificaciones intrainstitucionales y ejecución real (Gestión {{ gestion_actual|default:"2026" }}).
+            </p>
         </div>
-        <div class="flex flex-wrap gap-2 w-full sm:w-auto">
-            <!-- Registrar POA -->
-            <a href="{% url 'crear_poa' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
-                <span class="material-symbols-outlined text-[18px]">add_box</span> Registrar Techo POA
+
+        <!-- BOTONES DE ACCIÓN DE LA TARJETA 4 -->
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <!-- 1. Traspaso Intrainstitucional entre Partidas -->
+            <a href="{% url 'traspaso_entre_partidas' %}" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+                <span>Traspaso Presupuestario</span>
+            </a>
+
+            <!-- 2. Registrar Techo POA -->
+            <a href="{% url 'crear_poa' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">add_box</span>
+                <span>Asignar Techo POA</span>
             </a>
             
-            <!-- Tarjeta 11: Acceso Directo al Reporte de Ejecución Presupuestaria -->
-            <a href="{% url 'reporte_presupuestos' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition whitespace-nowrap">
-                <span class="material-symbols-outlined text-[18px]">analytics</span> Ver Reporte POA
+            <!-- 3. Reporte de Ejecución -->
+            <a href="{% url 'reporte_presupuestos' %}" class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">analytics</span>
+                <span>Reporte POA</span>
             </a>
-<!-- 
-            <a href="{% url 'inventario' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
-                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
-            </a> -->
         </div>
     </div>
 
-    <!-- BUSCADOR -->
-    <form method="GET" class="mb-6 flex gap-3 max-w-lg">
-        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Buscar por unidad o partida..." class="w-full border border-gray-300 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
-        <button type="submit" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-5 rounded-2xl text-sm font-semibold transition flex items-center justify-center">
-            <span class="material-symbols-outlined text-[20px]">search</span>
-        </button>
-    </form>
-
+    <!-- MENSAJES DEL SISTEMA -->
     {% if messages %}
-        <div class="mb-6">
+        <div>
             {% for message in messages %}
-                <div class="p-4 rounded-2xl text-sm border bg-green-50 text-green-700 border-green-200 mb-2">{{ message }}</div>
+                <div class="p-4 rounded-2xl text-sm border {% if message.tags == 'error' %}bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/30{% else %}bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30{% endif %} mb-2 font-['Outfit'] font-medium">
+                    {{ message }}
+                </div>
             {% endfor %}
         </div>
     {% endif %}
 
+    <!-- BARRA DE FILTROS Y BÚSQUEDA -->
+    <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <form method="GET" class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div class="flex-1 flex flex-col sm:flex-row gap-3">
+                <!-- Buscador de texto -->
+                <div class="relative flex-1">
+                    <input 
+                        type="text" 
+                        name="q" 
+                        value="{{ query|default:'' }}" 
+                        placeholder="Buscar por código, nombre de partida o unidad..." 
+                        class="w-full border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/60 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition font-['Outfit']"
+                    >
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">search</span>
+                </div>
+
+                <!-- Filtro por Unidad -->
+                <select name="unidad" onchange="this.form.submit()" class="border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/60 rounded-xl px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8b0000] font-['Outfit']">
+                    <option value="">-- Todas las Unidades --</option>
+                    {% for u in unidades %}
+                        <option value="{{ u.id }}" {% if filtro_unidad == u.id|stringformat:"s" %}selected{% endif %}>
+                            {{ u.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="submit" class="bg-gray-800 hover:bg-gray-900 dark:bg-slate-800 dark:hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer font-['Outfit']">
+                    <span class="material-symbols-outlined text-[16px]">filter_alt</span> Aplicar
+                </button>
+                {% if query or filtro_unidad %}
+                    <a href="{% url 'poa_list' %}" class="border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center" title="Limpiar filtros">
+                        <span class="material-symbols-outlined text-[16px]">close</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
     <!-- TABLA DE CONTROL DEL POA -->
-    <div class="card overflow-hidden shadow-sm">
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[900px]">
-                <thead class="bg-gray-50 border-b border-gray-100">
-                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider font-semibold">
-                        <th class="px-6 py-4 w-28">Gestión</th>
-                        <th class="px-6 py-4">Unidad Organizacional</th>
-                        <th class="px-6 py-4 w-48 text-center">Partida</th>
-                        <th class="px-6 py-4 text-right w-44">Monto Inicial (Bs.)</th>
-                        <th class="px-6 py-4 text-right w-44">Monto Disponible (Bs.)</th>
-                        <th class="px-6 py-4 text-right pr-8 w-32">Acciones</th>
+            <table class="w-full text-xs text-left border-collapse">
+                <thead class="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-gray-800 text-gray-500 uppercase font-semibold">
+                    <tr>
+                        <th class="px-5 py-4 w-20 text-center font-['Outfit']">Gestión</th>
+                        <th class="px-5 py-4 font-['Outfit']">Unidad Organizacional</th>
+                        <th class="px-5 py-4 text-center w-36 font-['Outfit']">Partida</th>
+                        <th class="px-5 py-4 text-right font-['Outfit']">Presupuesto Vigente (Bs.)</th>
+                        <th class="px-5 py-4 text-right font-['Outfit']">Ejecutado Real (Bs.)</th>
+                        <th class="px-5 py-4 text-right font-['Outfit']">Disponible (Bs.)</th>
+                        <th class="px-5 py-4 text-center w-28 font-['Outfit']">% Ejecución</th>
+                        <th class="px-5 py-4 text-right pr-6 w-28 font-['Outfit']">Acciones</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-['Outfit']">
                     {% for poa in page_obj %}
-                    <tr class="hover:bg-gray-50/50 transition duration-150">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{{ poa.gestion }}</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-700">{{ poa.unidad.nombre }}</td>
-                        <td class="px-6 py-4 text-center text-sm">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold badge-info">{{ poa.partida.codigo }}</span>
-                            <div class="text-[10px] text-gray-400 mt-1 truncate max-w-[120px] mx-auto" title="{{ poa.partida.nombre }}">{{ poa.partida.nombre }}</div>
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                        <!-- Gestión -->
+                        <td class="px-5 py-4 text-center font-bold text-gray-700 dark:text-gray-300">
+                            {{ poa.gestion }}
                         </td>
-                        <td class="px-6 py-4 text-right text-sm font-bold text-gray-500">{{ poa.monto_inicial|floatformat:2 }}</td>
-                        <td class="px-6 py-4 text-right text-sm font-black text-gray-800">
-                            {% if poa.monto_disponible <= 0 %}
-                                <span class="text-red-700 font-mono">{{ poa.monto_disponible|floatformat:2 }}</span>
-                            {% else %}
-                                <span class="font-mono">{{ poa.monto_disponible|floatformat:2 }}</span>
+
+                        <!-- Unidad Organizacional -->
+                        <td class="px-5 py-4 font-semibold text-gray-800 dark:text-gray-200">
+                            <div>{{ poa.unidad.nombre }}</div>
+                            {% if poa.unidad.secretaria %}
+                                <span class="text-[10px] text-gray-400 block font-normal">{{ poa.unidad.secretaria.nombre }}</span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
-                            <div class="flex justify-end gap-2">
-                                <!-- Tarjeta 10: Botón verde para Registrar Modificación (Ajuste) -->
-                                <a href="{% url 'registrar_modificacion' poa.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-green-50 hover:border-green-200 inline-flex items-center justify-center transition" title="Ajuste Presupuestario (Incrementar / Reducir Saldo)">
-                                    <span class="material-symbols-outlined text-green-600 text-[20px]">payments</span>
+
+                        <!-- Partida Presupuestaria -->
+                        <td class="px-5 py-4 text-center">
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30 font-mono">
+                                {{ poa.partida.codigo }}
+                            </span>
+                            <div class="text-[10px] text-gray-400 truncate max-w-[140px] mx-auto mt-1" title="{{ poa.partida.nombre }}">
+                                {{ poa.partida.nombre }}
+                            </div>
+                        </td>
+
+                        <!-- Presupuesto Vigente -->
+                        <td class="px-5 py-4 text-right font-bold text-gray-600 dark:text-gray-300 font-mono">
+                            {{ poa.presupuesto_vigente|floatformat:2 }}
+                            {% if poa.total_modificaciones != 0 %}
+                                <span class="text-[10px] block font-normal {% if poa.total_modificaciones > 0 %}text-green-600{% else %}text-amber-600{% endif %}">
+                                    {% if poa.total_modificaciones > 0 %}+{% endif %}{{ poa.total_modificaciones|floatformat:2 }} Traspaso
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Monto Ejecutado Real (Almacén / Entregas) -->
+                        <td class="px-5 py-4 text-right font-bold text-purple-700 dark:text-purple-400 font-mono">
+                            {{ poa.monto_ejecutado|floatformat:2 }}
+                        </td>
+
+                        <!-- Monto Disponible -->
+                        <td class="px-5 py-4 text-right font-black font-mono text-sm">
+                            {% if poa.monto_disponible <= 0 %}
+                                <span class="text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded-lg border border-red-200 dark:border-red-900/30">
+                                    Bs. {{ poa.monto_disponible|floatformat:2 }}
+                                </span>
+                            {% else %}
+                                <span class="text-gray-900 dark:text-gray-100">
+                                    Bs. {{ poa.monto_disponible|floatformat:2 }}
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Porcentaje de Ejecución -->
+                        <td class="px-5 py-4 text-center">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black font-mono inline-block
+                                {% if poa.porcentaje_ejecucion >= 90 %}
+                                    bg-red-50 text-red-700 border border-red-200
+                                {% elif poa.porcentaje_ejecucion >= 50 %}
+                                    bg-amber-50 text-amber-700 border border-amber-200
+                                {% else %}
+                                    bg-green-50 text-green-700 border border-green-200
+                                {% endif %}">
+                                {{ poa.porcentaje_ejecucion }}%
+                            </span>
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="px-5 py-4 text-right pr-6 whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-1.5">
+                                <!-- 1. NUEVO: Ver Ficha Formulario 005 Completa -->
+                                <a href="{% url 'detalle_poa' poa.id %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400 inline-flex items-center justify-center transition shadow-sm" title="Ver Detalle Formulario 005 (Materiales e Historial)">
+                                    <span class="material-symbols-outlined text-[16px]">visibility</span>
                                 </a>
 
-                                <!-- Botón de Edición (Original) -->
-                                <a href="{% url 'editar_poa' poa.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 inline-flex items-center justify-center transition" title="Editar Montos Directamente">
-                                    <span class="material-symbols-outlined text-[#d97706] text-[20px]">edit</span>
+                                <!-- 2. Ajuste / Modificación individual -->
+                                <a href="{% url 'registrar_modificacion' poa.id %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-green-50 dark:hover:bg-green-950/30 text-green-700 dark:text-green-400 inline-flex items-center justify-center transition shadow-sm" title="Ajuste Presupuestario (Incrementar / Reducir Saldo)">
+                                    <span class="material-symbols-outlined text-[16px]">payments</span>
+                                </a>
+
+                                <!-- 3. Edición de Techo Apertura -->
+                                <a href="{% url 'editar_poa' poa.id %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-[#d97706] inline-flex items-center justify-center transition shadow-sm" title="Editar Monto Inicial">
+                                    <span class="material-symbols-outlined text-[16px]">edit</span>
                                 </a>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
-                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">bar_chart</span>
-                            No se registran techos presupuestarios para el POA.
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-700 mb-2 block">account_balance_wallet</span>
+                            No se registran techos presupuestarios para el POA con los filtros aplicados.
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        <!-- PIE DE PAGINACIÓN -->
+        {% if page_obj.has_other_pages %}
+        <div class="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/40 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-500 font-['Outfit']">
+            <span>Mostrando página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            <div class="flex items-center gap-1">
+                {% if page_obj.has_previous %}
+                    <a href="?page=1{% if query %}&q={{ query }}{% endif %}{% if filtro_unidad %}&unidad={{ filtro_unidad }}{% endif %}" class="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition font-bold">« Primera</a>
+                    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_unidad %}&unidad={{ filtro_unidad }}{% endif %}" class="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition font-bold">Anterior</a>
+                {% endif %}
+
+                <span class="px-3 py-1.5 bg-[#8b0000] text-white font-bold rounded-lg">{{ page_obj.number }}</span>
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_unidad %}&unidad={{ filtro_unidad }}{% endif %}" class="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition font-bold">Siguiente</a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}{% if filtro_unidad %}&unidad={{ filtro_unidad }}{% endif %}" class="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition font-bold">Última »</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
