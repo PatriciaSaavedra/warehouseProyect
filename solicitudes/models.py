@@ -55,6 +55,19 @@ class Solicitud(models.Model):
     
     )
 
+    # Tarjeta 5: Almacén de despacho congelado al autorizar la solicitud (revisar_solicitud).
+    # Protegido (PROTECT) para preservar la trazabilidad histórica del despacho:
+    # una vez congelado, TODA la cadena (preparar/entregar/rechazar/cerrar/PEPS) opera
+    # exclusivamente sobre este almacén, sin re-resolver la Unidad por unidades_atendidas.
+    almacen_operativo = models.ForeignKey(
+        'inventario.Almacen',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='solicitudes_operativas',
+        help_text="Tarjeta 5: Almacén de despacho congelado al momento de la reserva (revisión)."
+    )
+
     # --- CAMPOS DE TRAZABILIDAD Y AUDITORÍA DE LA CADENA SABS ---
     revisado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_revisadas')
     fecha_revision = models.DateTimeField(null=True, blank=True)

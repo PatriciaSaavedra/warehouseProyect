@@ -1412,7 +1412,7 @@ def nota_ingreso_list(request):
 def nota_salida_list(request):
     query = request.GET.get('q', '').strip()
     from .models import NotaSalida
-    notas = NotaSalida.objects.select_related('unidad_destino', 'usuario').all()
+    notas = NotaSalida.objects.select_related('unidad_destino', 'usuario', 'solicitud_origen', 'almacen_origen').all()
 
     if query:
         notas = notas.filter(

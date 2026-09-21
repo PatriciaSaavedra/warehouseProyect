@@ -25,6 +25,13 @@ from presupuestos.models import POA
 from auditoria.models import Bitacora
 
 from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD, FLUJOS_ATENCION
+from .services import (
+    AlmacenSolicitudError,
+    almacen_operativo_o_historial,
+    q_bandeja_almacenero,
+    resolver_almacen_por_unidad,
+    solicitud_operable_por_almacenero,
+)
 from inventario.models import (
     InventarioAlmacen, Material, MovimientoInventario, 
     PartidaPresupuestaria, UnidadMedida, Almacen
@@ -114,8 +121,13 @@ def solicitudes_general(request):
     unidad = perfil.unidad
 
     # Acceso global para administradores y personal de almacenes
-    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO', 'KARDISTA']:
+    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'KARDISTA']:
         solicitudes_query = Solicitud.objects.all()
+    elif rol == 'ALMACENERO':
+        # Tarjeta 5: el ALMACENERO solo ve las solicitudes cuyo almacén de despacho
+        # es suyo (congelado) o que su Unidad es atendida por sus almacenes.
+        # .distinct() evita duplicados por el JOIN histórico hacia NotaSalida.
+        solicitudes_query = Solicitud.objects.filter(q_bandeja_almacenero(perfil)).distinct()
     else:
         solicitudes_query = Solicitud.objects.filter(unidad_solicitante=unidad)
 
@@ -146,10 +158,17 @@ def solicitudes_general(request):
     hoy = timezone.now().date()
     primer_dia_mes = hoy.replace(day=1)
     
-    pendientes_count = Solicitud.objects.filter(estado='REGISTRADA').count()
-    preparacion_count = Solicitud.objects.filter(estado__in=['APROBADA', 'PREPARADA']).count()
-    entregas_hoy_count = Solicitud.objects.filter(estado='ENTREGADA', fecha_entrega__date=hoy).count()
-    total_folios_count = Solicitud.objects.filter(fecha_registro__date__gte=primer_dia_mes).count()
+    # Tarjeta 5: los KPIs de la bandeja del ALMACENERO se acotan a su ámbito de
+    # despacho; el resto de roles conserva las métricas globales de antes.
+    if rol == 'ALMACENERO':
+        kpi_qs = Solicitud.objects.filter(q_bandeja_almacenero(perfil)).distinct()
+    else:
+        kpi_qs = Solicitud.objects.all()
+
+    pendientes_count = kpi_qs.filter(estado='REGISTRADA').count()
+    preparacion_count = kpi_qs.filter(estado__in=['APROBADA', 'PREPARADA']).count()
+    entregas_hoy_count = kpi_qs.filter(estado='ENTREGADA', fecha_entrega__date=hoy).count()
+    total_folios_count = kpi_qs.filter(fecha_registro__date__gte=primer_dia_mes).count()
 
     paginator = Paginator(solicitudes_query, 10)
     page_number = request.GET.get('page')
@@ -529,6 +548,12 @@ def detalle_solicitud(request, id):
         else:
             if solicitud.solicitante != request.user:
                 return HttpResponseForbidden("No tiene autorización para ver esta solicitud.")
+    elif rol == 'ALMACENERO':
+        # Tarjeta 5: el ALMACENERO solo puede ver solicitudes de su propio despacho
+        # (solicitudes que él creó, o cuyo almacén de despacho le corresponde).
+        if solicitud.solicitante != request.user:
+            if not solicitud_operable_por_almacenero(solicitud, perfil):
+                return HttpResponseForbidden("No tiene autorización para ver solicitudes fuera de su almacén de despacho.")
 
     Bitacora.objects.create(
         usuario=request.user,
@@ -562,13 +587,15 @@ def revisar_solicitud(request, id):
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                almacen_origen = solicitud.almacen_origen
-                if not almacen_origen:
-                    raise ValueError(
-                        "No se pudo determinar el almacén de origen para esta solicitud. "
-                        "Asegúrese de haber registrado un Almacén Central activo (Tipo: 'CENTRAL') "
-                        "en el Panel de Administración de Django."
-                    )
+                # Tarjeta 5: al autorizar se CONGELA el almacén de despacho
+                # (dependencia directa de la Unidad del solicitante), dentro del
+                # MISMO atomic de la reserva. Nunca se cae al Almacén Central y
+                # nunca se usa .first() si hay más de un almacén configurado.
+                if solicitud.almacen_operativo_id:
+                    almacen_origen = solicitud.almacen_operativo
+                else:
+                    almacen_origen = resolver_almacen_por_unidad(solicitud.unidad_solicitante)
+                    solicitud.almacen_operativo = almacen_origen
 
                 for detalle in detalles:
                     aprobada = int(request.POST.get(f"aprobado_{detalle.id}") or 0)
@@ -807,6 +834,25 @@ def validar_jefatura(request, id):
 def preparar_solicitud(request, id):
     solicitud = get_object_or_404(Solicitud, id=id)
 
+    # Tarjeta 5: histórico sin almacén operativo congelado -> bloqueado (no se infiere).
+    almacen = solicitud.almacen_operativo
+    if not almacen:
+        messages.error(
+            request,
+            "Esta solicitud es histórica (anterior a la trazabilidad de almacén) y no "
+            "tiene almacén de despacho congelado. No puede prepararse; requiere "
+            "regularización manual por un Administrador."
+        )
+        return redirigir_despues_de_accion(request, solicitud)
+
+    if not request.user.perfilusuario.tiene_acceso_almacen(almacen):
+        messages.error(
+            request,
+            f"No tiene autorización para operar el almacén de despacho '{almacen.nombre}' "
+            "de esta solicitud."
+        )
+        return redirigir_despues_de_accion(request, solicitud)
+
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
         permitido = (solicitud.estado in ['REVISADA', 'VALIDADA_JEFATURA'])
         mensaje_error = "Para solicitudes con stock, se requiere primero la autorización del Jefe de Unidad (Estado: Revisada)."
@@ -857,9 +903,34 @@ def entregar_solicitud(request, id):
             solicitud = Solicitud.objects.select_for_update().get(id=id)
             costos_partidas = {}
 
-            almacen_origen = solicitud.almacen_origen
-            if not almacen_origen:
-                raise ValueError("No se pudo determinar el almacén de origen para esta solicitud. Verifique que exista un Almacén Central activo.")
+            # REVALIDACIÓN AUTORITATIVA DENTRO DEL LOCK:
+            # la solicitud pudo haber cambiado de estado mientras se esperaba el lock
+            # (doble POST/concurrencia). Si ya no está PREPARADA -> rollback, nunca
+            # doble despacho ni doble ejecución de POA.
+            if solicitud.flujo_atencion == 'CONTRATACION_SERVICIO':
+                raise ValueError(
+                    "Un requerimiento de tipo SERVICIO no puede entregarse físicamente."
+                )
+            if solicitud.estado != 'PREPARADA':
+                raise ValueError(
+                    "Esta solicitud ya no está en estado PREPARADA; la entrega ya fue "
+                    "procesada o la solicitud fue modificada. No se realizó ningún despacho."
+                )
+
+            # Tarjeta 5: despacho EXCLUSIVO desde el almacén operativo congelado.
+            # Histórico sin congelar -> bloqueado (nunca se infiere).
+            almacen_operativo = solicitud.almacen_operativo
+            if not almacen_operativo:
+                raise ValueError(
+                    "Esta solicitud es histórica (anterior a la trazabilidad de almacén) "
+                    "y no tiene almacén de despacho congelado. No puede entregarse; "
+                    "requiere regularización manual por un Administrador."
+                )
+            if not request.user.perfilusuario.tiene_acceso_almacen(almacen_operativo):
+                raise ValueError(
+                    f"No tiene autorización para operar el almacén de despacho "
+                    f"'{almacen_operativo.nombre}' de esta solicitud."
+                )
 
             ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
             nro_salida_num = (ultima_salida.id + 1) if ultima_salida else 1
@@ -868,7 +939,7 @@ def entregar_solicitud(request, id):
             nota_salida = NotaSalida.objects.create(
                 nro_nota=nro_nota_salida,
                 solicitud_origen=solicitud,
-                almacen_origen=almacen_origen,
+                almacen_origen=almacen_operativo,
                 unidad_destino=solicitud.unidad_solicitante,
                 fecha=timezone.now().date(),
                 usuario=request.user
@@ -879,12 +950,14 @@ def entregar_solicitud(request, id):
                 cantidad_despacho = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
 
                 if material.stock_actual < cantidad_despacho:
-                    messages.error(request, f"Inconsistencia: Stock insuficiente en {material.nombre} para despachar la solicitud.")
-                    return redirigir_despues_de_accion(request, solicitud)
+                    raise ValueError(
+                        f"Inconsistencia: Stock insuficiente en {material.nombre} para "
+                        f"despachar la solicitud. No se realizó ningún egreso."
+                    )
 
                 mov = registrar_salida_valorada_peps(
                     material=material,
-                    almacen=almacen_origen,
+                    almacen=almacen_operativo,
                     cantidad_salida=cantidad_despacho,
                     tipo_movimiento='SALIDA',
                     referencia=f"DESPACHO: {solicitud.codigo}",
@@ -956,6 +1029,24 @@ def cerrar_solicitud(request, id):
 
     if solicitud.estado != 'ENTREGADA':
         messages.error(request, "Solo solicitudes ENTREGADAS pueden marcarse como CERRADAS.")
+        return redirigir_despues_de_accion(request, solicitud)
+
+    # Tarjeta 5: solo cierra quien opera el almacén de despacho de la solicitud.
+    # Las solicitudes históricas usan la Nota de Salida registrada (sin inferir).
+    almacen = almacen_operativo_o_historial(solicitud)
+    if not almacen:
+        messages.error(
+            request,
+            "No se puede determinar el almacén de despacho de esta solicitud (sin "
+            "almacén congelado ni Nota de Salida registrada). Requiere revisión manual."
+        )
+        return redirigir_despues_de_accion(request, solicitud)
+
+    if not request.user.perfilusuario.tiene_acceso_almacen(almacen):
+        messages.error(
+            request,
+            f"No tiene autorización para cerrar trámites del almacén '{almacen.nombre}'."
+        )
         return redirigir_despues_de_accion(request, solicitud)
 
     solicitud.estado = 'CERRADA'
@@ -1105,12 +1196,24 @@ def rechazar_solicitud(request, id):
             with transaction.atomic():
                 solicitud = Solicitud.objects.select_for_update().get(id=id)
 
+                # Tarjeta 5: la reserva se libera EXCLUSIVAMENTE del almacén operativo
+                # congelado. Los históricos sin congelar se bloquean (la reserva no
+                # puede reconstruirse con seguridad; no se infiere).
+                almacen_operativo = solicitud.almacen_operativo
+
                 if solicitud.estado in ['REVISADA', 'PREPARADA'] and solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+                    if not almacen_operativo:
+                        raise ValueError(
+                            "Esta solicitud es histórica (anterior a la trazabilidad de "
+                            "almacén) y no tiene almacén de despacho congelado; no se "
+                            "puede liberar su stock de forma segura. Requiere "
+                            "regularización manual por un Administrador."
+                        )
                     for detalle in solicitud.detalles.all():
                         if detalle.material:
                             inv = InventarioAlmacen.objects.select_for_update().filter(
                                 material=detalle.material,
-                                almacen=solicitud.almacen_origen
+                                almacen=almacen_operativo
                             ).first()
                             if inv:
                                 cantidad_reserva = detalle.cantidad_aprobada or detalle.cantidad_solicitada
