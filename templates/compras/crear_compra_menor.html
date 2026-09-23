@@ -1,134 +1,486 @@
 {% extends 'base.html' %}
 
-{% block title %} Registrar Orden {% endblock %}
+{% block title %} Emitir Orden de Compra o Servicio {% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-6xl mx-auto space-y-6">
 
     <!-- CABECERA -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Registrar Orden de Compra</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Genere una nueva Orden de Adquisición bajo la modalidad de Compra Menor [28].</p>
+            <a href="{% url 'compras_list' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition mb-2 font-['Outfit']">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Órdenes
+            </a>
+            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
+                <span id="header_icon" class="material-symbols-outlined text-3xl text-[#8b0000]">shopping_bag</span>
+                <span id="header_titulo">Emitir Orden de Compra (Bienes)</span>
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-['Outfit']">
+                Modalidad de Contratación Menor bajo D.S. 0181 y RE-SABS (Límite legal: hasta Bs. 50,000.00).
+            </p>
         </div>
-        <a href="{% url 'compras_list' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
-        </a>
     </div>
 
-    <!-- MENSAJES DE ERROR -->
+    <!-- MENSAJES -->
     {% if messages %}
-        <div class="mb-6">
+        <div>
             {% for message in messages %}
-                <div class="p-4 rounded-2xl text-sm border bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/30 mb-2">
+                <div class="p-4 rounded-2xl text-sm border {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %} font-['Outfit']">
                     {{ message }}
                 </div>
             {% endfor %}
         </div>
     {% endif %}
 
-    <!-- ALERTA DE COMPRA ASOCIADA POR INSUFICIENCIA DE STOCK -->
-    {% if solicitud_origen %}
-        <div class="p-6 mb-6 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl">
-            <h2 class="text-sm font-bold text-amber-800 dark:text-amber-400 font-['Outfit'] mb-3 flex items-center gap-2">
-                <span class="material-symbols-outlined text-amber-700 dark:text-amber-500 text-[20px]">warning</span>
-                Adquisición por Stock Insuficiente (RPA) [28]
-            </h2>
-            <div class="text-xs text-gray-600 dark:text-gray-450 space-y-1 font-['Outfit']">
-                <p>Esta compra se origina para resolver el folio de solicitud: <strong class="text-gray-700 dark:text-gray-250">{{ solicitud_origen.codigo }}</strong></p>
-                <p>Unidad Solicitante destinataria: <strong>{{ solicitud_origen.unidad_solicitante.nombre }}</strong></p>
+    <!-- FORMULARIO -->
+    <form method="POST" id="form-compra" class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm space-y-6 font-['Outfit']">
+        {% csrf_token %}
+
+        <!-- SWITCH REACTIVO: TIPO DE ORDEN (COMPRA VS SERVICIO) -->
+        <div class="p-4 rounded-2xl bg-gray-50/80 dark:bg-slate-800/40 border border-gray-200/80 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+                <span class="text-xs font-bold uppercase text-gray-400 block tracking-wider">1. Seleccione el Tipo de Contratación Menor</span>
+                <p class="text-[11px] text-gray-500 mt-0.5">Define si los ítems ingresarán físicamente a Almacén o si es una prestación de servicio directo.</p>
+            </div>
+            <div class="inline-flex p-1 bg-gray-200/70 dark:bg-slate-800 rounded-2xl w-full sm:w-auto">
+                <button type="button" id="btn_tipo_compra" onclick="cambiarTipoOrden('COMPRA')" class="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm bg-white dark:bg-slate-900 text-[#8b0000] dark:text-red-400">
+                    <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+                    Orden de Compra (Bienes)
+                </button>
+                <button type="button" id="btn_tipo_servicio" onclick="cambiarTipoOrden('SERVICIO')" class="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900">
+                    <span class="material-symbols-outlined text-[18px]">room_service</span>
+                    Orden de Servicio (Servicios)
+                </button>
+            </div>
+            <input type="hidden" name="tipo_orden" id="input_tipo_orden" value="{{ tipo_orden_sugerido|default:'COMPRA' }}">
+        </div>
+
+        <!-- METADATOS DE ADJUDICACIÓN -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-gray-50/50 dark:bg-slate-800/20 border border-gray-200/60 dark:border-gray-800 text-xs">
+            <!-- Gestión Fiscal -->
+            <div>
+                <label class="block mb-1 font-bold text-gray-500 uppercase text-[10px]">Gestión Fiscal *</label>
+                <input type="number" name="gestion" value="{{ gestion_default|default:2026 }}" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono font-bold">
+            </div>
+
+            <!-- Proveedor / Adjudicatario -->
+            <div class="sm:col-span-2">
+                <label class="block mb-1 font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px]">Proveedor / Adjudicatario (A la orden de) *</label>
+                <select name="proveedor" id="select_proveedor" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-bold text-gray-800 dark:text-gray-100">
+                    <option value="">-- Seleccionar Proveedor --</option>
+                    {% for p in proveedores %}
+                        <option value="{{ p.id }}" data-nit="{{ p.nit }}">{{ p.razon_social }} (NIT: {{ p.nit }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Partida Presupuestaria -->
+            <div>
+                <label class="block mb-1 font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px]">Partida de Gasto *</label>
+                <select name="partida" id="partida_select" required class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-bold text-gray-800 dark:text-gray-100">
+                    <option value="">-- Seleccionar Partida --</option>
+                    {% for part in partidas %}
+                        <option value="{{ part.id }}" {% if partida_defecto and partida_defecto.id == part.id %}selected{% endif %}>
+                            {{ part.codigo }} - {{ part.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Solicitud de Origen -->
+            <div class="lg:col-span-4">
+                <label class="block mb-1 font-bold text-gray-400 uppercase text-[10px]">Unidad Solicitante / Requerimiento Origen</label>
+                <input type="text" readonly value="{% if solicitud_origen %}{{ solicitud_origen.unidad_solicitante.nombre }} • Requerimiento: {{ solicitud_origen.codigo }}{% else %}Contratación Directa (Sin Solicitud Previa){% endif %}" class="w-full border border-gray-200 dark:border-gray-800 bg-gray-100/80 dark:bg-slate-800/80 rounded-xl p-2.5 text-gray-600 dark:text-gray-300 font-medium">
             </div>
         </div>
-    {% endif %}
 
-    <!-- FORMULARIO -->
-    <form method="POST" class="card p-8 shadow-sm space-y-6">
-        {% csrf_token %}
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- PROVEEDOR -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Proveedor Adjudicado <span class="text-[#8b0000] dark:text-red-400">*</span></label>
-                <div class="relative">
-                    <select name="proveedor" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10" required>
-                        <option value="" class="dark:bg-[#151010]">Seleccione un proveedor</option>
-                        {% for prov in proveedores %}
-                            <option value="{{ prov.id }}" class="dark:bg-[#151010]">{{ prov.razon_social }}</option>
-                        {% endfor %}
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+        <!-- CARGA DE ARTÍCULOS O SERVICIOS -->
+        <div class="space-y-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 id="label_seccion_items" class="text-sm font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-gray-500 text-[18px]">list_alt</span>
+                        Artículos / Repuestos a Adquirir
+                    </h3>
+                    <p id="desc_seccion_items" class="text-[11px] text-gray-400">
+                        Agregue los repuestos o materiales cotizados que ingresarán físicamente a Almacén.
+                    </p>
                 </div>
             </div>
 
-            <!-- PARTIDA PRESUPUESTARIA -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Partida de Gasto <span class="text-[#8b0000] dark:text-red-400">*</span></label>
-                <div class="relative">
-                    <select name="partida" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition appearance-none pr-10" required>
-                        <option value="" class="dark:bg-[#151010]">Seleccione una partida</option>
-                        {% for part in partidas %}
-                            <option value="{{ part.id }}" class="dark:bg-[#151010]" {% if partida_defecto and partida_defecto.id == part.id %}selected{% endif %}>
-                                {{ part.codigo }} - {{ part.nombre }}
+            <!-- FILA DINÁMICA DE CARGA -->
+            <div class="p-4 rounded-2xl bg-gray-50/70 dark:bg-slate-800/40 border border-gray-200/80 dark:border-gray-800 space-y-3 text-xs">
+                
+                <!-- BUSCADOR DEL CATÁLOGO (SOLO VISIBLE CUANDO ES "COMPRA") -->
+                <div id="contenedor_catalogo">
+                    <label class="block text-[10px] font-bold text-[#8b0000] dark:text-red-400 uppercase flex items-center gap-1 mb-1">
+                        <span class="material-symbols-outlined text-[14px]">search</span>
+                        Cargar desde Catálogo de Almacenes (Opcional - Rellena Nombre y Unidad)
+                    </label>
+                    <select id="catalogo_select" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-gray-800 dark:text-gray-200" onchange="seleccionarDelCatalogo(this)">
+                        <option value="">-- Buscar material existente en almacenes (o escriba abajo) --</option>
+                        {% for mat in materiales_catalogo %}
+                            <option value="{{ mat.id }}" data-nombre="{{ mat.nombre }}" data-unidad="{{ mat.unidad_medida_fk.codigo|default:mat.unidad_medida }}" data-partida="{{ mat.partida.id|default:'' }}">
+                                {{ mat.codigo }} • {{ mat.nombre }} ({{ mat.unidad_medida_fk.codigo|default:mat.unidad_medida }})
                             </option>
                         {% endfor %}
                     </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
+                </div>
+
+                <!-- CAMPOS DE EDICIÓN DEL ÍTEM -->
+                <div class="grid grid-cols-12 gap-2 items-end">
+                    <div class="col-span-12 sm:col-span-5">
+                        <label id="label_temp_desc" class="block text-[10px] font-bold text-gray-500 uppercase">Descripción del Material *</label>
+                        <input type="text" id="temp_desc" placeholder="Ej: PASTILLAS DE FRENO DELANTERO" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        <input type="hidden" id="temp_material_id" value="">
+                    </div>
+                    
+                    <div class="col-span-4 sm:col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase">U. Manejo</label>
+                        <input type="text" id="temp_unidad" value="Pza" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-center font-bold text-gray-800 dark:text-gray-200">
+                        <div id="chips_unidades" class="flex gap-1 mt-1 justify-center">
+                            <!-- Inyectado por JS según tipo de orden -->
+                        </div>
+                    </div>
+
+                    <div class="col-span-4 sm:col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase">Cantidad *</label>
+                        <input type="number" min="1" id="temp_cant" placeholder="1" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-center font-bold text-gray-800 dark:text-gray-200">
+                    </div>
+
+                    <div class="col-span-4 sm:col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase">P. Unitario (Bs.) *</label>
+                        <input type="number" step="0.01" min="0.01" id="temp_precio" placeholder="0.00" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs font-mono font-bold text-right text-gray-800 dark:text-gray-200">
+                    </div>
+
+                    <div class="col-span-12 sm:col-span-1">
+                        <button type="button" onclick="agregarFilaManual()" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2 rounded-xl text-xs font-bold flex items-center justify-center transition shadow h-[38px] cursor-pointer" title="Añadir a la orden">
+                            <span class="material-symbols-outlined text-[20px]">add</span>
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            <!-- TABLA DE ARTÍCULOS ADJUDICADOS -->
+            <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                            <th class="p-3.5 w-12 text-center">Item</th>
+                            <th class="p-3.5">Descripción del Concepto Adjudicado</th>
+                            <th class="p-3.5 text-center w-24">Unidad</th>
+                            <th class="p-3.5 text-center w-24">Cantidad</th>
+                            <th class="p-3.5 text-right w-32">Precio Unit. (Bs.)</th>
+                            <th class="p-3.5 text-right w-36">Total (Bs.)</th>
+                            <th class="p-3.5 text-center w-16">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla_orden_body" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-slate-900">
+                        <!-- Renderizado dinámico -->
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- GESTIÓN -->
+        <!-- RESUMEN FINANCIERO Y GLOSA EN LETRAS -->
+        <div class="p-6 rounded-2xl bg-gray-50/80 dark:bg-slate-800/50 border border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Gestión Fiscal <span class="text-[#8b0000] dark:text-red-400">*</span></label>
-                <input type="number" name="gestion" value="{{ gestion_default }}" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-400 dark:text-gray-500 font-medium cursor-not-allowed select-none focus:outline-none" required readonly>
+                <span class="text-xs font-bold uppercase tracking-wider text-gray-400 block">Importe Total Oficial de Adjudicación</span>
+                <span id="label_monto_letras" class="text-xs font-bold text-gray-700 dark:text-gray-300 italic mt-0.5 block">
+                    SON: CERO 00/100 BOLIVIANOS
+                </span>
             </div>
-
-            <!-- MONTO ADJUDICADO (Con validación dinámica para el RPA de 50.000 Bs.) -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Monto Total Adjudicado (Bs.) <span class="text-[#8b0000] dark:text-red-400">*</span></label>
-                <input 
-                    type="number" 
-                    name="monto_total" 
-                    id="input_monto_total" 
-                    step="0.01" 
-                    min="0.01" 
-                    class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition" 
-                    value="{% if monto_estimado and monto_estimado > 0 %}{{ monto_estimado|stringformat:'.2f' }}{% else %}0.00{% endif %}"
-                    required
-                >
-                <p id="alerta_limite_sabs" class="text-[10px] text-gray-400 dark:text-gray-500 mt-2 font-['Outfit'] flex items-center gap-1">
-                    <span class="material-symbols-outlined text-xs">info</span>
-                    Límite máximo permitido para Contratación Menor por el RPA: <strong>50,000.00 Bs.</strong>
-                </p>
+            <div class="text-right">
+                <span class="text-3xl font-black text-[#8b0000] dark:text-red-400 font-mono" id="label_total_monto">Bs. 0.00</span>
             </div>
-    </div>
         </div>
 
-        <div class="pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
-            <a href="{% url 'compras_list' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
-            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer"><span class="material-symbols-outlined text-[18px]">save</span> Registrar Orden de Compra</button>
+        <input type="hidden" name="payload_items" id="payload_items" value="[]">
+
+        <!-- BOTONES -->
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+            <a href="{% url 'compras_list' %}" class="px-6 py-3 rounded-2xl border border-gray-300 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition">Cancelar</a>
+            <button type="submit" class="btn-primary px-8 py-3 rounded-2xl font-bold text-xs shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">verified</span>
+                <span id="btn_submit_texto">Emitir Orden de Compra Oficial</span>
+            </button>
         </div>
     </form>
 </div>
 
-<!-- SCRIPT DE VALIDACIÓN DE LÍMITES SABS / RPA -->
+<!-- DATOS EN FORMATO JSON SEGURO (0 ERRORES EN VS CODE) -->
+<script id="datos-solicitud" type="application/json">
+[
+    {% if solicitud_origen %}
+        {% for d in solicitud_origen.detalles.all %}
+        {
+            "material_id": {% if d.material %}{{ d.material.id }}{% else %}null{% endif %},
+            "descripcion": "{{ d.material.nombre|default:d.descripcion_material_no_catalogado|default:'Concepto'|escapejs }}",
+            "unidad": "{{ d.material.unidad_medida_fk.codigo|default:'Pza'|escapejs }}",
+            "cantidad": {{ d.cantidad_aprobada|default:d.cantidad_solicitada|default:1 }},
+            "precio_unitario": {{ d.precio_unitario_referencial|stringformat:".2f"|default:"0.00" }},
+            "subtotal": {{ d.subtotal_referencial|stringformat:".2f"|default:"0.00" }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    {% endif %}
+]
+</script>
+
 <script>
-    document.getElementById('input_monto_total').addEventListener('input', function() {
-        const monto = parseFloat(this.value) || 0;
-        const alerta = document.getElementById('alerta_limite_sabs');
-        
-        if (monto > 50000) {
-            this.setCustomValidity('El monto no puede superar los 50,000.00 Bs. correspondientes a la modalidad de Compra Menor.');
-            alerta.classList.remove('text-gray-400', 'dark:text-gray-500');
-            alerta.classList.add('text-red-700', 'dark:text-red-400', 'font-bold');
-            alerta.innerHTML = `<span class="material-symbols-outlined text-xs">warning</span> ¡Atención! El monto supera los 50,000 Bs. Se requiere derivación a proceso ANPE o Licitación.`;
-        } else {
-            this.setCustomValidity('');
-            alerta.classList.remove('text-red-700', 'dark:text-red-400', 'font-bold');
-            alerta.classList.add('text-gray-400', 'dark:text-gray-500');
-            alerta.innerHTML = `<span class="material-symbols-outlined text-xs">info</span> Límite máximo permitido para Contratación Menor por el RPA: <strong>50,000.00 Bs.</strong>`;
+let itemsOrden = [];
+let tipoOrdenActual = '{{ tipo_orden_sugerido|default:"COMPRA" }}';
+
+document.addEventListener('DOMContentLoaded', function() {
+    const contenedorDatos = document.getElementById('datos-solicitud');
+    if (contenedorDatos) {
+        try {
+            itemsOrden = JSON.parse(contenedorDatos.textContent) || [];
+        } catch (e) {
+            itemsOrden = [];
         }
+    }
+    cambiarTipoOrden(tipoOrdenActual);
+    renderizarTabla();
+});
+
+// FUNCIÓN CLAVE: CAMBIO REACTIVO ENTRE COMPRA Y SERVICIO
+function cambiarTipoOrden(tipo) {
+    tipoOrdenActual = tipo;
+    document.getElementById('input_tipo_orden').value = tipo;
+
+    const btnCompra = document.getElementById('btn_tipo_compra');
+    const btnServicio = document.getElementById('btn_tipo_servicio');
+    const contenedorCat = document.getElementById('contenedor_catalogo');
+    const headerTitulo = document.getElementById('header_titulo');
+    const headerIcon = document.getElementById('header_icon');
+    const labelSeccion = document.getElementById('label_seccion_items');
+    const descSeccion = document.getElementById('desc_seccion_items');
+    const labelTempDesc = document.getElementById('label_temp_desc');
+    const tempDesc = document.getElementById('temp_desc');
+    const tempUnidad = document.getElementById('temp_unidad');
+    const btnSubmit = document.getElementById('btn_submit_texto');
+    const chipsUnidades = document.getElementById('chips_unidades');
+
+    if (tipo === 'SERVICIO') {
+        // Estilo activo para Servicio
+        btnServicio.className = "flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm bg-white dark:bg-slate-900 text-[#8b0000] dark:text-red-400";
+        btnCompra.className = "flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900";
+        
+        // Ocultar buscador de catálogo de almacén (¡Los servicios no están en estantería!)
+        contenedorCat.classList.add('hidden');
+
+        // Adaptar textos y placeholders
+        headerTitulo.innerText = "Emitir Orden de Servicio (Servicios Generales)";
+        headerIcon.innerText = "room_service";
+        labelSeccion.innerHTML = '<span class="material-symbols-outlined text-gray-500 text-[18px]">room_service</span> Servicios / Conceptos Contratados';
+        descSeccion.innerText = "Detalle la prestación del servicio que atenderá directamente a la Unidad Solicitante.";
+        labelTempDesc.innerText = "Descripción del Servicio *";
+        tempDesc.placeholder = "Ej: SERVICIO DE HOSPEDAJE PARA DELEGACIÓN DEPORTIVA (60 PAX)";
+        tempUnidad.value = "PAX";
+        btnSubmit.innerText = "Emitir Orden de Servicio Oficial";
+
+        // Chips rápidos de unidades para servicios
+        chipsUnidades.innerHTML = `
+            <button type="button" onclick="setUnidad('PAX')" class="px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[9px] font-bold">PAX</button>
+            <button type="button" onclick="setUnidad('DÍAS')" class="px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[9px] font-bold">DÍAS</button>
+            <button type="button" onclick="setUnidad('GLOBAL')" class="px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[9px] font-bold">GLOBAL</button>
+        `;
+    } else {
+        // Estilo activo para Compra
+        btnCompra.className = "flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm bg-white dark:bg-slate-900 text-[#8b0000] dark:text-red-400";
+        btnServicio.className = "flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900";
+        
+        // Mostrar catálogo de almacenes
+        contenedorCat.classList.remove('hidden');
+
+        // Adaptar textos para compras
+        headerTitulo.innerText = "Emitir Orden de Compra (Bienes)";
+        headerIcon.innerText = "inventory_2";
+        labelSeccion.innerHTML = '<span class="material-symbols-outlined text-gray-500 text-[18px]">list_alt</span> Artículos / Repuestos a Adquirir';
+        descSeccion.innerText = "Agregue los repuestos o materiales cotizados que ingresarán físicamente a Almacén.";
+        labelTempDesc.innerText = "Descripción del Material *";
+        tempDesc.placeholder = "Ej: PASTILLAS DE FRENO DELANTERO o FILTRO DE GASOLINA";
+        tempUnidad.value = "Pza";
+        btnSubmit.innerText = "Emitir Orden de Compra Oficial";
+
+        // Chips rápidos para bienes
+        chipsUnidades.innerHTML = `
+            <button type="button" onclick="setUnidad('PZA')" class="px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[9px] font-bold">PZA</button>
+            <button type="button" onclick="setUnidad('PAQ')" class="px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[9px] font-bold">PAQ</button>
+            <button type="button" onclick="setUnidad('JUEGO')" class="px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-[9px] font-bold">JUEGO</button>
+        `;
+    }
+}
+
+function setUnidad(u) {
+    document.getElementById('temp_unidad').value = u;
+}
+
+function seleccionarDelCatalogo(selectElement) {
+    const opt = selectElement.options[selectElement.selectedIndex];
+    const descInput = document.getElementById('temp_desc');
+    const unidadInput = document.getElementById('temp_unidad');
+    const matIdInput = document.getElementById('temp_material_id');
+    const partidaSelect = document.getElementById('partida_select');
+
+    if (!selectElement.value || !opt) {
+        descInput.value = '';
+        unidadInput.value = 'Pza';
+        matIdInput.value = '';
+        return;
+    }
+
+    descInput.value = opt.getAttribute('data-nombre').toUpperCase();
+    unidadInput.value = (opt.getAttribute('data-unidad') || 'PZA').toUpperCase();
+    matIdInput.value = selectElement.value;
+
+    const partidaId = opt.getAttribute('data-partida');
+    if (partidaId && partidaSelect && !partidaSelect.value) {
+        partidaSelect.value = partidaId;
+    }
+
+    document.getElementById('temp_cant').focus();
+}
+
+function agregarFilaManual() {
+    const descInput = document.getElementById('temp_desc');
+    const unidadInput = document.getElementById('temp_unidad');
+    const cantInput = document.getElementById('temp_cant');
+    const precioInput = document.getElementById('temp_precio');
+    const matIdInput = document.getElementById('temp_material_id');
+    const catalogoSelect = document.getElementById('catalogo_select');
+
+    const desc = descInput.value.trim();
+    const unidad = unidadInput.value.trim() || 'Pza';
+    const cant = parseInt(cantInput.value, 10) || 0;
+    const precio = parseFloat(precioInput.value) || 0.00;
+    const materialId = matIdInput.value ? parseInt(matIdInput.value, 10) : null;
+
+    if (!desc) {
+        alert("Escriba la descripción del concepto.");
+        return;
+    }
+    if (cant <= 0) {
+        alert("La cantidad debe ser mayor a cero.");
+        return;
+    }
+    if (precio <= 0) {
+        alert("El precio unitario debe ser mayor a cero.");
+        return;
+    }
+
+    const subtotal = cant * precio;
+
+    itemsOrden.push({
+        material_id: materialId,
+        descripcion: desc.toUpperCase(),
+        unidad: unidad.toUpperCase(),
+        cantidad: cant,
+        precio_unitario: precio,
+        subtotal: subtotal
     });
+
+    renderizarTabla();
+
+    // Limpiar campos
+    descInput.value = '';
+    cantInput.value = '';
+    precioInput.value = '';
+    matIdInput.value = '';
+    catalogoSelect.value = '';
+    descInput.focus();
+}
+
+function eliminarFila(index) {
+    itemsOrden.splice(index, 1);
+    renderizarTabla();
+}
+
+function renderizarTabla() {
+    const tbody = document.getElementById('tabla_orden_body');
+    const labelTotal = document.getElementById('label_total_monto');
+    const labelLetras = document.getElementById('label_monto_letras');
+    const payloadInput = document.getElementById('payload_items');
+
+    tbody.innerHTML = '';
+    let totalGeneral = 0.0;
+
+    if (itemsOrden.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="p-6 text-center text-gray-400">
+                    No hay conceptos agregados a la orden. Agregue ítems en la barra superior.
+                </td>
+            </tr>
+        `;
+        labelTotal.innerText = 'Bs. 0.00';
+        labelLetras.innerText = 'SON: CERO 00/100 BOLIVIANOS';
+        payloadInput.value = '[]';
+        return;
+    }
+
+    itemsOrden.forEach(function(it, idx) {
+        totalGeneral += it.subtotal;
+        tbody.innerHTML += `
+            <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                <td class="p-3.5 text-center text-gray-400 font-mono">${idx + 1}</td>
+                <td class="p-3.5 font-semibold text-gray-800 dark:text-gray-200">
+                    <div>${it.descripcion}</div>
+                    ${it.material_id ? '<span class="text-[9px] text-green-600 dark:text-green-400 font-bold">✓ Material de Almacén</span>' : '<span class="text-[9px] text-amber-600 dark:text-amber-400 font-bold">• Ítem Libre / Servicio</span>'}
+                </td>
+                <td class="p-3.5 text-center text-gray-600 dark:text-gray-300 font-bold">${it.unidad}</td>
+                <td class="p-3.5 text-center font-bold text-gray-900 dark:text-gray-100 font-mono">${it.cantidad}</td>
+                <td class="p-3.5 text-right font-mono">${it.precio_unitario.toFixed(2)}</td>
+                <td class="p-3.5 text-right font-mono font-bold text-[#8b0000] dark:text-red-400">Bs. ${it.subtotal.toFixed(2)}</td>
+                <td class="p-3.5 text-center">
+                    <button type="button" onclick="eliminarFila(${idx})" class="text-red-500 hover:text-red-700 p-1">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    labelTotal.innerText = `Bs. ${totalGeneral.toFixed(2)}`;
+    labelLetras.innerText = `SON: ${numeroALetras(totalGeneral).toUpperCase()}`;
+    payloadInput.value = JSON.stringify(itemsOrden);
+}
+
+// CONVERSOR DE NÚMERO A LETRAS EN VIVO (Para la glosa "SON: ...")
+function numeroALetras(monto) {
+    if (monto <= 0) return "Cero 00/100 Bolivianos";
+    const entero = Math.floor(monto);
+    const centavos = Math.round((monto - entero) * 100).toString().padStart(2, '0');
+    return `${convertirNumero(entero)} ${centavos}/100 Bolivianos`;
+}
+
+function convertirNumero(n) {
+    const unidades = ["", "un", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"];
+    const decenas = ["", "diez", "veinte", "treinta", "cuarenta", "cincuenta", "sesenta", "setenta", "ochenta", "noventa"];
+    const especiales = {11:"once", 12:"doce", 13:"trece", 14:"catorce", 15:"quince", 16:"dieciséis", 17:"diecisiete", 18:"dieciocho", 19:"diecinueve"};
+    const centenas = ["", "cien", "doscientos", "trescientos", "cuatrocientos", "quinientos", "seiscientos", "setecientos", "ochocientos", "novecientos"];
+
+    if (n === 100) return "cien";
+    if (n < 10) return unidades[n];
+    if (especiales[n]) return especiales[n];
+    if (n < 100) {
+        const u = n % 10;
+        const d = Math.floor(n / 10);
+        return u === 0 ? decenas[d] : `${decenas[d]} y ${unidades[u]}`;
+    }
+    if (n < 1000) {
+        const c = Math.floor(n / 100);
+        const resto = n % 100;
+        const pref = (c === 1 && resto > 0) ? "ciento" : centenas[c];
+        return resto === 0 ? pref : `${pref} ${convertirNumero(resto)}`;
+    }
+    if (n < 1000000) {
+        const miles = Math.floor(n / 1000);
+        const resto = n % 1000;
+        const milesTexto = (miles === 1) ? "mil" : `${convertirNumero(miles)} mil`;
+        return resto === 0 ? milesTexto : `${milesTexto} ${convertirNumero(resto)}`;
+    }
+    return n.toString();
+}
 </script>
 {% endblock %}

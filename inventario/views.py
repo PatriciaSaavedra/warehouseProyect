@@ -1357,36 +1357,56 @@ def reporte_consumo_unidades(request):
 
 @login_required
 def obtener_items_compra_view(request):
+    """
+    API AJAX: Jala de la Orden de Compra los materiales, proveedor,
+    cantidades solicitadas, precios, ejecutora y observaciones.
+    """
     compra_id = request.GET.get('compra_id')
     if not compra_id:
-        return JsonResponse([], safe=False)
+        return JsonResponse({'ok': False, 'items': []})
 
-    compra = get_object_or_404(CompraMenor, id=compra_id)
+    from compras.models import CompraMenor
+    compra = get_object_or_404(
+        CompraMenor.objects.select_related('proveedor', 'solicitud_origen', 'solicitud_origen__unidad_solicitante'),
+        id=compra_id
+    )
     solicitud = compra.solicitud_origen
-    if not solicitud:
-        return JsonResponse([], safe=False)
 
-    detalles = solicitud.detalles.select_related('material')
-    data = []
+    items_data = []
+    observaciones = ""
+    cod_ejecutora = ""
 
-    for d in detalles:
-        if d.material:
-            last_ent = MovimientoInventario.objects.filter(material=d.material, tipo='ENTRADA').order_by('-fecha').first()
-            costo_u = last_ent.costo_unitario if last_ent else Decimal('0.00')
-            cantidad = d.cantidad_aprobada if d.cantidad_aprobada is not None else d.cantidad_solicitada
+    if solicitud:
+        observaciones = f"REGISTRO POR ADQUISICIÓN: {solicitud.justificacion}"
+        cod_ejecutora = solicitud.unidad_solicitante.codigo_sigep or solicitud.unidad_solicitante.nombre[:25]
 
-            data.append({
-                'material_id': d.material.id,
-                'codigo': d.material.codigo,
-                'nombre': d.material.nombre,
-                'cantidad': cantidad,
-                'costo_unitario': float(costo_u),
-                'stock_actual': d.material.stock_actual
-            })
+        for d in solicitud.detalles.select_related('material', 'material__partida', 'material__unidad_medida_fk'):
+            if d.material:
+                cant = d.cantidad_aprobada if d.cantidad_aprobada is not None else d.cantidad_solicitada
+                precio = float(d.precio_unitario_referencial) if d.precio_unitario_referencial > 0 else 0.0
 
-    return JsonResponse(data, safe=False)
+                items_data.append({
+                    'material_id': d.material.id,
+                    'codigo': d.material.codigo,
+                    'nombre': d.material.nombre,
+                    'unidad': d.material.unidad_medida_fk.nombre.upper() if d.material.unidad_medida_fk else d.material.unidad_medida.upper(),
+                    'partida': d.material.partida.codigo if d.material.partida else "—",
+                    'codigo_ejecutora': cod_ejecutora,
+                    'codigo_presupuestario': solicitud.codigo,
+                    'cantidad': cant,
+                    'precio_unitario': precio,
+                    'precio_total': round(cant * precio, 2)
+                })
 
-
+    return JsonResponse({
+        'ok': True,
+        'proveedor_id': compra.proveedor.id if compra.proveedor else None,
+        'proveedor_nombre': compra.proveedor.razon_social if compra.proveedor else '',
+        'proveedor_nit': compra.proveedor.nit if compra.proveedor else '',
+        'nro_orden': compra.nro_orden,
+        'observaciones': observaciones,
+        'items': items_data
+    })
 @login_required
 def inventario_por_almacen(request):
     perfil = getattr(request.user, 'perfilusuario', None)
@@ -1730,112 +1750,173 @@ def recibir_transferencia(request, id):
 
 
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
 def nota_recepcion_pdf(request, id):
+    """
+    Genera el formato oficial exacto de la "NOTA DE RECEPCIÓN" del GAD Potosí (Horizontal/Landscape).
+    Idéntico al documento físico oficial N° 162 con 10 columnas y 3 firmas.
+    """
     nota = get_object_or_404(
-        NotaIngreso.objects.prefetch_related('detalles__material__partida').select_related('proveedor', 'usuario'),
+        NotaIngreso.objects.prefetch_related('detalles__material__partida', 'detalles__material__unidad_medida_fk')
+        .select_related('proveedor', 'usuario', 'almacen_destino', 'compra_menor_origen', 'compra_menor_origen__solicitud_origen'),
         id=id
     )
 
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="nota_recepcion_{nota.nro_nota}.pdf"'
+    nro_limpio = nota.nro_nota.replace("NI-", "").replace("NI", "")
+    response['Content-Disposition'] = f'inline; filename="nota_recepcion_{nro_limpio}.pdf"'
 
-    pdf = canvas.Canvas(response, pagesize=letter)
-    width, height = letter
-    pdf.setTitle(f"Nota de Recepción Nro: {nota.nro_nota}")
+    # 1. Configuración Horizontal Landscape
+    pdf = canvas.Canvas(response, pagesize=landscape(letter))
+    width, height = landscape(letter)  # 792 x 612 pt
+    pdf.setTitle(f"Nota de Recepción N° {nro_limpio}")
 
+    # --- CABECERA INSTITUCIONAL ---
     pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(50, height - 40, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
-    pdf.drawString(50, height - 52, "SECRETARÍA DPTAL. ADMINISTRATIVA Y FINANCIERA")
-    pdf.drawString(50, height - 64, "UNIDAD DE ALMACENES")
+    pdf.drawCentredString(width / 2.0, height - 35, "GOBIERNO AUTÓNOMO DEL DEPARTAMENTO DE POTOSÍ")
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawCentredString(width / 2.0, height - 47, "UNIDAD DE ALMACENES")
 
+    # Título Principal con espaciado oficial
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawCentredString(width / 2.0, height - 70, "N O T A    D E    R E C E P C I Ó N")
+
+    # Número correlativo a la derecha (N°. 162)
     pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawRightString(width - 50, height - 50, f"Nº. {nota.nro_nota.replace('NI-', '')}")
-    pdf.drawString(50, height - 90, "NOTA DE RECEPCIÓN")
+    pdf.drawRightString(width - 45, height - 35, f"Nº. {nro_limpio}")
 
-    factura_val = nota.factura if nota.factura else '—'
-    c31_val = nota.c31 if nota.c31 else '—'
-    fecha_factura_val = nota.fecha.strftime('%Y-%m-%d') if nota.fecha else '—'
-    fecha_ingreso_val = nota.fecha_registro.strftime('%Y-%m-%d') if nota.fecha_registro else '—'
-    orden_val = nota.compra_menor_origen.nro_orden if nota.compra_menor_origen else '—'
+    # --- METADATOS DEL DOCUMENTO (Idéntico a la foto de la cabecera) ---
+    pdf.setFont("Helvetica-Bold", 8)
+    # Fila 1
+    pdf.drawString(45, height - 95, "Proveedor:")
+    pdf.setFont("Helvetica", 8)
+    pdf.drawString(100, height - 95, f"{nota.proveedor.razon_social.upper()}")
 
-    metadata = [
-        [f"Proveedor: {nota.proveedor.razon_social}", f"Fac. Nº: {factura_val}"],
-        [f"C.I. NIT. Nº: {nota.proveedor.nit}", f"C-31: {c31_val}"],
-        [f"Fecha de FACTURA: {fecha_factura_val}", f"Orden de: {orden_val}"],
-        [f"DESTINO: {nota.almacen_destino.nombre}", f"Fecha de Ingreso: {fecha_ingreso_val}"]
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(520, height - 95, "Fac. Nº.")
+    pdf.setFont("Helvetica", 8)
+    pdf.drawString(565, height - 95, f"{nota.factura or '—'}")
+
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(670, height - 95, "C-31:")
+    pdf.setFont("Helvetica", 8)
+    pdf.drawString(700, height - 95, f"{nota.c31 or '—'}")
+
+    # Fila 2
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(45, height - 110, "C.I. NIT. Nº.")
+    pdf.setFont("Helvetica", 8)
+    pdf.drawString(105, height - 110, f"{nota.proveedor.nit}")
+
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(320, height - 110, "Fecha de FACTURA:")
+    pdf.setFont("Helvetica", 8)
+    fecha_fac = nota.fecha.strftime('POTOSI, %Y-%m-%d') if nota.fecha else "POTOSI, —"
+    pdf.drawString(420, height - 110, f"{fecha_fac}")
+
+    pdf.setFont("Helvetica-Bold", 8)
+    orden_txt = nota.compra_menor_origen.nro_orden if nota.compra_menor_origen else (f"COMPRA {nota.id}/2026")
+    pdf.drawString(580, height - 110, f"Orden de: {orden_txt.upper()}")
+
+    # --- TABLA OFICIAL DE 10 COLUMNAS ---
+    headers = [
+        'ITEM',
+        'DESCRIPCION',
+        'UNIDAD\nMANEJO',
+        'PEDIDO',
+        'ENTREG.',
+        'COSTO\nUNITARIO',
+        'COSTO\nTOTAL',
+        'CODIGO\nPRESUPUESTARIO',
+        'CODIGO\nEJECUTORA',
+        'PARTIDA\nPRESUP.'
     ]
-
-    t_meta = Table(metadata, colWidths=[250, 250])
-    t_meta.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,0), (-1,-1), 8.5),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#D1D5DB')),
-        ('PADDING', (0,0), (-1,-1), 3),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    t_meta.wrapOn(pdf, 50, height - 170)
-    t_meta.drawOn(pdf, 50, height - 170)
-
-    headers = ['ITEM', 'DESCRIPCION', 'U. MEDIDA', 'PEDIDO', 'ENTREG.', 'P. UNIT (Bs.)', 'P. TOTAL (Bs.)', 'PARTIDA']
     data = [headers]
 
+    # Recuperar datos de la solicitud y unidad ejecutora
+    solicitud_origen = nota.compra_menor_origen.solicitud_origen if nota.compra_menor_origen else None
+    cod_ejecutora = solicitud_origen.unidad_solicitante.codigo_sigep if (solicitud_origen and solicitud_origen.unidad_solicitante.codigo_sigep) else ""
+    cod_presup = solicitud_origen.codigo if solicitud_origen else ""
+
     total_nota = Decimal('0.00')
-    for index, det in enumerate(nota.detalles.all(), start=1):
+    detalles = nota.detalles.select_related('material', 'material__partida', 'material__unidad_medida_fk').all()
+
+    for idx, det in enumerate(detalles, start=1):
         total_nota += det.precio_total
-        unidad_manejo = det.material.unidad_medida_fk.codigo if det.material.unidad_medida_fk else det.material.unidad_medida
+        u_manejo = det.material.unidad_medida_fk.nombre.upper() if (det.material and det.material.unidad_medida_fk) else (det.material.unidad_medida.upper() if det.material else "PAQUETE")
+        partida_cod = det.material.partida.codigo if (det.material and det.material.partida) else "—"
+
         data.append([
-            str(index),
-            det.material.nombre[:45],
-            unidad_manejo,
-            str(det.cantidad),
-            str(det.cantidad),
+            str(idx),
+            det.material.nombre.upper()[:55],
+            u_manejo[:10],
+            str(det.cantidad),  # Cantidad Pedida
+            str(det.cantidad),  # Cantidad Entregada
             f"{det.precio_unitario:.2f}",
             f"{det.precio_total:.2f}",
-            det.material.partida.codigo
+            str(cod_presup),
+            str(cod_ejecutora),
+            str(partida_cod)
         ])
 
-    data.append(['', 'COSTO TOTAL:', '', '', '', '', f"{total_nota:.2f}", ''])
+    # Fila de Destino y Costo Total (Idéntico a la fila gris de la foto)
+    data.append([
+        'DESTINO: ALMACENES', '', '', '', '',
+        'COSTO TOTAL:', f"{total_nota:.2f}", '', '', ''
+    ])
 
-    col_widths = [30, 200, 50, 45, 45, 60, 60, 40]
-    t_det = Table(data, colWidths=col_widths)
+    # Anchos de columna exactos para landscape (Suma = 705 pt, márgenes seguros de 43.5 pt)
+    col_widths = [25, 205, 55, 40, 40, 55, 65, 80, 75, 65]
+    t = Table(data, colWidths=col_widths)
     last_row = len(data) - 1
 
     t_style = TableStyle([
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('ALIGN', (1,1), (1, last_row), 'LEFT'),
-        ('ALIGN', (5,1), (6, last_row), 'RIGHT'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1, last_row - 1), 0.5, colors.HexColor('#D1D5DB')),
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F3F4F6')),
-        ('FONTNAME', (1, last_row), (1, last_row), 'Helvetica-Bold'),
-        ('FONTNAME', (6, last_row), (6, last_row), 'Helvetica-Bold'),
-        ('LINEABOVE', (6, last_row), (6, last_row), 1, colors.black),
+        ('SPAN', (0, last_row), (4, last_row)),  # DESTINO: ALMACENES ocupa 5 columnas
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 1), (1, last_row - 1), 'LEFT'),      # Descripción a la izquierda
+        ('ALIGN', (0, last_row), (0, last_row), 'LEFT'),   # DESTINO: ALMACENES a la izquierda
+        ('ALIGN', (5, 1), (6, last_row), 'RIGHT'),         # Precios a la derecha
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('GRID', (0, 0), (-1, last_row), 0.5, colors.HexColor('#9CA3AF')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E5E7EB')),
+        ('FONTNAME', (0, last_row), (-1, last_row), 'Helvetica-Bold'),
+        ('BACKGROUND', (0, last_row), (-1, last_row), colors.HexColor('#F3F4F6')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
     ])
-    t_det.setStyle(t_style)
+    t.setStyle(t_style)
 
-    w_act, h_act = t_det.wrapOn(pdf, width - 100, height - 250)
-    pdf_y = height - 190 - h_act
-    t_det.drawOn(pdf, 50, pdf_y)
+    # Dibujar la tabla
+    w_act, h_act = t.wrapOn(pdf, 705, height - 170)
+    pdf_y = height - 130 - h_act
+    t.drawOn(pdf, 45, pdf_y)
 
-    y_firmas = 80
+    # --- OBSERVACIONES ---
+    obs_y = pdf_y - 20
+    pdf.setFont("Helvetica-Bold", 7.5)
+    pdf.drawString(45, obs_y, "Observaciones:")
     pdf.setFont("Helvetica", 7.5)
-    pdf.drawString(50, y_firmas, "___________________________________")
-    pdf.drawString(50, y_firmas - 10, "Responsable Almacenes")
-    pdf.drawString(230, y_firmas, "___________________________________")
-    pdf.drawString(230, y_firmas - 10, "Responsable Bienes y Servicios")
-    pdf.drawString(410, y_firmas, "___________________________________")
-    pdf.drawString(410, y_firmas - 10, "Responsable Kardex Valorado")
+    obs_texto = getattr(nota, 'observaciones', None) or (solicitud_origen.justificacion if solicitud_origen else "REGISTRO POR LA ADQUISICION DE MATERIALES PARA LAS DIFERENTES UNIDADES DE LA INSTITUCION")
+    pdf.drawString(115, obs_y, f"{obs_texto.upper()[:120]}")
+
+    # --- 3 FIRMAS OFICIALES (Almacenes, Bienes y Servicios, Kardex Valorado) ---
+    y_firmas = 45
+    pdf.setFont("Helvetica", 7.5)
+
+    # Firma 1: Responsable Almacenes
+    pdf.drawString(80, y_firmas + 15, "___________________________________")
+    pdf.drawString(95, y_firmas, "Responsable Almacenes")
+
+    # Firma 2: Responsable Bienes y Servicios
+    pdf.drawString(310, y_firmas + 15, "___________________________________")
+    pdf.drawString(320, y_firmas, "Responsable Bienes y Servicios")
+
+    # Firma 3: Responsable Kardex Valorado
+    pdf.drawString(560, y_firmas + 15, "___________________________________")
+    pdf.drawString(570, y_firmas, "Responsable Kardex Valorado")
 
     pdf.save()
-
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Inventario',
-        accion='Exportar Nota Recepción PDF',
-        descripcion=f'Se descargó el PDF oficial de la Nota de Recepción Nro: {nota.nro_nota} del proveedor {nota.proveedor.razon_social}.'
-    )
     return response
 
 
