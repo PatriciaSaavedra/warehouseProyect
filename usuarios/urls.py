@@ -1,4 +1,3 @@
-# usuarios/urls.py
 from django.urls import path
 from .views import (
     usuarios_view,

@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %} Detalle Folio {% endblock %}
+{% block title %} Detalle Folio {{ solicitud.codigo }} {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-8">
+<div class="max-w-7xl mx-auto space-y-8 font-['Outfit']">
 
     <!-- CABECERA -->
     <div class="mb-4">
-        <!-- Enlace de regreso (Estilo Breadcrumb con micro-interacción) -->
-        <a href="{% url 'solicitudes_general' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-750 dark:text-gray-500 dark:hover:text-gray-300 transition-colors mb-3 font-['Outfit'] group">
+        <!-- Enlace de regreso con micro-interacción -->
+        <a href="{% url 'solicitudes_general' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 transition-colors mb-3 group">
             <span class="material-symbols-outlined text-[16px] transition-transform group-hover:-translate-x-0.5">arrow_back</span>
             Volver a solicitudes
         </a>
@@ -16,263 +16,284 @@
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit'] tracking-tight">Folio: {{ solicitud.codigo }}</h1>
+                    <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 tracking-tight">Folio: {{ solicitud.codigo }}</h1>
                     
                     <!-- BADGES DE ESTADO -->
                     {% if solicitud.estado == 'REGISTRADA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-250 dark:border-blue-900/30 font-['Outfit']">Registrada</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30">Registrada</span>
                     {% elif solicitud.estado == 'REVISADA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border border-purple-250 dark:border-purple-900/30 font-['Outfit']">Revisada</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/30">Revisada (Jefe)</span>
                     {% elif solicitud.estado == 'VALIDADA_SAF' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-250 dark:border-blue-900/30 font-['Outfit']">Validada por SAF</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">Validada por SAF</span>
                     {% elif solicitud.estado == 'VALIDADA_PRESUPUESTOS' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-250 dark:border-amber-900/30 font-['Outfit']">Aprobada (POA)</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900/30">Aprobada (POA)</span>
                     {% elif solicitud.estado == 'VALIDADA_RPA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-250 dark:border-amber-900/30 font-['Outfit']">Aprobada por RPA</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30">Aprobada por RPA</span>
                     {% elif solicitud.estado == 'VALIDADA_JEFATURA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-250 dark:border-indigo-900/30 font-['Outfit']">Aprobada Jefatura</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">Aprobada Jefatura</span>
                     {% elif solicitud.estado == 'PREPARADA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-250 dark:border-indigo-900/30 font-['Outfit']">Preparada</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30">Preparada</span>
                     {% elif solicitud.estado == 'ENTREGADA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-250 dark:border-green-900/30 font-['Outfit']">Entregada</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30">Entregada</span>
                     {% elif solicitud.estado == 'CERRADA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 font-['Outfit']">Cerrada</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">Cerrada</span>
                     {% elif solicitud.estado == 'RECHAZADA' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-250 dark:border-red-900/30 font-['Outfit']">Rechazada</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30">Rechazada</span>
                     {% endif %}
+
+                    <!-- BADGE DE FLUJO ATENCIÓN -->
+                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400">
+                        {{ solicitud.get_flujo_atencion_display }}
+                    </span>
                 </div>
-                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 font-['Outfit']">Fecha de Registro: {{ solicitud.fecha_registro|date:"d \d\e F, Y | H:i" }} AM</p>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Fecha de Registro: {{ solicitud.fecha_registro|date:"d \d\e F, Y | H:i" }}</p>
             </div>
 
-        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <a 
-                href="{% url 'solicitud_pdf' solicitud.id %}" 
-                target="_blank" 
-                class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition animate-pulse"
-                title="Visualizar y mandar a imprimir el comprobante"
-            >
-                <span class="material-symbols-outlined text-[16px]">visibility</span> 
-                Vista Previa / Imprimir
-            </a>
-            
-            {% if solicitud.tiene_detalles %}
-                {% if solicitud.estado == 'REGISTRADA' %}
-                    {% if request.user.perfilusuario.rol == 'JEFE_INMEDIATO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <a href="{% url 'revisar_solicitud' solicitud.id %}" class="bg-[#ffa726] hover:bg-[#fb8c00] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">rate_review</span> Autorizar Pedido
-                        </a>
-                        <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">cancel</span> Rechazar
-                        </a>
-                    {% endif %}
-
-                <!-- 2. REVISADA -->
-                {% elif solicitud.estado == 'REVISADA' %}
-                    <!-- Caso A: Si es Bien con Stock, el Almacenero/Administrador puede Preparar el Pedido directamente -->
-                    {% if solicitud.flujo_atencion == 'SALIDA_ALMACEN' %}
-                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'preparar_solicitud' solicitud.id %}" class="inline">
-                                {% csrf_token %}
-                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                    <span class="material-symbols-outlined text-[16px]">inventory_2</span> Preparar Pedido
-                                </button>
-                            </form>
-                        {% endif %}
-                        
-                    <!-- Caso B: Si es Adquisición o Servicio, sigue el circuito administrativo del SAF -->
-                    {% else %}
-                        {% if request.user.perfilusuario.rol == 'SECRETARIO_SAF' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'validar_saf' solicitud.id %}" class="inline">
-                                {% csrf_token %}
-                                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                    <span class="material-symbols-outlined text-[16px]">assignment_turned_in</span> Validar por SAF
-                                </button>
-                            </form>
-                            <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
-                                <span class="material-symbols-outlined text-[16px]">cancel</span> Rechazar
+            <!-- BOTONES DE ACCIÓN SEGÚN EL ROL Y CIRCUITO SABS -->
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <a 
+                    href="{% url 'solicitud_pdf' solicitud.id %}" 
+                    target="_blank" 
+                    class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition"
+                    title="Visualizar y mandar a imprimir el comprobante"
+                >
+                    <span class="material-symbols-outlined text-[16px]">visibility</span> 
+                    Vista Previa / Imprimir
+                </a>
+                
+                {% if solicitud.tiene_detalles %}
+                    <!-- 1. REGISTRADA: AUTORIZACIÓN DEL JEFE DE UNIDAD -->
+                    {% if solicitud.estado == 'REGISTRADA' %}
+                        {% if request.user.perfilusuario.rol in 'JEFE_INMEDIATO,ADMINISTRADOR' %}
+                            <a href="{% url 'revisar_solicitud' solicitud.id %}" class="bg-[#d97706] hover:bg-[#b45309] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                                <span class="material-symbols-outlined text-[16px]">rate_review</span> Autorizar (Jefe)
+                            </a>
+                            <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                                Rechazar
                             </a>
                         {% endif %}
+
+                    <!-- 2. REVISADA: BIFURCACIÓN DE CIRCUITO -->
+                    {% elif solicitud.estado == 'REVISADA' %}
+                        {% if solicitud.flujo_atencion == 'SALIDA_ALMACEN' %}
+                            <!-- CASO STOCK: ALMACÉN PREPARA EL PEDIDO DIRECTO -->
+                            {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR,ADMIN_ALMACENES' %}
+                                <form method="POST" action="{% url 'preparar_solicitud' solicitud.id %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                        <span class="material-symbols-outlined text-[16px]">inventory_2</span> Preparar Pedido
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% else %}
+                            <!-- CASO ADQUISICIÓN / SERVICIO: PASA AL SECRETARIO SAF -->
+                            {% if request.user.perfilusuario.rol in 'SECRETARIO_SAF,ADMINISTRADOR' %}
+                                <form method="POST" action="{% url 'validar_saf' solicitud.id %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                        <span class="material-symbols-outlined text-[16px]">assignment_turned_in</span> Validar por SAF
+                                    </button>
+                                </form>
+                                <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
+                                    Rechazar
+                                </a>
+                            {% endif %}
+                        {% endif %}
+
+                    <!-- 3. VALIDADA SAF: CONTROL PRESUPUESTARIO POA -->
+                    {% elif solicitud.estado == 'VALIDADA_SAF' %}
+                        {% if request.user.perfilusuario.rol in 'PRESUPUESTOS,ADMINISTRADOR' %}
+                            <form method="POST" action="{% url 'aprobar_solicitud' solicitud.id %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span> Validar POA
+                                </button>
+                            </form>
+                            <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
+                                Rechazar
+                            </a>
+                        {% endif %}
+
+                    <!-- 4. VALIDADA PRESUPUESTOS: AUTORIZACIÓN RPA -->
+                    {% elif solicitud.estado == 'VALIDADA_PRESUPUESTOS' %}
+                        {% if request.user.perfilusuario.rol in 'RPA,ADMINISTRADOR' %}
+                            <form method="POST" action="{% url 'validar_rpa' solicitud.id %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]">how_to_reg</span> Validar por RPA
+                                </button>
+                            </form>
+                            <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
+                                Rechazar
+                            </a>
+                        {% endif %}
+
+                    <!-- 5. VALIDADA RPA: VISTO BUENO JEFATURA ADMINISTRATIVA -->
+                    {% elif solicitud.estado == 'VALIDADA_RPA' %}
+                        {% if request.user.perfilusuario.rol in 'JEFE_ADMINISTRATIVO,ADMINISTRADOR' %}
+                            <form method="POST" action="{% url 'validar_jefatura' solicitud.id %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]">gavel</span> Validar Jefatura Adm.
+                                </button>
+                            </form>
+                            <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
+                                Rechazar
+                            </a>
+                        {% endif %}
+
+                    <!-- 6. VALIDADA JEFATURA: EMISIÓN DE ORDEN EN BIENES Y SERVICIOS -->
+                    {% elif solicitud.estado == 'VALIDADA_JEFATURA' %}
+                        {% if solicitud.flujo_atencion in 'ADQUISICION,CONTRATACION_SERVICIO' %}
+                            {% if request.user.perfilusuario.rol in 'BIENES_SERVICIOS,ADMINISTRADOR' %}
+                                <a href="{% url 'crear_compra_menor' %}?solicitud={{ solicitud.id }}" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
+                                    <span class="material-symbols-outlined text-[16px]">receipt_long</span>
+                                    Emitir {% if solicitud.tipo_requerimiento == 'SERVICIO' %}Orden de Servicio{% else %}Orden de Compra{% endif %}
+                                </a>
+                            {% else %}
+                                <span class="px-3.5 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold border border-blue-200 inline-block">
+                                    Enviado a Bienes y Servicios p/ Adjudicación
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <!-- Salvaguarda si fuera stock -->
+                            {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR,ADMIN_ALMACENES' %}
+                                <form method="POST" action="{% url 'preparar_solicitud' solicitud.id %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                        <span class="material-symbols-outlined text-[16px]">inventory_2</span> Preparar Pedido
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% endif %}
+
+                    <!-- 7. PREPARADA: DESPACHO FÍSICO -->
+                    {% elif solicitud.estado == 'PREPARADA' %}
+                        {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR,ADMIN_ALMACENES' %}
+                            <a href="{% url 'entregar_solicitud' solicitud.id %}" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">local_shipping</span> Despacho Físico
+                            </a>
+                        {% endif %}
+
+                    <!-- 8. ENTREGADA: CIERRE FORMAL -->
+                    {% elif solicitud.estado == 'ENTREGADA' %}
+                        {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR,ADMIN_ALMACENES' %}
+                            <form method="POST" action="{% url 'cerrar_solicitud' solicitud.id %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]">task</span> Concluir y Cerrar Trámite
+                                </button>
+                            </form>
+                        {% endif %}
                     {% endif %}
 
-                {% elif solicitud.estado == 'VALIDADA_SAF' %}
-                    {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <form method="POST" action="{% url 'aprobar_solicitud' solicitud.id %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span> Validar POA
-                            </button>
-                        </form>
-                        <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">cancel</span> Rechazar
-                        </a>
-                    {% endif %}
-
-                {% elif solicitud.estado == 'VALIDADA_PRESUPUESTOS' %}
-                    {% if request.user.perfilusuario.rol == 'RPA' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <form method="POST" action="{% url 'validar_rpa' solicitud.id %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">how_to_reg</span> Validar por RPA
-                            </button>
-                        </form>
-                        <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">cancel</span> Rechazar
-                        </a>
-                    {% endif %}
-
-                {% elif solicitud.estado == 'VALIDADA_RPA' %}
-                    {% if request.user.perfilusuario.rol == 'JEFE_ADMINISTRATIVO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <form method="POST" action="{% url 'validar_jefatura' solicitud.id %}" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">gavel</span> Validar Jefatura Adm.
-                            </button>
-                        </form>
-                        <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">cancel</span> Rechazar
-                        </a>
-                    {% endif %}
-
-                {% elif solicitud.estado == 'VALIDADA_JEFATURA' %}
-                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <form method="POST" action="{% url 'preparar_solicitud' solicitud.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">inventory_2</span> Preparar Pedido
-                            </button>
-                        </form>
-                    {% endif %}
-
-                {% elif solicitud.estado == 'PREPARADA' %}
-                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <form method="POST" action="{% url 'entregar_solicitud' solicitud.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">local_shipping</span> Confirmar Entrega
-                            </button>
-                        </form>
-                    {% endif %}
-
-                {% elif solicitud.estado == 'ENTREGADA' %}
-                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                        <form method="POST" action="{% url 'cerrar_solicitud' solicitud.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">task</span> Concluir y Cerrar Trámite
-                            </button>
-                        </form>
-                    {% endif %}
+                {% else %}
+                    <span class="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30 px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-sm">warning</span> Solicitud Vacía (Sin ítems)
+                    </span>
                 {% endif %}
-
-            {% else %}
-                <span class="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30 px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-sm">warning</span> Solicitud Vacía (Sin ítems)
-                </span>
-            {% endif %}
+            </div>
         </div>
     </div>
 
-    <!-- STEPPER SUPERIOR -->
+    <!-- ========================================================================= -->
+    <!-- STEPPER SUPERIOR DINÁMICO (STOCK VS ADQUISICIÓN SABS) -->
+    <!-- ========================================================================= -->
     <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-        <div class="flex justify-between items-center relative py-2">
-            
-            <!-- Contenedor encapsulado con desborde controlado y alineación vertical exacta con respecto a los círculos (left/right al 5%) -->
-            <div class="absolute h-0.5 left-[5%] right-[5%] top-[24px] z-0 overflow-hidden rounded-full">
-                <!-- Pista gris de fondo -->
-                <div class="absolute inset-0 bg-gray-200 dark:bg-gray-800"></div>
-                <!-- Pista roja de progreso activo -->
-                <div class="absolute left-0 top-0 h-full bg-[#580000] transition-all duration-300 progress-bar-line" 
-                     data-width="{{ solicitud.progreso_porcentaje }}"></div>
-            </div>
-            
-            <!-- 1. Registrada -->
-            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
-                <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
-                    <span class="material-symbols-outlined text-[16px]">done</span>
-                </span>
-                <span class="text-[#580000] dark:text-red-400">Registrada</span>
-            </div>
-
-            <!-- 2. Revisada -->
-            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
-                {% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
-                        <span class="material-symbols-outlined text-[16px]">done</span>
+        
+        {% if solicitud.flujo_atencion == 'SALIDA_ALMACEN' %}
+            <!-- CASO A: FLUJO CORTO DE ALMACÉN (4 PASOS DIRECTOS) -->
+            <div class="flex justify-between items-center relative py-2">
+                <div class="absolute h-0.5 left-[8%] right-[8%] top-[24px] z-0 overflow-hidden rounded-full">
+                    <div class="absolute inset-0 bg-gray-200 dark:bg-gray-800"></div>
+                    <div class="absolute left-0 top-0 h-full bg-[#580000] transition-all duration-300 progress-bar-line" data-width="{{ solicitud.progreso_porcentaje }}"></div>
+                </div>
+                
+                <!-- 1. Registrada -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-24 text-center text-xs font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow"><span class="material-symbols-outlined text-sm">done</span></span>
+                    <span class="text-[#580000] dark:text-red-400">1. Registrada</span>
+                </div>
+                <!-- 2. Revisada -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-24 text-center text-xs font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}border-[#580000] bg-[#580000] text-white{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">{% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}done{% else %}rate_review{% endif %}</span>
                     </span>
-                    <span class="text-[#580000] dark:text-red-400">Revisada</span>
-                {% elif solicitud.estado == 'REGISTRADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 animate-spin">
-                        <span class="material-symbols-outlined text-[16px]">sync</span>
+                    <span class="{% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}text-[#580000] dark:text-red-400{% else %}text-gray-400{% endif %}">2. Revisada</span>
+                </div>
+                <!-- 3. Preparada -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-24 text-center text-xs font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'PREPARADA,ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">inventory_2</span>
                     </span>
-                    <span class="text-amber-700">Revisada</span>
-                {% else %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
-                        <span class="material-symbols-outlined text-[16px]">rate_review</span>
+                    <span class="{% if solicitud.estado in 'PREPARADA,ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% else %}text-gray-400{% endif %}">3. Preparada</span>
+                </div>
+                <!-- 4. Entregada -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-24 text-center text-xs font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">local_shipping</span>
                     </span>
-                    <span class="text-gray-400 font-['Outfit']">Revisada</span>
-                {% endif %}
+                    <span class="{% if solicitud.estado in 'ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% else %}text-gray-400{% endif %}">4. Entregada</span>
+                </div>
             </div>
 
-            <!-- 3. Aprobada -->
-            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
-                {% if solicitud.estado in 'APROBADA,PREPARADA,ENTREGADA,CERRADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
-                        <span class="material-symbols-outlined text-[16px]">done</span>
-                    </span>
-                    <span class="text-[#580000] dark:text-red-400">Aprobada</span>
-                {% elif solicitud.estado == 'REVISADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-amber-500 bg-amber-50 text-amber-600 animate-spin">
-                        <span class="material-symbols-outlined text-[16px]">sync</span>
-                    </span>
-                    <span class="text-amber-700">Aprobada</span>
-                {% else %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
-                        <span class="material-symbols-outlined text-[16px]">shield</span>
-                    </span>
-                    <span class="text-gray-400">Aprobada</span>
-                {% endif %}
-            </div>
+        {% else %}
+            <!-- CASO B: CIRCUITO COMPLETO DE ADQUISICIÓN / SERVICIO SABS (7 PASOS REALES) -->
+            <div class="flex justify-between items-center relative py-2 overflow-x-auto">
+                <div class="absolute h-0.5 left-[6%] right-[6%] top-[24px] z-0 overflow-hidden rounded-full">
+                    <div class="absolute inset-0 bg-gray-200 dark:bg-gray-800"></div>
+                    <div class="absolute left-0 top-0 h-full bg-[#580000] transition-all duration-300 progress-bar-line" data-width="{{ solicitud.progreso_porcentaje_sabs|default:15 }}"></div>
+                </div>
 
-            <!-- 4. Preparada -->
-            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
-                {% if solicitud.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
-                        <span class="material-symbols-outlined text-[16px]">done</span>
+                <!-- 1. Unidad -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow"><span class="material-symbols-outlined text-sm">done</span></span>
+                    <span class="text-[#580000] dark:text-red-400">1. Unidad</span>
+                </div>
+                <!-- 2. Jefe -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}border-[#580000] bg-[#580000] text-white{% else %}border-amber-500 bg-amber-50 text-amber-600 animate-spin{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">{% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}done{% else %}sync{% endif %}</span>
                     </span>
-                    <span class="text-[#580000] dark:text-red-400">Preparada</span>
-                {% elif solicitud.estado == 'APROBADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-indigo-500 bg-indigo-50 text-indigo-600 animate-spin">
-                        <span class="material-symbols-outlined text-[16px]">sync</span>
+                    <span class="{% if solicitud.estado != 'REGISTRADA' and solicitud.estado != 'RECHAZADA' %}text-[#580000] dark:text-red-400{% else %}text-amber-700{% endif %}">2. Jefe</span>
+                </div>
+                <!-- 3. SAF -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'VALIDADA_SAF,VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% elif solicitud.estado == 'REVISADA' %}border-amber-500 bg-amber-50 text-amber-600 animate-spin{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">{% if solicitud.estado in 'VALIDADA_SAF,VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}done{% elif solicitud.estado == 'REVISADA' %}sync{% else %}assignment_turned_in{% endif %}</span>
                     </span>
-                    <span class="text-indigo-600 dark:text-indigo-400">Preparada</span>
-                {% else %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
-                        <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                    <span class="{% if solicitud.estado in 'VALIDADA_SAF,VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% elif solicitud.estado == 'REVISADA' %}text-amber-700{% else %}text-gray-400{% endif %}">3. SAF</span>
+                </div>
+                <!-- 4. POA -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% elif solicitud.estado == 'VALIDADA_SAF' %}border-amber-500 bg-amber-50 text-amber-600 animate-spin{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">{% if solicitud.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}done{% elif solicitud.estado == 'VALIDADA_SAF' %}sync{% else %}account_balance_wallet{% endif %}</span>
                     </span>
-                    <span class="text-gray-400 font-['Outfit']">Preparada</span>
-                {% endif %}
+                    <span class="{% if solicitud.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% elif solicitud.estado == 'VALIDADA_SAF' %}text-amber-700{% else %}text-gray-400{% endif %}">4. POA</span>
+                </div>
+                <!-- 5. RPA -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% elif solicitud.estado == 'VALIDADA_PRESUPUESTOS' %}border-amber-500 bg-amber-50 text-amber-600 animate-spin{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">{% if solicitud.estado in 'VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}done{% elif solicitud.estado == 'VALIDADA_PRESUPUESTOS' %}sync{% else %}how_to_reg{% endif %}</span>
+                    </span>
+                    <span class="{% if solicitud.estado in 'VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% elif solicitud.estado == 'VALIDADA_PRESUPUESTOS' %}text-amber-700{% else %}text-gray-400{% endif %}">5. RPA</span>
+                </div>
+                <!-- 6. Jefatura / Orden BB.SS. -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% elif solicitud.estado == 'VALIDADA_RPA' %}border-amber-500 bg-amber-50 text-amber-600 animate-spin{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">{% if solicitud.estado in 'VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}done{% elif solicitud.estado == 'VALIDADA_RPA' %}sync{% else %}receipt_long{% endif %}</span>
+                    </span>
+                    <span class="{% if solicitud.estado in 'VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% elif solicitud.estado == 'VALIDADA_RPA' %}text-amber-700{% else %}text-gray-400{% endif %}">6. Orden</span>
+                </div>
+                <!-- 7. Recepción / Entrega -->
+                <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
+                        <span class="material-symbols-outlined text-sm">local_shipping</span>
+                    </span>
+                    <span class="{% if solicitud.estado in 'ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% else %}text-gray-400{% endif %}">7. Recepción</span>
+                </div>
             </div>
-
-            <!-- 5. Entregada -->
-            <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-xs font-bold font-['Outfit']">
-                {% if solicitud.estado in 'ENTREGADA,CERRADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-[#580000] bg-[#580000] text-white shadow">
-                        <span class="material-symbols-outlined text-[16px]">done</span>
-                    </span>
-                    <span class="text-[#580000] dark:text-red-400">Entregada</span>
-                {% elif solicitud.estado == 'PREPARADA' %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-green-600 bg-green-50 text-green-700 animate-spin">
-                        <span class="material-symbols-outlined text-[16px]">sync</span>
-                    </span>
-                    <span class="text-green-700 font-bold">Entregada</span>
-                {% else %}
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-400">
-                        <span class="material-symbols-outlined text-[16px]">local_shipping</span>
-                    </span>
-                    <span class="text-gray-400">Entregada</span>
-                {% endif %}
-            </div>
-        </div>
+        {% endif %}
     </div>
 
     <!-- REJILLA CENTRAL DE DATOS -->
@@ -281,23 +302,21 @@
         <!-- Información General (Ancho 5/12) -->
         <div class="lg:col-span-5 space-y-6">
             <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-                <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-6 flex items-center gap-2">
+                <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
                     <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">info</span> Información General
                 </h3>
                 
-                <div class="grid grid-cols-2 gap-y-6 gap-x-4 text-xs font-['Outfit']">
+                <div class="grid grid-cols-2 gap-y-6 gap-x-4 text-xs">
                     <div>
                         <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Solicitante</span>
                         <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username }}</span>
                     </div>
                     <div>
-                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Unidad</span>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Unidad Solicitante</span>
                         <span class="font-bold text-gray-700 dark:text-gray-200 text-sm">{{ solicitud.unidad_solicitante.nombre }}</span>
                     </div>
-                    
-                    <!-- Tarjeta 1: Mostrar Tipo de Requerimiento -->
                     <div>
-                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Tipo de Requerimiento</span>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Tipo Requerimiento</span>
                         <span class="px-2.5 py-1 rounded-full text-xs font-bold inline-block
                             {% if solicitud.tipo_requerimiento == 'SERVICIO' %}
                                 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30
@@ -307,7 +326,6 @@
                             {{ solicitud.get_tipo_requerimiento_display|default:"Bien" }}
                         </span>
                     </div>
-                    
                     <div>
                         <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold tracking-wider mb-1">Prioridad</span>
                         <span class="text-red-700 font-bold text-xs flex items-center gap-1 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 py-1 px-2.5 rounded-full w-fit">
@@ -318,21 +336,24 @@
 
                 <div class="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
                     <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider mb-2">Justificación Institucional</span>
-                    <p class="text-sm text-gray-600 dark:text-gray-350 bg-gray-50 dark:bg-slate-900/60 p-4 rounded-xl border border-gray-100 dark:border-gray-800 italic">
+                    <p class="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-slate-900/60 p-4 rounded-xl border border-gray-100 dark:border-gray-800 italic">
                         "{{ solicitud.justificacion }}"
                     </p>
                 </div>
             </div>
         </div>
 
-        <!-- Artículos Solicitados (Ancho 7/12) -->
+        <!-- Artículos / Servicios Solicitados (Ancho 7/12) -->
         <div class="lg:col-span-7">
             <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
                 <div class="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/40">
-                    <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
-                        <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">list_alt</span> Artículos / Servicios Solicitados
+                    <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">list_alt</span>
+                        {% if solicitud.flujo_atencion == 'SALIDA_ALMACEN' %}Artículos Solicitados de Almacén{% else %}Ítems a Adquirir / Contratar{% endif %}
                     </h3>
-                    <span class="px-2.5 py-1 rounded-full text-xs font-black bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30">{{ solicitud.detalles.count }} Ítems</span>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-black bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30">
+                        {{ solicitud.detalles.count }} Ítems
+                    </span>
                 </div>
                 
                 <table class="w-full text-xs text-gray-700 dark:text-gray-300 border-collapse">
@@ -342,7 +363,11 @@
                             <th class="px-4 py-3 text-center">Cant. Solicitada</th>
                             <th class="px-4 py-3 text-right">P. Unit. Ref (Bs.)</th>
                             <th class="px-4 py-3 text-right">Subtotal (Bs.)</th>
-                            <th class="px-4 py-3 text-center">Despachar</th>
+                            {% if solicitud.flujo_atencion == 'SALIDA_ALMACEN' %}
+                                <th class="px-4 py-3 text-center">Despachar</th>
+                            {% else %}
+                                <th class="px-4 py-3 text-center">Cant. Autorizada</th>
+                            {% endif %}
                             <th class="px-4 py-3 text-center">Estado</th>
                         </tr>
                     </thead>
@@ -358,39 +383,50 @@
                                     <span class="text-[9px] text-gray-400 block font-mono">Cód: {{ d.material.codigo }}</span>
                                 {% endif %}
                             </td>
-                            <td class="px-4 py-4 text-center font-bold text-gray-600 dark:text-gray-400">{{ d.cantidad_solicitada }} Units</td>
+                            <td class="px-4 py-4 text-center font-bold text-gray-600 dark:text-gray-400 font-mono">{{ d.cantidad_solicitada }} Units</td>
                             
-                            <!-- Tarjeta 2: Mostrar Precio Referencial Unitario -->
                             <td class="px-4 py-4 text-right text-gray-600 dark:text-gray-400 font-mono">
                                 {{ d.precio_unitario_referencial|floatformat:2 }}
                             </td>
                             
-                            <!-- Tarjeta 2: Mostrar Subtotal -->
                             <td class="px-4 py-4 text-right font-bold text-gray-800 dark:text-gray-100 font-mono">
                                 {{ d.subtotal_referencial|floatformat:2 }}
                             </td>
 
+                            <!-- Cantidad Autorizada (Lectura Limpia) -->
                             <td class="px-4 py-4 text-center">
-                                <input type="number" value="{{ d.cantidad_aprobada|default:d.cantidad_solicitada }}" class="border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-200 rounded-xl p-1 w-14 text-center font-semibold focus:outline-none" readonly>
+                                <span class="inline-block border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-slate-900 text-gray-700 dark:text-gray-200 rounded-xl py-1 px-3 text-center font-bold text-xs font-mono">
+                                    {{ d.cantidad_aprobada|default:d.cantidad_solicitada }}
+                                </span>
                             </td>
-                            <td class="px-4 py-4 text-center flex items-center justify-center gap-2">
+
+                            <!-- Estado del Ítem -->
+                            <td class="px-4 py-4 text-center">
                                 {% if d.es_nueva_adquisicion %}
-                                    {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                        <a href="{% url 'catalogar_item_pendiente' d.id %}" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold shadow-sm transition flex items-center gap-1 cursor-pointer">
+                                    {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR' %}
+                                        <a href="{% url 'catalogar_item_pendiente' d.id %}" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold shadow-sm transition inline-flex items-center gap-1 cursor-pointer">
                                             <span class="material-symbols-outlined text-xs">app_registration</span> Catalogar
                                         </a>
+                                    {% else %}
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            Pendiente Código
+                                        </span>
                                     {% endif %}
                                 {% else %}
                                     {% if solicitud.estado == 'ENTREGADA' or solicitud.estado == 'CERRADA' %}
-                                        <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30 flex items-center gap-1">
+                                        <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30 inline-flex items-center gap-1">
                                             <span class="material-symbols-outlined text-xs">done_all</span> Entregado
                                         </span>
+                                    {% elif solicitud.flujo_atencion == 'ADQUISICION' %}
+                                        <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-xs">shopping_cart</span> En Trámite Compra
+                                        </span>
                                     {% elif d.material.stock_actual < d.cantidad_solicitada and solicitud.tipo_requerimiento != 'SERVICIO' %}
-                                        <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30 flex items-center gap-1 animate-pulse" title="Es necesario reabastecer mediante Bienes y Servicios">
+                                        <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1">
                                             <span class="material-symbols-outlined text-xs">warning</span> Stock Insuficiente
                                         </span>
                                     {% else %}
-                                        <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30 flex items-center gap-1">
+                                        <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
                                             <span class="material-symbols-outlined text-xs">hourglass_empty</span> Disponible
                                         </span>
                                     {% endif %}
@@ -401,8 +437,7 @@
                     </tbody>
                 </table>
                 
-                <!-- Tarjeta 2: Mostrar Total Referencial de la Solicitud -->
-                <div class="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/40 flex justify-between items-center text-xs font-['Outfit']">
+                <div class="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-900/40 flex justify-between items-center text-xs">
                     <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Total Referencial Estimado:</span>
                     <span class="text-lg font-black text-[#580000] dark:text-red-400 font-mono">Bs. {{ solicitud.total_referencial|floatformat:2 }}</span>
                 </div>
@@ -411,10 +446,10 @@
 
     </div>
 
-    <!-- REVERSION Y RETROCESO-->
+    <!-- REVERSIÓN Y RETROCESO (ADMINISTRADOR) -->
     {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <div class="card p-6 bg-red-50/10 border border-red-100 dark:border-red-950/20 rounded-2xl shadow-sm">
-            <h3 class="text-sm font-bold text-red-700 dark:text-red-400 font-['Outfit'] mb-4 flex items-center gap-2">
+            <h3 class="text-sm font-bold text-red-700 dark:text-red-400 mb-4 flex items-center gap-2">
                 <span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>
                 Herramientas de Anulación y Reversión (Exclusivo Administrador)
             </h3>
@@ -440,21 +475,21 @@
         </div>
     {% endif %}
 
-   <!-- HISTORIAL DE AUDITORÍA DINÁMICO SABS -->
-    <!-- 3. HISTORIAL DE AUDITORÍA DINÁMICO SABS (Tarjeta 3, 4 y 5) -->
+    <!-- ========================================================================= -->
+    <!-- HISTORIAL DE AUDITORÍA Y FIRMAS SABS COMPLETO (INCLUYE AL RPA) -->
+    <!-- ========================================================================= -->
     <div class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-        <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] mb-8 flex items-center gap-2">
+        <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 mb-8 flex items-center gap-2">
             <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">history</span> Historial de Acciones / Auditoría (Trazabilidad SABS)
         </h3>
         
         {% if solicitud.flujo_atencion == 'SALIDA_ALMACEN' %}
-            <!-- CASO A: HISTORIAL DE 3 HITOS REALES PARA CONSUMO DIRECTO DE STOCK (ALMACÉN) -->
+            <!-- HISTORIAL SIMPLIFICADO: 3 HITOS DE ALMACÉN -->
             <div class="flex flex-col md:flex-row justify-between items-start relative gap-8 py-2">
-                <!-- Línea de tiempo simplificada (3 hitos) -->
                 <div class="absolute h-0.5 bg-gray-200 dark:bg-gray-800 left-[15%] right-[15%] top-[25px] z-0 hidden md:block"></div>
 
-                <!-- HITO 1: Validación Unidad (Jefe) -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs font-['Outfit']">
+                <!-- 1. Validación Unidad -->
+                <div class="flex md:flex-col items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs">
                     {% if solicitud.revisado_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">person_check</span>
@@ -469,15 +504,14 @@
                             <span class="material-symbols-outlined text-lg">person</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">1. Validación Unidad</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Firma</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
+                            <span class="font-bold text-gray-400 text-sm block">1. Validación Unidad</span>
+                            <span class="text-gray-400 block">Pendiente de Firma</span>
                         </div>
                     {% endif %}
                 </div>
 
-                <!-- HITO 2: Alistamiento Físico (Almacenero) -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs font-['Outfit']">
+                <!-- 2. Alistamiento Físico -->
+                <div class="flex md:flex-col items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs">
                     {% if solicitud.preparado_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">inventory_2</span>
@@ -492,15 +526,14 @@
                             <span class="material-symbols-outlined text-lg">inventory_2</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">2. Alistamiento Físico</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Preparación</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
+                            <span class="font-bold text-gray-400 text-sm block">2. Alistamiento Físico</span>
+                            <span class="text-gray-400 block">Pendiente de Preparación</span>
                         </div>
                     {% endif %}
                 </div>
 
-                <!-- HITO 3: Despacho Almacén (PEPS) -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs font-['Outfit']">
+                <!-- 3. Despacho Almacén -->
+                <div class="flex md:flex-col items-center gap-4 md:gap-2 z-10 w-full md:w-1/3 text-left md:text-center text-xs">
                     {% if solicitud.entregado_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">warehouse</span>
@@ -515,139 +548,128 @@
                             <span class="material-symbols-outlined text-lg">local_shipping</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">3. Despacho y Entrega</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Despacho</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
+                            <span class="font-bold text-gray-400 text-sm block">3. Despacho y Entrega</span>
+                            <span class="text-gray-400 block">Pendiente de Despacho</span>
                         </div>
                     {% endif %}
                 </div>
             </div>
 
         {% else %}
-            <!-- CASO B: HISTORIAL COMPLETO DE 5 HITOS SABS (Para Adquisiciones y Servicios) -->
-            <div class="flex flex-col md:flex-row justify-between items-start relative gap-8 py-2">
-                <!-- Línea de tiempo completa (5 hitos) -->
+            <!-- CASO B: CIRCUITO COMPLETO DE ADQUISICIÓN / SERVICIO SABS (INCLUYE AL RPA) -->
+            <div class="flex flex-col md:flex-row justify-between items-start relative gap-6 py-2">
                 <div class="absolute h-0.5 bg-gray-200 dark:bg-gray-800 left-[8%] right-[8%] top-[25px] z-0 hidden md:block"></div>
 
                 <!-- 1. Validación Unidad -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/5 text-left md:text-center text-xs font-['Outfit']">
+                <div class="flex md:flex-col items-center gap-2 z-10 w-full md:w-1/6 text-left md:text-center text-xs">
                     {% if solicitud.revisado_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">person_check</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">1. Validación Unidad</span>
-                            <span class="text-gray-500 dark:text-gray-400 block">Jefe: {{ solicitud.revisado_por.get_full_name|default:solicitud.aprobado_por }}</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_revision|date:"d/m/Y | H:i" }}</span>
+                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">1. Unidad</span>
+                            <span class="text-gray-500 text-[10px] block">Jefe: {{ solicitud.revisado_por.first_name|default:solicitud.revisado_por.username }}</span>
+                            <span class="text-gray-400 block text-[9px]">{{ solicitud.fecha_revision|date:"d/m/Y" }}</span>
                         </div>
                     {% else %}
-                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow">
-                            <span class="material-symbols-outlined text-lg">person</span>
-                        </div>
-                        <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">1. Validación Unidad</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Firma</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow"><span class="material-symbols-outlined text-lg">person</span></div>
+                        <div><span class="font-bold text-gray-400 text-xs block">1. Unidad</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
                     {% endif %}
                 </div>
 
-                <!-- 2. Firma de la SAF -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/5 text-left md:text-center text-xs font-['Outfit']">
+                <!-- 2. Firma SAF -->
+                <div class="flex md:flex-col items-center gap-2 z-10 w-full md:w-1/6 text-left md:text-center text-xs">
                     {% if solicitud.saf_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">assignment_turned_in</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">2. Firma de la SAF</span>
-                            <span class="text-gray-500 dark:text-gray-400 block">Sec. SAF: {{ solicitud.saf_por.get_full_name|default:solicitud.saf_por.username }}</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_saf|date:"d/m/Y | H:i" }}</span>
+                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">2. SAF</span>
+                            <span class="text-gray-500 text-[10px] block">Sec: {{ solicitud.saf_por.first_name|default:solicitud.saf_por.username }}</span>
+                            <span class="text-gray-400 block text-[9px]">{{ solicitud.fecha_saf|date:"d/m/Y" }}</span>
                         </div>
                     {% else %}
-                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow">
-                            <span class="material-symbols-outlined text-lg">assignment</span>
-                        </div>
-                        <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">2. Firma de la SAF</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Firma</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow"><span class="material-symbols-outlined text-lg">assignment</span></div>
+                        <div><span class="font-bold text-gray-400 text-xs block">2. SAF</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
                     {% endif %}
                 </div>
 
                 <!-- 3. Habilitación POA -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/5 text-left md:text-center text-xs font-['Outfit']">
+                <div class="flex md:flex-col items-center gap-2 z-10 w-full md:w-1/6 text-left md:text-center text-xs">
                     {% if solicitud.presupuestado_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">account_balance_wallet</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">3. Habilitación POA</span>
-                            <span class="text-gray-500 dark:text-gray-400 block">Encargado: {{ solicitud.presupuestado_por.get_full_name|default:solicitud.presupuestado_por.username }}</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_presupuesto|date:"d/m/Y | H:i" }}</span>
+                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">3. POA</span>
+                            <span class="text-gray-500 text-[10px] block">{{ solicitud.presupuestado_por.first_name|default:solicitud.presupuestado_por.username }}</span>
+                            <span class="text-gray-400 block text-[9px]">{{ solicitud.fecha_presupuesto|date:"d/m/Y" }}</span>
                         </div>
                     {% else %}
-                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow">
-                            <span class="material-symbols-outlined text-lg">account_balance</span>
-                        </div>
-                        <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">3. Habilitación POA</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Firma</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow"><span class="material-symbols-outlined text-lg">account_balance</span></div>
+                        <div><span class="font-bold text-gray-400 text-xs block">3. POA</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
                     {% endif %}
                 </div>
 
-                <!-- 4. Firma Jefatura Adm. -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/5 text-left md:text-center text-xs font-['Outfit']">
+                <!-- 4. Autorización RPA (REINCORPORADO) -->
+                <div class="flex md:flex-col items-center gap-2 z-10 w-full md:w-1/6 text-left md:text-center text-xs">
+                    {% if solicitud.rpa_por %}
+                        <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
+                            <span class="material-symbols-outlined text-lg">how_to_reg</span>
+                        </div>
+                        <div>
+                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">4. RPA</span>
+                            <span class="text-gray-500 text-[10px] block">{{ solicitud.rpa_por.first_name|default:solicitud.rpa_por.username }}</span>
+                            <span class="text-gray-400 block text-[9px]">{{ solicitud.fecha_rpa|date:"d/m/Y" }}</span>
+                        </div>
+                    {% else %}
+                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow"><span class="material-symbols-outlined text-lg">how_to_reg</span></div>
+                        <div><span class="font-bold text-gray-400 text-xs block">4. RPA</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
+                    {% endif %}
+                </div>
+
+                <!-- 5. Firma Jefatura Adm. -->
+                <div class="flex md:flex-col items-center gap-2 z-10 w-full md:w-1/6 text-left md:text-center text-xs">
                     {% if solicitud.jefatura_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">gavel</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">4. Firma Jefatura Adm.</span>
-                            <span class="text-gray-500 dark:text-gray-400 block">Jefe Adm: {{ solicitud.jefatura_por.get_full_name|default:solicitud.jefatura_por.username }}</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_jefatura|date:"d/m/Y | H:i" }}</span>
+                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">5. Jefatura</span>
+                            <span class="text-gray-500 text-[10px] block">{{ solicitud.jefatura_por.first_name|default:solicitud.jefatura_por.username }}</span>
+                            <span class="text-gray-400 block text-[9px]">{{ solicitud.fecha_jefatura|date:"d/m/Y" }}</span>
                         </div>
                     {% else %}
-                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow">
-                            <span class="material-symbols-outlined text-lg">how_to_reg</span>
-                        </div>
-                        <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">4. Firma Jefatura Adm.</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Firma</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow"><span class="material-symbols-outlined text-lg">gavel</span></div>
+                        <div><span class="font-bold text-gray-400 text-xs block">5. Jefatura</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
                     {% endif %}
                 </div>
 
-                <!-- 5. Despacho Almacén -->
-                <div class="flex md:flex-col items-center md:items-center gap-4 md:gap-2 z-10 w-full md:w-1/5 text-left md:text-center text-xs font-['Outfit']">
+                <!-- 6. Despacho / Recepción -->
+                <div class="flex md:flex-col items-center gap-2 z-10 w-full md:w-1/6 text-left md:text-center text-xs">
                     {% if solicitud.entregado_por %}
                         <div class="w-10 h-10 rounded-full bg-green-50 dark:bg-green-950/20 border-2 border-[#580000] text-[#580000] dark:text-red-400 flex items-center justify-center shadow">
                             <span class="material-symbols-outlined text-lg">warehouse</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-700 dark:text-gray-200 text-sm block">5. Despacho Almacén</span>
-                            <span class="text-gray-500 dark:text-gray-400 block">Almacenero: {{ solicitud.entregado_por.get_full_name|default:solicitud.entregado_por.username }}</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">{{ solicitud.fecha_entrega|date:"d/m/Y | H:i" }}</span>
+                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">6. Recepción</span>
+                            <span class="text-gray-500 text-[10px] block">{{ solicitud.entregado_por.first_name|default:solicitud.entregado_por.username }}</span>
+                            <span class="text-gray-400 block text-[9px]">{{ solicitud.fecha_entrega|date:"d/m/Y" }}</span>
                         </div>
                     {% else %}
-                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow">
-                            <span class="material-symbols-outlined text-lg">local_shipping</span>
-                        </div>
-                        <div>
-                            <span class="font-bold text-gray-400 dark:text-gray-500 text-sm block">5. Despacho Almacén</span>
-                            <span class="text-gray-400 dark:text-gray-500 block">Pendiente de Entrega</span>
-                            <span class="text-gray-400 block text-[10px] mt-0.5">—</span>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow"><span class="material-symbols-outlined text-lg">local_shipping</span></div>
+                        <div><span class="font-bold text-gray-400 text-xs block">6. Recepción</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
                     {% endif %}
                 </div>
             </div>
         {% endif %}
     </div>
+
 </div>
+
 <script>
-    document.querySelectorAll('.progress-bar-line').forEach(el => el.style.width = el.getAttribute('data-width') + '%');
+    document.querySelectorAll('.progress-bar-line').forEach(function(el) {
+        el.style.width = el.getAttribute('data-width') + '%';
+    });
 </script>
 {% endblock %}

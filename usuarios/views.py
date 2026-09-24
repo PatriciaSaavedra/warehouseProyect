@@ -406,7 +406,6 @@ def crear_usuario_view(request):
             'almacenes': almacenes  # <--- Pasar al formulario GET
         }
     )
-# VISTA DE EDICIÓN
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def editar_usuario_view(request, user_id):
@@ -415,8 +414,15 @@ def editar_usuario_view(request, user_id):
     unidades = UnidadAdministrativa.objects.all()
     secretarias = Secretaria.objects.all()
 
+    # 1. Consultar almacenes activos y los IDs que este usuario ya tiene asignados
+    almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
+    almacenes_asignados_ids = list(perfil.almacenes_autorizados.values_list('id', flat=True)) if perfil else []
+
     if request.method == 'POST':
         datos_normalizados, errores = validar_datos_usuario(request.POST, es_creacion=False, user_id=user_id)
+
+        # Capturar los checkboxes de almacenes marcados en el formulario
+        almacenes_ids = request.POST.getlist('almacenes_autorizados')
 
         if errores:
             for error in errores:
@@ -430,6 +436,8 @@ def editar_usuario_view(request, user_id):
                     'roles': ROLES,
                     'unidades': unidades,
                     'secretarias': secretarias,
+                    'almacenes': almacenes,  # <-- Enviado al template
+                    'almacenes_asignados_ids': [int(x) for x in almacenes_ids if x.isdigit()],
                     'valores': request.POST
                 }
             )
@@ -447,11 +455,19 @@ def editar_usuario_view(request, user_id):
                 perfil.unidad_id = datos_normalizados['unidad_id']
                 perfil.save()
 
+                # 2. Asignar los permisos de almacén según el rol
+                if datos_normalizados['rol'] == 'ADMINISTRADOR':
+                    # Si es Administrador, tiene potestad sobre todos los almacenes
+                    perfil.almacenes_autorizados.set(almacenes)
+                else:
+                    # Si es Almacenero o Kardista, se guardan los que marcaste
+                    perfil.almacenes_autorizados.set(almacenes_ids)
+
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Usuarios',
                     accion='Editar usuario',
-                    descripcion=f'Se modificó el usuario {usuario.username}'
+                    descripcion=f'Se modificó el usuario {usuario.username} y sus permisos de almacén (Rol: {perfil.rol})'
                 )
 
             messages.success(request, 'Usuario actualizado correctamente.')
@@ -468,12 +484,14 @@ def editar_usuario_view(request, user_id):
                     'roles': ROLES,
                     'unidades': unidades,
                     'secretarias': secretarias,
+                    'almacenes': almacenes,  # <-- Enviado al template
+                    'almacenes_asignados_ids': [int(x) for x in almacenes_ids if x.isdigit()],
                     'valores': request.POST
                 }
             )
-        except Exception:
-            messages.error(request, 'Error al actualizar el usuario.')
-            return redirect('editar_usuario', user_id=user_id)
+        except Exception as e:
+            messages.error(request, f'Error al actualizar el usuario: {str(e)}')
+            return redirect('editar_usuario_view', user_id=user_id)
 
     return render(
         request,
@@ -483,10 +501,11 @@ def editar_usuario_view(request, user_id):
             'perfil': perfil,
             'roles': ROLES,
             'unidades': unidades,
-            'secretarias': secretarias
+            'secretarias': secretarias,
+            'almacenes': almacenes,  # <-- Ahora el template sí recibe los almacenes
+            'almacenes_asignados_ids': almacenes_asignados_ids
         }
     )
-
 @login_required
 @rol_requerido(['ADMINISTRADOR'])
 def toggle_usuario_view(request, user_id):

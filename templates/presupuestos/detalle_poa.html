@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+
+{% block title %} Formulario 005: {{ poa.unidad.nombre }} - Partida {{ poa.partida.codigo }} {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- BREADCRUMB Y ACCIONES SUPERIORES -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <a href="{% url 'poa_list' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition mb-2 font-['Outfit']">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Techos POA
+            </a>
+            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit']">
+                Formulario 005: Determinación de Requerimientos
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-['Outfit']">
+                Programación oficial de materiales, suministros y ejecución presupuestaria — Gestión Fiscal {{ poa.gestion }}
+            </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <a href="{% url 'traspaso_entre_partidas' %}" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+                Traspaso Presupuestario
+            </a>
+            <a href="{% url 'registrar_modificacion' poa.id %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">payments</span>
+                Ajuste Individual
+            </a>
+        </div>
+    </div>
+
+    <!-- TARJETA MEMBRETE OFICIAL FORMULARIO 005 -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm space-y-4">
+        <div class="border-b border-gray-100 dark:border-gray-800 pb-3 flex justify-between items-center">
+            <span class="text-xs font-black uppercase text-[#8b0000] dark:text-red-400 tracking-wider">
+                Gobierno Autónomo Departamental de Potosí • Secretaría Departamental Administrativa y Financiera
+            </span>
+            <span class="px-3 py-1 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 rounded-full font-mono text-xs font-extrabold border border-blue-200 dark:border-blue-900/30">
+                GESTIÓN: {{ poa.gestion }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-['Outfit']">
+            <div>
+                <span class="text-gray-400 block uppercase font-bold text-[10px]">Secretaría Departamental</span>
+                <span class="font-bold text-gray-800 dark:text-gray-200 text-sm">
+                    {{ poa.unidad.secretaria.nombre|default:"Gobernación Central" }}
+                </span>
+            </div>
+            <div>
+                <span class="text-gray-400 block uppercase font-bold text-[10px]">Unidad / Área Organizacional</span>
+                <span class="font-bold text-gray-800 dark:text-gray-200 text-sm">
+                    {{ poa.unidad.nombre }}
+                </span>
+            </div>
+            <div>
+                <span class="text-gray-400 block uppercase font-bold text-[10px]">Categoría Programática</span>
+                <span class="font-bold text-gray-700 dark:text-gray-300 font-mono text-sm">
+                    {{ poa.categoria_programatica|default:"13 0 0 002" }}
+                </span>
+            </div>
+            <div>
+                <span class="text-gray-400 block uppercase font-bold text-[10px]">Partida Presupuestaria</span>
+                <span class="font-black text-[#8b0000] dark:text-red-400 font-mono text-sm">
+                    {{ poa.partida.codigo }} - {{ poa.partida.nombre }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TARJETAS KPIS DE CONTROL DE FONDOS -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 font-['Outfit']">
+        <!-- Techo Inicial -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-gray-400 block">Presupuesto Apertura</span>
+            <span class="text-lg font-black text-gray-700 dark:text-gray-200 font-mono mt-1 block">Bs. {{ poa.monto_inicial|floatformat:2 }}</span>
+        </div>
+
+        <!-- Presupuesto Vigente -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-gray-400 block">Presupuesto Vigente</span>
+            <span class="text-lg font-black text-blue-700 dark:text-blue-400 font-mono mt-1 block">Bs. {{ poa.presupuesto_vigente|floatformat:2 }}</span>
+        </div>
+
+        <!-- Ejecutado Real -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-gray-400 block">Ejecutado Real (Almacén)</span>
+            <span class="text-lg font-black text-purple-700 dark:text-purple-400 font-mono mt-1 block">Bs. {{ poa.monto_ejecutado|floatformat:2 }}</span>
+            <span class="text-[10px] text-gray-400 mt-0.5 block">{{ poa.porcentaje_ejecucion }}% consumido</span>
+        </div>
+
+        <!-- Saldo Disponible -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-gray-400 block">Saldo Disponible</span>
+            <span class="text-lg font-black {% if poa.monto_disponible <= 0 %}text-red-700 dark:text-red-400{% else %}text-green-700 dark:text-green-400{% endif %} font-mono mt-1 block">
+                Bs. {{ poa.monto_disponible|floatformat:2 }}
+            </span>
+        </div>
+    </div>
+
+    <!-- TABLA DETALLADA: MATERIALES Y SUMINISTROS DEMANDADOS (FORMULARIO 005) -->
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <div class="p-4 bg-gray-50/60 dark:bg-slate-800/40 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+            <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-500 text-[18px]">inventory_2</span>
+                Desglose Físico y Presupuestario por Insumo (Cuotas Form. 005)
+            </h3>
+            <span class="px-2.5 py-1 bg-red-50 text-red-700 rounded-full text-xs font-black border border-red-100 font-mono">
+                {{ items_programados.count }} Insumos Programados
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-gray-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800 font-['Outfit']">
+                    <tr>
+                        <th class="p-3 w-28 text-center">Código POA</th>
+                        <th class="p-3">Material / Suministro Demandado</th>
+                        <th class="p-3 text-center w-24">U. Medida</th>
+                        <th class="p-3 text-center w-28">Cant. Programada</th>
+                        <th class="p-3 text-center w-28">Cant. Consumida</th>
+                        <th class="p-3 text-center w-28">Saldo Físico</th>
+                        <th class="p-3 text-right w-28">P. Unitario (Bs.)</th>
+                        <th class="p-3 text-right w-32">Total Monto (Bs.)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-['Outfit']">
+                    {% for it in items_programados %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                        <!-- Código Actividad POA -->
+                        <td class="p-3 text-center font-mono font-bold text-gray-600 dark:text-gray-300">
+                            {{ it.codigo_actividad_poa }}
+                        </td>
+
+                        <!-- Material -->
+                        <td class="p-3 font-semibold text-gray-800 dark:text-gray-200">
+                            <div>{{ it.material.nombre }}</div>
+                            <span class="text-[10px] text-gray-400 font-mono">Cód: {{ it.material.codigo }}</span>
+                        </td>
+
+                        <!-- Unidad de Medida -->
+                        <td class="p-3 text-center font-bold text-gray-600 dark:text-gray-400">
+                            {{ it.unidad_medida }}
+                        </td>
+
+                        <!-- Cantidad Programada -->
+                        <td class="p-3 text-center font-bold font-mono text-gray-800 dark:text-gray-100">
+                            {{ it.cantidad_programada }}
+                        </td>
+
+                        <!-- Cantidad Consumida -->
+                        <td class="p-3 text-center font-bold font-mono text-purple-700 dark:text-purple-400">
+                            {{ it.cantidad_consumida }}
+                        </td>
+
+                        <!-- Saldo Físico Disponible (Cuota) -->
+                        <td class="p-3 text-center">
+                            <span class="px-2.5 py-0.5 rounded-full font-bold font-mono text-[11px] {% if it.cantidad_disponible <= 0 %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                                {{ it.cantidad_disponible }}
+                            </span>
+                        </td>
+
+                        <!-- Precio Unitario -->
+                        <td class="p-3 text-right font-mono text-gray-600 dark:text-gray-400">
+                            {{ it.precio_unitario_estimado|floatformat:2 }}
+                        </td>
+
+                        <!-- Total Monto -->
+                        <td class="p-3 text-right font-mono font-black text-gray-800 dark:text-gray-100">
+                            Bs. {{ it.subtotal|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="p-6 text-center text-gray-400">
+                            Este techo fue registrado de forma global sin desglose de insumos en el Formulario 005.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- HISTORIAL DE TRAZABILIDAD Y TRASPASOS (LEY 1178) -->
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+        <div class="p-4 bg-gray-50/60 dark:bg-slate-800/40 border-b border-gray-100 dark:border-gray-800">
+            <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-500 text-[18px]">history</span>
+                Historial de Modificaciones Presupuestarias y Traspasos de esta Partida
+            </h3>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-gray-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800 font-['Outfit']">
+                    <tr>
+                        <th class="p-3 w-36">Fecha / Hora</th>
+                        <th class="p-3 w-32 text-center">Tipo Ajuste</th>
+                        <th class="p-3 text-right w-28">Monto (Bs.)</th>
+                        <th class="p-3">Justificación / Respaldo Legal</th>
+                        <th class="p-3 w-32">Registrado Por</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-['Outfit']">
+                    {% for m in historial_modificaciones %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                        <td class="p-3 text-gray-500 font-mono">{{ m.fecha_registro|date:"d/m/Y H:i" }}</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black {% if m.tipo == 'INCREMENTO' %}bg-green-50 text-green-700 border border-green-200{% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
+                                {{ m.get_tipo_display }}
+                            </span>
+                        </td>
+                        <td class="p-3 text-right font-mono font-bold {% if m.tipo == 'INCREMENTO' %}text-green-700{% else %}text-amber-700{% endif %}">
+                            {% if m.tipo == 'INCREMENTO' %}+{% else %}-{% endif %}Bs. {{ m.monto|floatformat:2 }}
+                        </td>
+                        <td class="p-3 text-gray-700 dark:text-gray-300 italic">
+                            "{{ m.justificacion }}"
+                        </td>
+                        <td class="p-3 text-gray-500">
+                            {{ m.usuario.get_full_name|default:m.usuario.username }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="p-6 text-center text-gray-400">
+                            No se han registrado traspasos ni modificaciones presupuestarias para esta partida.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

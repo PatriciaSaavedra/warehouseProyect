@@ -9,10 +9,10 @@
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
             <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
-                Pedido de Almacén
+                Pedido de Materiales y/o Bienes
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Solicitud de materiales en stock según techos autorizados en su POA {{ GESTION_ACTUAL|default:"2026" }}
+                Solicitud de materiales existentes en almacén para consumo de oficina [Formulario Oficial]
             </p>
         </div>
         <a href="{% url 'solicitudes' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
@@ -20,8 +20,8 @@
         </a>
     </div>
 
-    <!-- SELECTOR DE UNIDAD (SOLO SI ES ADMINISTRADOR) -->
-    {% if rol == 'ADMINISTRADOR' %}
+    <!-- SELECTOR DE UNIDAD (SOLO MODO ADMINISTRADOR) -->
+    {% if rol in 'ADMINISTRADOR,ADMIN_ALMACENES' %}
     <div class="card p-4 rounded-2xl mb-6 border border-amber-200 bg-amber-50/50 dark:bg-slate-900 dark:border-amber-900/40">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -42,42 +42,74 @@
     </div>
     {% endif %}
 
-    <!-- FORMULARIO -->
+    <!-- FORMULARIO DEL SOLICITANTE (PASO ①) -->
     <form method="POST" id="form-solicitud" class="card p-8 shadow-sm rounded-2xl">
         {% csrf_token %}
         <input type="hidden" name="unidad_solicitante_id" value="{{ unidad_solicitante.id }}">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- UNIDAD SOLICITANTE ACTIVA -->
+            <!-- UNIDAD SOLICITANTE (UNID. EJEC.) -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Unidad Solicitante</label>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Unidad Solicitante (Unid. Ejec.)</label>
                 <div class="p-3 border border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-slate-900/50 text-sm font-bold text-[#8b0000] dark:text-red-400 flex items-center gap-2">
                     <span class="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
                     {{ unidad_solicitante.nombre }}
                 </div>
             </div>
 
-            <!-- FECHA -->
+            <!-- FECHA DEL PEDIDO -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Fecha de Solicitud</label>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Fecha del Pedido</label>
                 <input type="text" value="{% now 'd/m/Y' %}" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-500 font-medium focus:outline-none" readonly>
                 <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
             </div>
 
-            <!-- SELECTOR DE ARTÍCULOS CON CONTROL POA -->
+            <!-- BUSCADOR PREDICTIVO Y MODERNO DE MATERIALES -->
             <div class="md:col-span-2">
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
-                    Artículos Disponibles en Almacén (Autorizados en su POA)
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit'] flex items-center justify-between">
+                    <span>Buscar Material Demandado</span>
+                    <span class="text-xs font-normal text-gray-400">Puede buscar por Código o Nombre</span>
                 </label>
 
-                <div class="grid grid-cols-12 gap-3 items-start">
-                    <div class="col-span-12 sm:col-span-7">
-                        <select 
-                            id="material_select" 
-                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] text-sm"
-                            onchange="actualizarInfoMaterial(this)"
+                <div class="grid grid-cols-12 gap-3 items-start relative">
+                    
+                    <!-- BUSCADOR CON COMBOBOX DINÁMICO -->
+                    <div class="col-span-12 sm:col-span-7 relative">
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-[20px]">
+                                search
+                            </span>
+                            <input 
+                                type="text" 
+                                id="input_buscador_material" 
+                                placeholder="Escribe el código o nombre (ej: 32100, papel, lapicero)..." 
+                                autocomplete="off"
+                                onfocus="abrirDropdownCombobox()"
+                                oninput="filtrarMaterialesEnVivo(this.value)"
+                                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl pl-10 pr-10 py-3 text-sm focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition shadow-sm"
+                            >
+                            <button 
+                                type="button" 
+                                id="btn_limpiar_buscador" 
+                                onclick="limpiarSeleccionMaterial()" 
+                                class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hidden"
+                                title="Limpiar búsqueda"
+                            >
+                                <span class="material-symbols-outlined text-[18px]">cancel</span>
+                            </button>
+                        </div>
+
+                        <!-- MENÚ FLOTANTE DE RESULTADOS PREDICTIVOS -->
+                        <div 
+                            id="menu_resultados_combobox" 
+                            class="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl z-50 max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 hidden"
                         >
-                            <option value="">-- Seleccione un material con saldo POA --</option>
+                            <!-- Los resultados se inyectan automáticamente con JS -->
+                        </div>
+
+                        <!-- SELECT NATIVO OCULTO PARA MANTENER COMPATIBILIDAD -->
+                        <select id="material_select" class="hidden">
+                            <option value="">--</option>
                             {% for m in materiales %}
                             <option 
                                 value="{{ m.id }}" 
@@ -86,28 +118,29 @@
                                 data-unidad="{{ m.unidad_medida }}"
                                 data-stock="{{ m.stock_almacen }}"
                                 data-partida="{{ m.partida_codigo }} - {{ m.partida_nombre }}"
-                                data-costo="{{ m.costo_unitario }}"
-                                data-saldopoa="{{ m.saldo_poa }}"
                                 data-max="{{ m.max_solicitable }}"
+                                data-modalidad="{{ m.modalidad }}"
+                                data-modalidad-label="{{ m.modalidad_label }}"
+                                data-cuota-saldo="{{ m.cuota_saldo }}"
                             >
-                                {{ m.nombre }} (Tu tope: {{ m.max_solicitable }} {{ m.unidad_medida }} | Almacén: {{ m.stock_almacen }})
+                                {{ m.codigo }} - {{ m.nombre }}
                             </option>
-                            {% empty %}
-                            <option value="" disabled>No hay materiales disponibles con saldo en su POA 2026</option>
                             {% endfor %}
                         </select>
                     </div>
 
+                    <!-- Cantidad Pedida -->
                     <div class="col-span-8 sm:col-span-3">
                         <input 
                             type="number" 
                             id="cantidad_input" 
                             min="1" 
-                            placeholder="Cantidad" 
+                            placeholder="Cant. Pedida" 
                             class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000]"
                         >
                     </div>
 
+                    <!-- Botón Añadir -->
                     <div class="col-span-4 sm:col-span-2">
                         <button 
                             type="button" 
@@ -120,24 +153,24 @@
                     </div>
                 </div>
 
-                <!-- PANEL DINÁMICO DE VALIDACIÓN POA EN TIEMPO REAL -->
-                <div id="panel-info-poa" class="hidden mt-3 p-4 rounded-xl border border-blue-100 dark:border-slate-800 bg-blue-50/50 dark:bg-slate-900/60 text-xs">
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <!-- FICHA TÉCNICA DEL MATERIAL SELECCIONADO -->
+                <div id="panel-info-poa" class="hidden mt-3 p-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-900/60 text-xs">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Partida Afectada</span>
-                            <span id="info-partida" class="font-semibold text-gray-800 dark:text-gray-200 truncate block"></span>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Código SABS</span>
+                            <span id="info-codigo" class="font-bold text-[#8b0000] dark:text-red-400 font-mono"></span>
                         </div>
                         <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Saldo POA Unidad</span>
-                            <span id="info-saldopoa" class="font-bold text-blue-700 dark:text-blue-400"></span>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Unidad de Manejo</span>
+                            <span id="info-unidad" class="font-bold text-gray-700 dark:text-gray-200"></span>
                         </div>
                         <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Stock en Almacén</span>
-                            <span id="info-stock" class="font-semibold text-gray-700 dark:text-gray-300"></span>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Modalidad</span>
+                            <span id="badge-modalidad" class="inline-block font-bold"></span>
                         </div>
                         <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Máximo a Solicitar</span>
-                            <span id="info-max" class="font-extrabold text-[#8b0000] dark:text-red-400"></span>
+                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Tope Permitido</span>
+                            <span id="info-max" class="font-extrabold text-gray-800 dark:text-gray-100"></span>
                         </div>
                     </div>
                 </div>
@@ -146,113 +179,209 @@
             </div>
         </div>
 
-        <!-- LISTADO DE MATERIALES EN CARRITO -->
-        <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+        <!-- TABLA ZONA ① DE LA BOLETA OFICIAL -->
+        <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
             <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase">
+                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase font-semibold">
                     <tr>
-                        <th class="p-4 font-bold">Material</th>
-                        <th class="p-4 font-bold text-center w-36">Cantidad</th>
-                        <th class="p-4 font-bold text-center w-24">Acción</th>
+                        <th class="p-4 font-bold w-32">Código</th>
+                        <th class="p-4 font-bold">Descripción del Material</th>
+                        <th class="p-4 font-bold text-center w-32">Unidad Manejo</th>
+                        <th class="p-4 font-bold text-center w-32">Cantidad Pedida</th>
+                        <th class="p-4 font-bold text-center w-20">Acción</th>
                     </tr>
                 </thead>
                 <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent"></tbody>
             </table>
         </div>
 
-        <!-- JUSTIFICACIÓN -->
+        <!-- JUSTIFICACIÓN (ACTIVIDAD U OBRA DEL POA) -->
         <div class="mt-6">
-            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Justificación <span class="text-[#8b0000]">*</span></label>
-            <textarea name="justificacion" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] text-sm" rows="3" placeholder="Indique la justificación y destino de los materiales para las labores de la oficina..." required></textarea>
+            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
+                Justificación / Actividad u Obra del POA <span class="text-[#8b0000]">*</span>
+            </label>
+            <textarea name="justificacion" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] text-sm" rows="3" placeholder="Indique el uso institucional y la actividad u obra para la cual se solicita el material..." required></textarea>
         </div>
 
-        <!-- BOTONES -->
+        <!-- BOTONES DE ENVÍO -->
         <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
             <a href="{% url 'solicitudes' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
             <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer">
                 <span class="material-symbols-outlined text-[18px]">send</span>
-                Enviar Pedido
+                Enviar Pedido a Almacén
             </button>
         </div>
     </form>
 </div>
+<!-- 1. Django genera el JSON seguro fuera del script -->
+{{ materiales|json_script:"catalogo-materiales-data" }}
 
+<!-- 2. Tu script lee el JSON de forma 100% estándar (0 errores en VS Code) -->
 <script>
+const catalogoMateriales = JSON.parse(document.getElementById('catalogo-materiales-data').textContent);
+
 let carrito = {};
 
-function actualizarInfoMaterial(select) {
-    const panel = document.getElementById('panel-info-poa');
-    const cantidadInput = document.getElementById('cantidad_input');
-    const opt = select.options[select.selectedIndex];
+// -------------------------------------------------------------
+// CONTROL DEL BUSCADOR PREDICTIVO (COMBOBOX)
+// -------------------------------------------------------------
+function abrirDropdownCombobox() {
+    filtrarMaterialesEnVivo(document.getElementById('input_buscador_material').value);
+}
 
-    if (!select.value || !opt) {
-        panel.classList.add('hidden');
-        cantidadInput.removeAttribute('max');
-        return;
+function filtrarMaterialesEnVivo(termino) {
+    const menu = document.getElementById('menu_resultados_combobox');
+    const btnLimpiar = document.getElementById('btn_limpiar_buscador');
+    const query = termino.toLowerCase().trim();
+
+    btnLimpiar.classList.toggle('hidden', query.length === 0);
+
+    const filtrados = catalogoMateriales.filter(m => 
+        m.codigo.toLowerCase().includes(query) || 
+        m.nombre.toLowerCase().includes(query)
+    );
+
+    if (filtrados.length === 0) {
+        menu.innerHTML = `
+            <div class="p-4 text-center text-xs text-gray-400">
+                <span class="material-symbols-outlined text-xl mb-1 block">search_off</span>
+                No se encontraron materiales autorizados con "${termino}"
+            </div>
+        `;
+    } else {
+        menu.innerHTML = filtrados.map(m => `
+            <div 
+                onclick="seleccionarMaterialDesdeCombobox('${m.id}')"
+                class="p-3 hover:bg-red-50/60 dark:hover:bg-slate-800/80 cursor-pointer transition flex items-center justify-between gap-3 text-left"
+            >
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-xs font-bold text-[#8b0000] dark:text-red-400">${m.codigo}</span>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">${m.nombre}</span>
+                    </div>
+                    <div class="text-[11px] text-gray-400 mt-0.5">
+                        Modalidad: <span class="font-bold ${m.modalidad === 'CUOTA_FISICA' ? 'text-purple-600' : 'text-blue-600'}">${m.modalidad_label}</span>
+                    </div>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 block">
+                        ${m.unidad_medida}
+                    </span>
+                    <span class="text-[10px] text-gray-400 block mt-0.5">Disp: <strong>${m.max_solicitable}</strong></span>
+                </div>
+            </div>
+        `).join('');
     }
 
-    const partida = opt.getAttribute('data-partida');
-    const saldoPoa = parseFloat(opt.getAttribute('data-saldopoa') || 0).toFixed(2);
-    const stock = opt.getAttribute('data-stock');
-    const unidad = opt.getAttribute('data-unidad');
-    const max = opt.getAttribute('data-max');
-
-    document.getElementById('info-partida').innerText = partida;
-    document.getElementById('info-saldopoa').innerText = `${saldoPoa} Bs.`;
-    document.getElementById('info-stock').innerText = `${stock} ${unidad}`;
-    document.getElementById('info-max').innerText = `${max} ${unidad}`;
-
-    cantidadInput.max = max;
-    cantidadInput.placeholder = `Máx: ${max}`;
-    panel.classList.remove('hidden');
+    menu.classList.remove('hidden');
 }
+
+function seleccionarMaterialDesdeCombobox(materialId) {
+    // Usamos == para comparar string con número de forma segura
+    const mat = catalogoMateriales.find(m => String(m.id) === String(materialId));
+    if (!mat) return;
+
+    const select = document.getElementById('material_select');
+    select.value = mat.id;
+
+    const inputBuscador = document.getElementById('input_buscador_material');
+    inputBuscador.value = `${mat.codigo} — ${mat.nombre} (${mat.unidad_medida})`;
+
+    document.getElementById('menu_resultados_combobox').classList.add('hidden');
+    document.getElementById('btn_limpiar_buscador').classList.remove('hidden');
+
+    document.getElementById('info-codigo').innerText = mat.codigo;
+    document.getElementById('info-unidad').innerText = mat.unidad_medida;
+    document.getElementById('info-max').innerText = `${mat.max_solicitable} ${mat.unidad_medida}`;
+
+    const badge = document.getElementById('badge-modalidad');
+    if (mat.modalidad === 'CUOTA_FISICA') {
+        badge.innerText = `Cuota Asignada (${mat.cuota_saldo} disp.)`;
+        badge.className = 'text-purple-700 dark:text-purple-400 font-bold';
+    } else {
+        badge.innerText = 'Bolsa Común (POA)';
+        badge.className = 'text-blue-700 dark:text-blue-400 font-bold';
+    }
+
+    const cantidadInput = document.getElementById('cantidad_input');
+    cantidadInput.max = mat.max_solicitable;
+    cantidadInput.placeholder = `Máx: ${mat.max_solicitable}`;
+    document.getElementById('panel-info-poa').classList.remove('hidden');
+
+    cantidadInput.focus();
+}
+
+function limpiarSeleccionMaterial() {
+    document.getElementById('material_select').value = '';
+    const inputBuscador = document.getElementById('input_buscador_material');
+    inputBuscador.value = '';
+    document.getElementById('btn_limpiar_buscador').classList.add('hidden');
+    document.getElementById('panel-info-poa').classList.add('hidden');
+    
+    const cantidadInput = document.getElementById('cantidad_input');
+    cantidadInput.value = '';
+    cantidadInput.removeAttribute('max');
+    cantidadInput.placeholder = 'Cant. Pedida';
+
+    abrirDropdownCombobox();
+    inputBuscador.focus();
+}
+
+document.addEventListener('click', (e) => {
+    const combobox = document.getElementById('menu_resultados_combobox');
+    const input = document.getElementById('input_buscador_material');
+    if (combobox && input && !combobox.contains(e.target) && e.target !== input) {
+        combobox.classList.add('hidden');
+    }
+});
 
 function agregarMaterial() {
     const select = document.getElementById('material_select');
     const cantidadInput = document.getElementById('cantidad_input');
     const materialId = select.value;
-    const opt = select.options[select.selectedIndex];
+    const mat = catalogoMateriales.find(m => String(m.id) === String(materialId));
     const cantidad = parseInt(cantidadInput.value);
 
-    if (!materialId || !opt) {
-        alert("Seleccione un material de la lista autorizada.");
+    if (!materialId || !mat) {
+        alert("Por favor, busca y selecciona un material de la lista autorizada.");
+        document.getElementById('input_buscador_material').focus();
         return;
     }
 
     if (isNaN(cantidad) || cantidad <= 0) {
         alert("Ingrese una cantidad válida mayor a 0.");
+        cantidadInput.focus();
         return;
     }
 
-    const nombre = opt.getAttribute('data-nombre');
-    const maxPermitido = parseInt(opt.getAttribute('data-max')) || 0;
-
-    if (cantidad > maxPermitido) {
-        alert(`No puede solicitar ${cantidad}. El límite máximo según su presupuesto POA y existencia es de ${maxPermitido}.`);
+    if (cantidad > mat.max_solicitable) {
+        alert(`La cantidad pedida (${cantidad}) supera el tope permitido (${mat.max_solicitable} ${mat.unidad_medida}).`);
+        cantidadInput.value = mat.max_solicitable;
         return;
     }
 
     if (carrito[materialId]) {
         const total = carrito[materialId].cantidad + cantidad;
-        if (total > maxPermitido) {
-            alert(`El total acumulado (${total}) supera el tope permitido (${maxPermitido}).`);
+        if (total > mat.max_solicitable) {
+            alert(`El total acumulado (${total}) supera el tope permitido (${mat.max_solicitable} ${mat.unidad_medida}).`);
             return;
         }
         carrito[materialId].cantidad = total;
     } else {
         carrito[materialId] = {
-            nombre: nombre,
+            codigo: mat.codigo,
+            nombre: mat.nombre,
+            unidad: mat.unidad_medida,
             cantidad: cantidad,
-            max: maxPermitido
+            max: mat.max_solicitable
         };
     }
 
     renderTabla();
     renderInputs();
 
-    select.value = '';
-    actualizarInfoMaterial(select);
-    cantidadInput.value = '';
+    limpiarSeleccionMaterial();
+    document.getElementById('menu_resultados_combobox').classList.add('hidden');
 }
 
 function renderTabla() {
@@ -263,8 +392,8 @@ function renderTabla() {
     if (keys.length === 0) {
         tabla.innerHTML = `
             <tr>
-                <td colspan="3" class="p-8 text-center text-gray-400 dark:text-gray-500">
-                    Añada artículos autorizados usando el selector superior.
+                <td colspan="5" class="p-8 text-center text-gray-400 dark:text-gray-500">
+                    Añada los materiales requeridos usando el buscador superior.
                 </td>
             </tr>
         `;
@@ -275,7 +404,9 @@ function renderTabla() {
         const item = carrito[id];
         tabla.innerHTML += `
             <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
+                <td class="p-4 font-mono font-bold text-[#8b0000] dark:text-red-400">${item.codigo}</td>
                 <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">${item.nombre}</td>
+                <td class="p-4 text-center text-gray-600 dark:text-gray-400 font-bold text-xs">${item.unidad}</td>
                 <td class="p-4 text-center">
                     <input 
                         type="number" 
@@ -287,7 +418,7 @@ function renderTabla() {
                     >
                 </td>
                 <td class="p-4 text-center">
-                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 hover:text-red-800 font-medium text-xs">Eliminar</button>
+                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 hover:text-red-800 font-medium text-xs cursor-pointer">Eliminar</button>
                 </td>
             </tr>
         `;
@@ -298,7 +429,7 @@ function editarCantidad(id, input) {
     let cant = parseInt(input.value) || 1;
     const item = carrito[id];
     if (cant > item.max) {
-        alert(`Supera el límite autorizado (${item.max}).`);
+        alert(`Supera el límite autorizado (${item.max} ${item.unidad}).`);
         cant = item.max;
     }
     item.cantidad = cant;

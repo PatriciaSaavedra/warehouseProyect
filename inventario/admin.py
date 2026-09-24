@@ -5,8 +5,10 @@ from .models import (
     Material,
     MovimientoInventario,
     PartidaPresupuestaria,
-    UnidadMedida
+    UnidadMedida,
+    AsignacionMaterialUnidad
 )
+
 admin.site.register(Material)
 admin.site.register(MovimientoInventario)
 admin.site.register(PartidaPresupuestaria)
@@ -32,3 +34,9 @@ class InventarioAlmacenAdmin(admin.ModelAdmin):
     list_display = ('material', 'almacen', 'stock_disponible')
     list_filter = ('almacen',)
     search_fields = ('material__nombre', 'almacen__nombre')
+
+@admin.register(AsignacionMaterialUnidad)
+class AsignacionMaterialUnidadAdmin(admin.ModelAdmin):
+    list_display = ('unidad', 'material', 'gestion', 'cantidad_asignada', 'cantidad_consumida', 'saldo_disponible')
+    list_filter = ('gestion', 'unidad')
+    search_fields = ('unidad__nombre', 'material__nombre', 'material__codigo')
