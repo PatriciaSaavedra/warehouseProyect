@@ -1,172 +1,172 @@
 {% extends 'base.html' %}
 
-{% block title %} Kardex de Existencias {% endblock %}
+{% block title %} Kardex Valorado - {{ material.nombre }} {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto space-y-6 font-['Outfit']">
+
     <!-- CABECERA -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <a href="{% url 'inventario_por_almacen' %}" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2 transition font-['Outfit']">
-                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a existencias
+            <a href="{% url 'inventario' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition mb-2">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Existencias
             </a>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Kardex de Control de Existencias</h1>
-            <p class="text-sm text-gray-500 mt-1">{{ material.nombre }} | Código: <span class="text-[#8b0000] font-bold">{{ material.codigo }}</span></p>
-        </div>
-        <div class="flex gap-2">
-            <a href="{% url 'kardex_fisico_pdf' material.id %}" target="_blank" class="bg-[#d97706] hover:bg-[#b45309] text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm font-['Outfit']">
-                <span class="material-symbols-outlined text-[18px]">print</span> Imprimir Kardex Físico
-            </a>
-            <a href="{% url 'kardex_pdf' material.id %}" target="_blank" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm font-['Outfit']">
-                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Kardex Valorado (PDF)
-            </a>
-        </div>
-    </div>
+            <!-- En la cabecera superior derecha de inventario/templates/inventario/kardex.html: -->
+            <div class="flex items-center gap-2">
+                <!-- Kardex Físico Aislado -->
+                <a href="{% url 'kardex_fisico_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}" target="_blank" class="btn-secondary px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">print</span> Kardex Físico
+                </a>
 
-    <!-- TARJETAS DE INFORMACIÓN Y DESGLOSE POR ALMACÉN -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
-        
-        <!-- Partida -->
-        <div>
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Partida Presupuestaria</p>
-            <p class="text-sm font-semibold text-gray-800">{{ material.partida.codigo }} - {{ material.partida.nombre|truncatechars:25 }}</p>
-        </div>
-        
-        <!-- Unidad -->
-        <div>
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Unidad de Manejo</p>
-            <p class="text-sm font-semibold text-gray-800">{{ material.unidad_medida }}</p>
-        </div>
-        
-        <!-- Stock Global -->
-        <div>
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Existencia Global (Gobernación)</p>
-            <p class="text-lg font-extrabold text-[#8b0000]">{{ material.stock_actual }} <span class="text-xs font-normal text-gray-500">Unidades</span></p>
-        </div>
-        
-        <!-- Desglose por Almacén -->
-        <div class="border-l border-gray-100 pl-4">
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Desglose de Stock Físico</p>
-            <div class="flex flex-col gap-1.5 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
-                {% for inv in material.inventarios_almacen.all %}
-                    <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-1 last:border-0 last:pb-0">
-                        <span class="font-medium text-gray-600 truncate mr-2" title="{{ inv.almacen.nombre }}">📍 {{ inv.almacen.nombre|truncatechars:18 }}</span>
-                        <span class="font-bold {% if inv.stock_fisico > 0 %}text-green-700 bg-green-50{% else %}text-red-700 bg-red-50{% endif %} px-2 py-0.5 rounded-md border {% if inv.stock_fisico > 0 %}border-green-200{% else %}border-red-200{% endif %}">
-                            {{ inv.stock_fisico }}
-                        </span>
-                    </div>
-                {% empty %}
-                    <span class="text-xs text-gray-400 italic">No hay stock distribuido</span>
-                {% endfor %}
+                <!-- Kardex Valorado Aislado -->
+                <a href="{% url 'kardex_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde }}&hasta={{ hasta }}" target="_blank" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Kardex Valorado (PDF)
+                </a>
             </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Subartículo: <strong class="text-gray-900 dark:text-white">{{ material.nombre }}</strong> • Código: <span class="font-mono text-[#8b0000] dark:text-red-400 font-bold">{{ material.codigo }}</span> • Partida: <span class="font-mono font-bold">{{ material.partida.codigo }}</span>
+            </p>
         </div>
 
     </div>
 
-    <!-- BARRA DE FILTROS INTERACTIVA -->
-    <form method="GET" class="bg-gray-50 p-4 rounded-2xl border border-gray-200 mb-6 flex flex-wrap gap-3 items-end">
-        
-        <div class="flex-1 min-w-[220px]">
-            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Aislar por Almacén</label>
-            <select name="almacen" class="w-full border border-gray-300 bg-white rounded-xl text-sm py-2 px-3 focus:ring-[#8b0000] focus:border-[#8b0000]">
-                <option value="">-- Todos mis almacenes autorizados --</option>
-                {% for a in almacenes_disponibles %}
-                    <option value="{{ a.id }}" {% if filtro_almacen_id|stringformat:"s" == a.id|stringformat:"s" %}selected{% endif %}>{{ a.nombre }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        
-        <div class="w-[120px]">
-            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Gestión</label>
-            <select name="gestion" class="w-full border border-gray-300 bg-white rounded-xl text-sm py-2 px-3 focus:ring-[#8b0000] focus:border-[#8b0000]">
-                <option value="2026" {% if filtro_gestion == '2026' %}selected{% endif %}>2026</option>
-                <option value="2027" {% if filtro_gestion == '2027' %}selected{% endif %}>2027</option>
-            </select>
-        </div>
+    <!-- BARRA DE AISLAMIENTO POR ALMACÉN Y RANGO DE FECHAS -->
+    <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end text-xs">
+            <!-- Selector de Almacén -->
+            <div class="sm:col-span-4">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Almacén a Auditar *</label>
+                <select name="almacen" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#8b0000]">
+                    {% for alm in almacenes_disponibles %}
+                        <option value="{{ alm.id }}" {% if almacen_seleccionado.id == alm.id %}selected{% endif %}>
+                            📍 {{ alm.nombre }} {% if alm.tipo == 'CENTRAL' %}(Sede Central){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
 
-        <button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-xl text-sm font-semibold transition font-['Outfit']">
-            Filtrar Kardex
-        </button>
-        
-        {% if filtro_almacen_id %}
-        <a href="{% url 'kardex' material.id %}" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold transition font-['Outfit']">
-            Limpiar
-        </a>
-        {% endif %}
-    </form>
+            <!-- Desde -->
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Fecha Desde</label>
+                <input type="date" name="desde" value="{{ desde }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono">
+            </div>
 
-    <!-- TABLA DE MOVIMIENTOS -->
-    <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        
-        <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-            <h2 class="font-bold text-gray-800 font-['Outfit']">Movimientos Cronológicos Registrados</h2>
-            {% if filtro_almacen_id %}
-                <span class="text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
-                    Mostrando historial aislado de 1 almacén
-                </span>
-            {% else %}
-                <span class="text-xs bg-gray-200 text-gray-700 font-bold px-3 py-1 rounded-full">
-                    Mostrando historial global (Mezclado)
-                </span>
-            {% endif %}
+            <!-- Hasta -->
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Fecha Hasta</label>
+                <input type="date" name="hasta" value="{{ hasta }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono">
+            </div>
+
+            <!-- Botón -->
+            <div class="sm:col-span-2">
+                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 shadow cursor-pointer h-[38px]">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                    <span>Filtrar</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- CUADRO DE COMPROBACIÓN CONTABLE DEL ALMACÉN AUDITADO -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-gray-400 block">Inv. Inicial en {{ almacen_seleccionado.nombre }}</span>
+            <span class="text-xl font-black text-gray-800 dark:text-gray-100 font-mono mt-1 block">Bs. {{ comprobacion.inv_inicial_val|floatformat:2 }}</span>
+            <span class="text-[11px] text-gray-500 font-mono">{{ comprobacion.inv_inicial_cant }} unidades</span>
         </div>
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-green-600 block">(+) Entradas a este Almacén</span>
+            <span class="text-xl font-black text-green-700 dark:text-green-400 font-mono mt-1 block">+Bs. {{ comprobacion.compras_val|floatformat:2 }}</span>
+            <span class="text-[11px] text-gray-500 font-mono">{{ comprobacion.compras_cant }} ingresadas</span>
+        </div>
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-red-600 block">(-) Salidas de este Almacén</span>
+            <span class="text-xl font-black text-red-700 dark:text-red-400 font-mono mt-1 block">-Bs. {{ comprobacion.salidas_val|floatformat:2 }}</span>
+            <span class="text-[11px] text-gray-500 font-mono">{{ comprobacion.salidas_cant }} retiradas</span>
+        </div>
+        <div class="card p-4 bg-white dark:bg-slate-900 border-2 border-[#8b0000]/40 rounded-2xl shadow-sm bg-red-50/20">
+            <span class="text-[10px] font-bold uppercase text-[#8b0000] dark:text-red-400 block">(=) Stock Real en {{ almacen_seleccionado.nombre }}</span>
+            <span class="text-xl font-black text-[#8b0000] dark:text-red-400 font-mono mt-1 block">Bs. {{ comprobacion.inv_final_val|floatformat:2 }}</span>
+            <span class="text-[11px] text-gray-800 dark:text-gray-200 font-black font-mono">{{ comprobacion.inv_final_cant }} unidades en estantería</span>
+        </div>
+    </div>
 
+    <!-- TABLA DEL LIBRO DE ALMACÉN AUDITADO -->
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="text-[10px] text-gray-500 uppercase bg-white border-b border-gray-200 text-center font-bold">
+            <table class="w-full text-xs text-left border-collapse">
+                <thead class="bg-gray-100 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-600 dark:text-gray-300 border-b border-gray-300 dark:border-gray-700">
                     <tr>
-                        <th class="px-4 py-4 w-28">Fecha</th>
-                        <th class="px-4 py-4 w-32">Almacén Origen/Dest.</th>
-                        <th class="px-4 py-4 text-left">Detalle / Trámite</th>
-                        <th class="px-4 py-4 w-24">Tipo</th>
-                        <th class="px-2 py-4 w-20">Entrada</th>
-                        <th class="px-2 py-4 w-20">Salida</th>
-                        <th class="px-2 py-4 w-24 bg-gray-50">Saldo Físico</th>
-                        <th class="px-4 py-4 w-28">P. Unitario</th>
-                        <th class="px-4 py-4 w-32 bg-gray-50">Saldo Valorado</th>
+                        <th rowspan="2" class="p-3 w-28 text-center border-r border-gray-200 dark:border-gray-700">Fecha</th>
+                        <th rowspan="2" class="p-3 border-r border-gray-200 dark:border-gray-700">Detalle / Destino (Unidad Solicitante)</th>
+                        <th colspan="3" class="p-2 text-center bg-green-50/60 dark:bg-green-950/20 border-r border-gray-200 dark:border-gray-700 text-green-800 dark:text-green-300">Entradas</th>
+                        <th colspan="3" class="p-2 text-center bg-red-50/60 dark:bg-red-950/20 border-r border-gray-200 dark:border-gray-700 text-red-800 dark:text-red-300">Salidas</th>
+                        <th colspan="2" class="p-2 text-center bg-blue-50/60 dark:bg-blue-950/20 border-r border-gray-200 dark:border-gray-700 text-blue-800 dark:text-blue-300">Saldos</th>
+                        <th rowspan="2" class="p-3 text-center w-24">Vencimiento</th>
+                    </tr>
+                    <tr class="text-[9px] border-t border-gray-200 dark:border-gray-700">
+                        <th class="p-2 text-center w-16">Cant.</th>
+                        <th class="p-2 text-right w-20">P.U. (Bs.)</th>
+                        <th class="p-2 text-right w-24 border-r border-gray-200 dark:border-gray-700">P.T. (Bs.)</th>
+                        <th class="p-2 text-center w-16">Cant.</th>
+                        <th class="p-2 text-right w-20">P.U. (Bs.)</th>
+                        <th class="p-2 text-right w-24 border-r border-gray-200 dark:border-gray-700">P.T. (Bs.)</th>
+                        <th class="p-2 text-center w-16">Cant.</th>
+                        <th class="p-2 text-right w-24 border-r border-gray-200 dark:border-gray-700">P.T. (Bs.)</th>
                     </tr>
                 </thead>
-                <tbody class="text-gray-700 text-center">
-                    <!-- Fila de Saldo Inicial -->
-                    {% if saldo_inicial_cant > 0 or saldo_inicial_val > 0 %}
-                    <tr class="border-b border-gray-100 bg-yellow-50/30">
-                        <td class="px-4 py-3 text-xs text-gray-500 font-medium">Arrastre</td>
-                        <td class="px-4 py-3">—</td>
-                        <td class="px-4 py-3 text-left font-bold text-gray-600">SALDO ANTERIOR</td>
-                        <td class="px-4 py-3">—</td>
-                        <td class="px-2 py-3">—</td>
-                        <td class="px-2 py-3">—</td>
-                        <td class="px-2 py-3 font-bold text-gray-800 bg-gray-50">{{ saldo_inicial_cant }}</td>
-                        <td class="px-4 py-3">—</td>
-                        <td class="px-4 py-3 font-bold text-gray-800 bg-gray-50">Bs. {{ saldo_inicial_val|floatformat:2 }}</td>
-                    </tr>
-                    {% endif %}
 
-                    <!-- Filas Dinámicas -->
-                    {% for mov in movimientos %}
-                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                        <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ mov.fecha|date:"d/m/Y H:i" }}</td>
-                        <td class="px-4 py-3 text-xs font-semibold text-gray-600">{{ mov.almacen|truncatechars:15 }}</td>
-                        <td class="px-4 py-3 text-left">
-                            <span class="block truncate max-w-[200px] font-medium" title="{{ mov.detalle }}">{{ mov.detalle }}</span>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                    {% for f in movimientos %}
+                    <tr class="hover:bg-gray-50/60 dark:hover:bg-slate-800/40 transition">
+                        <td class="p-3 text-center text-gray-500 font-sans text-[11px] border-r border-gray-100 dark:border-gray-800">
+                            {{ f.fecha|date:"d/m/Y H:i" }}
                         </td>
-                        <td class="px-4 py-3">
-                            {% if mov.entrada_cant > 0 %}
-                                <span class="text-[10px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-md border border-green-200">Entrada</span>
+                        <td class="p-3 font-sans font-semibold text-gray-800 dark:text-gray-200 border-r border-gray-100 dark:border-gray-800">
+                            {{ f.detalle }}
+                        </td>
+                        <td class="p-2 text-center font-bold text-green-700 dark:text-green-400">
+                            {% if f.ent_cant > 0 %}{{ f.ent_cant }}{% else %}—{% endif %}
+                        </td>
+                        <td class="p-2 text-right text-gray-600 dark:text-gray-400">
+                            {% if f.ent_cant > 0 %}{{ f.ent_pu|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                        <td class="p-2 text-right font-bold text-green-800 dark:text-green-300 border-r border-gray-100 dark:border-gray-800">
+                            {% if f.ent_pt > 0 %}{{ f.ent_pt|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                        <td class="p-2 text-center font-bold text-red-600 dark:text-red-400">
+                            {% if f.sal_cant > 0 %}{{ f.sal_cant }}{% else %}—{% endif %}
+                        </td>
+                        <td class="p-2 text-right text-gray-600 dark:text-gray-400">
+                            {% if f.sal_cant > 0 %}{{ f.sal_pu|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                        <td class="p-2 text-right font-bold text-red-700 dark:text-red-300 border-r border-gray-100 dark:border-gray-800">
+                            {% if f.sal_pt > 0 %}{{ f.sal_pt|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                        <td class="p-2 text-center font-black text-gray-900 dark:text-gray-100 bg-gray-50/30">
+                            {{ f.saldo_cant }}
+                        </td>
+                        <td class="p-2 text-right font-black text-[#8b0000] dark:text-red-400 bg-gray-50/30 border-r border-gray-100 dark:border-gray-800">
+                            {{ f.saldo_pt|floatformat:2 }}
+                        </td>
+                        <td class="p-2 text-center font-sans">
+                            {% if f.fecha_vencimiento %}
+                                {% if f.estado_vencimiento == 'VENCIDO' %}
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-red-100 text-red-800 border border-red-300">VENCIDO</span>
+                                {% elif f.estado_vencimiento == 'POR_VENCER_CRITICO' %}
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">{{ f.dias_para_vencer }}d</span>
+                                {% else %}
+                                    <span class="text-[10px] text-gray-400 font-mono">{{ f.fecha_vencimiento|date:"d/m/Y" }}</span>
+                                {% endif %}
                             {% else %}
-                                <span class="text-[10px] font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-md border border-red-200">Salida</span>
+                                <span class="text-gray-300 text-[10px]">—</span>
                             {% endif %}
                         </td>
-                        <td class="px-2 py-3 font-medium text-green-700">{% if mov.entrada_cant > 0 %}{{ mov.entrada_cant }}{% else %}—{% endif %}</td>
-                        <td class="px-2 py-3 font-medium text-red-700">{% if mov.salida_cant > 0 %}{{ mov.salida_cant }}{% else %}—{% endif %}</td>
-                        <td class="px-2 py-3 font-extrabold text-gray-800 bg-gray-50">{{ mov.saldo_cant }}</td>
-                        <td class="px-4 py-3 text-xs">Bs. {{ mov.precio_unitario|floatformat:2 }}</td>
-                        <td class="px-4 py-3 font-bold text-gray-800 bg-gray-50 whitespace-nowrap">Bs. {{ mov.saldo_importe|floatformat:2 }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
-                            No se encontraron movimientos registrados con los filtros aplicados.
+                        <td colspan="11" class="p-8 text-center text-gray-400 font-sans">
+                            No se registran movimientos para este material en {{ almacen_seleccionado.nombre }}.
                         </td>
                     </tr>
                     {% endfor %}
@@ -174,5 +174,6 @@
             </table>
         </div>
     </div>
+
 </div>
 {% endblock %}

@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
@@ -23,7 +24,7 @@ urlpatterns = [
     path('entrada/obtener-items-compra/', views.obtener_items_compra_view, name='obtener_items_compra'),
     path('api/items-compra/', views.obtener_items_compra_view, name='api_items_compra'),
 
-    path('existencias/', views.inventario_por_almacen, name='inventario_por_almacen'),
+    path('existencias/', RedirectView.as_view(pattern_name='inventario', permanent=False), name='inventario_por_almacen'),
     path('entradas/', views.nota_ingreso_list, name='nota_ingreso_list'), 
     path('salidas/', views.nota_salida_list, name='nota_salida_list'),   
     path('unidades/crear-ajax/', views.crear_unidad_medida_ajax, name='crear_unidad_medida_ajax'),
