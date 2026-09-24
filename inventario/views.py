@@ -344,6 +344,263 @@ def kardex(request, id):
         'hasta': hasta_str,
         'filtro_gestion': filtro_gestion,
     })
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+def kardex_fisico_pdf(request, id):
+    """
+    Kardex Físico (Ficha amarilla): Filtrable por Almacén y Rango de Fechas (Desde / Hasta).
+    Calcula el saldo anterior físico y muestra solo los movimientos del periodo.
+    """
+    material = get_object_or_404(Material, id=id)
+    perfil = request.user.perfilusuario
+    rol = perfil.rol
+
+    # 1. Filtros de Almacén y Fechas
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
+    almacen = get_object_or_404(Almacen, id=filtro_almacen_id) if filtro_almacen_id else Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
+
+    desde_str = request.GET.get('desde', '').strip()
+    hasta_str = request.GET.get('hasta', '').strip()
+    desde = parse_date(desde_str) if desde_str else None
+    hasta = parse_date(hasta_str) if hasta_str else None
+
+    # 2. Saldo Físico Anterior (Arrastre)
+    saldo_anterior = 0
+    if desde:
+        movs_previos = MovimientoInventario.objects.filter(
+            material=material,
+            almacen=almacen,
+            fecha__date__lt=desde
+        )
+        for m in movs_previos:
+            if m.tipo == 'ENTRADA':
+                saldo_anterior += m.cantidad
+            else:
+                saldo_anterior -= m.cantidad
+
+    # 3. Movimientos del Periodo
+    movs_periodo = MovimientoInventario.objects.filter(material=material, almacen=almacen)
+    if desde:
+        movs_periodo = movs_periodo.filter(fecha__date__gte=desde)
+    if hasta:
+        movs_periodo = movs_periodo.filter(fecha__date__lte=hasta)
+    
+    movs_db = movs_periodo.select_related('unidad_destino').order_by('fecha', 'id')
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="kardex_fisico_{material.codigo}.pdf"'
+
+    pdf = canvas.Canvas(response, pagesize=letter)
+    width, height = letter
+    pdf.setTitle(f"Kardex Físico - {material.codigo}")
+
+    # Membrete
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(50, height - 40, "KARDEX DE CONTROL DE EXISTENCIAS")
+    pdf.drawString(50, height - 52, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
+    pdf.setFont("Helvetica", 8)
+    periodo_txt = f"Del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')}" if (desde and hasta) else ("Desde " + desde.strftime('%d/%m/%Y') if desde else "Gestión Completa")
+    pdf.drawString(50, height - 64, f"DEPÓSITO: {almacen.nombre.upper()} • PERÍODO: {periodo_txt}")
+
+    pdf.drawString(50, height - 85, "Artículo / Subartículo:")
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(160, height - 85, material.nombre)
+
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(50, height - 98, "Código Material:")
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(160, height - 98, material.codigo)
+
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(420, height - 85, "U. de Manejo:")
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(495, height - 85, material.unidad_medida_fk.codigo if material.unidad_medida_fk else material.unidad_medida)
+
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(420, height - 98, "Partida:")
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(495, height - 98, material.partida.codigo if material.partida else "—")
+
+    # Tabla
+    headers_1 = ['FECHA', 'DETALLE / DESTINO', 'Nº INGRESO', 'Nº SALIDA', 'CONTROL FISICO (Cantidades)', '', '']
+    headers_2 = ['', '', '', '', 'Entrada', 'Salida', 'Saldo']
+    data = [headers_1, headers_2]
+
+    saldo_fisico = saldo_anterior
+
+    # Si hay fecha de inicio, pintar la fila de Arrastre
+    if desde:
+        data.append([desde.strftime('%d/%m/%Y'), 'SALDO ANTERIOR / ARRASTRE', '—', '—', '—', '—', str(saldo_anterior)])
+
+    for mov in movs_db:
+        nro_ingreso = mov.referencia.replace("NOTA INGRESO NRO ", "").replace("INGRESO: ", "") if "INGRESO" in mov.referencia else "—"
+        nro_salida = mov.referencia.replace("DESPACHO: ", "").replace("SALIDA: ", "") if ("DESPACHO" in mov.referencia or "SALIDA" in mov.referencia) else "—"
+
+        if mov.tipo == 'ENTRADA':
+            saldo_fisico += mov.cantidad
+            ent, sal = str(mov.cantidad), ""
+        else:
+            saldo_fisico -= mov.cantidad
+            ent, sal = "", str(mov.cantidad)
+
+        detalle = mov.unidad_destino.nombre if mov.unidad_destino else mov.referencia
+        data.append([mov.fecha.strftime('%d/%m/%Y'), detalle[:35], nro_ingreso[:15], nro_salida[:15], ent, sal, str(saldo_fisico)])
+
+    col_widths = [65, 175, 65, 65, 45, 45, 50]
+    t = Table(data, colWidths=col_widths)
+    last_row = len(data) - 1
+
+    t.setStyle(TableStyle([
+        ('SPAN', (0,0), (0,1)),
+        ('SPAN', (1,0), (1,1)),
+        ('SPAN', (2,0), (2,1)),
+        ('SPAN', (3,0), (3,1)),
+        ('SPAN', (4,0), (6,0)),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('ALIGN', (1,2), (1, last_row), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('GRID', (0,0), (-1, last_row), 0.5, colors.HexColor('#9CA3AF')),
+        ('BACKGROUND', (0,0), (-1,1), colors.HexColor('#FDF2F2')),
+        ('FONTNAME', (0,2), (-1, last_row), 'Helvetica'),
+    ]))
+
+    w_act, h_act = t.wrapOn(pdf, width - 100, 1500)
+    pdf_y = height - 120 - h_act
+    t.drawOn(pdf, 50, pdf_y)
+
+    pdf.save()
+    return response
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+def kardex_pdf(request, id):
+    """
+    Kardex Valorado (PDF Oficial): Filtrable por Almacén y Rango de Fechas (Desde / Hasta).
+    Calcula Saldos Físicos y Monetarios Anteriores y saldos por periodo.
+    """
+    material = get_object_or_404(Material, id=id)
+
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
+    almacen = get_object_or_404(Almacen, id=filtro_almacen_id) if filtro_almacen_id else Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
+
+    desde_str = request.GET.get('desde', '').strip()
+    hasta_str = request.GET.get('hasta', '').strip()
+    desde = parse_date(desde_str) if desde_str else None
+    hasta = parse_date(hasta_str) if hasta_str else None
+
+    # 1. Saldo Inicial Físico y Valorado Anterior
+    saldo_anterior_cant = 0
+    saldo_anterior_val = Decimal('0.00')
+
+    if desde:
+        movs_previos = MovimientoInventario.objects.filter(material=material, almacen=almacen, fecha__date__lt=desde)
+        for m in movs_previos:
+            if m.tipo == 'ENTRADA':
+                saldo_anterior_cant += m.cantidad
+                saldo_anterior_val += (m.costo_total or Decimal('0.00'))
+            else:
+                saldo_anterior_cant -= m.cantidad
+                saldo_anterior_val -= (m.costo_total or Decimal('0.00'))
+
+    # 2. Movimientos del periodo
+    movs_periodo = MovimientoInventario.objects.filter(material=material, almacen=almacen)
+    if desde:
+        movs_periodo = movs_periodo.filter(fecha__date__gte=desde)
+    if hasta:
+        movs_periodo = movs_periodo.filter(fecha__date__lte=hasta)
+
+    movs_db = movs_periodo.select_related('unidad_destino').order_by('fecha', 'id')
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="kardex_valorado_{material.codigo}.pdf"'
+
+    pdf = canvas.Canvas(response, pagesize=landscape(letter))
+    width, height = landscape(letter)
+
+    pdf.setTitle(f"Kardex Valorado - {material.codigo}")
+
+    # Cabecera
+    pdf.setFont("Helvetica-Bold", 15)
+    pdf.drawString(50, height - 40, "KARDEX DE EXISTENCIAS VALORADO")
+    pdf.setFont("Helvetica", 8)
+    periodo_txt = f"Del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')}" if (desde and hasta) else "Gestión Completa"
+    pdf.drawString(50, height - 55, f"GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ • DEPÓSITO: {almacen.nombre.upper()} • PERÍODO: {periodo_txt}")
+
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(50, height - 75, f"Subartículo: {material.nombre}")
+    pdf.drawString(50, height - 88, f"Código: {material.codigo}")
+    pdf.drawString(420, height - 75, f"Partida: {material.partida.codigo} - {material.partida.nombre[:30]}")
+    pdf.drawString(420, height - 88, f"U. Medida: {material.unidad_medida_fk.codigo if material.unidad_medida_fk else material.unidad_medida}")
+
+    # Tabla 9 columnas
+    data = [
+        ['Fecha', 'Detalle / Referencia', 'Cantidades (Físico)', '', '', 'P. Unitario\n(Bs.)', 'Importes (Valorado)', '', ''],
+        ['', '', 'Entrada', 'Salida', 'Saldo', '', 'Entrada', 'Salida', 'Saldo']
+    ]
+
+    saldo_fisico = saldo_anterior_cant
+    saldo_valorado = saldo_anterior_val
+
+    if desde:
+        data.append([
+            desde.strftime('%d/%m/%Y'), 'SALDO ANTERIOR / ARRASTRE',
+            '—', '—', str(saldo_anterior_cant),
+            '—', '—', '—', f"{saldo_anterior_val:.2f}"
+        ])
+
+    for mov in movs_db:
+        if mov.tipo == 'ENTRADA':
+            saldo_fisico += mov.cantidad
+            saldo_valorado += (mov.costo_total or Decimal('0.00'))
+            ent_c, sal_c = str(mov.cantidad), ""
+            ent_v, sal_v = f"{(mov.costo_total or Decimal('0.00')):.2f}", ""
+        else:
+            saldo_fisico -= mov.cantidad
+            saldo_valorado -= (mov.costo_total or Decimal('0.00'))
+            ent_c, sal_c = "", str(mov.cantidad)
+            ent_v, sal_v = "", f"{(mov.costo_total or Decimal('0.00')):.2f}"
+
+        detalle = mov.unidad_destino.nombre if mov.unidad_destino else mov.referencia
+
+        data.append([
+            mov.fecha.strftime('%d/%m/%Y'),
+            detalle[:30],
+            ent_c, sal_c, str(saldo_fisico),
+            f"{(mov.costo_unitario or Decimal('0.00')):.2f}",
+            ent_v, sal_v, f"{saldo_valorado:.2f}"
+        ])
+
+    col_widths = [65, 185, 45, 45, 50, 60, 60, 60, 65]
+    t = Table(data, colWidths=col_widths)
+    last_row = len(data) - 1
+
+    t.setStyle(TableStyle([
+        ('SPAN', (0,0), (0,1)),
+        ('SPAN', (1,0), (1,1)),
+        ('SPAN', (2,0), (4,0)),
+        ('SPAN', (5,0), (5,1)),
+        ('SPAN', (6,0), (8,0)),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('ALIGN', (1,2), (1, last_row), 'LEFT'),
+        ('ALIGN', (5,2), (-1,-1), 'RIGHT'),
+        ('FONTNAME', (0,0), (-1,1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 7.5),
+        ('GRID', (0,0), (-1, last_row), 0.5, colors.HexColor('#D1D5DB')),
+        ('BACKGROUND', (0,0), (-1,1), colors.HexColor('#F3F4F6')),
+        ('FONTNAME', (0,2), (-1, last_row), 'Helvetica'),
+    ]))
+
+    w_act, h_act = t.wrapOn(pdf, width - 100, 2000)
+    pdf_y = height - 105 - h_act
+    t.drawOn(pdf, 50, pdf_y)
+
+    pdf.save()
+    return response
+
 @login_required
 @rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def almacen_list(request):
@@ -493,137 +750,30 @@ def editar_almacen(request, id):
     })
 
 
-@login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
-def kardex_pdf(request, id):
-    material = get_object_or_404(Material, id=id)
-    movimientos_db = MovimientoInventario.objects.filter(material=material).order_by('fecha')
-
-    data = [
-        ['Fecha', 'Detalle / Referencia', 'Cantidades (Físico)', '', '', 'P. Unitario\n(Bs.)', 'Importes (Valorado)', '', ''],
-        ['', '', 'Entrada', 'Salida', 'Saldo', '', 'Entrada', 'Salida', 'Saldo']
-    ]
-
-    saldo_fisico = 0
-    saldo_valorado = Decimal('0.00')
-
-    for mov in movimientos_db:
-        if mov.tipo == 'ENTRADA':
-            saldo_fisico += mov.cantidad
-            saldo_valorado += (mov.costo_total or Decimal('0.00'))
-            ent_cant = str(mov.cantidad)
-            sal_cant = ""
-            ent_imp = f"{(mov.costo_total or Decimal('0.00')):.2f}"
-            sal_imp = ""
-        else:
-            saldo_fisico -= mov.cantidad
-            saldo_valorado -= (mov.costo_total or Decimal('0.00'))
-            ent_cant = ""
-            sal_cant = str(mov.cantidad)
-            ent_imp = ""
-            sal_imp = f"{(mov.costo_total or Decimal('0.00')):.2f}"
-
-        data.append([
-            str(mov.fecha.strftime('%d/%m/%Y')),
-            str(mov.referencia or ''),
-            str(ent_cant),
-            str(sal_cant),
-            str(saldo_fisico),
-            f"{(mov.costo_unitario or Decimal('0.00')):.2f}",
-            str(ent_imp),
-            str(sal_imp),
-            f"{saldo_valorado:.2f}"
-        ])
-
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="kardex_{material.codigo}.pdf"'
-
-    pdf = canvas.Canvas(response, pagesize=landscape(letter))
-    width, height = landscape(letter)
-
-    pdf.setTitle(f"Kardex Valorado - {material.codigo}")
-    pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
-    pdf.setAuthor("Sistema de Gestión de Almacenes")
-
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(50, height - 50, "KARDEX DE EXISTENCIAS VALORADO")
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(50, height - 75, "Subartículo:")
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(120, height - 75, material.nombre)
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(50, height - 90, "Código:")
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(120, height - 90, material.codigo)
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(420, height - 75, "Partida:")
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(480, height - 75, f"{material.partida.codigo} - {material.partida.nombre[:30]}")
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(420, height - 90, "U. Medida:")
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(480, height - 90, material.unidad_medida)
-
-    col_widths = [70, 182, 50, 50, 50, 60, 60, 60, 60]
-    t = Table(data, colWidths=col_widths)
-    last_row = len(data) - 1
-
-    t_style = TableStyle([
-        ('SPAN', (0, 0), (0, 1)),
-        ('SPAN', (1, 0), (1, 1)),
-        ('SPAN', (2, 0), (4, 0)),
-        ('SPAN', (5, 0), (5, 1)),
-        ('SPAN', (6, 0), (8, 0)),
-        ('ALIGN', (0, 0), (8, last_row), 'CENTER'),
-        ('ALIGN', (1, 2), (1, last_row), 'LEFT'),
-        ('ALIGN', (5, 2), (8, last_row), 'RIGHT'),
-        ('FONTNAME', (0, 0), (8, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (8, 1), 9),
-        ('BACKGROUND', (0, 0), (8, 1), colors.HexColor('#F3F4F6')), 
-        ('GRID', (0, 0), (8, last_row), 0.5, colors.HexColor('#D1D5DB')), 
-        ('FONTNAME', (0, 2), (8, last_row), 'Helvetica'),
-        ('FONTSIZE', (0, 2), (8, last_row), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-    ])
-    t.setStyle(t_style)
-
-    avail_width = width - 100
-    avail_height = height - 150
-    w_actual, h_actual = t.wrapOn(pdf, avail_width, avail_height)
-    pdf_y = height - 125 - h_actual
-    t.drawOn(pdf, 50, pdf_y)
-
-    pdf.save()
-
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Inventario',
-        accion='Exportar PDF Kardex',
-        descripcion=f'Se descargó el PDF del Kardex de existencias para {material.nombre} ({material.codigo})'
-    )
-    return response
 
 
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def reporte_inventario(request):
+    """
+    Genera el reporte de Inventario Físico Valorado tabular oficial en PDF (Horizontal/Landscape).
+    Soporta paginación automática y evita KeyErrors en ReportLab.
+    """
     desde_str = request.GET.get('desde')
     hasta_str = request.GET.get('hasta')
 
     desde = parse_date(desde_str) if desde_str else datetime.date(2026, 1, 1)
     hasta = parse_date(hasta_str) if hasta_str else datetime.date(2026, 12, 31)
 
-    materiales = Material.objects.all().order_by('codigo')
+    materiales = Material.objects.filter(is_active=True).order_by('codigo')
 
+    # Encabezados de doble nivel reglamentarios
     headers_1 = ['Código', 'Descripción del Material', 'Unid.', 'Saldo Inicial / Apertura', '', 'Entradas del Periodo', '', 'Salidas del Periodo', '', 'Saldos de Cierre', '']
     headers_2 = ['', '', '', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)']
-    data = [headers_1, headers_2]
 
+    filas_datos = []
+
+    # Procesar matemáticamente los saldos físicos y monetarios por período
     for mat in materiales:
         mov_previos = MovimientoInventario.objects.filter(material=mat, fecha__date__lt=desde)
         ini_cant = 0
@@ -631,10 +781,10 @@ def reporte_inventario(request):
         for m in mov_previos:
             if m.tipo == 'ENTRADA':
                 ini_cant += m.cantidad
-                ini_val += m.costo_total
+                ini_val += (m.costo_total or Decimal('0.00'))
             else:
                 ini_cant -= m.cantidad
-                ini_val -= m.costo_total
+                ini_val -= (m.costo_total or Decimal('0.00'))
 
         mov_periodo = MovimientoInventario.objects.filter(material=mat, fecha__date__range=[desde, hasta])
         ent_cant = 0
@@ -644,17 +794,18 @@ def reporte_inventario(request):
         for m in mov_periodo:
             if m.tipo == 'ENTRADA':
                 ent_cant += m.cantidad
-                ent_val += m.costo_total
+                ent_val += (m.costo_total or Decimal('0.00'))
             else:
                 sal_cant += m.cantidad
-                sal_val += m.costo_total
+                sal_val += (m.costo_total or Decimal('0.00'))
 
+        # Cálculo de Saldos de Cierre
         fin_cant = ini_cant + ent_cant - sal_cant
         fin_val = ini_val + ent_val - sal_val
 
-        data.append([
+        filas_datos.append([
             mat.codigo,
-            mat.nombre[:35], 
+            mat.nombre[:32], 
             mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
             str(ini_cant),
             f"{ini_val:.2f}",
@@ -676,44 +827,67 @@ def reporte_inventario(request):
     pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
     pdf.setAuthor("Sistema de Gestión de Almacenes")
 
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(50, height - 50, "INVENTARIO FÍSICO VALORADO DE ALMACENES")
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(50, height - 75, "Gobierno Autónomo Departamental de Potosí")
-    pdf.drawString(50, height - 90, f"Período de Evaluación: Desde {desde.strftime('%d/%m/%Y')} hasta {hasta.strftime('%d/%m/%Y')}")
+    # Paginación inteligente: 18 filas por página para que no se desborde
+    filas_por_pagina = 18
+    total_filas = len(filas_datos)
+    total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
 
     col_widths = [65, 142, 35, 45, 60, 45, 60, 45, 60, 45, 65]
-    t = Table(data, colWidths=col_widths)
 
-    t_style = TableStyle([
-        ('SPAN', (0, 0), (0, 1)),  
-        ('SPAN', (1, 0), (1, 1)),  
-        ('SPAN', (2, 0), (2, 1)),  
-        ('SPAN', (3, 0), (4, 0)),  
-        ('SPAN', (5, 0), (6, 0)),  
-        ('SPAN', (7, 0), (8, 0)),  
-        ('SPAN', (9, 0), (10, 0)), 
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 2), (1, -1), 'LEFT'),  
-        ('ALIGN', (4, 2), (4, -1), 'RIGHT'), 
-        ('ALIGN', (6, 2), (6, -1), 'RIGHT'),
-        ('ALIGN', (8, 2), (8, -1), 'RIGHT'),
-        ('ALIGN', (10, 2), (10, -1), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 1), 8),
-        ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
-        ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
-        ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 2), (-1, -1), 7.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-    ])
-    t.setStyle(t_style)
+    for num_pagina in range(total_paginas):
+        inicio = num_pagina * filas_por_pagina
+        fin = inicio + filas_por_pagina
+        filas_bloque = filas_datos[inicio:fin]
 
-    table_height = len(data) * 16  
-    t.wrapOn(pdf, 50, height - 120 - table_height)
-    t.drawOn(pdf, 50, height - 120 - table_height)
+        # Encabezado de página
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(50, height - 40, "INVENTARIO FÍSICO VALORADO DE ALMACENES")
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(50, height - 55, "Gobierno Autónomo Departamental de Potosí — Unidad de Almacenes")
+        pdf.drawString(50, height - 68, f"Período de Evaluación: Desde {desde.strftime('%d/%m/%Y')} hasta {hasta.strftime('%d/%m/%Y')}")
+        pdf.drawRightString(width - 50, height - 40, f"Pág. {num_pagina + 1} de {total_paginas}")
+
+        tabla_pagina = [headers_1, headers_2] + filas_bloque
+
+        t = Table(tabla_pagina, colWidths=col_widths)
+        t_style = TableStyle([
+            ('SPAN', (0, 0), (0, 1)),  
+            ('SPAN', (1, 0), (1, 1)),  
+            ('SPAN', (2, 0), (2, 1)),  
+            ('SPAN', (3, 0), (4, 0)),  
+            ('SPAN', (5, 0), (6, 0)),  
+            ('SPAN', (7, 0), (8, 0)),  
+            ('SPAN', (9, 0), (10, 0)), 
+
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (1, 2), (1, -1), 'LEFT'),  
+            ('ALIGN', (4, 2), (4, -1), 'RIGHT'), 
+            ('ALIGN', (6, 2), (6, -1), 'RIGHT'),
+            ('ALIGN', (8, 2), (8, -1), 'RIGHT'),
+            ('ALIGN', (10, 2), (10, -1), 'RIGHT'),
+
+            ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 1), 7.5),
+            ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
+
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
+            ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
+
+            ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 2), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ])
+        t.setStyle(t_style)
+
+        # Dimensiones seguras sin colisiones de split
+        w_act, h_act = t.wrapOn(pdf, width - 100, 1000)
+        pdf_y = height - 85 - h_act
+        t.drawOn(pdf, 50, pdf_y)
+
+        # Salto a la siguiente página si hay más bloques
+        if num_pagina < total_paginas - 1:
+            pdf.showPage()
 
     pdf.save()
 
@@ -723,8 +897,8 @@ def reporte_inventario(request):
         accion='Exportar Inventario Valorado',
         descripcion=f'Se exportó el reporte de Inventario Físico Valorado desde {desde} hasta {hasta}.'
     )
-    return response
 
+    return response
 
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -734,155 +908,215 @@ def movimientos(request):
 
 
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def inventario_por_unidad(request):
     """
-    Tarjeta 4.5: Consulta de existencias físicas cruzadas con la programación anual del Formulario 005.
-    Filtra estrictamente los materiales autorizados según el POA de la Unidad seleccionada.
+    Tarjeta 4.5: Consulta de Stock y Cuotas del Formulario 005.
+    FILTRO EN CASCADA:
+    - Almacén -> Filtra Secretarías y Unidades que están autorizadas a ser atendidas por ese depósito.
+    - Secretaría -> Filtra Unidades pertenecientes a esa secretaría.
+    - Unidad -> Cruza existencias de ese almacén con las cuotas del Formulario 005 de su POA 2026.
     """
     from presupuestos.models import POA, DetalleProgramacionPOA
+    from inventario.models import PartidaPresupuestaria
 
     perfil = request.user.perfilusuario
     rol = perfil.rol
 
-    # Almacenes que el usuario tiene derecho a ver
+    # 1. Almacenes a los que el usuario tiene acceso
     almacenes_usuario = obtener_almacenes_usuario(request.user)
-    es_central = (rol == 'ADMINISTRADOR' or almacenes_usuario.filter(tipo='CENTRAL').exists())
-    almacenes_visibles = Almacen.objects.filter(is_active=True) if es_central else almacenes_usuario
+    es_admin = (rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'])
 
-    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
-    unidades_query = UnidadOrganizacional.objects.filter(is_active=True).select_related('secretaria').order_by('nombre')
+    if es_admin:
+        almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+    else:
+        almacenes_disponibles = almacenes_usuario
+
+    # Captura de almacén seleccionado
+    filtro_almacen_id = request.GET.get('almacen_id', '').strip()
+    almacen_seleccionado = None
+
+    if filtro_almacen_id:
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
+        if not es_admin and not perfil.tiene_acceso_almacen(almacen_seleccionado):
+            messages.error(request, f"No tiene autorización para ver: {almacen_seleccionado.nombre}")
+            almacen_seleccionado = almacenes_disponibles.first()
+    else:
+        # Por defecto Almacén Central o el asignado al encargado
+        almacen_central = Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
+        if almacen_central and (es_admin or perfil.tiene_acceso_almacen(almacen_central)):
+            almacen_seleccionado = almacen_central
+            filtro_almacen_id = str(almacen_central.id)
+        else:
+            almacen_seleccionado = almacenes_disponibles.first()
+            if almacen_seleccionado:
+                filtro_almacen_id = str(almacen_seleccionado.id)
+
+    almacenes_a_consultar = [almacen_seleccionado] if almacen_seleccionado else almacenes_disponibles
+
+    # ========================================================
+    # 2. FILTRADO EN CASCADA: DEPENDENCIAS ATENDIDAS POR ESTE ALMACÉN
+    # ========================================================
+    if almacen_seleccionado:
+        if almacen_seleccionado.tipo == 'CENTRAL':
+            # Central atiende a todas las unidades salvo que tenga asignación restrictiva
+            if almacen_seleccionado.unidades_atendidas.exists():
+                unidades_del_almacen = almacen_seleccionado.unidades_atendidas.filter(is_active=True)
+            else:
+                unidades_del_almacen = UnidadOrganizacional.objects.filter(is_active=True)
+        else:
+            # Subalmacén (SIGEPRO, UNASBA): SOLO atiende a sus unidades asignadas y a su propia unidad
+            unidades_ids = list(almacen_seleccionado.unidades_atendidas.filter(is_active=True).values_list('id', flat=True))
+            if almacen_seleccionado.unidad_organizacional_id:
+                unidades_ids.append(almacen_seleccionado.unidad_organizacional_id)
+            unidades_del_almacen = UnidadOrganizacional.objects.filter(id__in=unidades_ids, is_active=True)
+    else:
+        unidades_del_almacen = UnidadOrganizacional.objects.filter(is_active=True)
+
+    # Secretarías que tienen oficinas atendidas por este almacén
+    secretarias = Secretaria.objects.filter(
+        unidades_organizacionales__in=unidades_del_almacen,
+        is_active=True
+    ).distinct().order_by('nombre')
 
     filtro_secretaria_id = request.GET.get('secretaria_id', '').strip()
     filtro_unidad_id = request.GET.get('unidad_id', '').strip()
 
-    secretaria_seleccionada = None
-    unidad_seleccionada = None
+    # Si cambió de almacén y la secretaría previa ya no corresponde, se resetea
+    if filtro_secretaria_id and not secretarias.filter(id=filtro_secretaria_id).exists():
+        filtro_secretaria_id = ''
 
+    # Unidades dependientes de la secretaría seleccionada
+    if filtro_secretaria_id:
+        unidades_query = unidades_del_almacen.filter(secretaria_id=filtro_secretaria_id).order_by('nombre')
+    else:
+        unidades_query = unidades_del_almacen.order_by('nombre')
+
+    # Si la unidad previa ya no pertenece a este almacén/secretaría, se resetea
+    if filtro_unidad_id and not unidades_query.filter(id=filtro_unidad_id).exists():
+        filtro_unidad_id = ''
+
+    secretaria_seleccionada = Secretaria.objects.filter(id=filtro_secretaria_id).first() if filtro_secretaria_id else None
+    unidad_seleccionada = UnidadOrganizacional.objects.filter(id=filtro_unidad_id).first() if filtro_unidad_id else None
+
+    # ========================================================
+    # 3. BASE DE INVENTARIO: AISLADO AL ALMACÉN Y AL POA DE LA UNIDAD
+    # ========================================================
     inventario_qs = InventarioAlmacen.objects.filter(
-        almacen__in=almacenes_visibles,
+        almacen__in=almacenes_a_consultar,
         stock_fisico__gt=0
     )
 
-    # ========================================================
-    # FILTRADO INTELIGENTE POR UNIDAD Y POA (LEY 1178)
-    # ========================================================
-    if filtro_unidad_id:
-        unidad_seleccionada = get_object_or_404(UnidadOrganizacional, id=filtro_unidad_id)
-        secretaria_seleccionada = unidad_seleccionada.secretaria
-        
-        # 1. Almacenes autorizados para esta unidad
-        almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas=unidad_seleccionada)
-        if not almacenes_atendidos.exists():
-            almacenes_atendidos = almacenes_visibles.filter(tipo='CENTRAL')
-
-        # 2. Partidas presupuestarias que esta unidad tiene en su POA 2026
+    if unidad_seleccionada:
         partidas_poa_ids = POA.objects.filter(
             unidad=unidad_seleccionada,
             gestion=2026
         ).values_list('partida_id', flat=True)
 
-        # 3. FILTRO ESTRICTO: Solo materiales en sus almacenes autorizados Y de sus partidas POA
-        inventario_qs = inventario_qs.filter(
-            almacen__in=almacenes_atendidos,
-            material__partida_id__in=partidas_poa_ids  # <-- ESTA LÍNEA ELIMINA LOS MATERIALES NO AUTORIZADOS
-        )
+        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_poa_ids)
 
-    elif filtro_secretaria_id:
-        secretaria_seleccionada = get_object_or_404(Secretaria, id=filtro_secretaria_id)
-        unidades_sec = unidades_query.filter(secretaria=secretaria_seleccionada)
-        
-        almacenes_atendidos = almacenes_visibles.filter(unidades_atendidas__in=unidades_sec)
-        if not almacenes_atendidos.exists():
-            almacenes_atendidos = almacenes_visibles.filter(tipo='CENTRAL')
-            
+    elif secretaria_seleccionada:
+        unidades_sec = unidades_del_almacen.filter(secretaria=secretaria_seleccionada)
         partidas_poa_sec = POA.objects.filter(
             unidad__in=unidades_sec,
             gestion=2026
         ).values_list('partida_id', flat=True)
 
-        inventario_qs = inventario_qs.filter(
-            almacen__in=almacenes_atendidos,
-            material__partida_id__in=partidas_poa_sec
-        )
+        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_poa_sec)
 
-    # Métricas superiores calculadas sobre los materiales filtrados
+    # Métricas superiores
     total_materiales = inventario_qs.values('material_id').distinct().count()
-    total_almacenes = inventario_qs.values('almacen_id').distinct().count()
+    total_almacenes = len(almacenes_a_consultar)
     total_stock_fisico = inventario_qs.aggregate(total=Sum('stock_fisico'))['total'] or 0
 
-    registros_inventario = inventario_qs.select_related(
-        'almacen', 'material', 'material__partida', 'material__unidad_medida_fk'
-    ).order_by('material__nombre')
+    # 4. Agrupación por Partidas
+    partidas_ids = inventario_qs.values_list('material__partida_id', flat=True).distinct()
+    partidas_en_inventario = PartidaPresupuestaria.objects.filter(id__in=partidas_ids).order_by('codigo')
 
-    # Cruce de existencias con el Formulario 005
-    items_cruzados = []
-    for inv in registros_inventario:
-        mat = inv.material
-        
-        item_005 = None
-        poa_partida = None
-        if unidad_seleccionada:
-            item_005 = DetalleProgramacionPOA.objects.filter(
-                poa__unidad=unidad_seleccionada,
-                poa__gestion=2026,
-                material=mat
-            ).first()
+    grupos_por_partida = []
 
-            poa_partida = POA.objects.filter(
-                unidad=unidad_seleccionada,
-                partida=mat.partida,
-                gestion=2026
-            ).first()
+    for part in partidas_en_inventario:
+        items_partida = inventario_qs.filter(material__partida=part).select_related(
+            'almacen', 'material', 'material__unidad_medida_fk'
+        ).order_by('material__nombre')
 
-        # Costo unitario PEPS del lote activo más antiguo
-        lote_activo = MovimientoInventario.objects.filter(
-            material=mat,
-            almacen=inv.almacen,
-            tipo='ENTRADA',
-            saldo_disponible_lote__gt=0
-        ).order_by('fecha', 'id').first()
-        costo_ref = lote_activo.costo_unitario if lote_activo else Decimal('0.00')
+        filas = []
+        for inv in items_partida:
+            mat = inv.material
+            item_005 = None
+            poa_partida = None
 
-        stock_disp = inv.stock_disponible
-        if item_005:
-            saldo_cuota = item_005.cantidad_disponible
-            tope_permitido = min(stock_disp, saldo_cuota)
-            tiene_cuota = True
-        else:
-            saldo_cuota = None
-            tope_permitido = stock_disp
-            tiene_cuota = False
+            if unidad_seleccionada:
+                item_005 = DetalleProgramacionPOA.objects.filter(
+                    poa__unidad=unidad_seleccionada,
+                    poa__gestion=2026,
+                    material=mat
+                ).first()
 
-        items_cruzados.append({
-            'inventario': inv,
-            'material': mat,
-            'almacen': inv.almacen,
-            'stock_fisico': inv.stock_fisico,
-            'stock_disponible': stock_disp,
-            'item_005': item_005,
-            'tiene_cuota': tiene_cuota,
-            'cuota_programada': item_005.cantidad_programada if item_005 else None,
-            'cuota_consumida': item_005.cantidad_consumida if item_005 else 0,
-            'saldo_cuota': saldo_cuota,
-            'tope_permitido': tope_permitido,
-            'costo_referencial': costo_ref,
-            'saldo_poa': poa_partida.monto_disponible if poa_partida else None
+                poa_partida = POA.objects.filter(
+                    unidad=unidad_seleccionada,
+                    partida=mat.partida,
+                    gestion=2026
+                ).first()
+
+            lote_activo = MovimientoInventario.objects.filter(
+                material=mat,
+                almacen=inv.almacen,
+                tipo='ENTRADA',
+                saldo_disponible_lote__gt=0
+            ).order_by('fecha', 'id').first()
+            costo_ref = lote_activo.costo_unitario if lote_activo else Decimal('0.00')
+
+            stock_disp = inv.stock_disponible
+            if item_005:
+                saldo_cuota = item_005.cantidad_disponible
+                tope_permitido = min(stock_disp, saldo_cuota)
+                tiene_cuota = True
+            else:
+                saldo_cuota = None
+                tope_permitido = stock_disp
+                tiene_cuota = False
+
+            filas.append({
+                'inventario': inv,
+                'material': mat,
+                'almacen': inv.almacen,
+                'stock_fisico': inv.stock_fisico,
+                'stock_disponible': stock_disp,
+                'item_005': item_005,
+                'tiene_cuota': tiene_cuota,
+                'cuota_programada': item_005.cantidad_programada if item_005 else None,
+                'cuota_consumida': item_005.cantidad_consumida if item_005 else 0,
+                'saldo_cuota': saldo_cuota,
+                'tope_permitido': tope_permitido,
+                'costo_referencial': costo_ref,
+                'saldo_poa': poa_partida.monto_disponible if poa_partida else None
+            })
+
+        grupos_por_partida.append({
+            'partida': part,
+            'items': filas,
+            'total_items': len(filas),
+            'stock_total_partida': sum(f['stock_disponible'] for f in filas)
         })
 
     return render(request, 'inventario/stock_por_unidad.html', {
         'secretarias': secretarias,
         'unidades': unidades_query,
+        'almacenes_disponibles': almacenes_disponibles,
+        'almacen_seleccionado': almacen_seleccionado,
+        'filtro_almacen_id': filtro_almacen_id,
         'secretaria_seleccionada': secretaria_seleccionada,
         'unidad_seleccionada': unidad_seleccionada,
         'filtro_secretaria_id': filtro_secretaria_id,
         'filtro_unidad_id': filtro_unidad_id,
-        'items_cruzados': items_cruzados,
+        'grupos_por_partida': grupos_por_partida,
         'total_materiales': total_materiales,
         'total_stock_fisico': total_stock_fisico,
         'total_almacenes': total_almacenes,
-        'es_central': es_central,
+        'es_admin': es_admin,
     })
+
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def entrada_inventario(request):
@@ -2009,120 +2243,6 @@ def nota_recepcion_pdf(request, id):
     return response
 
 
-
-@login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
-def kardex_fisico_pdf(request, id):
-    """
-    Ficha de cartón de estantería oficial (Kardex Físico).
-    Aislado estrictamente al almacén seleccionado.
-    """
-    material = get_object_or_404(Material, id=id)
-    perfil = request.user.perfilusuario
-    rol = perfil.rol
-
-    # 1. Identificar almacén a auditar
-    filtro_almacen_id = request.GET.get('almacen', '').strip()
-    if filtro_almacen_id:
-        almacen = get_object_or_404(Almacen, id=filtro_almacen_id)
-    else:
-        almacen = Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
-
-    # 2. Filtrar movimientos exclusivamente del almacén auditado
-    movimientos_db = MovimientoInventario.objects.filter(
-        material=material,
-        almacen=almacen
-    ).order_by('fecha', 'id')
-
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="kardex_fisico_{material.codigo}_{almacen.nombre}.pdf"'
-
-    pdf = canvas.Canvas(response, pagesize=letter)
-    width, height = letter
-    pdf.setTitle(f"Kardex Físico - {material.codigo} ({almacen.nombre})")
-
-    # Encabezado
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(50, height - 40, "KARDEX DE CONTROL DE EXISTENCIAS")
-    pdf.drawString(50, height - 52, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
-    pdf.setFont("Helvetica", 9)
-    pdf.drawString(50, height - 64, f"DEPÓSITO / CUSTODIA: {almacen.nombre.upper()}")
-
-    pdf.drawString(50, height - 85, "Artículo / Subartículo:")
-    pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(160, height - 85, material.nombre)
-
-    pdf.setFont("Helvetica", 9)
-    pdf.drawString(50, height - 100, "Código Material:")
-    pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(160, height - 100, material.codigo)
-
-    pdf.setFont("Helvetica", 9)
-    pdf.drawString(420, height - 85, "U. de Manejo:")
-    pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(495, height - 85, material.unidad_medida_fk.codigo if material.unidad_medida_fk else material.unidad_medida)
-
-    pdf.setFont("Helvetica", 9)
-    pdf.drawString(420, height - 100, "Partida:")
-    pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(495, height - 100, material.partida.codigo if material.partida else "—")
-
-    # Tabla Físico
-    headers_1 = ['FECHA', 'DETALLE / DESTINO', 'Nº INGRESO', 'Nº SALIDA', 'CONTROL FISICO (Cantidades)', '', '']
-    headers_2 = ['', '', '', '', 'Entrada', 'Salida', 'Saldo']
-    data = [headers_1, headers_2]
-
-    saldo_fisico = 0
-    for mov in movimientos_db:
-        nro_ingreso = mov.referencia.replace("NOTA INGRESO NRO ", "").replace("INGRESO: ", "") if "INGRESO" in mov.referencia else "—"
-        nro_salida = mov.referencia.replace("DESPACHO: ", "").replace("SALIDA: ", "") if ("DESPACHO" in mov.referencia or "SALIDA" in mov.referencia) else "—"
-
-        if mov.tipo == 'ENTRADA':
-            saldo_fisico += mov.cantidad
-            entrada = str(mov.cantidad)
-            salida = ""
-        else:
-            saldo_fisico -= mov.cantidad
-            entrada = ""
-            salida = str(mov.cantidad)
-
-        detalle_destino = mov.unidad_destino.nombre if mov.unidad_destino else mov.referencia
-
-        data.append([
-            mov.fecha.strftime('%d/%m/%Y'),
-            detalle_destino[:35],
-            nro_ingreso[:15],
-            nro_salida[:15],
-            entrada,
-            salida,
-            str(saldo_fisico)
-        ])
-
-    col_widths = [65, 175, 65, 65, 45, 45, 50]
-    t = Table(data, colWidths=col_widths)
-    last_row = len(data) - 1
-
-    t.setStyle(TableStyle([
-        ('SPAN', (0,0), (0,1)),
-        ('SPAN', (1,0), (1,1)),
-        ('SPAN', (2,0), (2,1)),
-        ('SPAN', (3,0), (3,1)),
-        ('SPAN', (4,0), (6,0)),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('ALIGN', (1,2), (1, last_row), 'LEFT'),
-        ('FONTNAME', (0,0), (-1,1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1, last_row), 0.5, colors.HexColor('#9CA3AF')),
-        ('BACKGROUND', (0,0), (-1,1), colors.HexColor('#FDF2F2')),
-        ('FONTNAME', (0,2), (-1, last_row), 'Helvetica'),
-    ]))
-
-    w_act, h_act = t.wrapOn(pdf, width - 100, height - 200)
-    pdf_y = height - 130 - h_act
-    t.drawOn(pdf, 50, pdf_y)
-
-    pdf.save()
-    return response
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def reporte_inventario_oficial_pdf(request):

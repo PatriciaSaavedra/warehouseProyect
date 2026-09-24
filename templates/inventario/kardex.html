@@ -13,13 +13,13 @@
             </a>
             <!-- En la cabecera superior derecha de inventario/templates/inventario/kardex.html: -->
             <div class="flex items-center gap-2">
-                <!-- Kardex Físico Aislado -->
-                <a href="{% url 'kardex_fisico_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}" target="_blank" class="btn-secondary px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <!-- Kardex Físico con Rango de Fechas -->
+                <a href="{% url 'kardex_fisico_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde|default:'' }}&hasta={{ hasta|default:'' }}" target="_blank" class="btn-secondary px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">print</span> Kardex Físico
                 </a>
 
-                <!-- Kardex Valorado Aislado -->
-                <a href="{% url 'kardex_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde }}&hasta={{ hasta }}" target="_blank" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <!-- Kardex Valorado PDF con Rango de Fechas -->
+                <a href="{% url 'kardex_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde|default:'' }}&hasta={{ hasta|default:'' }}" target="_blank" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Kardex Valorado (PDF)
                 </a>
             </div>

@@ -3,16 +3,16 @@
 {% block title %} Stock y Cuotas por Estructura Organizacional {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-6">
+<div class="max-w-7xl mx-auto space-y-6 font-['Outfit']">
 
     <!-- CABECERA -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit']">
+            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100">
                 Stock y Cuotas por Estructura Organizacional
             </h1>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-['Outfit']">
-                Control físico en estantería cruzado con la programación anual del Formulario 005 (Gestión 2026).
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Existencias aisladas por Almacén, agrupadas por Partidas Presupuestarias y cruzadas con el Formulario 005.
             </p>
         </div>
         <a href="{% url 'inventario' %}" class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
@@ -21,45 +21,59 @@
     </div>
 
     <!-- TARJETAS KPIS SUPERIORES -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 font-['Outfit']">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-950/20 text-[#8b0000] dark:text-red-400 flex items-center justify-center">
+            <div class="w-12 h-12 rounded-xl bg-red-50 text-[#8b0000] flex items-center justify-center">
                 <span class="material-symbols-outlined text-2xl">category</span>
             </div>
             <div>
-                <span class="text-[10px] uppercase font-bold text-gray-400 block">Materiales Catalogados</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">Materiales en este Almacén</span>
                 <span class="text-2xl font-black text-gray-800 dark:text-gray-100">{{ total_materiales }}</span>
             </div>
         </div>
 
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 flex items-center justify-center">
+            <div class="w-12 h-12 rounded-xl bg-green-50 text-green-700 flex items-center justify-center">
                 <span class="material-symbols-outlined text-2xl">inventory</span>
             </div>
             <div>
-                <span class="text-[10px] uppercase font-bold text-gray-400 block">Total Unidades Físicas</span>
-                <span class="text-2xl font-black text-gray-800 dark:text-gray-100">{{ total_stock_fisico }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">Stock Físico en {{ almacen_seleccionado.nombre }}</span>
+                <span class="text-2xl font-black text-green-700 font-mono">{{ total_stock_fisico }}</span>
             </div>
         </div>
 
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 flex items-center justify-center">
+            <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
                 <span class="material-symbols-outlined text-2xl">warehouse</span>
             </div>
             <div>
-                <span class="text-[10px] uppercase font-bold text-gray-400 block">Almacenes Involucrados</span>
-                <span class="text-2xl font-black text-gray-800 dark:text-gray-100">{{ total_almacenes }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">Depósito Consultado</span>
+                <span class="text-base font-extrabold text-blue-700 block truncate max-w-[180px]">{{ almacen_seleccionado.nombre }}</span>
             </div>
         </div>
     </div>
 
-    <!-- FILTRO DE SECRETARÍA Y UNIDAD -->
+    <!-- FILTROS (ALMACÉN + SECRETARÍA + UNIDAD) -->
+    <!-- FILTROS EN CASCADA (ALMACÉN -> SECRETARÍA -> UNIDAD) -->
     <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-        <form method="GET" class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
-            <!-- Secretaría -->
-            <div class="sm:col-span-5">
-                <label class="block text-xs font-bold uppercase text-gray-500 mb-1.5 font-['Outfit']">1. Filtrar por Secretaría</label>
-                <select name="secretaria_id" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-[#8b0000]">
+        <form method="GET" id="form-filtros-cascada" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end text-xs">
+            
+            <!-- 1. Almacén a Consultar -->
+            <div class="sm:col-span-4">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Almacén a Consultar *</label>
+                <select name="almacen_id" id="select_almacen" onchange="cambiarAlmacenCascada()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#8b0000]">
+                    {% for alm in almacenes_disponibles %}
+                        <option value="{{ alm.id }}" {% if almacen_seleccionado.id == alm.id %}selected{% endif %}>
+                            📍 {{ alm.nombre }} {% if alm.tipo == 'CENTRAL' %}(Central){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 2. Secretaría Departamental -->
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Filtrar Secretaría</label>
+                <select name="secretaria_id" id="select_secretaria" onchange="cambiarSecretariaCascada()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-gray-700 dark:text-gray-300">
                     <option value="">-- Todas las Secretarías --</option>
                     {% for s in secretarias %}
                         <option value="{{ s.id }}" {% if filtro_secretaria_id == s.id|stringformat:"s" %}selected{% endif %}>
@@ -69,14 +83,14 @@
                 </select>
             </div>
 
-            <!-- Unidad -->
-            <div class="sm:col-span-5">
-                <label class="block text-xs font-bold uppercase text-gray-500 mb-1.5 font-['Outfit']">2. Unidad Organizacional</label>
-                <select name="unidad_id" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-[#8b0000]">
+            <!-- 3. Unidad Organizacional -->
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Unidad Organizacional</label>
+                <select name="unidad_id" id="select_unidad" onchange="this.form.submit()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-gray-700 dark:text-gray-300">
                     <option value="">-- Todas las Unidades --</option>
                     {% for u in unidades %}
                         <option value="{{ u.id }}" {% if filtro_unidad_id == u.id|stringformat:"s" %}selected{% endif %}>
-                            {{ u.nombre }} {% if u.secretaria %}({{ u.secretaria.nombre }}){% endif %}
+                            {{ u.nombre }}
                         </option>
                     {% endfor %}
                 </select>
@@ -84,132 +98,139 @@
 
             <!-- Botón -->
             <div class="sm:col-span-2">
-                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow cursor-pointer font-['Outfit']">
+                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 shadow cursor-pointer h-[38px]">
                     <span class="material-symbols-outlined text-[18px]">filter_alt</span> Aplicar Filtro
                 </button>
             </div>
         </form>
     </div>
 
-    <!-- TABLA DE EXISTENCIAS Y CUOTAS CRUZADAS -->
-    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
-        <div class="p-4 bg-gray-50/70 dark:bg-slate-800/40 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center font-['Outfit']">
-            <div>
-                <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-gray-500 text-[18px]">rule</span>
-                    Consolidado de Existencias Físicas vs. Programación Formulario 005
-                </h3>
-                <p class="text-[11px] text-gray-400 mt-0.5">
-                    {% if unidad_seleccionada %}
-                        Mostrando cruce para: <strong class="text-[#8b0000] dark:text-red-400">{{ unidad_seleccionada.nombre }}</strong>
-                    {% else %}
-                        Seleccione una Unidad específica arriba para auditar sus cuotas del Formulario 005.
-                    {% endif %}
-                </p>
+    <script>
+    // Al cambiar de almacén, se resetean secretaría y unidad para cargar las opciones que corresponden
+    function cambiarAlmacenCascada() {
+        const secSelect = document.getElementById('select_secretaria');
+        const uniSelect = document.getElementById('select_unidad');
+        if (secSelect) secSelect.value = '';
+        if (uniSelect) uniSelect.value = '';
+        document.getElementById('form-filtros-cascada').submit();
+    }
+
+    // Al cambiar de secretaría, se resetea la unidad para listar únicamente las oficinas de esa secretaría
+    function cambiarSecretariaCascada() {
+        const uniSelect = document.getElementById('select_unidad');
+        if (uniSelect) uniSelect.value = '';
+        document.getElementById('form-filtros-cascada').submit();
+    }
+    </script>
+    <!-- SECCIÓN ORGANIZADA JERÁRQUICAMENTE POR PARTIDAS -->
+    <div class="space-y-6">
+        {% for grupo in grupos_por_partida %}
+        <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+            
+            <!-- ENCABEZADO DE LA PARTIDA PRESUPUESTARIA -->
+            <div class="p-4 bg-gray-50/90 dark:bg-slate-800/60 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div class="flex items-center gap-3">
+                    <span class="px-3 py-1 rounded-xl text-xs font-black font-mono bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
+                        PARTIDA {{ grupo.partida.codigo }}
+                    </span>
+                    <div>
+                        <h2 class="text-sm font-bold text-gray-900 dark:text-white uppercase">{{ grupo.partida.nombre }}</h2>
+                        <span class="text-[11px] text-gray-400">{{ grupo.total_items }} materiales en {{ almacen_seleccionado.nombre }}</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-gray-400 uppercase font-bold block">Stock Disponible en este Almacén</span>
+                    <span class="text-base font-black text-[#8b0000] dark:text-red-400 font-mono">{{ grupo.stock_total_partida }} unidades</span>
+                </div>
             </div>
-            <span class="px-2.5 py-1 bg-gray-100 dark:bg-slate-800 rounded-full text-xs font-mono font-bold text-gray-600 dark:text-gray-300">
-                {{ items_cruzados|length }} registros
-            </span>
-        </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left">
-                <thead class="bg-gray-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800 font-['Outfit']">
-                    <tr>
-                        <th class="p-3">Código / Material</th>
-                        <th class="p-3 w-32 text-center">Partida</th>
-                        <th class="p-3 w-40">Almacén Despachador</th>
-                        <th class="p-3 text-center w-28">Stock Almacén (Disp.)</th>
-                        {% if unidad_seleccionada %}
-                            <th class="p-3 text-center w-48">Cuota Form. 005 [Prog / Cons / Saldo]</th>
-                            <th class="p-3 text-center w-28">Tope Permitido</th>
-                        {% endif %}
-                        <th class="p-3 text-right w-28">Costo Ref. (Bs.)</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-['Outfit']">
-                    {% for item in items_cruzados %}
-                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
-                        <!-- Código y Nombre -->
-                        <td class="p-3">
-                            <span class="font-mono font-bold text-[#8b0000] dark:text-red-400">{{ item.material.codigo }}</span>
-                            <div class="font-semibold text-gray-800 dark:text-gray-200">{{ item.material.nombre }}</div>
-                            <span class="text-[10px] text-gray-400">{{ item.material.unidad_medida_fk.codigo|default:item.material.unidad_medida }}</span>
-                        </td>
-
-                        <!-- Partida Presupuestaria -->
-                        <td class="p-3 text-center">
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30 font-mono">
-                                {{ item.material.partida.codigo }}
-                            </span>
-                            {% if item.saldo_poa is not None %}
-                                <div class="text-[9px] text-gray-400 font-mono mt-0.5" title="Saldo disponible en el POA de la unidad">
-                                    Disp: Bs. {{ item.saldo_poa|floatformat:2 }}
-                                </div>
+            <!-- TABLA DE MATERIALES DE ESTA PARTIDA -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-100/60 dark:bg-slate-900 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                            <th class="p-3">Código SABS / Material</th>
+                            <th class="p-3 w-40">Almacén Despachador</th>
+                            <th class="p-3 text-center w-28">Stock Almacén (Disp.)</th>
+                            {% if unidad_seleccionada %}
+                                <th class="p-3 text-center w-48">Cuota Form. 005 [Prog / Cons / Saldo]</th>
+                                <th class="p-3 text-center w-28">Tope Permitido</th>
                             {% endif %}
-                        </td>
+                            <th class="p-3 text-right w-28 pr-6">Costo Ref. (Bs.)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        {% for item in grupo.items %}
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                            <!-- Material -->
+                            <td class="p-3 font-semibold text-gray-800 dark:text-gray-200">
+                                <div>{{ item.material.nombre }}</div>
+                                <span class="text-[10px] text-[#8b0000] dark:text-red-400 font-mono font-bold">{{ item.material.codigo }}</span>
+                                <span class="text-[10px] text-gray-400 font-normal">({{ item.material.unidad_medida_fk.codigo|default:item.material.unidad_medida }})</span>
+                            </td>
 
-                        <!-- Almacén -->
-                        <td class="p-3 text-gray-600 dark:text-gray-300">
-                            <div class="flex items-center gap-1 font-medium">
-                                <span class="material-symbols-outlined text-[14px] text-[#8b0000]">location_on</span>
-                                {{ item.almacen.nombre }}
-                            </div>
-                        </td>
-
-                        <!-- Stock en Almacén -->
-                        <td class="p-3 text-center">
-                            <span class="font-mono font-extrabold text-sm {% if item.stock_disponible <= 0 %}text-red-600{% else %}text-gray-800 dark:text-gray-100{% endif %}">
-                                {{ item.stock_disponible }}
-                            </span>
-                            <span class="text-[10px] text-gray-400 block font-normal">(Físico: {{ item.stock_fisico }})</span>
-                        </td>
-
-                        <!-- Cuotas del Formulario 005 (Solo si se filtró por unidad) -->
-                        {% if unidad_seleccionada %}
-                        <td class="p-3 text-center">
-                            {% if item.tiene_cuota %}
-                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-gray-700 font-mono text-xs">
-                                    <span class="text-gray-700 dark:text-gray-300 font-bold" title="Programado Anual">{{ item.cuota_programada }}</span>
-                                    <span class="text-gray-300">/</span>
-                                    <span class="text-purple-600 dark:text-purple-400 font-bold" title="Retirado a la fecha">{{ item.cuota_consumida }}</span>
-                                    <span class="text-gray-300">/</span>
-                                    <span class="font-black {% if item.saldo_cuota <= 0 %}text-red-600{% else %}text-green-600{% endif %}" title="Saldo de Cuota Remanente">
-                                        {{ item.saldo_cuota }}
-                                    </span>
-                                </div>
-                                <span class="text-[9px] text-gray-400 block mt-0.5">Actividad: {{ item.item_005.codigo_actividad_poa }}</span>
-                            {% else %}
-                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">
-                                    Bolsa Común (Sin Cuota)
+                            <!-- Almacén -->
+                            <td class="p-3 text-gray-600 dark:text-gray-300">
+                                <span class="font-medium flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px] text-[#8b0000]">location_on</span>
+                                    {{ item.almacen.nombre }}
                                 </span>
+                            </td>
+
+                            <!-- Stock en Almacén -->
+                            <td class="p-3 text-center">
+                                <span class="font-mono font-black text-sm {% if item.stock_disponible <= 0 %}text-red-600{% else %}text-gray-900 dark:text-gray-100{% endif %}">
+                                    {{ item.stock_disponible }}
+                                </span>
+                                <span class="text-[10px] text-gray-400 block font-normal">(Físico: {{ item.stock_fisico }})</span>
+                            </td>
+
+                            <!-- Cuota Formulario 005 (Si hay unidad seleccionada) -->
+                            {% if unidad_seleccionada %}
+                            <td class="p-3 text-center">
+                                {% if item.tiene_cuota %}
+                                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-gray-700 font-mono text-xs">
+                                        <span class="text-gray-700 dark:text-gray-300 font-bold" title="Programado Anual">{{ item.cuota_programada }}</span>
+                                        <span class="text-gray-300">/</span>
+                                        <span class="text-purple-600 dark:text-purple-400 font-bold" title="Retirado a la fecha">{{ item.cuota_consumida }}</span>
+                                        <span class="text-gray-300">/</span>
+                                        <span class="font-black {% if item.saldo_cuota <= 0 %}text-red-600{% else %}text-green-600{% endif %}" title="Saldo de Cuota Remanente">
+                                            {{ item.saldo_cuota }}
+                                        </span>
+                                    </div>
+                                    <span class="text-[9px] text-gray-400 block mt-0.5 font-mono">Actividad: {{ item.item_005.codigo_actividad_poa }}</span>
+                                {% else %}
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">
+                                        Bolsa Común (Sin Cuota)
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Tope Permitido -->
+                            <td class="p-3 text-center">
+                                <span class="px-2.5 py-1 rounded-xl text-xs font-black font-mono inline-block {% if item.tope_permitido <= 0 %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                                    {{ item.tope_permitido }}
+                                </span>
+                            </td>
                             {% endif %}
-                        </td>
 
-                        <!-- Tope Permitido -->
-                        <td class="p-3 text-center">
-                            <span class="px-2.5 py-1 rounded-xl text-xs font-black font-mono inline-block {% if item.tope_permitido <= 0 %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
-                                {{ item.tope_permitido }}
-                            </span>
-                        </td>
-                        {% endif %}
-
-                        <!-- Costo Referencial (Discreto) -->
-                        <td class="p-3 text-right font-mono text-gray-500 dark:text-gray-400">
-                            Bs. {{ item.costo_referencial|floatformat:2 }}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="{% if unidad_seleccionada %}7{% else %}5{% endif %}" class="p-8 text-center text-gray-400">
-                            <span class="material-symbols-outlined text-3xl mb-1 block text-gray-300 dark:text-gray-700">inventory_2</span>
-                            No se encontraron existencias físicas en los almacenes autorizados para esta consulta.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            <!-- Costo Referencial -->
+                            <td class="p-3 text-right pr-6 font-mono text-gray-500 dark:text-gray-400">
+                                Bs. {{ item.costo_referencial|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+        {% empty %}
+        <div class="card p-12 text-center text-gray-400">
+            <span class="material-symbols-outlined text-4xl mb-2 block">inventory_2</span>
+            No existen materiales registrados para los filtros seleccionados en {{ almacen_seleccionado.nombre }}.
+        </div>
+        {% endfor %}
     </div>
+
 </div>
 {% endblock %}

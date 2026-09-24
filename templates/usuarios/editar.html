@@ -176,38 +176,52 @@ Editar Usuario
                 </div>
             </div>
 <!-- ALMACENES AUTORIZADOS (Para la Edición de Permisos) -->
-            <div id="seccion_almacenes" class="md:col-span-2 border border-gray-200 rounded-2xl p-6 bg-gray-50/50">
-                <h3 class="text-sm font-bold text-gray-700 font-['Outfit'] mb-1">
-                    Almacenes Autorizados
-                </h3>
-                <p class="text-xs text-gray-500 mb-4">
-                    Marque los almacenes donde este funcionario tiene permisos para realizar registros físicos o de kardex.
-                </p>
-                
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <!-- BLOQUE DE ALMACENES AUTORIZADOS -->
+            <div class="p-5 rounded-2xl bg-gray-50/70 dark:bg-slate-800/40 border border-gray-200/80 dark:border-gray-800 space-y-3 font-['Outfit']">
+                <div>
+                    <span class="text-xs font-bold uppercase text-gray-700 dark:text-gray-200 block tracking-wider">
+                        Almacenes Autorizados
+                    </span>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                        Marque los almacenes o depósitos donde este funcionario tiene potestad para realizar registros físicos, recepciones o auditoría de Kardex.
+                    </p>
+                </div>
+
+                <!-- GRID DE CHECKBOXES DE ALMACENES -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
                     {% for alm in almacenes %}
-                        <label class="flex items-start gap-3 bg-white p-4 rounded-xl border border-gray-200 hover:border-[#8b0000] cursor-pointer transition">
-                            <input
-                                type="checkbox"
-                                name="almacenes"
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 hover:border-[#8b0000] cursor-pointer transition select-none">
+                            <input 
+                                type="checkbox" 
+                                name="almacenes_autorizados" 
                                 value="{{ alm.id }}"
-                                class="checkbox-almacen rounded text-[#8b0000] focus:ring-[#8b0000] h-5 w-5 border-gray-300 mt-0.5"
-                                {% if alm.id in almacenes_autorizados_ids %}checked{% endif %}
+                                {% if alm.id in almacenes_asignados_ids %}checked{% endif %}
+                                class="w-4 h-4 accent-[#8b0000] rounded focus:ring-0 cursor-pointer"
                             >
-                            <div class="flex flex-col">
-                                <span class="text-sm font-bold text-gray-800">{{ alm.nombre }}</span>
-                                <span class="text-xs text-gray-500 mt-1 uppercase font-semibold">
-                                    {% if alm.tipo == 'CENTRAL' %}Almacén Central{% else %}Subalmacén{% endif %}
+                            <div class="text-xs">
+                                <span class="font-bold text-gray-800 dark:text-gray-100 block">
+                                    📍 {{ alm.nombre }}
+                                </span>
+                                <span class="text-[10px] text-gray-400 block font-normal">
+                                    {% if alm.tipo == 'CENTRAL' %}Almacén Central (Sede){% else %}Subalmacén Seccional{% endif %}
                                 </span>
                             </div>
                         </label>
                     {% empty %}
-                        <div class="col-span-full text-center text-sm text-gray-500 py-2">
-                            No existen almacenes registrados en el sistema.
+                        <div class="col-span-3 text-center py-4 text-xs text-gray-400">
+                            No existen almacenes activos registrados en el sistema.
                         </div>
                     {% endfor %}
                 </div>
+
+                <!-- AVISO AUTOMÁTICO SI ES ADMINISTRADOR -->
+                <div id="aviso_admin" class="hidden p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 text-blue-700 dark:text-blue-400 text-xs font-semibold flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">verified_user</span>
+                    <span>Como <strong>Administrador</strong>, este usuario tendrá automáticamente acceso global a todos los almacenes de la Gobernación.</span>
+                </div>
             </div>
+
+            
             <!-- BOTONES DE ACCIÓN (Alineados a la derecha) -->
             <div class="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3 pt-4 border-t border-gray-100">
                 
@@ -296,6 +310,24 @@ if (secretariaSelect && unidadSelect) {
         selectRol.addEventListener('change', alternarVisibilidadAlmacenes);
         alternarVisibilidadAlmacenes(); // Sincronización inicial
     }
+// Script para mostrar el aviso si eligen rol Administrador
+    document.addEventListener('DOMContentLoaded', function() {
+        const rolSelect = document.querySelector('select[name="rol"]');
+        const avisoAdmin = document.getElementById('aviso_admin');
+
+        function evaluarRol() {
+            if (rolSelect && rolSelect.value === 'ADMINISTRADOR') {
+                avisoAdmin.classList.remove('hidden');
+            } else if (avisoAdmin) {
+                avisoAdmin.classList.add('hidden');
+            }
+        }
+
+        if (rolSelect) {
+            rolSelect.addEventListener('change', evaluarRol);
+            evaluarRol();
+        }
+    });
 </script>
 
 {% endblock %}

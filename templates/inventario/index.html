@@ -169,51 +169,54 @@
                             <th class="px-6 py-3">Código SABS</th>
                             <th class="px-6 py-3">Subpartida / Descripción del Material</th>
                             <th class="px-6 py-3 text-center w-24">U. Manejo</th>
-                            <th class="px-6 py-3 text-center w-48">Stock en {{ almacen_seleccionado.nombre }}</th>
-                            <th class="px-6 py-3 text-center w-24">Stock Mínimo</th>
+                            <th class="px-6 py-3 text-center w-36">Stock en {{ almacen_seleccionado.nombre }}</th>
                             <th class="px-6 py-3 text-center w-28">Estado</th>
-                            <th class="px-6 py-3 text-right w-36 pr-8">Acciones</th>
+                            <th class="px-6 py-3 text-right w-32 pr-8">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-['Outfit']">
                         {% for item in grupo.materiales_data %}
                         <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
-                            <td class="px-6 py-3.5 font-mono font-bold text-[#8b0000] dark:text-red-400">{{ item.material.codigo }}</td>
-                            <td class="px-6 py-3.5 font-semibold text-gray-800 dark:text-gray-200">{{ item.material.nombre }}</td>
-                            <td class="px-6 py-3.5 text-center font-bold text-gray-600 dark:text-gray-400">{{ item.material.unidad_medida_fk.codigo|default:item.material.unidad_medida }}</td>
+                            <!-- 1. Código SABS -->
+                            <td class="px-6 py-3.5 font-mono font-bold text-[#8b0000] dark:text-red-400">
+                                {{ item.material.codigo }}
+                            </td>
+
+                            <!-- 2. Nombre del Material -->
+                            <td class="px-6 py-3.5 font-semibold text-gray-800 dark:text-gray-200">
+                                {{ item.material.nombre }}
+                            </td>
+
+                            <!-- 3. Unidad de Manejo -->
+                            <td class="px-6 py-3.5 text-center font-bold text-gray-600 dark:text-gray-400">
+                                {{ item.material.unidad_medida_fk.codigo|default:item.material.unidad_medida }}
+                            </td>
                             
-                            <!-- Stock físico del Almacén y desglose en otros depósitos -->
+                            <!-- 4. Stock ÚNICO del Almacén Actual (SIN etiquetas molestas de otros almacenes) -->
+                            <td class="px-6 py-3.5 text-center font-mono font-black text-sm text-gray-900 dark:text-gray-100">
+                                {{ item.stock_almacen }}
+                            </td>
+
+                            <!-- 5. Estado Limpio (Disponible vs Agotado) -->
                             <td class="px-6 py-3.5 text-center">
-                                <span class="font-mono font-black text-sm text-gray-900 dark:text-gray-100 block">{{ item.stock_almacen }}</span>
-                                {% if item.desglose %}
-                                    <div class="flex flex-wrap justify-center gap-1 mt-1">
-                                        {% for d in item.desglose %}
-                                            {% if d.almacen != almacen_seleccionado.nombre %}
-                                                <span class="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-500 font-mono" title="{{ d.almacen }}: {{ d.stock_disponible }} disponibles">
-                                                    📍 {{ d.almacen|truncatechars:10 }}: {{ d.stock_fisico }}
-                                                </span>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </div>
+                                {% if item.stock_almacen > 0 %}
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
+                                        Disponible
+                                    </span>
+                                {% else %}
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800">
+                                        Agotado
+                                    </span>
                                 {% endif %}
                             </td>
 
-                            <td class="px-6 py-3.5 text-center font-mono text-gray-400">{{ item.material.stock_minimo }}</td>
-                            <td class="px-6 py-3.5 text-center">
-                                {% if item.stock_almacen == 0 %}
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">Agotado</span>
-                                {% elif item.stock_almacen <= item.material.stock_minimo %}
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">Bajo Stock</span>
-                                {% else %}
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">Disponible</span>
-                                {% endif %}
-                            </td>
+                            <!-- 6. Acciones -->
                             <td class="px-6 py-3.5 text-right pr-8 whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-1.5">
                                     <a href="{% url 'kardex' item.material.id %}?almacen={{ almacen_seleccionado.id }}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-blue-50 text-blue-600 inline-flex items-center justify-center transition shadow-sm" title="Ver Libro de Almacén / Kardex">
                                         <span class="material-symbols-outlined text-[16px]">menu_book</span>
                                     </a>
-                                    {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR' %}
+                                    {% if request.user.perfilusuario.rol in 'ALMACENERO,ADMINISTRADOR,ADMIN_ALMACENES' %}
                                         <a href="{% url 'editar_material' item.material.id %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-amber-50 text-[#d97706] inline-flex items-center justify-center transition shadow-sm" title="Editar catalogación">
                                             <span class="material-symbols-outlined text-[16px]">edit</span>
                                         </a>
