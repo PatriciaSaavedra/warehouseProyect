@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db import models
@@ -5,24 +6,28 @@ from django.db.models import F, Q
 
 from inventario.models import Material, MovimientoInventario, InventarioAlmacen, Almacen
 from solicitudes.models import Solicitud
+from inventario.services import obtener_alertas_tempranas  # <-- IMPORT DEL MOTOR DE ALERTAS
 
 
 @login_required
 def dashboard_view(request):
     """
-    Panel de Control contextualizado:
-    - Administrador / Admin de Almacenes: Métricas macro de toda la Gobernación.
-    - Almacenero Seccional (Pedro en UNASBA): Métricas aisladas de su depósito y despachos locales.
-    - Unidad Solicitante (Sebastián en Archivo): Resumen de sus requerimientos personales.
+    Panel de Control contextualizado con Centro de Alertas Tempranas SABS:
+    - Administrador / SAF: Métricas macro y alertas de toda la Gobernación.
+    - Almacenero Seccional (Pedro en UNASBA): Métricas y alertas aisladas de su depósito.
+    - Unidad Solicitante (Sebastián en Archivo): Resumen y alertas de su oficina.
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
 
     # 1. Determinar el alcance del usuario
     es_admin_global = (
-        rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'SECRETARIO_SAF'] or 
+        rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'SECRETARIO_SAF', 'PRESUPUESTOS'] or 
         request.user.is_superuser
     )
+
+    # 2. Obtener las alertas del motor centralizado (Tarjeta 7)
+    alertas = obtener_alertas_tempranas(request.user)
 
     if es_admin_global:
         # ========================================================
@@ -35,8 +40,6 @@ def dashboard_view(request):
 
         total_materiales = Material.objects.filter(is_active=True).count()
         total_solicitudes = Solicitud.objects.count()
-
-        # CORREGIDO: En tu modelo el estado inicial real es 'REGISTRADA'
         solicitudes_pendientes = Solicitud.objects.filter(estado='REGISTRADA').count()
 
         total_movimientos = MovimientoInventario.objects.count()
@@ -55,12 +58,10 @@ def dashboard_view(request):
             is_active=True
         ).distinct()
 
-        # Existencias físicas del almacén asignado
         items_almacen = InventarioAlmacen.objects.filter(
             almacen__in=almacenes_user
         ).select_related('material', 'material__unidad_medida_fk')
 
-        # Alerta: materiales en bajo stock físico en su depósito
         ids_bajos = [
             inv.material_id for inv in items_almacen 
             if inv.stock_fisico <= inv.material.stock_minimo
@@ -69,7 +70,6 @@ def dashboard_view(request):
 
         total_materiales = items_almacen.filter(stock_fisico__gt=0).values('material_id').distinct().count()
 
-        # Solicitudes que deben ser atendidas por su almacén
         unidades_atendidas_ids = almacenes_user.values_list('unidades_atendidas', flat=True)
         solicitudes_almacen = Solicitud.objects.filter(
             Q(unidad_solicitante__in=unidades_atendidas_ids) |
@@ -82,6 +82,12 @@ def dashboard_view(request):
         movimientos_recientes = MovimientoInventario.objects.filter(
             almacen__in=almacenes_user
         ).select_related('material', 'almacen', 'usuario').order_by('-id')[:5]
+
+        # Contextualizar alertas de almacén: solo mostrar agotados que afecten sus depósitos
+        ids_almacen = list(almacenes_user.values_list('id', flat=True))
+        alertas['materiales_agotados'] = alertas['materiales_agotados'].filter(
+            inventarios_almacen__almacen_id__in=ids_almacen
+        ).distinct()
 
     else:
         # ========================================================
@@ -97,6 +103,15 @@ def dashboard_view(request):
         total_movimientos = 0
         movimientos_recientes = []
 
+        # Contextualizar alertas para el solicitante: solo las alertas de su propia oficina
+        if perfil and perfil.unidad:
+            alertas['poas_criticos'] = [p for p in alertas['poas_criticos'] if p['poa'].unidad == perfil.unidad]
+            alertas['cuotas_criticas'] = [c for c in alertas['cuotas_criticas'] if c['unidad'] == perfil.unidad]
+            alertas['materiales_vencidos'] = Material.objects.none()
+            alertas['materiales_por_vencer'] = Material.objects.none()
+            alertas['total_criticas'] = len([p for p in alertas['poas_criticos'] if p['es_cero']]) + len([c for c in alertas['cuotas_criticas'] if c['agotado']])
+            alertas['total_advertencias'] = len([p for p in alertas['poas_criticos'] if not p['es_cero']]) + len([c for c in alertas['cuotas_criticas'] if not c['agotado']])
+
     return render(
         request,
         'dashboard/index.html',
@@ -107,6 +122,7 @@ def dashboard_view(request):
             'solicitudes_pendientes': solicitudes_pendientes,
             'total_movimientos': total_movimientos,
             'movimientos_recientes': movimientos_recientes,
+            'alertas': alertas,  # <-- Inyectado en el context para el bloque de semáforos
             'rol': rol,
         }
     )

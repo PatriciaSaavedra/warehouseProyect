@@ -183,10 +183,29 @@
                             </td>
 
                             <!-- 2. Nombre del Material -->
+                            <!-- Debajo del nombre del material en inventario/templates/inventario/index.html: -->
                             <td class="px-6 py-3.5 font-semibold text-gray-800 dark:text-gray-200">
-                                {{ item.material.nombre }}
+                                <div>{{ item.material.nombre }}</div>
+                                
+                                <!-- AVISO DE CADUCIDAD TEMPRANA -->
+                                {% if item.material.fecha_vencimiento %}
+                                    {% if item.material.estado_vencimiento == 'VENCIDO' %}
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black bg-red-100 text-red-800 border border-red-300 mt-0.5">
+                                            <span class="material-symbols-outlined text-[12px]">error</span>
+                                            VENCIDO ({{ item.material.fecha_vencimiento|date:"d/m/Y" }})
+                                        </span>
+                                    {% elif item.material.estado_vencimiento == 'POR_VENCER_CRITICO' %}
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 mt-0.5 animate-pulse">
+                                            <span class="material-symbols-outlined text-[12px]">warning</span>
+                                            Vence en {{ item.material.dias_para_vencer }} días ({{ item.material.fecha_vencimiento|date:"d/m/Y" }})
+                                        </span>
+                                    {% else %}
+                                        <span class="text-[9px] text-gray-400 font-mono block mt-0.5">
+                                            Caducidad: {{ item.material.fecha_vencimiento|date:"d/m/Y" }}
+                                        </span>
+                                    {% endif %}
+                                {% endif %}
                             </td>
-
                             <!-- 3. Unidad de Manejo -->
                             <td class="px-6 py-3.5 text-center font-bold text-gray-600 dark:text-gray-400">
                                 {{ item.material.unidad_medida_fk.codigo|default:item.material.unidad_medida }}

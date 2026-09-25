@@ -90,7 +90,145 @@ Dashboard
         </div>
 
     </div>
+    <!-- CENTRO DE ALERTAS TEMPRANAS SABS (TARJETA 7) -->
+    <div class="space-y-4 font-['Outfit'] mb-8">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-extrabold text-gray-850 dark:text-gray-100 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[#8b0000] dark:text-red-400 text-2xl">notification_important</span>
+                Centro de Alertas Tempranas Institucionales
+            </h2>
+            <div class="flex items-center gap-2">
+                {% if alertas.total_criticas > 0 %}
+                    <span class="px-2.5 py-1 bg-red-100 text-red-800 text-xs font-black rounded-full animate-pulse border border-red-300">
+                        🚨 {{ alertas.total_criticas }} Críticas
+                    </span>
+                {% endif %}
+                {% if alertas.total_advertencias > 0 %}
+                    <span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-full border border-amber-300">
+                        ⚠️ {{ alertas.total_advertencias }} Advertencias
+                    </span>
+                {% endif %}
+            </div>
+        </div>
 
+        <!-- REJILLA DE 4 PANELES DE ALERTA -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            
+            <!-- 1. VENCIMIENTOS -->
+            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.materiales_vencidos.exists %}border-red-300 bg-red-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase text-gray-400">Caducidad / Perecederos</span>
+                    <span class="material-symbols-outlined text-red-600 text-xl">event_busy</span>
+                </div>
+                <div>
+                    <span class="text-2xl font-black text-gray-900 dark:text-gray-100 font-mono">
+                        {{ alertas.materiales_vencidos.count|add:alertas.materiales_por_vencer.count }}
+                    </span>
+                    <span class="text-[10px] text-gray-400 block mt-0.5">insumos con alerta</span>
+                </div>
+                
+                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
+                    {% for m in alertas.materiales_vencidos %}
+                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-red-50 dark:bg-red-950/30 rounded-lg text-red-700 dark:text-red-400">
+                            <span class="truncate font-semibold max-w-[130px]" title="{{ m.nombre }}">{{ m.nombre }}</span>
+                            <span class="font-bold font-mono">VENCIDO</span>
+                        </div>
+                    {% empty %}
+                        {% for m in alertas.materiales_por_vencer %}
+                            <div class="flex justify-between items-center text-[11px] p-1.5 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-amber-800 dark:text-amber-400">
+                                <span class="truncate font-semibold max-w-[130px]" title="{{ m.nombre }}">{{ m.nombre }}</span>
+                                <span class="font-bold font-mono">{{ m.dias_para_vencer }}d</span>
+                            </div>
+                        {% empty %}
+                            <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Sin productos por vencer</span>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 2. DESABASTECIMIENTO (STOCK AGOTADO) -->
+            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.materiales_agotados.exists %}border-red-300 bg-red-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase text-gray-400">Almacén (Stock Cero)</span>
+                    <span class="material-symbols-outlined text-red-600 text-xl">production_quantity_limits</span>
+                </div>
+                <div>
+                    <span class="text-2xl font-black text-gray-900 dark:text-gray-100 font-mono">
+                        {{ alertas.materiales_agotados.count }}
+                    </span>
+                    <span class="text-[10px] text-gray-400 block mt-0.5">materiales agotados</span>
+                </div>
+
+                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
+                    {% for m in alertas.materiales_agotados|slice:":4" %}
+                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                            <span class="truncate font-semibold max-w-[140px]" title="{{ m.nombre }}">{{ m.nombre }}</span>
+                            <a href="{% url 'nueva_solicitud_compra' %}" class="text-[10px] font-bold text-[#8b0000] hover:underline" title="Iniciar compra">Comprar</a>
+                        </div>
+                    {% empty %}
+                        <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Existencias normales</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 3. PRESUPUESTO CRÍTICO POA (< 15%) -->
+            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.poas_criticos %}border-amber-300 bg-amber-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase text-gray-400">Presupuesto POA (&lt; 15%)</span>
+                    <span class="material-symbols-outlined text-amber-600 text-xl">account_balance_wallet</span>
+                </div>
+                <div>
+                    <span class="text-2xl font-black text-amber-700 dark:text-amber-400 font-mono">
+                        {{ alertas.poas_criticos|length }}
+                    </span>
+                    <span class="text-[10px] text-gray-400 block mt-0.5">partidas en riesgo</span>
+                </div>
+
+                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
+                    {% for p in alertas.poas_criticos|slice:":4" %}
+                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-amber-900 dark:text-amber-300">
+                            <div class="truncate max-w-[120px]" title="{{ p.poa.unidad.nombre }} - Partida {{ p.poa.partida.codigo }}">
+                                <strong>{{ p.poa.partida.codigo }}</strong> • {{ p.poa.unidad.nombre|truncatechars:12 }}
+                            </div>
+                            <a href="{% url 'traspaso_entre_partidas' %}" class="text-[10px] font-bold text-[#8b0000] font-mono hover:underline">
+                                Bs. {{ p.saldo_disponible|floatformat:0 }}
+                            </a>
+                        </div>
+                    {% empty %}
+                        <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Presupuestos estables</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 4. CUOTAS FÍSICAS FORM. 005 (> 85%) -->
+            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.cuotas_criticas %}border-purple-300 bg-purple-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase text-gray-400">Cuotas Form. 005 (&gt; 85%)</span>
+                    <span class="material-symbols-outlined text-purple-600 text-xl">assignment_late</span>
+                </div>
+                <div>
+                    <span class="text-2xl font-black text-purple-700 dark:text-purple-400 font-mono">
+                        {{ alertas.cuotas_criticas|length }}
+                    </span>
+                    <span class="text-[10px] text-gray-400 block mt-0.5">insumos al límite</span>
+                </div>
+
+                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
+                    {% for c in alertas.cuotas_criticas|slice:":4" %}
+                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-purple-50 dark:bg-purple-950/30 rounded-lg text-purple-900 dark:text-purple-300">
+                            <div class="truncate max-w-[130px]" title="{{ c.material.nombre }} - {{ c.unidad.nombre }}">
+                                {{ c.material.nombre|truncatechars:15 }} ({{ c.unidad.nombre|truncatechars:10 }})
+                            </div>
+                            <span class="font-bold font-mono text-[10px]">{{ c.pct_consumido }}%</span>
+                        </div>
+                    {% empty %}
+                        <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Cuotas bajo control</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+    </div>
     <!-- ALERTAS DE STOCK (Indicadores y advertencias adaptadas) -->
     <div class="card p-6 mb-8 shadow-sm">
         
@@ -136,6 +274,7 @@ Dashboard
         {% endif %}
 
     </div>
+    
 
     <!-- GRÁFICO DE BARRAS Y ACTIVIDAD RECIENTE -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

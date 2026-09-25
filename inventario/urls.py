@@ -21,6 +21,7 @@ urlpatterns = [
     path('almacenes/editar/<int:id>/', views.editar_almacen, name='editar_almacen'),
     path('almacenes/toggle/<int:id>/', views.toggle_almacen, name='toggle_almacen'), 
     path('reporte/consumo/', views.reporte_consumo_unidades, name='reporte_consumo_unidades'),
+    path('reporte-consumo/', views.reporte_consumo_unidades, name='reporte_consumo_unidades'),
     path('entrada/obtener-items-compra/', views.obtener_items_compra_view, name='obtener_items_compra'),
     path('api/items-compra/', views.obtener_items_compra_view, name='api_items_compra'),
 

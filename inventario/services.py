@@ -1,9 +1,15 @@
-# inventario/services.py
-
 from .models import Material, MovimientoInventario, InventarioAlmacen, Almacen
 from decimal import Decimal
 from django.db import transaction
 from django.core.exceptions import ValidationError
+
+from datetime import date, timedelta
+from decimal import Decimal
+from django.utils import timezone
+from inventario.models import Material, Almacen, InventarioAlmacen
+from presupuestos.models import POA, DetalleProgramacionPOA
+from django.db.models import F  
+
 
 # ========================================================
 # 1. SALIDAS VALORADAS (PEPS)
@@ -166,3 +172,113 @@ def validar_operacion_almacen(usuario, almacen):
         raise ValidationError("Tu usuario no tiene un perfil de roles asignado en el sistema.")
     
     return True
+
+def obtener_alertas_tempranas(usuario=None):
+    """
+    Tarjeta 7: Motor centralizado de Alertas Tempranas del SGA (GAD Potosí).
+    Retorna un diccionario con alertas de:
+    - Vencimientos (Perecederos)
+    - Stock físico crítico / agotado
+    - Techos presupuestarios POA (< 15%)
+    - Cuotas físicas Formulario 005 (> 85%)
+    """
+    hoy = timezone.now().date()
+    en_30_dias = hoy + timedelta(days=30)
+    gestion_actual = hoy.year
+
+    # 1. ALERTAS DE VENCIMIENTO (Materiales perecederos)
+    materiales_vencidos = Material.objects.filter(
+        is_active=True,
+        fecha_vencimiento__lt=hoy
+    ).select_related('unidad_medida_fk', 'partida').order_by('fecha_vencimiento')
+
+    materiales_por_vencer = Material.objects.filter(
+        is_active=True,
+        fecha_vencimiento__gte=hoy,
+        fecha_vencimiento__lte=en_30_dias
+    ).select_related('unidad_medida_fk', 'partida').order_by('fecha_vencimiento')
+
+    # 2. ALERTAS DE EXISTENCIAS (Agotados en Almacenes)
+    materiales_agotados = Material.objects.filter(
+        is_active=True,
+        stock_actual=0
+    ).select_related('partida', 'unidad_medida_fk').order_by('partida__codigo', 'nombre')
+
+    materiales_bajo_stock = (
+        Material.objects.filter(
+            is_active=True, stock_actual__gt=0, stock_actual__lte=F('stock_minimo')
+        )
+        .select_related('partida', 'unidad_medida_fk')
+        .order_by('stock_actual')
+    )
+    # 3. ALERTAS DE PRESUPUESTO CRÍTICO EN POA (< 15% disponible)
+    poas_criticos = []
+    poas_activos = POA.objects.filter(
+        gestion=gestion_actual,
+        monto_inicial__gt=0
+    ).select_related('unidad', 'unidad__secretaria', 'partida')
+
+    for p in poas_activos:
+        limite_15 = p.monto_inicial * Decimal('0.15')
+        if p.monto_disponible <= limite_15:
+            pct = p.porcentaje_ejecucion
+            poas_criticos.append({
+                'poa': p,
+                'saldo_disponible': p.monto_disponible,
+                'monto_inicial': p.monto_inicial,
+                'pct_consumido': pct,
+                'es_cero': (p.monto_disponible <= Decimal('0.00'))
+            })
+
+    # Ordenar primero los que están en Bs. 0.00
+    poas_criticos.sort(key=lambda x: x['saldo_disponible'])
+
+    # 4. ALERTAS DE CUOTAS DEL FORMULARIO 005 (> 85% consumido)
+    cuotas_criticas = []
+    items_005 = DetalleProgramacionPOA.objects.filter(
+        poa__gestion=gestion_actual,
+        cantidad_programada__gt=0
+    ).select_related('poa__unidad', 'material', 'poa__partida')
+
+    for it in items_005:
+        pct_cant = (it.cantidad_consumida / it.cantidad_programada) * 100
+        if pct_cant >= 85:
+            cuotas_criticas.append({
+                'item': it,
+                'unidad': it.poa.unidad,
+                'material': it.material,
+                'programado': it.cantidad_programada,
+                'consumido': it.cantidad_consumida,
+                'disponible': it.cantidad_disponible,
+                'pct_consumido': round(pct_cant, 1),
+                'agotado': (it.cantidad_disponible == 0)
+            })
+
+    cuotas_criticas.sort(key=lambda x: x['disponible'])
+
+    # Métricas de conteo total
+    total_criticas = (
+        materiales_vencidos.count() +
+        materiales_agotados.count() +
+        len([p for p in poas_criticos if p['es_cero']]) +
+        len([c for c in cuotas_criticas if c['agotado']])
+    )
+
+    total_advertencias = (
+        materiales_por_vencer.count() +
+        materiales_bajo_stock.count() +
+        len([p for p in poas_criticos if not p['es_cero']]) +
+        len([c for c in cuotas_criticas if not c['agotado']])
+    )
+
+    return {
+        'materiales_vencidos': materiales_vencidos,
+        'materiales_por_vencer': materiales_por_vencer,
+        'materiales_agotados': materiales_agotados,
+        'materiales_bajo_stock': materiales_bajo_stock,
+        'poas_criticos': poas_criticos,
+        'cuotas_criticas': cuotas_criticas,
+        'total_criticas': total_criticas,
+        'total_advertencias': total_advertencias,
+        'total_alertas': total_criticas + total_advertencias,
+    }

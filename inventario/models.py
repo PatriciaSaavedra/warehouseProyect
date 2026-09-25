@@ -81,45 +81,43 @@ class Almacen(models.Model):
         verbose_name = "Almacén"
         verbose_name_plural = "Almacenes"
         
+
 class Material(models.Model):
-    partida = models.ForeignKey(
-        PartidaPresupuestaria,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
+    partida = models.ForeignKey(PartidaPresupuestaria, on_delete=models.PROTECT, null=True, blank=True)
     codigo = models.CharField(max_length=50, unique=True)
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True, null=True)
-    stock_actual = models.IntegerField(default=0)  # Iniciará en 0 al crearse
+    stock_actual = models.IntegerField(default=0)
     stock_minimo = models.IntegerField(default=5)
     unidad_medida = models.CharField(max_length=50)
-    unidad_medida_fk = models.ForeignKey(
-        UnidadMedida,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
+    unidad_medida_fk = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, null=True, blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
-    def __str__(self):
-        return self.nombre
-    
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['partida', 'nombre'],
-                name='material_unico_por_partida'
-            )
-        ]
+    fecha_vencimiento = models.DateField(
+        null=True, 
+        blank=True, 
+        help_text="Fecha de vencimiento opcional para productos perecederos (químicos, tintas, limpieza, etc.)"
+    )
 
     @property
-    def tiene_movimientos(self):
-        """
-        Retorna True si el material ya cuenta con movimientos en el Kardex.
-        """
-        return self.movimientoinventario_set.exists()
+    def dias_para_vencer(self):
+        if self.fecha_vencimiento:
+            from django.utils import timezone
+            return (self.fecha_vencimiento - timezone.now().date()).days
+        return None
 
+    @property
+    def estado_vencimiento(self):
+        dias = self.dias_para_vencer
+        if dias is None:
+            return 'SIN_VENCIMIENTO'
+        if dias < 0:
+            return 'VENCIDO'
+        elif dias <= 30:
+            return 'POR_VENCER_CRITICO'  # Menos de 30 días
+        elif dias <= 60:
+            return 'POR_VENCER_ALERTA'   # Menos de 60 días
+        return 'VIGENTE'
 
 class InventarioAlmacen(models.Model):
     """

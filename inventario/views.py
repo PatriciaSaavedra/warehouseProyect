@@ -1386,7 +1386,7 @@ def registrar_baja(request):
 
 
 @login_required
-@rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def nuevo_material(request):
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
     unidades = UnidadMedida.objects.all().order_by('nombre')
@@ -1398,29 +1398,20 @@ def nuevo_material(request):
         descripcion = request.POST.get('descripcion', '').strip()
         unidad_id = request.POST.get('unidad_medida_fk')
         stock_minimo = request.POST.get('stock_minimo', 5)
+        
+        # Captura fecha de vencimiento (opcional)
+        fecha_venc_raw = request.POST.get('fecha_vencimiento', '').strip()
+        fecha_vencimiento = parse_date(fecha_venc_raw) if fecha_venc_raw else None
 
         if not codigo or not nombre or not unidad_id:
-            messages.error(request, "Los campos con asterisco (Código, Nombre y Unidad de Medida) son obligatorios.")
+            messages.error(request, "Los campos Código, Nombre y Unidad de Medida son obligatorios.")
             return redirect('nuevo_material')
 
         partida = get_object_or_404(PartidaPresupuestaria, id=partida_id) if partida_id else None
         unidad = get_object_or_404(UnidadMedida, id=unidad_id)
 
-        if partida and not codigo.startswith(partida.codigo):
-            messages.error(
-                request, 
-                f"Error de Codificación SABS: El código del material debe comenzar obligatoriamente con el código de su partida presupuestaria ({partida.codigo}). Ejemplo: {partida.codigo}-0001"
-            )
-            return redirect('nuevo_material')
-
-        if '-' in codigo:
-            prefijo, correlativo = codigo.split('-', 1)
-            if not correlativo.strip():
-                messages.error(request, "Error de Codificación SABS: Debe ingresar un número correlativo después del guion.")
-                return redirect('nuevo_material')
-
         if Material.objects.filter(codigo=codigo).exists():
-            messages.error(request, f"Ya existe un material registrado con el código '{codigo}'.")
+            messages.error(request, f"Ya existe un material con el código '{codigo}'.")
             return redirect('nuevo_material')
 
         try:
@@ -1432,25 +1423,82 @@ def nuevo_material(request):
                 unidad_medida_fk=unidad,
                 unidad_medida=unidad.nombre,
                 stock_actual=0,
-                stock_minimo=int(stock_minimo)
+                stock_minimo=int(stock_minimo) if stock_minimo else 5,
+                fecha_vencimiento=fecha_vencimiento  # <-- Guardar vencimiento
             )
 
             Bitacora.objects.create(
                 usuario=request.user,
                 modulo='Inventario',
                 accion='Registrar Material',
-                descripcion=f'Se registró el material {nombre} con el código {codigo} en el catálogo.'
+                descripcion=f'Se registró el material {nombre} ({codigo}). Vencimiento: {fecha_venc_raw or "No perecedero"}'
             )
 
             messages.success(request, f"El material '{nombre}' ha sido registrado en el catálogo.")
-            return redirect('inventario_por_almacen')
+            return redirect('inventario')
 
         except Exception as e:
-            messages.error(request, f"Error al procesar el guardado del material: {str(e)}")
+            messages.error(request, f"Error al guardar: {str(e)}")
             return redirect('nuevo_material')
 
-    return render(request, 'inventario/nuevo_material.html', {'partidas': partidas, 'unidades': unidades})
+    return render(request, 'inventario/nuevo_material.html', {
+        'partidas': partidas,
+        'unidades': unidades
+    })
 
+
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def editar_material(request, id):
+    material = get_object_or_404(Material, id=id)
+    unidades = UnidadMedida.objects.all().order_by('nombre')
+    partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        descripcion = request.POST.get('descripcion', '').strip()
+        unidad_id = request.POST.get('unidad_medida_fk')
+        stock_minimo = request.POST.get('stock_minimo', 5)
+        
+        # Actualiza fecha de vencimiento (opcional)
+        fecha_venc_raw = request.POST.get('fecha_vencimiento', '').strip()
+        fecha_vencimiento = parse_date(fecha_venc_raw) if fecha_venc_raw else None
+
+        if not nombre or not unidad_id:
+            messages.error(request, "Nombre y Unidad de Medida son obligatorios.")
+            return redirect('editar_material', id=id)
+
+        unidad = get_object_or_404(UnidadMedida, id=unidad_id)
+
+        try:
+            with transaction.atomic():
+                material.nombre = nombre
+                material.descripcion = descripcion
+                material.unidad_medida_fk = unidad
+                material.unidad_medida = unidad.nombre
+                material.stock_minimo = int(stock_minimo) if stock_minimo else 5
+                material.fecha_vencimiento = fecha_vencimiento  # <-- Actualizar
+                material.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Editar Material',
+                    descripcion=f'Se actualizaron los datos de {nombre} ({material.codigo})'
+                )
+
+            messages.success(request, f"Ficha del material '{nombre}' actualizada correctamente.")
+            return redirect('inventario')
+
+        except Exception as e:
+            messages.error(request, f"Error al actualizar: {str(e)}")
+            return redirect('editar_material', id=id)
+
+    return render(request, 'inventario/editar_material.html', {
+        'material': material,
+        'unidades': unidades,
+        'partidas': partidas
+    })
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -1538,48 +1586,6 @@ def establecer_saldo_inicial(request, id):
     return render(request, 'inventario/establecer_saldo_inicial.html', {'material': material})
 
 
-@login_required
-@rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
-def editar_material(request, id):
-    material = get_object_or_404(Material, id=id)
-    unidades = UnidadMedida.objects.all().order_by('nombre')
-
-    if request.method == 'POST':
-        nombre = request.POST.get('nombre', '').strip()
-        descripcion = request.POST.get('descripcion', '').strip()
-        unidad_id = request.POST.get('unidad_medida_fk')
-        stock_minimo = request.POST.get('stock_minimo', 5)
-
-        if not nombre or not unidad_id:
-            messages.error(request, "Los campos Nombre y Unidad de Medida son obligatorios.")
-            return redirect('editar_material', id=id)
-
-        unidad = get_object_or_404(UnidadMedida, id=unidad_id)
-
-        try:
-            with transaction.atomic():
-                material.nombre = nombre
-                material.descripcion = descripcion
-                material.unidad_medida_fk = unidad
-                material.unidad_medida = unidad.nombre
-                material.stock_minimo = int(stock_minimo)
-                material.save()
-
-                Bitacora.objects.create(
-                    usuario=request.user,
-                    modulo='Inventario',
-                    accion='Editar Material',
-                    descripcion=f'Se modificaron los datos de catalogación del material {nombre} (Cód: {material.codigo})'
-                )
-
-            messages.success(request, f"La ficha del material '{nombre}' ha sido actualizada.")
-            return redirect('inventario_por_almacen')
-
-        except Exception as e:
-            messages.error(request, f"Error al actualizar la ficha del material: {str(e)}")
-            return redirect('editar_material', id=id)
-
-    return render(request, 'inventario/editar_material.html', {'material': material, 'unidades': unidades})
 
 
 @login_required
@@ -1657,26 +1663,114 @@ def lotes_list(request):
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def reporte_consumo_unidades(request):
-    unidades = UnidadOrganizacional.objects.all().order_by('nombre')
-    datos_consumo = []
+    """
+    Tarjeta 6: Reporte Consolidado Institucional de Consumo por Dependencia (Formulario 005 / SABS).
+    Agrupa por Secretaría y Unidad, calculando insumos físicos retirados,
+    gasto valorado por PEPS y comparativa porcentual frente al techo POA.
+    """
+    from organizacion.models import Secretaria, UnidadOrganizacional
+    from presupuestos.models import POA
+    from datetime import date
 
-    for unidad in unidades:
-        movimientos_unidad = MovimientoInventario.objects.filter(
-            unidad_destino=unidad,
-            tipo='SALIDA'
-        )
-        total_items = movimientos_unidad.aggregate(Sum('cantidad'))['cantidad__sum'] or 0
-        total_monto = movimientos_unidad.aggregate(Sum('costo_total'))['costo_total__sum'] or Decimal('0.00')
+    # 1. Filtros de Fechas y Secretaría
+    desde_str = request.GET.get('desde', '').strip()
+    hasta_str = request.GET.get('hasta', '').strip()
+    filtro_secretaria_id = request.GET.get('secretaria_id', '').strip()
 
-        if total_items > 0:
-            datos_consumo.append({
-                'unidad': unidad,
-                'total_items': total_items,
-                'total_monto': total_monto
+    desde = parse_date(desde_str) if desde_str else date(2026, 1, 1)
+    hasta = parse_date(hasta_str) if hasta_str else date(2026, 12, 31)
+
+    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
+    secretarias_query = secretarias
+    if filtro_secretaria_id:
+        secretarias_query = secretarias_query.filter(id=filtro_secretaria_id)
+
+    # 2. Base de movimientos de salida en el periodo
+    salidas_periodo = MovimientoInventario.objects.filter(
+        tipo='SALIDA',
+        fecha__date__range=[desde, hasta]
+    )
+
+    datos_por_secretaria = []
+    total_general_fisico = 0
+    total_general_valorado = Decimal('0.00')
+    total_general_poa = Decimal('0.00')
+
+    for sec in secretarias_query:
+        unidades_sec = sec.unidades_organizacionales.filter(is_active=True).order_by('nombre')
+        filas_unidades = []
+
+        total_sec_fisico = 0
+        total_sec_valorado = Decimal('0.00')
+        total_sec_poa = Decimal('0.00')
+
+        for u in unidades_sec:
+            # Salidas dirigidas a esta oficina
+            salidas_u = salidas_periodo.filter(unidad_destino=u)
+            
+            tot_cant = salidas_u.aggregate(s=Sum('cantidad'))['s'] or 0
+            tot_val = salidas_u.aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
+
+            # Presupuesto POA total asignado a esta oficina en 2026
+            poas_u = POA.objects.filter(unidad=u, gestion=2026)
+            poa_inicial = poas_u.aggregate(s=Sum('monto_inicial'))['s'] or Decimal('0.00')
+            poa_disponible = poas_u.aggregate(s=Sum('monto_disponible'))['s'] or Decimal('0.00')
+
+            # Porcentaje de consumo sobre el presupuesto de apertura
+            pct_consumo = round((float(tot_val) / float(poa_inicial) * 100), 1) if poa_inicial > 0 else 0.0
+
+            total_sec_fisico += tot_cant
+            total_sec_valorado += tot_val
+            total_sec_poa += poa_inicial
+
+            # Listado de los 5 materiales más retirados por esta oficina (para detalle rápido)
+            top_materiales = salidas_u.values(
+                'material__codigo', 'material__nombre', 'material__unidad_medida'
+            ).annotate(
+                cant_total=Sum('cantidad'),
+                val_total=Sum('costo_total')
+            ).order_by('-val_total')[:4]
+
+            filas_unidades.append({
+                'unidad': u,
+                'total_cant': tot_cant,
+                'total_val': tot_val,
+                'poa_inicial': poa_inicial,
+                'poa_disponible': poa_disponible,
+                'pct_consumo': pct_consumo,
+                'top_materiales': top_materiales,
+                'tiene_consumo': (tot_cant > 0)
             })
 
-    return render(request, 'inventario/consumo_unidades.html', {'datos_consumo': datos_consumo})
+        total_general_fisico += total_sec_fisico
+        total_general_valorado += total_sec_valorado
+        total_general_poa += total_sec_poa
 
+        pct_sec = round((float(total_sec_valorado) / float(total_sec_poa) * 100), 1) if total_sec_poa > 0 else 0.0
+
+        datos_por_secretaria.append({
+            'secretaria': sec,
+            'unidades': filas_unidades,
+            'total_fisico': total_sec_fisico,
+            'total_valorado': total_sec_valorado,
+            'total_poa': total_sec_poa,
+            'pct_consumo': pct_sec,
+            'tiene_consumo': (total_sec_fisico > 0)
+        })
+
+    pct_global = round((float(total_general_valorado) / float(total_general_poa) * 100), 1) if total_general_poa > 0 else 0.0
+
+    return render(request, 'inventario/consumo_unidades.html', {
+        'secretarias': secretarias,
+        'datos_por_secretaria': datos_por_secretaria,
+        'filtro_secretaria_id': filtro_secretaria_id,
+        'desde': desde.strftime('%Y-%m-%d'),
+        'hasta': hasta.strftime('%Y-%m-%d'),
+        'total_general_fisico': total_general_fisico,
+        'total_general_valorado': total_general_valorado,
+        'total_general_poa': total_general_poa,
+        'pct_global': pct_global,
+    })
 
 @login_required
 def obtener_items_compra_view(request):
