@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>DGCF - R1.06 DETALLE DE ALMACENES</title>
+    <style>
+        @page {
+            size: letter landscape;
+            margin: 1cm 1.2cm 1.2cm 1.2cm;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            color: #000;
+            margin: 0;
+            padding: 15px;
+            background-color: #f8fafc;
+        }
+
+        .toolbar-container {
+            max-width: 1100px;
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 10px 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .filter-form { display: flex; align-items: center; gap: 12px; }
+        .filter-group { display: flex; flex-direction: column; gap: 2px; }
+        .filter-group label { font-size: 9px; font-weight: bold; color: #64748b; text-transform: uppercase; }
+        .filter-group input { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; }
+        .btn-filter {
+            background-color: #8b0000; color: white; border: none; padding: 7px 15px;
+            border-radius: 6px; font-weight: bold; font-size: 11px; cursor: pointer; margin-top: 12px;
+        }
+        .btn-print {
+            background-color: #16a34a; color: white; border: none; padding: 7px 16px;
+            border-radius: 6px; font-weight: bold; font-size: 11px; cursor: pointer; margin-top: 12px;
+        }
+
+        .sheet-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            padding: 25px 30px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .header-table { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
+        .header-table td { vertical-align: middle; }
+        .logo-box { width: 20%; text-align: left; }
+        .logo-box img { max-height: 55px; width: auto; }
+        .title-box { width: 60%; text-align: center; }
+        .title-box h3 { margin: 0; font-size: 11px; font-weight: bold; }
+        .title-box h2 { margin: 2px 0; font-size: 12px; font-weight: bold; }
+        .title-box p { margin: 1px 0; font-size: 9.5px; }
+        .code-box { width: 20%; text-align: right; font-size: 10px; font-weight: bold; }
+
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        table.data-table th, table.data-table td { border: 1px solid #333; padding: 4px 5px; }
+        table.data-table th { background-color: #555; color: #fff; text-align: center; font-size: 8.5px; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .row-total { font-weight: bold; background-color: #f1f5f9; }
+
+        .firmas-container { margin-top: 60px; width: 100%; page-break-inside: avoid; }
+        .firmas-table { width: 100%; border-collapse: collapse; }
+        .firmas-table td { text-align: center; vertical-align: bottom; width: 33.33%; padding: 0 25px; }
+        .linea-firma { border-top: 1px solid #000; padding-top: 4px; font-weight: bold; font-size: 9.5px; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .no-print { display: none !important; }
+            .sheet-container { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar-container no-print">
+        <form method="GET" class="filter-form">
+            <div class="filter-group">
+                <label>Gestión Fiscal</label>
+                <input type="number" name="gestion" value="{{ gestion }}" min="2020" max="2035" style="width: 75px;">
+            </div>
+            <div class="filter-group">
+                <label>Fecha de Corte</label>
+                <input type="date" name="fecha_corte" value="{{ fecha_corte|date:'Y-m-d' }}">
+            </div>
+            <button type="submit" class="btn-filter">🔍 Filtrar Periodo</button>
+        </form>
+
+        <button onclick="window.print()" class="btn-print">
+            🖨️ Imprimir / Guardar en PDF
+        </button>
+    </div>
+
+    <div class="sheet-container">
+        <table class="header-table">
+            <tr>
+                <td class="logo-box">
+                    <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo Gobernación">
+                </td>
+                <td class="title-box">
+                    <h3>"GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ"</h3>
+                    <h2>DETALLE DE ALMACENES (BIENES DE CONSUMO)</h2>
+                    <p>Al {{ fecha_corte|date:"d" }} de {{ fecha_corte|date:"F" }} de {{ gestion }}</p>
+                    <p><em>(Expresado en Bolivianos)</em></p>
+                </td>
+                <td class="code-box">
+                    DGCF - R1.06<br>
+                    Versión 01
+                </td>
+            </tr>
+        </table>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="width: 3%;">N°</th>
+                    <th rowspan="2" style="width: 25%;">Descripción (Ítem)</th>
+                    <th rowspan="2" style="width: 6%;">Unidad de<br>medida</th>
+                    <th rowspan="2" style="width: 6%;">Precio<br>Unitario</th>
+                    <th colspan="4" style="width: 30%;">Cantidad</th>
+                    <th colspan="4" style="width: 30%;">Valores (Bs.)</th>
+                </tr>
+                <tr>
+                    <th style="width: 7.5%;">Saldo Inicial</th>
+                    <th style="width: 7.5%;">Entradas</th>
+                    <th style="width: 7.5%;">Salidas</th>
+                    <th style="width: 7.5%;">Saldo Final</th>
+                    <th style="width: 7.5%;">Saldo Inicial</th>
+                    <th style="width: 7.5%;">Entradas</th>
+                    <th style="width: 7.5%;">Salidas</th>
+                    <th style="width: 7.5%;">Saldo Final</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in filas %}
+                <tr>
+                    <td class="text-center">{{ f.nro }}</td>
+                    <td class="text-left"><strong>{{ f.codigo }}</strong> - {{ f.descripcion }}</td>
+                    <td class="text-center">{{ f.unidad_medida }}</td>
+                    <td class="text-right">{{ f.precio_unitario|floatformat:2 }}</td>
+                    
+                    <td class="text-center">{{ f.cant_inicial }}</td>
+                    <td class="text-center">{{ f.cant_entradas }}</td>
+                    <td class="text-center">{{ f.cant_salidas }}</td>
+                    <td class="text-center font-bold">{{ f.cant_final }}</td>
+                    
+                    <td class="text-right">{{ f.val_inicial|floatformat:2 }}</td>
+                    <td class="text-right">{{ f.val_entradas|floatformat:2 }}</td>
+                    <td class="text-right">{{ f.val_salidas|floatformat:2 }}</td>
+                    <td class="text-right font-bold">{{ f.val_final|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" class="text-center" style="padding: 15px;">
+                        No existen movimientos registrados para el periodo seleccionado.
+                    </td>
+                </tr>
+                {% endfor %}
+
+                <tr class="row-total">
+                    <td colspan="4" class="text-center">TOTAL</td>
+                    <td class="text-center">{{ totales.cant_inicial }}</td>
+                    <td class="text-center">{{ totales.cant_entradas }}</td>
+                    <td class="text-center">{{ totales.cant_salidas }}</td>
+                    <td class="text-center">{{ totales.cant_final }}</td>
+                    <td class="text-right">{{ totales.val_inicial|floatformat:2 }}</td>
+                    <td class="text-right">{{ totales.val_entradas|floatformat:2 }}</td>
+                    <td class="text-right">{{ totales.val_salidas|floatformat:2 }}</td>
+                    <td class="text-right">{{ totales.val_final|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="firmas-container">
+            <table class="firmas-table">
+                <tr>
+                    <td><div class="linea-firma">Responsable del Área Financiera</div></td>
+                    <td><div class="linea-firma">Contador General</div></td>
+                    <td><div class="linea-firma">Máxima Autoridad Ejecutiva</div></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>

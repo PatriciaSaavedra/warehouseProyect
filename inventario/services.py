@@ -1,14 +1,12 @@
-from .models import Material, MovimientoInventario, InventarioAlmacen, Almacen
-from decimal import Decimal
-from django.db import transaction
-from django.core.exceptions import ValidationError
-
 from datetime import date, timedelta
 from decimal import Decimal
+from django.db import transaction
+from django.db.models import F
+from django.core.exceptions import ValidationError
 from django.utils import timezone
-from inventario.models import Material, Almacen, InventarioAlmacen
+
+from .models import Material, MovimientoInventario, InventarioAlmacen, Almacen
 from presupuestos.models import POA, DetalleProgramacionPOA
-from django.db.models import F  
 
 
 # ========================================================
@@ -22,31 +20,22 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
     
     Adicionalmente, permite descontar del stock_reservado si la salida proviene de una solicitud aprobada.
     """
-    # 1. Validar cantidad de salida estrictamente mayor a cero
     if cantidad_salida <= 0:
         raise ValueError("La cantidad de salida debe ser estrictamente mayor a cero.")
 
-    # (Opcional) Validar que el usuario tenga permisos sobre este almacén
-    # validar_operacion_almacen(usuario, almacen) 
-
-    # 2. Transacción atómica integral para evitar inconsistencias y bloquear lecturas concurrentes
     with transaction.atomic():
-        
-        # Obtener y bloquear el registro del inventario del almacén específico
         try:
             inventario_almacen = InventarioAlmacen.objects.select_for_update().get(material=material, almacen=almacen)
         except InventarioAlmacen.DoesNotExist:
             raise ValueError(f"No existe un registro de inventario para {material.nombre} en el almacén {almacen.nombre}.")
 
-        # Validar existencias físicas
         if cantidad_salida > inventario_almacen.stock_fisico:
             raise ValueError(
                 f"No existe suficiente stock físico disponible en el almacén {almacen.nombre} "
                 f"({inventario_almacen.stock_fisico} disponibles, solicitado: {cantidad_salida})."
             )
 
-        # 3. Obtener y bloquear los lotes de entrada más antiguos con saldo disponible (PEPS)
-        # Se agrega 'id' en el order_by como fallback determinista
+        # Lotes de entrada más antiguos con saldo disponible (PEPS)
         lotes_disponibles = MovimientoInventario.objects.select_for_update().filter(
             material=material,
             almacen=almacen,
@@ -57,50 +46,42 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
         cantidad_restante = cantidad_salida
         costo_total_egreso = Decimal('0.00')
 
-        # 4. Bucle secuencial de agotamiento de capas de costo (PEPS)
         for lote in lotes_disponibles:
             if cantidad_restante <= 0:
                 break
 
             if lote.saldo_disponible_lote >= cantidad_restante:
-                # El lote cubre por completo el resto del despacho
                 costo_total_egreso += Decimal(cantidad_restante) * lote.costo_unitario
                 lote.saldo_disponible_lote -= cantidad_restante
                 lote.save()
                 cantidad_restante = 0
             else:
-                # El lote no alcanza; se agota por completo y se pasa al siguiente
                 costo_total_egreso += Decimal(lote.saldo_disponible_lote) * lote.costo_unitario
                 cantidad_restante -= lote.saldo_disponible_lote
                 lote.saldo_disponible_lote = 0
                 lote.save()
 
-        # Validación de integridad física vs contable
         if cantidad_restante > 0:
             raise ValueError("Inconsistencia en el inventario: La suma de lotes valorados PEPS es menor al stock físico.")
 
-        # 5. Actualizar stock en el inventario del almacén
+        # Actualizar stock en el inventario del almacén
         stock_anterior = inventario_almacen.stock_fisico
         inventario_almacen.stock_fisico -= cantidad_salida
         
-        # Descontar de las reservas si corresponde (evitando saldos negativos en reserva)
         if descontar_reserva:
             if inventario_almacen.stock_reservado >= cantidad_salida:
                 inventario_almacen.stock_reservado -= cantidad_salida
             else:
-                inventario_almacen.stock_reservado = 0  # Previene inconsistencias negativas
+                inventario_almacen.stock_reservado = 0
 
-        # Al guardar inventario_almacen, se actualiza el stock consolidado del Material automáticamente (vía save() del modelo)
         inventario_almacen.save()
 
-        # Calcular el costo unitario real promedio ponderado para esta transacción de salida
         costo_unitario_ponderado = costo_total_egreso / Decimal(cantidad_salida)
 
-        # 6. Registrar movimiento final en el Kardex
         movimiento = MovimientoInventario.objects.create(
             material=material,
             almacen=almacen,
-            tipo=tipo_movimiento,  # 'SALIDA' o 'BAJA'
+            tipo=tipo_movimiento,
             cantidad=cantidad_salida,
             costo_unitario=costo_unitario_ponderado,
             costo_total=costo_total_egreso,
@@ -119,23 +100,11 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
 # ========================================================
 
 def obtener_inventario_por_almacen(almacen):
-    """
-    REQUERIMIENTO 5: Consultar inventario según almacén.
-    Retorna todo el stock de materiales asociado únicamente al almacén indicado.
-    """
     return InventarioAlmacen.objects.filter(almacen=almacen).select_related('material')
 
 
 def obtener_inventario_para_unidad(unidad_organizacional):
-    """
-    REQUERIMIENTO 6: Consultar inventario según Unidad Organizacional.
-    Retorna el inventario de aquellos almacenes que tienen autorización
-    para atender (despachar) a la Unidad Organizacional dada.
-    """
-    # Filtramos almacenes que contengan a esta unidad en sus unidades_atendidas
     almacenes_autorizados = Almacen.objects.filter(unidades_atendidas=unidad_organizacional)
-    
-    # Obtenemos el inventario de esos almacenes (evitando duplicados con distinct si fuera necesario)
     return InventarioAlmacen.objects.filter(
         almacen__in=almacenes_autorizados
     ).select_related('almacen', 'material').distinct()
@@ -146,38 +115,35 @@ def obtener_inventario_para_unidad(unidad_organizacional):
 # ========================================================
 
 def validar_operacion_almacen(usuario, almacen):
-    """
-    REQUERIMIENTO 9: Validar que las operaciones se realicen 
-    sobre el almacén correspondiente.
-    """
     if not usuario.is_authenticated:
         raise ValidationError("Debe iniciar sesión para operar el inventario.")
 
-    # Si es superusuario de Django, tiene acceso global
     if usuario.is_superuser:
         return True
 
-    # Comprobar si es el responsable directo del almacén
     if almacen.responsable == usuario:
         return True
 
-    # Comprobar el permiso en el perfil del usuario
     if hasattr(usuario, 'perfilusuario'):
         if not usuario.perfilusuario.tiene_acceso_almacen(almacen):
             raise ValidationError(
-                f"No tienes autorización para procesar operaciones en el almacén: {almacen.nombre}. "
-                "Contacta al administrador si necesitas acceso."
+                f"No tienes autorización para procesar operaciones en el almacén: {almacen.nombre}."
             )
     else:
         raise ValidationError("Tu usuario no tiene un perfil de roles asignado en el sistema.")
     
     return True
 
+
+# ========================================================
+# 4. MOTOR CENTRALIZADO DE ALERTAS TEMPRANAS SABS (TARJETA 7)
+# ========================================================
+
 def obtener_alertas_tempranas(usuario=None):
     """
     Tarjeta 7: Motor centralizado de Alertas Tempranas del SGA (GAD Potosí).
     Retorna un diccionario con alertas de:
-    - Vencimientos (Perecederos)
+    - Vencimientos REALES por Lote físico en estantería (saldo_disponible_lote > 0)
     - Stock físico crítico / agotado
     - Techos presupuestarios POA (< 15%)
     - Cuotas físicas Formulario 005 (> 85%)
@@ -186,19 +152,23 @@ def obtener_alertas_tempranas(usuario=None):
     en_30_dias = hoy + timedelta(days=30)
     gestion_actual = hoy.year
 
-    # 1. ALERTAS DE VENCIMIENTO (Materiales perecederos)
-    materiales_vencidos = Material.objects.filter(
-        is_active=True,
+    # 1. ALERTAS DE VENCIMIENTO REALES POR LOTE EN ESTANTERÍA CON EXISTENCIAS
+    lotes_vencidos = MovimientoInventario.objects.filter(
+        tipo='ENTRADA',
+        saldo_disponible_lote__gt=0,
+        fecha_vencimiento__isnull=False,
         fecha_vencimiento__lt=hoy
-    ).select_related('unidad_medida_fk', 'partida').order_by('fecha_vencimiento')
+    ).select_related('material', 'almacen', 'material__unidad_medida_fk').order_by('fecha_vencimiento')
 
-    materiales_por_vencer = Material.objects.filter(
-        is_active=True,
+    lotes_por_vencer = MovimientoInventario.objects.filter(
+        tipo='ENTRADA',
+        saldo_disponible_lote__gt=0,
+        fecha_vencimiento__isnull=False,
         fecha_vencimiento__gte=hoy,
         fecha_vencimiento__lte=en_30_dias
-    ).select_related('unidad_medida_fk', 'partida').order_by('fecha_vencimiento')
+    ).select_related('material', 'almacen', 'material__unidad_medida_fk').order_by('fecha_vencimiento')
 
-    # 2. ALERTAS DE EXISTENCIAS (Agotados en Almacenes)
+    # 2. ALERTAS DE EXISTENCIAS (Agotados y Bajo Stock)
     materiales_agotados = Material.objects.filter(
         is_active=True,
         stock_actual=0
@@ -211,6 +181,7 @@ def obtener_alertas_tempranas(usuario=None):
         .select_related('partida', 'unidad_medida_fk')
         .order_by('stock_actual')
     )
+
     # 3. ALERTAS DE PRESUPUESTO CRÍTICO EN POA (< 15% disponible)
     poas_criticos = []
     poas_activos = POA.objects.filter(
@@ -221,16 +192,14 @@ def obtener_alertas_tempranas(usuario=None):
     for p in poas_activos:
         limite_15 = p.monto_inicial * Decimal('0.15')
         if p.monto_disponible <= limite_15:
-            pct = p.porcentaje_ejecucion
             poas_criticos.append({
                 'poa': p,
                 'saldo_disponible': p.monto_disponible,
                 'monto_inicial': p.monto_inicial,
-                'pct_consumido': pct,
+                'pct_consumido': p.porcentaje_ejecucion,
                 'es_cero': (p.monto_disponible <= Decimal('0.00'))
             })
 
-    # Ordenar primero los que están en Bs. 0.00
     poas_criticos.sort(key=lambda x: x['saldo_disponible'])
 
     # 4. ALERTAS DE CUOTAS DEL FORMULARIO 005 (> 85% consumido)
@@ -256,24 +225,28 @@ def obtener_alertas_tempranas(usuario=None):
 
     cuotas_criticas.sort(key=lambda x: x['disponible'])
 
-    # Métricas de conteo total
+    # Conteo de Alertas
     total_criticas = (
-        materiales_vencidos.count() +
+        lotes_vencidos.count() +
         materiales_agotados.count() +
         len([p for p in poas_criticos if p['es_cero']]) +
         len([c for c in cuotas_criticas if c['agotado']])
     )
 
     total_advertencias = (
-        materiales_por_vencer.count() +
+        lotes_por_vencer.count() +
         materiales_bajo_stock.count() +
         len([p for p in poas_criticos if not p['es_cero']]) +
         len([c for c in cuotas_criticas if not c['agotado']])
     )
 
     return {
-        'materiales_vencidos': materiales_vencidos,
-        'materiales_por_vencer': materiales_por_vencer,
+        # Claves de lotes reales
+        'lotes_vencidos': lotes_vencidos,
+        'lotes_por_vencer': lotes_por_vencer,
+        # Claves de compatibilidad
+        'materiales_vencidos': lotes_vencidos,
+        'materiales_por_vencer': lotes_por_vencer,
         'materiales_agotados': materiales_agotados,
         'materiales_bajo_stock': materiales_bajo_stock,
         'poas_criticos': poas_criticos,
@@ -282,3 +255,4 @@ def obtener_alertas_tempranas(usuario=None):
         'total_advertencias': total_advertencias,
         'total_alertas': total_criticas + total_advertencias,
     }
+

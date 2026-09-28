@@ -97,7 +97,7 @@
             Solicitudes
         </a>
 
-        <!-- 4️⃣ INVENTARIO (LIMPIO: SIN TRANSFERENCIAS Y CON RUTA A EXISTENCIAS JERÁRQUICA) -->
+        <!-- 4️⃣ INVENTARIO -->
         {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,KARDISTA' %}
         <details 
             class="group" 
@@ -112,7 +112,7 @@
             </summary>
             
             <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <!-- Existencias (Apunta directamente a /inventario/ agrupado por Partidas) -->
+                <!-- Existencias -->
                 <a 
                     href="{% url 'inventario' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -171,6 +171,37 @@
                     <span class="material-symbols-outlined mr-2 text-[18px]">swap_horiz</span>
                     Movimientos
                 </a>
+
+                <!-- SECCIÓN AUDITORÍA / CIERRE DGCF -->
+                <div class="pt-2.5 pb-1 px-2 border-t border-[var(--border-color)]/60 mt-1.5">
+                    <p class="text-[9px] font-extrabold uppercase tracking-wider text-[var(--secondary)] dark:text-amber-500">
+                        Cierre / Auditoría DGCF
+                    </p>
+                </div>
+
+                <!-- Resumen por Partida (R1.05) -->
+                <a 
+                    href="{% url 'reporte_dgcf_r105' %}"
+                    target="_blank"
+                    class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/reportes/dgcf-r105/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                    title="Resumen de Almacenes por Partida Presupuestaria"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[18px]">receipt_long</span>
+                    Resumen Partidas (R1.05)
+                </a>
+
+                <!-- Detalle Valorado Ítem por Ítem (R1.06) -->
+                <a 
+                    href="{% url 'reporte_dgcf_r106' %}"
+                    target="_blank"
+                    class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/reportes/dgcf-r106/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                    title="Detalle Físico-Valorado por Ítem"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[18px]">table_view</span>
+                    Kardex Valorado (R1.06)
+                </a>
             </div>
         </details>
         {% endif %}
@@ -190,10 +221,14 @@
             </summary>
             
             <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <a href="/presupuestos/" class="...">Techos POA</a>
-                <a href="{% url 'reporte_presupuestos' %}" class="...">Ejecución POA</a>
-
-                <!-- NUEVO: Reporte de Consumo por Dependencia -->
+                <a href="/presupuestos/" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[18px]">payments</span>
+                    Techos POA
+                </a>
+                <a href="{% url 'reporte_presupuestos' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[18px]">monitoring</span>
+                    Ejecución POA
+                </a>
                 <a href="{% url 'reporte_consumo_unidades' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">pie_chart</span>
                     Consumo por Oficina

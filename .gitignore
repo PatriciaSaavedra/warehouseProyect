@@ -32,3 +32,8 @@ htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/*.lnk
+# Respaldos de base de datos
+*.dump
+*.sql
+respaldo_antes_de_prueba.*
+datos_respaldo.json

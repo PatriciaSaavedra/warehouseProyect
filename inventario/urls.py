@@ -42,4 +42,7 @@ urlpatterns = [
     path('gestion/cierre/', views.cierre_conciliacion_view, name='cierre_conciliacion'),
     path('stock-unidad/', views.inventario_por_unidad, name='inventario_por_unidad'),
 
+    path('reportes/dgcf-r105/', views.reporte_dgcf_r105, name='reporte_dgcf_r105'),
+    path('reportes/dgcf-r106/', views.reporte_dgcf_r106, name='reporte_dgcf_r106'),
+
 ]

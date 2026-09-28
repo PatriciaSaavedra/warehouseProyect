@@ -2,6 +2,11 @@ from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
 
+import hashlib
+from django.db import models
+from django.contrib.auth.models import User
+from decimal import Decimal
+
 # ========================================================
 # 1. MODELOS DE CONFIGURACIÓN Y CATÁLOGOS BASE
 # ========================================================
@@ -93,32 +98,18 @@ class Material(models.Model):
     unidad_medida_fk = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, null=True, blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
-    fecha_vencimiento = models.DateField(
-        null=True, 
-        blank=True, 
-        help_text="Fecha de vencimiento opcional para productos perecederos (químicos, tintas, limpieza, etc.)"
-    )
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['partida', 'nombre'], name='material_unico_por_partida')
+        ]
 
     @property
-    def dias_para_vencer(self):
-        if self.fecha_vencimiento:
-            from django.utils import timezone
-            return (self.fecha_vencimiento - timezone.now().date()).days
-        return None
-
-    @property
-    def estado_vencimiento(self):
-        dias = self.dias_para_vencer
-        if dias is None:
-            return 'SIN_VENCIMIENTO'
-        if dias < 0:
-            return 'VENCIDO'
-        elif dias <= 30:
-            return 'POR_VENCER_CRITICO'  # Menos de 30 días
-        elif dias <= 60:
-            return 'POR_VENCER_ALERTA'   # Menos de 60 días
-        return 'VIGENTE'
-
+    def tiene_movimientos(self):
+        return self.movimientoinventario_set.exists()
 class InventarioAlmacen(models.Model):
     """
     Tarjeta 5: Controlar y aislar la existencia física (stock) de cada material por Almacén.
@@ -180,17 +171,7 @@ TIPOS_MOVIMIENTO = [
 
 class MovimientoInventario(models.Model):
     material = models.ForeignKey(Material, on_delete=models.CASCADE)
-    
-    # Tarjeta 6: Asociar el movimiento y lote PEPS a un almacén específico
-    almacen = models.ForeignKey(
-        Almacen,
-        on_delete=models.PROTECT,
-        related_name='movimientos',
-        null=True,  
-        blank=True,
-        help_text="Almacén o subalmacén donde ocurre físicamente el movimiento"
-    )
-    
+    almacen = models.ForeignKey(Almacen, on_delete=models.PROTECT, related_name='movimientos', null=True, blank=True)
     tipo = models.CharField(max_length=20, choices=TIPOS_MOVIMIENTO)
     cantidad = models.IntegerField()
     costo_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -199,39 +180,24 @@ class MovimientoInventario(models.Model):
     stock_resultante = models.IntegerField(default=0)
     referencia = models.CharField(max_length=100)
     fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    saldo_disponible_lote = models.IntegerField(default=0)
+    unidad_destino = models.ForeignKey('organizacion.UnidadOrganizacional', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumos')
+
+    # ========================================================
+    # VENCIMIENTO POR LOTE DE ENTRADA (AQUÍ ES DONDE CORRESPONDE)
+    # ========================================================
     fecha_vencimiento = models.DateField(
         null=True, 
         blank=True, 
-        help_text="Fecha de caducidad/vencimiento para insumos perecederos (químicos, tintas, reactivos, etc.)"
-    )
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    saldo_disponible_lote = models.IntegerField(
-        default=0, 
-        help_text="Solo para ENTRADAS: Cantidad remanente de este lote para el costeo PEPS"
-    )
-    unidad_destino = models.ForeignKey(
-        'organizacion.UnidadOrganizacional',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='consumos',
-        help_text="Unidad organizacional de la Gobernación que consumió el material"
+        help_text="Fecha de vencimiento del lote recibido"
     )
 
-    def __str__(self):
-        return f"{self.tipo} - {self.material.nombre} ({self.cantidad}) en {self.almacen.nombre if self.almacen else 'Global'}"
-    @property
-    def valor_disponible_lote(self):
-        """
-        Calcula el valor monetario del saldo remanente de este lote específico.
-        """
-        return self.saldo_disponible_lote * self.costo_unitario
     @property
     def dias_para_vencer(self):
         if self.fecha_vencimiento:
             from django.utils import timezone
-            hoy = timezone.now().date()
-            return (self.fecha_vencimiento - hoy).days
+            return (self.fecha_vencimiento - timezone.now().date()).days
         return None
 
     @property
@@ -246,7 +212,8 @@ class MovimientoInventario(models.Model):
         elif dias <= 60:
             return 'POR_VENCER_ALERTA'
         return 'VIGENTE'
-# ========================================================
+    
+        # ========================================================
 # 4. COMPRAS (ENTRADAS DE ALMACÉN)
 # ========================================================
 
@@ -538,3 +505,32 @@ class AsignacionMaterialUnidad(models.Model):
         verbose_name = "Asignación de Material por Unidad"
         verbose_name_plural = "Asignaciones de Material por Unidad"
         unique_together = ('unidad', 'material', 'gestion')
+
+
+class ReporteCierreAuditado(models.Model):
+    TIPO_REPORTE = [
+        ('DGCF_R105', 'Resumen de Almacenes por Partida (DGCF - R1.05)'),
+        ('DGCF_R106', 'Detalle Físico-Valorado por Ítem (DGCF - R1.06)'),
+        ('CIERRE_ANUAL', 'Acta de Cierre de Gestión Anual'),
+    ]
+
+    codigo_documento = models.CharField(max_length=50, unique=True, help_text="Ej: CIERRE-2025-R105-001")
+    tipo = models.CharField(max_length=20, choices=TIPO_REPORTE)
+    gestion = models.IntegerField(default=2026)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    total_items = models.IntegerField(default=0)
+    valor_total_bs = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    archivo_pdf = models.FileField(upload_to='reportes_cierres/%Y/', blank=True, null=True)
+    hash_seguridad = models.CharField(max_length=64, blank=True, null=True, help_text="Firma SHA-256 del archivo")
+    generado_por = models.ForeignKey(User, on_delete=models.PROTECT)
+    fecha_generacion = models.DateTimeField(auto_now_add=True)
+    observaciones = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Reporte de Cierre Auditado"
+        verbose_name_plural = "Reportes de Cierre Auditados"
+        ordering = ['-fecha_generacion']
+
+    def __str__(self):
+        return f"{self.codigo_documento} - {self.get_tipo_display()} ({self.fecha_fin})"
