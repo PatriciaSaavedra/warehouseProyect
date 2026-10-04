@@ -21,7 +21,6 @@ urlpatterns = [
     path('almacenes/editar/<int:id>/', views.editar_almacen, name='editar_almacen'),
     path('almacenes/toggle/<int:id>/', views.toggle_almacen, name='toggle_almacen'), 
     path('reporte/consumo/', views.reporte_consumo_unidades, name='reporte_consumo_unidades'),
-    path('reporte-consumo/', views.reporte_consumo_unidades, name='reporte_consumo_unidades'),
     path('entrada/obtener-items-compra/', views.obtener_items_compra_view, name='obtener_items_compra'),
     path('api/items-compra/', views.obtener_items_compra_view, name='api_items_compra'),
 
@@ -38,11 +37,12 @@ urlpatterns = [
     path('transferencias/', views.transferencia_list, name='transferencia_list'),
     path('transferencias/enviar/', views.enviar_transferencia, name='enviar_transferencia'),
     path('transferencias/<int:id>/recibir/', views.recibir_transferencia, name='recibir_transferencia'),
-    path('kardex/<int:id>/', views.kardex, name='kardex'),  
     path('gestion/cierre/', views.cierre_conciliacion_view, name='cierre_conciliacion'),
     path('stock-unidad/', views.inventario_por_unidad, name='inventario_por_unidad'),
 
+    # REPORTES OFICIALES DGCF Y CONSUMO POR DEPENDENCIAS
     path('reportes/dgcf-r105/', views.reporte_dgcf_r105, name='reporte_dgcf_r105'),
     path('reportes/dgcf-r106/', views.reporte_dgcf_r106, name='reporte_dgcf_r106'),
-
+    path('reportes/consumo-dependencias/', views.reporte_consumo_unidades, name='reporte_consumo_dependencias'),
+    path('reportes/especificaciones-tecnicas/', views.reporte_especificaciones_tecnicas, name='reporte_especificaciones_tecnicas'),
 ]

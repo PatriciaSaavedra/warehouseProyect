@@ -202,6 +202,21 @@
                     <span class="material-symbols-outlined mr-2 text-[18px]">table_view</span>
                     Kardex Valorado (R1.06)
                 </a>
+                <a 
+                    href="{% url 'reporte_consumo_dependencias' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[18px]">account_balance_wallet</span>
+                    Consumo por Dependencias
+                </a>
+                <a 
+                    href="{% url 'reporte_especificaciones_tecnicas' %}"
+                    target="_blank"
+                    class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[18px]">view_column</span>
+                    Matriz Especif. Técnicas
+                </a>
             </div>
         </details>
         {% endif %}

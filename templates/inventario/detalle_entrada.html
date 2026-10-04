@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Detalle de Entrada {{ nota.nro_nota }}{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 font-['Outfit']">
     
     <!-- Botón de retorno -->
     <div class="mb-6">
@@ -13,87 +14,106 @@
         </a>
     </div>
 
-    <!-- Encabezado de la Ficha con Botón de Impresión -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <div>
-            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                Nota de Ingreso Físico
-            </h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Comprobante de recepción de bienes en almacén
-            </p>
+    <!-- Encabezado de la Ficha con Logo de la Gobernación y Botón de Impresión -->
+    <div class="card p-6 mb-8 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div class="flex items-center gap-5">
+            <!-- LOGO OFICIAL GAD POTOSÍ -->
+            <div class="p-2 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-gray-700 flex items-center justify-center shrink-0">
+                <img src="{% static 'img/logo_gober_horizontal.png' %}" 
+                    alt="Gobierno Autónomo Departamental de Potosí" 
+                    class="h-14 w-auto object-contain">
+            </div>
+
+            <div>
+                <span class="text-[10px] uppercase font-bold tracking-widest text-[#8b0000] dark:text-red-400 block mb-0.5">
+                    Gobierno Autónomo Departamental de Potosí • Unidad de Almacenes
+                </span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                    Nota de Ingreso Físico
+                </h1>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Comprobante de recepción y custodia de bienes de consumo en almacén
+                </p>
+            </div>
         </div>
-        <div>
-            <!-- NUEVO: Botón oficial de Impresión (Imagen 4) -->
-            <a href="{% url 'nota_recepcion_pdf' nota.id %}" target="_blank" class="btn-secondary px-5 py-2.5 text-sm font-semibold rounded-2xl shadow-sm inline-flex items-center gap-2 cursor-pointer">
-                <span class="material-symbols-outlined text-[20px]">print</span>
+
+        <div class="shrink-0">
+            <!-- Botón oficial de Impresión PDF -->
+            <a href="{% url 'nota_recepcion_pdf' nota.id %}" target="_blank" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 text-xs font-bold rounded-2xl shadow-sm inline-flex items-center gap-2 cursor-pointer transition">
+                <span class="material-symbols-outlined text-[18px]">print</span>
                 Imprimir Nota de Recepción (PDF)
             </a>
         </div>
     </div>
 
     <!-- Información General de la Entrada -->
-    <div class="card p-8 mb-8 text-sm">
+    <div class="card p-8 mb-8 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
         <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4 mb-6">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Información de Recepción</h2>
-            <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/20 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20">
+            <h2 class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-[20px] text-gray-400">receipt_long</span>
+                Información de Recepción
+            </h2>
+            <span class="inline-flex items-center rounded-xl bg-blue-50 dark:bg-blue-950/30 px-3.5 py-1 text-xs font-black font-mono text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
                 {{ nota.nro_nota }}
             </span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Datos del Proveedor</p>
-                <p class="mt-2 text-gray-900 dark:text-white font-semibold">{{ nota.proveedor.razon_social }}</p>
-                <p class="text-xs text-gray-500">NIT: {{ nota.proveedor.nit }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Datos del Proveedor</p>
+                <p class="mt-2 text-gray-900 dark:text-white font-bold">{{ nota.proveedor.razon_social }}</p>
+                <p class="text-xs text-gray-500 font-mono mt-0.5">NIT: {{ nota.proveedor.nit }}</p>
             </div>
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Documentos de Respaldo</p>
-                <p class="mt-2 text-gray-900 dark:text-white"><strong>Factura Nº:</strong> {{ nota.factura|default:"—" }}</p>
-                <p class="mt-1 text-gray-900 dark:text-white"><strong>C-31 (SIGEP):</strong> {{ nota.c31|default:"—" }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Documentos de Respaldo</p>
+                <p class="mt-2 text-gray-900 dark:text-white"><strong>Factura Nº:</strong> <span class="font-mono font-semibold">{{ nota.factura|default:"—" }}</span></p>
+                <p class="mt-1 text-gray-900 dark:text-white"><strong>C-31 (SIGEP):</strong> <span class="font-mono font-semibold">{{ nota.c31|default:"—" }}</span></p>
                 {% if nota.compra_menor_origen %}
-                <p class="mt-1 text-gray-900 dark:text-white"><strong>Orden de Compra:</strong> {{ nota.compra_menor_origen.nro_orden }}</p>
+                <p class="mt-1 text-gray-900 dark:text-white"><strong>Orden de Compra:</strong> <span class="font-mono font-semibold">{{ nota.compra_menor_origen.nro_orden }}</span></p>
                 {% endif %}
             </div>
             <div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Detalles de Entrega</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Detalles de Entrega</p>
                 <p class="mt-2 text-gray-900 dark:text-white"><strong>Destino:</strong> {{ nota.almacen_destino.nombre }}</p>
                 <p class="mt-1 text-gray-900 dark:text-white"><strong>Registrado por:</strong> {{ nota.usuario.get_full_name|default:nota.usuario.username }}</p>
-                <p class="mt-1 text-gray-500 text-xs">Fecha Recepción: {{ nota.fecha|date:"d/m/Y" }}</p>
+                <p class="mt-1 text-gray-500 text-xs font-mono">Fecha Recepción: {{ nota.fecha|date:"d/m/Y" }}</p>
             </div>
         </div>
     </div>
 
     <!-- Detalle de Materiales Recibidos -->
-    <div class="card overflow-hidden">
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm mb-12">
         <div class="p-6 border-b border-gray-100 dark:border-gray-800">
-            <h3 class="text-md font-bold text-gray-900 dark:text-white">Materiales Incorporados al Inventario</h3>
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-gray-400">inventory_2</span>
+                Materiales Incorporados al Inventario
+            </h3>
         </div>
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
-                <thead>
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-xs text-left">
+                <thead class="bg-gray-50/80 dark:bg-slate-800/60 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                        <th class="px-6 py-3 text-left">Código SABS</th>
-                        <th class="px-6 py-3 text-left">Descripción del Material</th>
-                        <th class="px-6 py-3 class text-center">Partida</th>
-                        <th class="px-6 py-3 text-center">U. Manejo</th>
-                        <th class="px-6 py-3 text-center">Cant. Ingresada</th>
-                        <th class="px-6 py-3 text-right">P. Unitario (Bs.)</th>
-                        <th class="px-6 py-3 text-right">Subtotal (Bs.)</th>
+                        <th class="px-6 py-3.5">Código SABS</th>
+                        <th class="px-6 py-3.5">Descripción del Material</th>
+                        <th class="px-6 py-3.5 text-center">Partida</th>
+                        <th class="px-6 py-3.5 text-center">U. Manejo</th>
+                        <th class="px-6 py-3.5 text-center">Cant. Ingresada</th>
+                        <th class="px-6 py-3.5 text-right">P. Unitario (Bs.)</th>
+                        <th class="px-6 py-3.5 text-right pr-8">Subtotal (Bs.)</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
                     {% for det in nota.detalles.all %}
-                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/40 transition">
-                        <td class="px-6 py-4 font-mono font-bold text-gray-700 dark:text-gray-300">{{ det.material.codigo }}</td>
-                        <td class="px-6 py-4 font-semibold text-gray-900 dark:text-white">{{ det.material.nombre }}</td>
-                        <td class="px-6 py-4 text-center font-semibold">{{ det.material.partida.codigo }}</td>
-                        <td class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/40 transition">
+                        <td class="px-6 py-3.5 font-bold text-[#8b0000] dark:text-red-400">{{ det.material.codigo }}</td>
+                        <td class="px-6 py-3.5 font-sans font-semibold text-gray-900 dark:text-white">{{ det.material.nombre }}</td>
+                        <td class="px-6 py-3.5 text-center font-bold text-gray-600 dark:text-gray-300">{{ det.material.partida.codigo }}</td>
+                        <td class="px-6 py-3.5 text-center text-gray-500 dark:text-gray-400">
                             {{ det.material.unidad_medida_fk.codigo|default:det.material.unidad_medida }}
                         </td>
-                        <td class="px-6 py-4 text-center font-bold text-gray-900 dark:text-white">{{ det.cantidad }}</td>
-                        <td class="px-6 py-4 text-right text-gray-700 dark:text-gray-300">Bs. {{ det.precio_unitario|floatformat:2 }}</td>
-                        <td class="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">Bs. {{ det.precio_total|floatformat:2 }}</td>
+                        <td class="px-6 py-3.5 text-center font-black text-gray-900 dark:text-white text-sm">{{ det.cantidad }}</td>
+                        <td class="px-6 py-3.5 text-right text-gray-700 dark:text-gray-300">{{ det.precio_unitario|floatformat:2 }}</td>
+                        <td class="px-6 py-3.5 text-right pr-8 font-black text-gray-900 dark:text-white text-sm">{{ det.precio_total|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

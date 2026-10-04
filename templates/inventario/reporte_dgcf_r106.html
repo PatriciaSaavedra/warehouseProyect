@@ -33,15 +33,23 @@
         .filter-form { display: flex; align-items: center; gap: 12px; }
         .filter-group { display: flex; flex-direction: column; gap: 2px; }
         .filter-group label { font-size: 9px; font-weight: bold; color: #64748b; text-transform: uppercase; }
-        .filter-group input { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; }
+        .filter-group input, .filter-group select {
+            padding: 5px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 11px;
+            background-color: #fff;
+        }
         .btn-filter {
             background-color: #8b0000; color: white; border: none; padding: 7px 15px;
             border-radius: 6px; font-weight: bold; font-size: 11px; cursor: pointer; margin-top: 12px;
         }
+        .btn-filter:hover { background-color: #6b0000; }
         .btn-print {
             background-color: #16a34a; color: white; border: none; padding: 7px 16px;
             border-radius: 6px; font-weight: bold; font-size: 11px; cursor: pointer; margin-top: 12px;
         }
+        .btn-print:hover { background-color: #15803d; }
 
         .sheet-container {
             max-width: 1100px;
@@ -87,6 +95,17 @@
     <div class="toolbar-container no-print">
         <form method="GET" class="filter-form">
             <div class="filter-group">
+                <label>Almacén / Depósito</label>
+                <select name="almacen">
+                    <option value="">🏢 TODOS (Consolidado)</option>
+                    {% for alm in almacenes_disponibles %}
+                        <option value="{{ alm.id }}" {% if almacen_seleccionado.id == alm.id %}selected{% endif %}>
+                            📍 {{ alm.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Gestión Fiscal</label>
                 <input type="number" name="gestion" value="{{ gestion }}" min="2020" max="2035" style="width: 75px;">
             </div>
@@ -113,6 +132,11 @@
                     <h2>DETALLE DE ALMACENES (BIENES DE CONSUMO)</h2>
                     <p>Al {{ fecha_corte|date:"d" }} de {{ fecha_corte|date:"F" }} de {{ gestion }}</p>
                     <p><em>(Expresado en Bolivianos)</em></p>
+                    {% if almacen_seleccionado %}
+                        <p style="font-weight: bold; color: #8b0000; margin-top: 2px;">ALMACÉN: {{ almacen_seleccionado.nombre|upper }}</p>
+                    {% else %}
+                        <p style="font-weight: bold; margin-top: 2px;">CONSOLIDADO INSTITUCIONAL</p>
+                    {% endif %}
                 </td>
                 <td class="code-box">
                     DGCF - R1.06<br>

@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Consolidado de Consumo por Dependencias - GAD Potosí</title>
+    <style>
+        @page {
+            size: letter landscape;
+            margin: 1cm 1.2cm 1.2cm 1.2cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 9.5px;
+            color: #111;
+            margin: 0;
+            padding: 15px;
+            background: #fff;
+        }
+        .header-table { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
+        .header-table td { vertical-align: middle; }
+        .logo-box { width: 20%; text-align: left; }
+        .logo-box img { max-height: 55px; }
+        .title-box { width: 60%; text-align: center; }
+        .title-box h3 { margin: 0; font-size: 11px; font-weight: bold; }
+        .title-box h2 { margin: 2px 0; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+        .title-box p { margin: 1px 0; font-size: 9px; }
+        .code-box { width: 20%; text-align: right; font-size: 9px; font-weight: bold; }
+
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 15px; }
+        table.data-table th, table.data-table td { border: 1px solid #444; padding: 4px 6px; }
+        table.data-table th { background: #555; color: #fff; text-align: center; font-size: 8.5px; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .row-total { background: #eee; font-weight: bold; }
+        .secretaria-header { background: #cbd5e1; font-weight: bold; padding: 5px 8px; font-size: 9.5px; border: 1px solid #444; border-bottom: none; }
+
+        .firmas-table { width: 100%; border-collapse: collapse; margin-top: 50px; page-break-inside: avoid; }
+        .firmas-table td { width: 33.33%; text-align: center; vertical-align: bottom; padding: 0 20px; }
+        .linea { border-top: 1px solid #000; padding-top: 4px; font-weight: bold; font-size: 8.5px; }
+
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+
+    <div class="no-print" style="margin-bottom: 15px;">
+        <button onclick="window.print()" style="padding: 8px 16px; background: #8b0000; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+            🖨️ Imprimir / Guardar en PDF
+        </button>
+    </div>
+
+    <!-- ENCABEZADO OFICIAL -->
+    <table class="header-table">
+        <tr>
+            <td class="logo-box">
+                <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo Gobernación">
+            </td>
+            <td class="title-box">
+                <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
+                <h2>INFORME EJECUTIVO DE CONSUMO DE MATERIALES Y EJECUCIÓN POA</h2>
+                <p>Gestión Fiscal: {{ gestion }} • Período: Del {{ desde }} al {{ hasta }}</p>
+                <p><em>(Valores monetarios expresados en Bolivianos - Costeo PEPS)</em></p>
+            </td>
+            <td class="code-box">
+                SGA - GADP<br>
+                Control Presupuestario
+            </td>
+        </tr>
+    </table>
+
+    <!-- SECCIONES POR SECRETARÍA -->
+    {% for grupo in datos_por_secretaria %}
+        <div class="secretaria-header">
+            SECRETARÍA: {{ grupo.secretaria.nombre|upper }}
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Unidad / Área Organizacional</th>
+                    <th style="width: 12%;">Cant. Retirada</th>
+                    <th style="width: 15%;">Gasto Real (Bs.)</th>
+                    <th style="width: 15%;">Presupuesto POA</th>
+                    <th style="width: 15%;">Saldo Remanente</th>
+                    <th style="width: 10%;">% Ejecución</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in grupo.unidades %}
+                <tr>
+                    <td class="text-left font-bold">{{ u.unidad.nombre }}</td>
+                    <td class="text-center">{{ u.total_cant }} u.</td>
+                    <td class="text-right font-bold">Bs. {{ u.total_val|floatformat:2 }}</td>
+                    <td class="text-right">Bs. {{ u.poa_inicial|floatformat:2 }}</td>
+                    <td class="text-right">Bs. {{ u.poa_disponible|floatformat:2 }}</td>
+                    <td class="text-center font-bold">{{ u.pct_consumo }}%</td>
+                </tr>
+                {% endfor %}
+                <tr class="row-total">
+                    <td class="text-right">SUBTOTAL SECRETARÍA:</td>
+                    <td class="text-center">{{ grupo.total_fisico }} u.</td>
+                    <td class="text-right">Bs. {{ grupo.total_valorado|floatformat:2 }}</td>
+                    <td class="text-right">Bs. {{ grupo.total_poa|floatformat:2 }}</td>
+                    <td class="text-right">—</td>
+                    <td class="text-center">{{ grupo.pct_consumo }}%</td>
+                </tr>
+            </tbody>
+        </table>
+    {% endfor %}
+
+    <!-- TOTAL GENERAL INSTITUCIONAL -->
+    <table class="data-table" style="margin-top: 10px;">
+        <tr class="row-total" style="background: #cbd5e1; font-size: 10px;">
+            <td style="width: 40%;" class="text-right">TOTAL CONSOLIDADO GOBERNACIÓN:</td>
+            <td style="width: 12%;" class="text-center">{{ total_general_fisico }} u.</td>
+            <td style="width: 15%;" class="text-right">Bs. {{ total_general_valorado|floatformat:2 }}</td>
+            <td style="width: 15%;" class="text-right">Bs. {{ total_general_poa|floatformat:2 }}</td>
+            <td style="width: 15%;" class="text-right">—</td>
+            <td style="width: 10%;" class="text-center">{{ pct_global }}%</td>
+        </tr>
+    </table>
+
+    <!-- FIRMAS OFICIALES -->
+    <table class="firmas-table">
+        <tr>
+            <td><div class="linea">Responsable Almacén Central</div></td>
+            <td><div class="linea">Responsable Unidad de Presupuestos</div></td>
+            <td><div class="linea">Secretaría Dptal. Administrativa y Financiera</div></td>
+        </tr>
+    </table>
+
+</body>
+</html>

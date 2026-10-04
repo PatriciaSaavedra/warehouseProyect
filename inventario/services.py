@@ -17,8 +17,7 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
     """
     Descuenta stock físico aplicando el método PEPS (FIFO) de manera aislada por Almacén.
     Agota cronológicamente los lotes de ENTRADA en el almacén especificado con saldo disponible y calcula el costo real.
-    
-    Adicionalmente, permite descontar del stock_reservado si la salida proviene de una solicitud aprobada.
+    Soporta consumo multicapa (ej. 5 de Lote 1 a 25 Bs. y 1 de Lote 2 a 30 Bs.).
     """
     if cantidad_salida <= 0:
         raise ValueError("La cantidad de salida debe ser estrictamente mayor a cero.")
@@ -45,21 +44,41 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
 
         cantidad_restante = cantidad_salida
         costo_total_egreso = Decimal('0.00')
+        desglose_lotes = []
 
         for lote in lotes_disponibles:
             if cantidad_restante <= 0:
                 break
 
             if lote.saldo_disponible_lote >= cantidad_restante:
-                costo_total_egreso += Decimal(cantidad_restante) * lote.costo_unitario
+                subtotal_capa = Decimal(cantidad_restante) * lote.costo_unitario
+                costo_total_egreso += subtotal_capa
                 lote.saldo_disponible_lote -= cantidad_restante
                 lote.save()
+                
+                desglose_lotes.append({
+                    'lote_id': lote.id,
+                    'fecha_ingreso': lote.fecha,
+                    'cantidad': cantidad_restante,
+                    'costo_unitario': lote.costo_unitario,
+                    'subtotal': subtotal_capa
+                })
                 cantidad_restante = 0
             else:
-                costo_total_egreso += Decimal(lote.saldo_disponible_lote) * lote.costo_unitario
-                cantidad_restante -= lote.saldo_disponible_lote
+                cant_tomada = lote.saldo_disponible_lote
+                subtotal_capa = Decimal(cant_tomada) * lote.costo_unitario
+                costo_total_egreso += subtotal_capa
+                cantidad_restante -= cant_tomada
                 lote.saldo_disponible_lote = 0
                 lote.save()
+                
+                desglose_lotes.append({
+                    'lote_id': lote.id,
+                    'fecha_ingreso': lote.fecha,
+                    'cantidad': cant_tomada,
+                    'costo_unitario': lote.costo_unitario,
+                    'subtotal': subtotal_capa
+                })
 
         if cantidad_restante > 0:
             raise ValueError("Inconsistencia en el inventario: La suma de lotes valorados PEPS es menor al stock físico.")
@@ -78,6 +97,12 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
 
         costo_unitario_ponderado = costo_total_egreso / Decimal(cantidad_salida)
 
+        # Si hubo consumo de múltiples capas con precios diferentes, agregar detalle a la referencia
+        ref_final = referencia
+        if len(desglose_lotes) > 1:
+            resumen_peps = " + ".join([f"{d['cantidad']}u x Bs.{d['costo_unitario']:.2f}" for d in desglose_lotes])
+            ref_final = f"{referencia} [PEPS: {resumen_peps}]"
+
         movimiento = MovimientoInventario.objects.create(
             material=material,
             almacen=almacen,
@@ -87,13 +112,14 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
             costo_total=costo_total_egreso,
             stock_anterior=stock_anterior,
             stock_resultante=inventario_almacen.stock_fisico,
-            referencia=referencia,
+            referencia=ref_final[:100],  # Respetar max_length
             usuario=usuario,
             unidad_destino=unidad_destino,
         )
 
-    return movimiento
+        movimiento.desglose_peps = desglose_lotes
 
+    return movimiento
 
 # ========================================================
 # 2. CONSULTAS DE INVENTARIO Y ALMACENES

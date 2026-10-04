@@ -55,6 +55,7 @@
             font-size: 12px;
             font-weight: 600;
             color: #1e293b;
+            background-color: #fff;
         }
         .btn-filter {
             background-color: #8b0000;
@@ -152,6 +153,17 @@
     <div class="toolbar-container no-print">
         <form method="GET" class="filter-form">
             <div class="filter-group">
+                <label>Almacén / Depósito</label>
+                <select name="almacen">
+                    <option value="">🏢 TODOS (Consolidado)</option>
+                    {% for alm in almacenes_disponibles %}
+                        <option value="{{ alm.id }}" {% if almacen_seleccionado.id == alm.id %}selected{% endif %}>
+                            📍 {{ alm.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Gestión Fiscal</label>
                 <input type="number" name="gestion" value="{{ gestion }}" min="2020" max="2035" style="width: 80px;">
             </div>
@@ -179,6 +191,11 @@
                     <h2>RESUMEN DE ALMACENES (BIENES DE CONSUMO)</h2>
                     <p>Al {{ fecha_corte|date:"d" }} de {{ fecha_corte|date:"F" }} de {{ gestion }}</p>
                     <p><em>(Expresado en Bolivianos)</em></p>
+                    {% if almacen_seleccionado %}
+                        <p style="font-weight: bold; color: #8b0000; margin-top: 4px;">ALMACÉN: {{ almacen_seleccionado.nombre|upper }}</p>
+                    {% else %}
+                        <p style="font-weight: bold; margin-top: 4px;">CONSOLIDADO INSTITUCIONAL</p>
+                    {% endif %}
                 </td>
                 <td class="code-box">
                     DGCF - R1.05<br>

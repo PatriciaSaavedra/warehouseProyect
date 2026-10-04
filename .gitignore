@@ -36,4 +36,4 @@ htmlcov/
 *.dump
 *.sql
 respaldo_antes_de_prueba.*
-datos_respaldo.json
+datos_respaldo.json  

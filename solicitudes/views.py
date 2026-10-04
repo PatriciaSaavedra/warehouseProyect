@@ -12,6 +12,19 @@ from django.db import transaction, DatabaseError
 from django.contrib import messages
 from django.db.models import Q, Sum, F
 from django.core.paginator import Paginator
+import os
+
+from django.conf import settings
+
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.barcode.qr import QrCodeWidget
+from reportlab.graphics import renderPDF
+
+from solicitudes.models import Solicitud
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
@@ -812,32 +825,42 @@ def validar_jefatura(request, id):
 def preparar_solicitud(request, id):
     solicitud = get_object_or_404(Solicitud, id=id)
 
-    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-        permitido = (solicitud.estado in ['REVISADA', 'VALIDADA_JEFATURA'])
-        mensaje_error = "Para solicitudes con stock, se requiere primero la autorización del Jefe de Unidad (Estado: Revisada)."
-    else:
-        permitido = (solicitud.estado == 'VALIDADA_JEFATURA')
-        mensaje_error = "Solo solicitudes validadas administrativamente por la Jefatura Administrativa pueden prepararse."
+    if request.method == 'POST':
+        # El almacenero envía las cantidades reales que va a entregar
+        with transaction.atomic():
+            for det in solicitud.detalles.all():
+                campo_cant = f"cantidad_aprobar_{det.id}"
+                if campo_cant in request.POST:
+                    cant_a_entregar = int(request.POST.get(campo_cant, 0))
+                    
+                    # Validar contra stock real del almacén
+                    inv = InventarioAlmacen.objects.filter(
+                        material=det.material, 
+                        almacen=solicitud.almacen_origen
+                    ).first()
+                    
+                    stock_real = inv.stock_disponible if inv else 0
+                    
+                    # No puede entregar más de lo que hay físicamente
+                    if cant_a_entregar > stock_real:
+                        messages.error(request, f"No puedes entregar {cant_a_entregar} de {det.material.nombre}, solo hay {stock_real} en estantería.")
+                        return redirect('preparar_solicitud', id=solicitud.id)
+                    
+                    # Se asigna la cantidad física verificada
+                    det.cantidad_aprobada = cant_a_entregar
+                    det.cantidad_entregada = cant_a_entregar
+                    det.save()
 
-    if not permitido:
-        messages.error(request, mensaje_error)
-        return redirigir_despues_de_accion(request, solicitud)
+            # Pasa al estado que habilita la impresión
+            solicitud.estado = 'PREPARADA'
+            solicitud.preparado_por = request.user
+            solicitud.fecha_preparado = timezone.now()
+            solicitud.save()
 
-    solicitud.estado = 'PREPARADA'
-    solicitud.preparado_por = request.user
-    solicitud.fecha_preparado = timezone.now()
-    solicitud.save()
+            messages.success(request, f"Solicitud {solicitud.codigo} preparada con éxito. Formulario listo para impresión y entrega.")
+            return redirect('detalle_solicitud', id=solicitud.id)
 
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Solicitudes',
-        accion='Preparación física',
-        descripcion=f'El almacenero preparó y empaquetó físicamente los materiales de la solicitud {solicitud.codigo}'
-    )
-
-    messages.success(request, f"La solicitud {solicitud.codigo} ha sido marcada como PREPARADA para su despacho.")
-    return redirigir_despues_de_accion(request, solicitud)
-
+    return render(request, 'solicitudes/preparar.html', {'solicitud': solicitud})
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -1227,6 +1250,8 @@ def reabrir_solicitud(request, id):
 
     messages.info(request, f"La solicitud {solicitud.codigo} ha sido reabierta.")
     return redirigir_despues_de_accion(request, solicitud)
+
+
 @login_required
 def solicitud_pdf(request, id):
     solicitud = get_object_or_404(
@@ -1234,9 +1259,20 @@ def solicitud_pdf(request, id):
         id=id
     )
 
+    # ========================================================
+    # 1. REGLA SABS: BLOQUEO HASTA VERIFICACIÓN/APROBACIÓN DE ALMACENES
+    # ========================================================
+    if solicitud.estado not in ['PREPARADA', 'ENTREGADA', 'CERRADA']:
+        messages.warning(
+            request, 
+            "El Formulario Oficial de Pedido no puede imprimirse hasta que Almacén verifique existencias y prepare/apruebe el despacho."
+        )
+        return redirect('detalle_solicitud', id=solicitud.id)
+
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="pedido_material_{solicitud.codigo}.pdf"'
 
+    # Formato horizontal idéntico a la hoja física (Landscape Letter: 792 x 612 pt)
     pdf = canvas.Canvas(response, pagesize=landscape(letter))
     width, height = landscape(letter)
     
@@ -1244,33 +1280,58 @@ def solicitud_pdf(request, id):
     pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
     pdf.setAuthor("Sistema de Gestión de Almacenes")
 
-    # Encabezado Institucional
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(50, height - 40, "ESTADO PLURINACIONAL DE BOLIVIA")
-    pdf.drawString(50, height - 52, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
-    pdf.setFont("Helvetica", 9)
-    pdf.drawString(50, height - 64, "ALMACÉN CENTRAL")
+    # ========================================================
+    # 2. LOGO INSTITUCIONAL OFICIAL
+    # ========================================================
+    posibles_logos = [
+        os.path.join(settings.BASE_DIR, 'static', 'img', 'logo_gober_horizontal.png'),
+        os.path.join(settings.BASE_DIR, 'static', 'img', 'cropped-cropped-logo-vertical-gober.jpg'),
+    ]
+    for ruta in posibles_logos:
+        if os.path.exists(ruta):
+            try:
+                pdf.drawImage(ruta, 45, height - 68, width=60, height=45, preserveAspectRatio=True, mask='auto')
+                break
+            except Exception:
+                pass
 
-    pdf.setFont("Helvetica-Bold", 15)
-    pdf.drawString(50, height - 95, "PEDIDO DE MATERIALES y/o BIENES")
-
+    # ========================================================
+    # 3. ENCABEZADO INSTITUCIONAL CENTRADO (Idéntico a la hoja física)
+    # ========================================================
+    pdf.setFont("Helvetica-Bold", 10.5)
+    pdf.drawString(115, height - 32, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
     pdf.setFont("Helvetica", 8)
-    right_x = 480
-    pdf.drawString(right_x, height - 35, "Programa: _____________________________________")
-    pdf.drawString(right_x, height - 47, "Subprograma: __________________________________")
-    pdf.drawString(right_x, height - 59, "Proyecto: _____________________________________")
-    pdf.drawString(right_x, height - 71, "Act. u Obra: __________________________________")
-    pdf.drawString(right_x, height - 83, f"Unid. Ejec.: {solicitud.unidad_solicitante.nombre[:28]}")
-    pdf.drawString(right_x, height - 95, f"Código Presup: _______________ Código Nº: {solicitud.codigo}")
+    almacen_nombre = solicitud.almacen_origen.nombre.upper() if hasattr(solicitud, 'almacen_origen') and solicitud.almacen_origen else "ALMACÉN CENTRAL"
+    pdf.drawString(115, height - 44, f"{almacen_nombre} DEL GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
 
-    pdf.setFont("Helvetica-Bold", 9)
-    fecha_pedido = solicitud.fecha.strftime('%d / %m / %Y') if solicitud.fecha else "__ / __ / ____"
-    pdf.drawString(50, height - 120, f"Fecha del Pedido: {fecha_pedido}")
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(115, height - 66, "PEDIDO DE MATERIAL y/o BIENES")
 
-    headers_1 = ['CÓDIGO', 'DESCRIPCIÓN', 'Unidad de\nManejo', 'Cantidad', '', 'Partida\nPresupuestaria', 'Costo (Bs.)', '']
-    headers_2 = ['', '', '', 'Pedida', 'Entrega', '', 'Unidad', 'TOTAL']
+    # Fecha del Pedido en formato formulario
+    pdf.setFont("Helvetica", 8)
+    dia = solicitud.fecha.strftime('%d') if solicitud.fecha else "___"
+    mes = solicitud.fecha.strftime('%m') if solicitud.fecha else "___"
+    anio = solicitud.fecha.strftime('%Y') if solicitud.fecha else "2026"
+    pdf.drawString(115, height - 80, f"Fecha del Pedido: {dia} de {mes} de {anio}")
+
+    # Cuadro de Metadatos Presupuestarios (Derecha)
+    right_x = 520
+    pdf.setFont("Helvetica", 7.5)
+    pdf.drawString(right_x, height - 30, "Programa: _____________________________________")
+    pdf.drawString(right_x, height - 42, "Subprograma: __________________________________")
+    pdf.drawString(right_x, height - 54, "Proyecto: _____________________________________")
+    pdf.drawString(right_x, height - 66, "Act. u Obra: __________________________________")
+    pdf.drawString(right_x, height - 78, f"Unid. Ejec.: {solicitud.unidad_solicitante.nombre[:26]}")
+    pdf.drawString(right_x, height - 90, f"Código Presup: _______________ Código Nº: {solicitud.codigo}")
+
+    # ========================================================
+    # 4. TABLA OFICIAL SEGÚN HOJA FÍSICA (Columnas ① ② ③ ④)
+    # ========================================================
+    headers_1 = ['CODIGO', 'DESCRIPCION', 'Unidad de\nManejo', 'Cantidad', '', 'Partida\nPresupuestaria', 'Costo (Bs.)', '']
+    headers_2 = ['', '', '', 'Pedido', 'Entrega', '', 'Unidad', 'Total']
 
     data = [headers_1, headers_2]
+    total_costo_pedido = Decimal('0.00')
 
     for d in solicitud.detalles.all():
         if d.es_nueva_adquisicion:
@@ -1281,9 +1342,9 @@ def solicitud_pdf(request, id):
             costo_u = d.precio_unitario_referencial
             costo_total = Decimal(d.cantidad_entregada) * costo_u if d.cantidad_entregada > 0 else Decimal('0.00')
         else:
-            desc = d.material.nombre[:40]
+            desc = d.material.nombre[:42]
             codigo_mat = d.material.codigo
-            unidad_cod = d.material.unidad_medida_fk.codigo if d.material.unidad_medida_fk else d.material.unidad_medida
+            unidad_cod = d.material.unidad_medida_fk.codigo if d.material.unidad_medida_fk else (d.material.unidad_medida or "PZA")
             partida_cod = d.material.partida.codigo if d.material.partida else "—"
 
             if solicitud.estado in ['ENTREGADA', 'CERRADA']:
@@ -1300,15 +1361,16 @@ def solicitud_pdf(request, id):
                     costo_total = Decimal(d.cantidad_entregada) * costo_u
             else:
                 costo_u = d.precio_unitario_referencial
-                costo_total = Decimal('0.00')
+                costo_total = Decimal(d.cantidad_entregada) * costo_u
 
         cant_pedida = d.cantidad_solicitada
         cant_entrega = d.cantidad_entregada
+        total_costo_pedido += costo_total
 
         data.append([
             codigo_mat,
             desc,
-            unidad_cod,
+            str(unidad_cod)[:8],
             str(cant_pedida),
             str(cant_entrega) if cant_entrega > 0 else "—",
             partida_cod,
@@ -1316,100 +1378,111 @@ def solicitud_pdf(request, id):
             f"{costo_total:.2f}" if (costo_total > 0 and cant_entrega > 0) else "—"
         ])
 
-    col_widths = [75, 192, 55, 45, 45, 80, 100, 100]
-    t = Table(data, colWidths=col_widths)
+    # Fila de Totales
+    data.append([
+        'TOTAL GENERAL', '', '', '', '', '', '', f"{total_costo_pedido:.2f}"
+    ])
 
-    t_style = TableStyle([
+    col_widths = [75, 235, 50, 42, 42, 68, 70, 70]  # Suma = 652 pt
+    t = Table(data, colWidths=col_widths)
+    last_row = len(data) - 1
+
+    t.setStyle(TableStyle([
         ('SPAN', (0, 0), (0, 1)),  
         ('SPAN', (1, 0), (1, 1)),  
         ('SPAN', (2, 0), (2, 1)),  
-        ('SPAN', (3, 0), (4, 0)),  
+        ('SPAN', (3, 0), (4, 0)),  # Cantidad (Pedido / Entrega)
         ('SPAN', (5, 0), (5, 1)),  
-        ('SPAN', (6, 0), (7, 0)),  
+        ('SPAN', (6, 0), (7, 0)),  # Costo (Unidad / Total)
+        ('SPAN', (0, last_row), (5, last_row)), # Fila TOTAL
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 2), (1, -1), 'LEFT'),
+        ('ALIGN', (1, 2), (1, last_row - 1), 'LEFT'),
+        ('ALIGN', (0, last_row), (0, last_row), 'RIGHT'),
         ('ALIGN', (6, 2), (-1, -1), 'RIGHT'),
         ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 1), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('GRID', (0, 0), (-1, last_row), 0.5, colors.HexColor('#6B7280')),
         ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
-        ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
-        ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 2), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-    ])
-    t.setStyle(t_style)
+        ('FONTNAME', (0, last_row), (-1, last_row), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+    ]))
 
-    table_height = len(data) * 18
-    t.wrapOn(pdf, 50, height - 150 - table_height)
-    t.drawOn(pdf, 50, height - 150 - table_height)
+    w_act, h_act = t.wrapOn(pdf, 652, height - 200)
+    pdf_y = height - 105 - h_act
+    t.drawOn(pdf, 45, pdf_y)
 
-    # Firmas
-    pdf.setFont("Helvetica", 7.5)
-    y_firma_1 = 90
-    pdf.drawString(50, y_firma_1, "___________________________")
-    pdf.drawString(50, y_firma_1 - 10, "Pedido por:")
-    pdf.setFont("Helvetica-Bold", 7.5)
-    pdf.drawString(50, y_firma_1 - 20, f"{solicitud.solicitante.get_full_name() or solicitud.solicitante.username}")
-    
-    pdf.setFont("Helvetica", 7.5)
-    pdf.drawString(230, y_firma_1, "___________________________")
-    pdf.drawString(230, y_firma_1 - 10, "Autorizado por:")
-    pdf.setFont("Helvetica-Bold", 7.5)
-    autorizador = solicitud.revisado_por.get_full_name() if solicitud.revisado_por else (solicitud.aprobado_por or "Director Administrativo")
-    pdf.drawString(230, y_firma_1 - 20, autorizador)
-    
-    pdf.setFont("Helvetica", 7.5)
-    pdf.drawString(410, y_firma_1, "___________________________")
-    pdf.drawString(410, y_firma_1 - 10, "Entregado por:")
-    pdf.setFont("Helvetica-Bold", 7.5)
-    entregador = solicitud.entregado_por.get_full_name() if solicitud.entregado_por else "Almacenero"
-    pdf.drawString(410, y_firma_1 - 20, entregador)
-    
-    pdf.setFont("Helvetica", 7.5)
-    pdf.drawString(590, y_firma_1, "___________________________")
-    pdf.drawString(590, y_firma_1 - 10, "Recibido por:")
-    pdf.setFont("Helvetica-Bold", 7.5)
-    pdf.drawString(590, y_firma_1 - 20, "Firma del Solicitante")
+    # ========================================================
+    # 5. LAS 5 FIRMAS OFICIALES ALINEADAS (Idénticas a la foto física)
+    # ========================================================
+    # Posición dinámica debajo de la tabla
+    y_firmas = max(42, pdf_y - 70)
+    pdf.setFont("Helvetica", 7)
 
-    y_firma_2 = 40
-    pdf.setFont("Helvetica", 7.5)
-    pdf.drawString(140, y_firma_2, "___________________________")
-    pdf.drawString(140, y_firma_2 - 10, "Control Existencias:")
-    pdf.setFont("Helvetica-Bold", 7.5)
-    pdf.drawString(140, y_firma_2 - 20, "Kardista de Almacén")
+    # Nombres de responsables si existen
+    solicitante_nom = solicitud.solicitante.get_full_name() or solicitud.solicitante.username
+    autorizador_nom = solicitud.aprobado_por or (solicitud.revisado_por.get_full_name() if solicitud.revisado_por else "")
+    entregador_nom = solicitud.entregado_por.get_full_name() if solicitud.entregado_por else "Almacenero"
 
-    pdf.setFont("Helvetica", 7.5)
-    pdf.drawString(320, y_firma_2, "___________________________")
-    pdf.drawString(320, y_firma_2 - 10, "Presupuestos:")
-    pdf.setFont("Helvetica-Bold", 7.5)
-    presupuestador = solicitud.presupuestado_por.get_full_name() if solicitud.presupuestado_por else "Unidad de Presupuestos"
-    pdf.drawString(320, y_firma_2 - 20, presupuestador)
+    # 1. Pedido Por
+    pdf.drawString(45, y_firmas + 25, "_______________________")
+    pdf.drawString(45, y_firmas + 14, "Pedido Por:")
+    pdf.setFont("Helvetica-Bold", 6.5)
+    pdf.drawString(45, y_firmas + 4, solicitante_nom[:20])
+    pdf.setFont("Helvetica", 6)
+    pdf.drawString(45, y_firmas - 5, "Nombre, Cargo y Firma")
 
-    pdf.setFont("Helvetica-Bold", 8)
-    fecha_salida = solicitud.fecha_entrega.strftime('%d / %m / %Y') if solicitud.fecha_entrega else "__ / __ / ____"
-    pdf.drawString(540, y_firma_2, f"Fecha de salida física: {fecha_salida}")
+    # 2. V.B. Por
+    pdf.setFont("Helvetica", 7)
+    pdf.drawString(195, y_firmas + 25, "_______________________")
+    pdf.drawString(195, y_firmas + 14, "V.B. Por:")
+    pdf.setFont("Helvetica", 6)
+    pdf.drawString(195, y_firmas - 5, "Jefe Administrativo")
 
+    # 3. Autorizado Por
+    pdf.setFont("Helvetica", 7)
+    pdf.drawString(345, y_firmas + 25, "_______________________")
+    pdf.drawString(345, y_firmas + 14, "Autorizado Por:")
+    pdf.setFont("Helvetica-Bold", 6.5)
+    pdf.drawString(345, y_firmas + 4, autorizador_nom[:20])
+    pdf.setFont("Helvetica", 6)
+    pdf.drawString(345, y_firmas - 5, "Nombre, Cargo y Firma")
+
+    # 4. Entregado Por
+    pdf.setFont("Helvetica", 7)
+    pdf.drawString(495, y_firmas + 25, "_______________________")
+    pdf.drawString(495, y_firmas + 14, "Entregado Por:")
+    pdf.setFont("Helvetica-Bold", 6.5)
+    pdf.drawString(495, y_firmas + 4, entregador_nom[:20])
+    pdf.setFont("Helvetica", 6)
+    pdf.drawString(495, y_firmas - 5, "Nombre, Cargo y Firma")
+
+    # 5. Recibido Por
+    pdf.setFont("Helvetica", 7)
+    pdf.drawString(645, y_firmas + 25, "_______________________")
+    pdf.drawString(645, y_firmas + 14, "Recibido Por:")
+    pdf.setFont("Helvetica-Bold", 6.5)
+    pdf.drawString(645, y_firmas + 4, solicitante_nom[:20])
+    pdf.setFont("Helvetica", 6)
+    pdf.drawString(645, y_firmas - 5, "Nombre, Cargo y Firma")
+
+    # ========================================================
+    # 6. CÓDIGO QR Y FECHA DE SALIDA FÍSICA
+    # ========================================================
     if solicitud.estado in ['ENTREGADA', 'CERRADA']:
         qr_url = f"http://10.153.101.3:8000/solicitudes/verificar/{solicitud.codigo}/"
         qr_code = QrCodeWidget(qr_url)
         bounds = qr_code.getBounds()
-        width_qr = bounds[2] - bounds[0]
-        height_qr = bounds[3] - bounds[1]
+        w_qr = bounds[2] - bounds[0]
+        h_qr = bounds[3] - bounds[1]
         
-        d = Drawing(55, 55, transform=[55./width_qr, 0, 0, 55./height_qr, 0, 0])
+        d = Drawing(40, 40, transform=[40./w_qr, 0, 0, 40./h_qr, 0, 0])
         d.add(qr_code)
-        renderPDF.draw(d, pdf, 710, 15)
+        renderPDF.draw(d, pdf, width - 75, 12)
         
         pdf.setFont("Helvetica-Bold", 6.5)
         pdf.setFillColor(colors.HexColor('#16A34A'))
-        pdf.drawString(540, 15, f"CÓDIGO DE VALIDACIÓN: {solicitud.codigo}-2026-SABS-OK")
-        pdf.setFillColor(colors.black)
-    else:
-        pdf.setFont("Helvetica-Bold", 8)
-        pdf.setFillColor(colors.HexColor('#DC2626'))
-        pdf.drawString(540, 15, "DOCUMENTO EN TRÁMITE - SIN VALOR OFICIAL")
+        pdf.drawString(45, 14, f"CÓDIGO DE VALIDACIÓN: {solicitud.codigo}-2026-SABS-OK • DOCUMENTO OFICIAL DESPACHADO")
         pdf.setFillColor(colors.black)
 
     pdf.save()

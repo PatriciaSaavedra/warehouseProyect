@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 import json 
 import html
+
 from django.contrib import messages
 from django.utils import timezone
 from django.db import transaction
@@ -890,26 +891,49 @@ def editar_almacen(request, id):
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def reporte_inventario(request):
     """
-    Genera el reporte de Inventario Físico Valorado tabular oficial en PDF (Horizontal/Landscape).
-    Soporta paginación automática y evita KeyErrors en ReportLab.
+    Genera el reporte oficial de Inventario Físico Valorado en PDF (Horizontal/Landscape).
+    Soporta:
+    - Filtro por Rango de Fechas (Desde / Hasta).
+    - Filtro por Almacén específico o Consolidado General.
+    - Escudo oficial institucional.
+    - Exclusión de ítems sin movimiento/saldo para evitar páginas vacías.
+    - Fila de Totales Generales al final.
     """
-    desde_str = request.GET.get('desde')
-    hasta_str = request.GET.get('hasta')
+    desde_str = request.GET.get('desde', '').strip()
+    hasta_str = request.GET.get('hasta', '').strip()
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
 
     desde = parse_date(desde_str) if desde_str else datetime.date(2026, 1, 1)
     hasta = parse_date(hasta_str) if hasta_str else datetime.date(2026, 12, 31)
 
-    materiales = Material.objects.filter(is_active=True).order_by('codigo')
+    # 1. Resolver almacén
+    almacen_seleccionado = None
+    if filtro_almacen_id:
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
 
-    # Encabezados de doble nivel reglamentarios
+    materiales = Material.objects.filter(is_active=True).select_related('unidad_medida_fk', 'partida').order_by('partida__codigo', 'codigo')
+
     headers_1 = ['Código', 'Descripción del Material', 'Unid.', 'Saldo Inicial / Apertura', '', 'Entradas del Periodo', '', 'Salidas del Periodo', '', 'Saldos de Cierre', '']
     headers_2 = ['', '', '', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)', 'Cant.', 'Importe (Bs.)']
 
     filas_datos = []
 
-    # Procesar matemáticamente los saldos físicos y monetarios por período
+    # Acumuladores para el TOTAL
+    tot_ini_cant = 0
+    tot_ini_val = Decimal('0.00')
+    tot_ent_cant = 0
+    tot_ent_val = Decimal('0.00')
+    tot_sal_cant = 0
+    tot_sal_val = Decimal('0.00')
+    tot_fin_cant = 0
+    tot_fin_val = Decimal('0.00')
+
     for mat in materiales:
+        # Movimientos previos (Saldo Inicial)
         mov_previos = MovimientoInventario.objects.filter(material=mat, fecha__date__lt=desde)
+        if almacen_seleccionado:
+            mov_previos = mov_previos.filter(almacen=almacen_seleccionado)
+
         ini_cant = 0
         ini_val = Decimal('0.00')
         for m in mov_previos:
@@ -920,7 +944,11 @@ def reporte_inventario(request):
                 ini_cant -= m.cantidad
                 ini_val -= (m.costo_total or Decimal('0.00'))
 
+        # Movimientos del periodo
         mov_periodo = MovimientoInventario.objects.filter(material=mat, fecha__date__range=[desde, hasta])
+        if almacen_seleccionado:
+            mov_periodo = mov_periodo.filter(almacen=almacen_seleccionado)
+
         ent_cant = 0
         ent_val = Decimal('0.00')
         sal_cant = 0
@@ -933,107 +961,136 @@ def reporte_inventario(request):
                 sal_cant += m.cantidad
                 sal_val += (m.costo_total or Decimal('0.00'))
 
-        # Cálculo de Saldos de Cierre
+        # Saldos de Cierre
         fin_cant = ini_cant + ent_cant - sal_cant
         fin_val = ini_val + ent_val - sal_val
 
-        filas_datos.append([
-            mat.codigo,
-            mat.nombre[:32], 
-            mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
-            str(ini_cant),
-            f"{ini_val:.2f}",
-            str(ent_cant),
-            f"{ent_val:.2f}",
-            str(sal_cant),
-            f"{sal_val:.2f}",
-            str(fin_cant),
-            f"{fin_val:.2f}"
-        ])
+        # SOLO incluir si tiene saldo o hubo movimiento (evita 19 páginas vacías)
+        if ini_cant != 0 or ent_cant != 0 or sal_cant != 0 or fin_cant != 0 or fin_val != Decimal('0.00'):
+            filas_datos.append([
+                mat.codigo,
+                mat.nombre[:34],
+                mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else (mat.unidad_medida or 'UND')[:5],
+                str(ini_cant),
+                f"{ini_val:.2f}",
+                str(ent_cant),
+                f"{ent_val:.2f}",
+                str(sal_cant),
+                f"{sal_val:.2f}",
+                str(fin_cant),
+                f"{fin_val:.2f}"
+            ])
+
+            tot_ini_cant += ini_cant
+            tot_ini_val += ini_val
+            tot_ent_cant += ent_cant
+            tot_ent_val += ent_val
+            tot_sal_cant += sal_cant
+            tot_sal_val += sal_val
+            tot_fin_cant += fin_cant
+            tot_fin_val += fin_val
+
+    # Fila de Totales al final
+    fila_total = [
+        'TOTAL', 'TOTALES GENERALES CONSOLIDADOS', '',
+        str(tot_ini_cant), f"{tot_ini_val:.2f}",
+        str(tot_ent_cant), f"{tot_ent_val:.2f}",
+        str(tot_sal_cant), f"{tot_sal_val:.2f}",
+        str(tot_fin_cant), f"{tot_fin_val:.2f}"
+    ]
 
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="inventario_fisico_valorado_{desde}_{hasta}.pdf"'
+    nombre_alm_slug = almacen_seleccionado.nombre.replace(" ", "_") if almacen_seleccionado else "CONSOLIDADO"
+    response['Content-Disposition'] = f'inline; filename="inventario_valorado_{nombre_alm_slug}_{desde}_{hasta}.pdf"'
 
     pdf = canvas.Canvas(response, pagesize=landscape(letter))
     width, height = landscape(letter)
 
     pdf.setTitle(f"Inventario Valorado ({desde} a {hasta})")
-    pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
-    pdf.setAuthor("Sistema de Gestión de Almacenes")
+    logo_path = obtener_ruta_logo()
 
-    # Paginación inteligente: 18 filas por página para que no se desborde
-    filas_por_pagina = 18
+    # Paginación (16 filas por página)
+    filas_por_pagina = 16
     total_filas = len(filas_datos)
     total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
+    col_widths = [65, 170, 35, 40, 58, 40, 58, 40, 58, 40, 68]
 
-    col_widths = [65, 142, 35, 45, 60, 45, 60, 45, 60, 45, 65]
+    deposito_txt = f"DEPÓSITO: {almacen_seleccionado.nombre.upper()}" if almacen_seleccionado else "DEPÓSITO: TODOS LOS ALMACENES (CONSOLIDADO GENERAL)"
 
     for num_pagina in range(total_paginas):
         inicio = num_pagina * filas_por_pagina
         fin = inicio + filas_por_pagina
-        filas_bloque = filas_datos[inicio:fin]
+        bloque = filas_datos[inicio:fin]
 
-        # Encabezado de página
-        pdf.setFont("Helvetica-Bold", 14)
-        pdf.drawString(50, height - 40, "INVENTARIO FÍSICO VALORADO DE ALMACENES")
-        pdf.setFont("Helvetica", 9)
-        pdf.drawString(50, height - 55, "Gobierno Autónomo Departamental de Potosí — Unidad de Almacenes")
-        pdf.drawString(50, height - 68, f"Período de Evaluación: Desde {desde.strftime('%d/%m/%Y')} hasta {hasta.strftime('%d/%m/%Y')}")
-        pdf.drawRightString(width - 50, height - 40, f"Pág. {num_pagina + 1} de {total_paginas}")
+        es_ultima_pagina = (num_pagina == total_paginas - 1)
+        if es_ultima_pagina:
+            bloque.append(fila_total)
 
-        tabla_pagina = [headers_1, headers_2] + filas_bloque
+        # Dibujar Escudo
+        if logo_path:
+            try:
+                pdf.drawImage(logo_path, 45, height - 60, width=38, height=45, preserveAspectRatio=True, mask='auto')
+            except Exception:
+                pass
 
+        # Encabezado institucional
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(92, height - 30, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(92, height - 44, "INVENTARIO FÍSICO VALORADO DE ALMACENES")
+        pdf.setFont("Helvetica", 8)
+        pdf.drawString(92, height - 56, f"{deposito_txt} • PERÍODO: Del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')}")
+        pdf.drawRightString(width - 45, height - 30, f"Pág. {num_pagina + 1} de {total_paginas}")
+
+        tabla_pagina = [headers_1, headers_2] + bloque
         t = Table(tabla_pagina, colWidths=col_widths)
-        t_style = TableStyle([
-            ('SPAN', (0, 0), (0, 1)),  
-            ('SPAN', (1, 0), (1, 1)),  
-            ('SPAN', (2, 0), (2, 1)),  
-            ('SPAN', (3, 0), (4, 0)),  
-            ('SPAN', (5, 0), (6, 0)),  
-            ('SPAN', (7, 0), (8, 0)),  
-            ('SPAN', (9, 0), (10, 0)), 
+        last_row = len(tabla_pagina) - 1
 
+        estilos = [
+            ('SPAN', (0, 0), (0, 1)),
+            ('SPAN', (1, 0), (1, 1)),
+            ('SPAN', (2, 0), (2, 1)),
+            ('SPAN', (3, 0), (4, 0)),
+            ('SPAN', (5, 0), (6, 0)),
+            ('SPAN', (7, 0), (8, 0)),
+            ('SPAN', (9, 0), (10, 0)),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (1, 2), (1, -1), 'LEFT'),  
-            ('ALIGN', (4, 2), (4, -1), 'RIGHT'), 
+            ('ALIGN', (1, 2), (1, -1), 'LEFT'),
+            ('ALIGN', (4, 2), (4, -1), 'RIGHT'),
             ('ALIGN', (6, 2), (6, -1), 'RIGHT'),
             ('ALIGN', (8, 2), (8, -1), 'RIGHT'),
             ('ALIGN', (10, 2), (10, -1), 'RIGHT'),
-
             ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 1), 7.5),
             ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F3F4F6')),
-
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D1D5DB')),
             ('LINEBELOW', (0, 1), (-1, 1), 1, colors.HexColor('#9CA3AF')),
-
             ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 2), (-1, -1), 7),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ])
-        t.setStyle(t_style)
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+            ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+        ]
 
-        # Dimensiones seguras sin colisiones de split
-        w_act, h_act = t.wrapOn(pdf, width - 100, 1000)
-        pdf_y = height - 85 - h_act
-        t.drawOn(pdf, 50, pdf_y)
+        # Estilo para la fila de Totales en la última página
+        if es_ultima_pagina:
+            estilos.extend([
+                ('SPAN', (0, last_row), (2, last_row)),
+                ('FONTNAME', (0, last_row), (-1, last_row), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, last_row), (-1, last_row), colors.HexColor('#E2E8F0')),
+                ('LINEABOVE', (0, last_row), (-1, last_row), 1, colors.HexColor('#475569')),
+            ])
 
-        # Salto a la siguiente página si hay más bloques
+        t.setStyle(TableStyle(estilos))
+
+        w_act, h_act = t.wrapOn(pdf, width - 90, 1000)
+        pdf_y = height - 100 - h_act
+        t.drawOn(pdf, 45, pdf_y)
+
         if num_pagina < total_paginas - 1:
             pdf.showPage()
 
     pdf.save()
-
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Inventario',
-        accion='Exportar Inventario Valorado',
-        descripcion=f'Se exportó el reporte de Inventario Físico Valorado desde {desde} hasta {hasta}.'
-    )
-
     return response
-
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def movimientos(request):
@@ -2300,75 +2357,118 @@ def recibir_transferencia(request, id):
 
 
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def nota_recepcion_pdf(request, id):
     """
-    Genera el formato oficial exacto de la "NOTA DE RECEPCIÓN" del GAD Potosí (Horizontal/Landscape).
-    Idéntico al documento físico oficial N° 162 con 10 columnas y 3 firmas.
+    Formato oficial de la "NOTA DE RECEPCIÓN" del GAD Potosí (Horizontal/Landscape).
+    Idéntico al documento físico oficial Nº. 162.
     """
     nota = get_object_or_404(
-        NotaIngreso.objects.prefetch_related('detalles__material__partida', 'detalles__material__unidad_medida_fk')
-        .select_related('proveedor', 'usuario', 'almacen_destino', 'compra_menor_origen', 'compra_menor_origen__solicitud_origen'),
+        NotaIngreso.objects.prefetch_related(
+            'detalles__material__partida', 
+            'detalles__material__unidad_medida_fk'
+        ).select_related(
+            'proveedor', 'usuario', 'almacen_destino', 
+            'compra_menor_origen', 'compra_menor_origen__solicitud_origen'
+        ),
         id=id
     )
 
     response = HttpResponse(content_type='application/pdf')
-    nro_limpio = nota.nro_nota.replace("NI-", "").replace("NI", "")
+    nro_limpio = nota.nro_nota.replace("NI-", "").replace("NI", "").replace("TEST26-ING-", "").replace("ING-", "")
     response['Content-Disposition'] = f'inline; filename="nota_recepcion_{nro_limpio}.pdf"'
 
-    # 1. Configuración Horizontal Landscape
+    # Landscape Carta: 792 pt x 612 pt
     pdf = canvas.Canvas(response, pagesize=landscape(letter))
-    width, height = landscape(letter)  # 792 x 612 pt
-    pdf.setTitle(f"Nota de Recepción N° {nro_limpio}")
+    width, height = landscape(letter)
+    pdf.setTitle(f"Nota de Recepción Nº {nro_limpio}")
 
-    # --- CABECERA INSTITUCIONAL ---
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawCentredString(width / 2.0, height - 35, "GOBIERNO AUTÓNOMO DEL DEPARTAMENTO DE POTOSÍ")
-    pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawCentredString(width / 2.0, height - 47, "UNIDAD DE ALMACENES")
+    # ========================================================
+    # 1. LOGOS OFICIALES (Izquierda: Escudo Bolivia | Derecha: Potosí)
+    # ========================================================
+    # Buscamos el escudo de Bolivia (GIF o PNG compatible con ReportLab)
+    logo_bolivia_gif = os.path.join(settings.BASE_DIR, 'static', 'img', 'Escudo-de-Bolivia.gif')
+    logo_bolivia_png = os.path.join(settings.BASE_DIR, 'static', 'img', 'escudo_bolivia.png')
+    logo_potosi = os.path.join(settings.BASE_DIR, 'static', 'img', 'logo_gober_horizontal.png')
+    logo_fallback = os.path.join(settings.BASE_DIR, 'static', 'img', 'cropped-cropped-logo-vertical-gober.jpg')
 
-    # Título Principal con espaciado oficial
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawCentredString(width / 2.0, height - 70, "N O T A    D E    R E C E P C I Ó N")
+    # Resolver Escudo de Bolivia para la izquierda
+    ruta_bolivia = None
+    if os.path.exists(logo_bolivia_gif):
+        ruta_bolivia = logo_bolivia_gif
+    elif os.path.exists(logo_bolivia_png):
+        ruta_bolivia = logo_bolivia_png
+    else:
+        ruta_bolivia = logo_fallback
 
-    # Número correlativo a la derecha (N°. 162)
+    # Dibujar Escudo de Bolivia a la izquierda
+    if ruta_bolivia and os.path.exists(ruta_bolivia):
+        try:
+            pdf.drawImage(ruta_bolivia, 45, height - 76, width=46, height=50, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+
+    # Correlativo en la esquina superior derecha (Nº. 162)
     pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawRightString(width - 45, height - 35, f"Nº. {nro_limpio}")
+    pdf.drawRightString(width - 45, height - 34, f"Nº. {nro_limpio}")
 
-    # --- METADATOS DEL DOCUMENTO (Idéntico a la foto de la cabecera) ---
-    pdf.setFont("Helvetica-Bold", 8)
+    # Logo Derecho: Escudo de Potosí (justo debajo del Nº)
+    ruta_potosi = logo_potosi if os.path.exists(logo_potosi) else logo_fallback
+    if os.path.exists(ruta_potosi):
+        try:
+            pdf.drawImage(ruta_potosi, width - 110, height - 76, width=65, height=38, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+
+    # ========================================================
+    # 2. CABECERA INSTITUCIONAL
+    # ========================================================
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawCentredString(width / 2.0, height - 32, "GOBIERNO AUTÓNOMO DEL DEPARTAMENTO DE POTOSÍ")
+    pdf.setFont("Helvetica-Bold", 9.5)
+    pdf.drawCentredString(width / 2.0, height - 46, "UNIDAD DE ALMACENES")
+
+    pdf.setFont("Helvetica-Bold", 17)
+    pdf.drawCentredString(width / 2.0, height - 68, "N O T A    D E    R E C E P C I Ó N")
+
+    # ========================================================
+    # 3. METADATOS DEL DOCUMENTO
+    # ========================================================
+    pdf.setFont("Helvetica-Bold", 7.5)
     # Fila 1
-    pdf.drawString(45, height - 95, "Proveedor:")
-    pdf.setFont("Helvetica", 8)
-    pdf.drawString(100, height - 95, f"{nota.proveedor.razon_social.upper()}")
+    pdf.drawString(45, height - 90, "Proveedor:")
+    pdf.setFont("Helvetica", 7.5)
+    pdf.drawString(98, height - 90, f"{nota.proveedor.razon_social.upper()[:45]}")
 
-    pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(520, height - 95, "Fac. Nº.")
-    pdf.setFont("Helvetica", 8)
-    pdf.drawString(565, height - 95, f"{nota.factura or '—'}")
+    pdf.setFont("Helvetica-Bold", 7.5)
+    pdf.drawString(500, height - 90, "Fac. Nº.")
+    pdf.setFont("Helvetica", 7.5)
+    pdf.drawString(540, height - 90, f"{nota.factura or '—'}")
 
-    pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(670, height - 95, "C-31:")
-    pdf.setFont("Helvetica", 8)
-    pdf.drawString(700, height - 95, f"{nota.c31 or '—'}")
+    pdf.setFont("Helvetica-Bold", 7.5)
+    pdf.drawString(640, height - 90, "C-31:")
+    pdf.setFont("Helvetica", 7.5)
+    pdf.drawString(670, height - 90, f"{nota.c31 or '—'}")
 
     # Fila 2
-    pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(45, height - 110, "C.I. NIT. Nº.")
-    pdf.setFont("Helvetica", 8)
-    pdf.drawString(105, height - 110, f"{nota.proveedor.nit}")
+    pdf.setFont("Helvetica-Bold", 7.5)
+    pdf.drawString(45, height - 104, "C.I. NIT. Nº.")
+    pdf.setFont("Helvetica", 7.5)
+    pdf.drawString(102, height - 104, f"{nota.proveedor.nit}")
 
-    pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(320, height - 110, "Fecha de FACTURA:")
-    pdf.setFont("Helvetica", 8)
+    pdf.setFont("Helvetica-Bold", 7.5)
+    pdf.drawString(300, height - 104, "Fecha de FACTURA:")
+    pdf.setFont("Helvetica", 7.5)
     fecha_fac = nota.fecha.strftime('POTOSI, %Y-%m-%d') if nota.fecha else "POTOSI, —"
-    pdf.drawString(420, height - 110, f"{fecha_fac}")
+    pdf.drawString(395, height - 104, f"{fecha_fac}")
 
-    pdf.setFont("Helvetica-Bold", 8)
-    orden_txt = nota.compra_menor_origen.nro_orden if nota.compra_menor_origen else (f"COMPRA {nota.id}/2026")
-    pdf.drawString(580, height - 110, f"Orden de: {orden_txt.upper()}")
+    pdf.setFont("Helvetica-Bold", 7.5)
+    orden_txt = nota.compra_menor_origen.nro_orden if nota.compra_menor_origen else f"COMPRA {nota.id}/2026"
+    pdf.drawString(555, height - 104, f"Orden de: {orden_txt.upper()}")
 
-    # --- TABLA OFICIAL DE 10 COLUMNAS ---
+    # ========================================================
+    # 4. TABLA OFICIAL (10 COLUMNAS)
+    # ========================================================
     headers = [
         'ITEM',
         'DESCRIPCION',
@@ -2383,7 +2483,6 @@ def nota_recepcion_pdf(request, id):
     ]
     data = [headers]
 
-    # Recuperar datos de la solicitud y unidad ejecutora
     solicitud_origen = nota.compra_menor_origen.solicitud_origen if nota.compra_menor_origen else None
     cod_ejecutora = solicitud_origen.unidad_solicitante.codigo_sigep if (solicitud_origen and solicitud_origen.unidad_solicitante.codigo_sigep) else ""
     cod_presup = solicitud_origen.codigo if solicitud_origen else ""
@@ -2393,15 +2492,15 @@ def nota_recepcion_pdf(request, id):
 
     for idx, det in enumerate(detalles, start=1):
         total_nota += det.precio_total
-        u_manejo = det.material.unidad_medida_fk.nombre.upper() if (det.material and det.material.unidad_medida_fk) else (det.material.unidad_medida.upper() if det.material else "PAQUETE")
+        u_manejo = det.material.unidad_medida_fk.codigo if (det.material and det.material.unidad_medida_fk) else (det.material.unidad_medida or "PAQUETE")
         partida_cod = det.material.partida.codigo if (det.material and det.material.partida) else "—"
 
         data.append([
             str(idx),
-            det.material.nombre.upper()[:55],
-            u_manejo[:10],
-            str(det.cantidad),  # Cantidad Pedida
-            str(det.cantidad),  # Cantidad Entregada
+            det.material.nombre.upper()[:58],
+            str(u_manejo).upper()[:10],
+            str(det.cantidad),
+            str(det.cantidad),
             f"{det.precio_unitario:.2f}",
             f"{det.precio_total:.2f}",
             str(cod_presup),
@@ -2409,67 +2508,175 @@ def nota_recepcion_pdf(request, id):
             str(partida_cod)
         ])
 
-    # Fila de Destino y Costo Total (Idéntico a la fila gris de la foto)
+    # Fila de Destino y Costo Total idéntica a la hoja física
     data.append([
         'DESTINO: ALMACENES', '', '', '', '',
         'COSTO TOTAL:', f"{total_nota:.2f}", '', '', ''
     ])
 
-    # Anchos de columna exactos para landscape (Suma = 705 pt, márgenes seguros de 43.5 pt)
-    col_widths = [25, 205, 55, 40, 40, 55, 65, 80, 75, 65]
+    col_widths = [26, 224, 48, 40, 40, 54, 60, 75, 75, 60]
     t = Table(data, colWidths=col_widths)
     last_row = len(data) - 1
 
-    t_style = TableStyle([
-        ('SPAN', (0, last_row), (4, last_row)),  # DESTINO: ALMACENES ocupa 5 columnas
+    t.setStyle(TableStyle([
+        ('SPAN', (0, last_row), (4, last_row)),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 1), (1, last_row - 1), 'LEFT'),      # Descripción a la izquierda
-        ('ALIGN', (0, last_row), (0, last_row), 'LEFT'),   # DESTINO: ALMACENES a la izquierda
-        ('ALIGN', (5, 1), (6, last_row), 'RIGHT'),         # Precios a la derecha
+        ('ALIGN', (1, 1), (1, last_row - 1), 'LEFT'),
+        ('ALIGN', (0, last_row), (0, last_row), 'LEFT'),
+        ('ALIGN', (5, last_row), (5, last_row), 'RIGHT'),
+        ('ALIGN', (5, 1), (6, last_row), 'RIGHT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 7),
-        ('GRID', (0, 0), (-1, last_row), 0.5, colors.HexColor('#9CA3AF')),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E5E7EB')),
+        ('FONTSIZE', (0, 0), (-1, -1), 6.8),
+        ('GRID', (0, 0), (-1, last_row), 0.5, colors.HexColor('#6B7280')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FFFFFF')),
         ('FONTNAME', (0, last_row), (-1, last_row), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, last_row), (-1, last_row), colors.HexColor('#F3F4F6')),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-    ])
-    t.setStyle(t_style)
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+    ]))
 
-    # Dibujar la tabla
-    w_act, h_act = t.wrapOn(pdf, 705, height - 170)
-    pdf_y = height - 130 - h_act
+    w_act, h_act = t.wrapOn(pdf, 702, height - 160)
+    pdf_y = height - 120 - h_act
     t.drawOn(pdf, 45, pdf_y)
 
-    # --- OBSERVACIONES ---
-    obs_y = pdf_y - 20
-    pdf.setFont("Helvetica-Bold", 7.5)
+    # ========================================================
+    # 5. OBSERVACIONES
+    # ========================================================
+    obs_y = pdf_y - 18
+    pdf.setFont("Helvetica-Bold", 7)
     pdf.drawString(45, obs_y, "Observaciones:")
-    pdf.setFont("Helvetica", 7.5)
-    obs_texto = getattr(nota, 'observaciones', None) or (solicitud_origen.justificacion if solicitud_origen else "REGISTRO POR LA ADQUISICION DE MATERIALES PARA LAS DIFERENTES UNIDADES DE LA INSTITUCION")
-    pdf.drawString(115, obs_y, f"{obs_texto.upper()[:120]}")
+    pdf.setFont("Helvetica", 7)
+    obs_texto = getattr(nota, 'observaciones', None) or (
+        solicitud_origen.justificacion if solicitud_origen else "REGISTRO POR LA ADQUISICION DE MATERIALES PARA LAS DIFERENTES UNIDADES DE LA INSTITUCION"
+    )
+    pdf.drawString(110, obs_y, f"{obs_texto.upper()[:140]}")
 
-    # --- 3 FIRMAS OFICIALES (Almacenes, Bienes y Servicios, Kardex Valorado) ---
-    y_firmas = 45
+    # ========================================================
+    # 6. FIRMAS INSTITUCIONALES
+    # ========================================================
+    y_firmas = max(40, obs_y - 65)
     pdf.setFont("Helvetica", 7.5)
 
     # Firma 1: Responsable Almacenes
-    pdf.drawString(80, y_firmas + 15, "___________________________________")
-    pdf.drawString(95, y_firmas, "Responsable Almacenes")
+    pdf.drawString(75, y_firmas + 14, "___________________________________")
+    pdf.drawCentredString(145, y_firmas, "Responsable Almacenes")
 
     # Firma 2: Responsable Bienes y Servicios
-    pdf.drawString(310, y_firmas + 15, "___________________________________")
-    pdf.drawString(320, y_firmas, "Responsable Bienes y Servicios")
+    pdf.drawString(310, y_firmas + 14, "___________________________________")
+    pdf.drawCentredString(380, y_firmas, "Responsable Bienes y Servicios")
 
     # Firma 3: Responsable Kardex Valorado
-    pdf.drawString(560, y_firmas + 15, "___________________________________")
-    pdf.drawString(570, y_firmas, "Responsable Kardex Valorado")
+    pdf.drawString(550, y_firmas + 14, "___________________________________")
+    pdf.drawCentredString(620, y_firmas, "Responsable Kardex Valorado")
 
     pdf.save()
     return response
 
 
+@login_required
+def reporte_dgcf_r106(request):
+    """
+    Formulario DGCF - R1.06: DETALLE DE ALMACENES (BIENES DE CONSUMO).
+    Soporta filtro por Almacén específico o Consolidado Institucional (todos).
+    """
+    gestion = int(request.GET.get('gestion', 2026))
+    fecha_corte_str = request.GET.get('fecha_corte', f"{gestion}-12-31")
+    fecha_corte = date.fromisoformat(fecha_corte_str)
+    fecha_inicio = date(gestion, 1, 1)
+
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
+    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+    almacen_seleccionado = None
+    if filtro_almacen_id:
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
+
+    materiales = Material.objects.select_related('partida', 'unidad_medida_fk').order_by('partida__codigo', 'codigo')
+
+    filas = []
+    totales = {
+        'cant_inicial': 0,
+        'cant_entradas': 0,
+        'cant_salidas': 0,
+        'cant_final': 0,
+        'val_inicial': Decimal('0.00'),
+        'val_entradas': Decimal('0.00'),
+        'val_salidas': Decimal('0.00'),
+        'val_final': Decimal('0.00'),
+    }
+
+    correlativo = 1
+    for m in materiales:
+        movs_ini = MovimientoInventario.objects.filter(material=m, fecha__date__lt=fecha_inicio)
+        if almacen_seleccionado:
+            movs_ini = movs_ini.filter(almacen=almacen_seleccionado)
+
+        cant_ini_in = movs_ini.filter(tipo='ENTRADA').aggregate(s=Sum('cantidad'))['s'] or 0
+        cant_ini_out = movs_ini.filter(tipo='SALIDA').aggregate(s=Sum('cantidad'))['s'] or 0
+        cant_inicial = cant_ini_in - cant_ini_out
+
+        val_ini_in = movs_ini.filter(tipo='ENTRADA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
+        val_ini_out = movs_ini.filter(tipo='SALIDA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
+        val_inicial = val_ini_in - val_ini_out
+
+        movs_periodo = MovimientoInventario.objects.filter(
+            material=m,
+            fecha__date__gte=fecha_inicio,
+            fecha__date__lte=fecha_corte
+        )
+        if almacen_seleccionado:
+            movs_periodo = movs_periodo.filter(almacen=almacen_seleccionado)
+
+        cant_entradas = movs_periodo.filter(tipo='ENTRADA').aggregate(s=Sum('cantidad'))['s'] or 0
+        cant_salidas = movs_periodo.filter(tipo='SALIDA').aggregate(s=Sum('cantidad'))['s'] or 0
+        val_entradas = movs_periodo.filter(tipo='ENTRADA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
+        val_salidas = movs_periodo.filter(tipo='SALIDA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
+
+        cant_final = cant_inicial + cant_entradas - cant_salidas
+        val_final = val_inicial + val_entradas - val_salidas
+
+        if (cant_inicial + cant_entradas) > 0:
+            precio_unitario = (val_inicial + val_entradas) / Decimal(cant_inicial + cant_entradas)
+        else:
+            ultimo_mov = MovimientoInventario.objects.filter(material=m).order_by('-fecha').first()
+            precio_unitario = ultimo_mov.costo_unitario if ultimo_mov else Decimal('0.00')
+
+        if cant_inicial != 0 or cant_entradas != 0 or cant_salidas != 0 or cant_final != 0 or val_final != Decimal('0.00'):
+            u_med = m.unidad_medida_fk.codigo if m.unidad_medida_fk else (m.unidad_medida or 'UND')
+            
+            filas.append({
+                'nro': correlativo,
+                'codigo': m.codigo,
+                'descripcion': m.nombre,
+                'unidad_medida': u_med,
+                'precio_unitario': precio_unitario,
+                'cant_inicial': cant_inicial,
+                'cant_entradas': cant_entradas,
+                'cant_salidas': cant_salidas,
+                'cant_final': cant_final,
+                'val_inicial': val_inicial,
+                'val_entradas': val_entradas,
+                'val_salidas': val_salidas,
+                'val_final': val_final,
+            })
+
+            totales['cant_inicial'] += cant_inicial
+            totales['cant_entradas'] += cant_entradas
+            totales['cant_salidas'] += cant_salidas
+            totales['cant_final'] += cant_final
+            totales['val_inicial'] += val_inicial
+            totales['val_entradas'] += val_entradas
+            totales['val_salidas'] += val_salidas
+            totales['val_final'] += val_final
+            correlativo += 1
+
+    context = {
+        'gestion': gestion,
+        'fecha_corte': fecha_corte,
+        'filas': filas,
+        'totales': totales,
+        'almacenes_disponibles': almacenes_disponibles,
+        'almacen_seleccionado': almacen_seleccionado,
+    }
+    return render(request, 'inventario/reporte_dgcf_r106.html', context)
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def reporte_inventario_oficial_pdf(request):
@@ -2691,12 +2898,20 @@ def cierre_conciliacion_view(request):
 @login_required
 def reporte_dgcf_r105(request):
     """
-    Genera el Formulario DGCF - R1.05 (Resumen de Almacenes - Bienes de Consumo)
+    Genera el Formulario DGCF - R1.05 (Resumen de Almacenes - Bienes de Consumo).
+    Soporta filtro por Almacén específico o Consolidado Institucional (todos).
     """
     gestion = int(request.GET.get('gestion', 2026))
     fecha_corte_str = request.GET.get('fecha_corte', f"{gestion}-12-31")
     fecha_corte = date.fromisoformat(fecha_corte_str)
     fecha_inicio = date(gestion, 1, 1)
+
+    # 1. Filtro opcional por Almacén
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
+    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+    almacen_seleccionado = None
+    if filtro_almacen_id:
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
 
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
     filas = []
@@ -2708,11 +2923,14 @@ def reporte_dgcf_r105(request):
 
     correlativo = 1
     for p in partidas:
-        # Movimientos de esta partida hasta antes de iniciar la gestión (Saldo Inicial)
+        # Movimientos previos (Saldo Inicial)
         movs_previos = MovimientoInventario.objects.filter(
             material__partida=p,
             fecha__date__lt=fecha_inicio
         )
+        if almacen_seleccionado:
+            movs_previos = movs_previos.filter(almacen=almacen_seleccionado)
+
         cant_ini_entradas = movs_previos.filter(tipo='ENTRADA').aggregate(s=Sum('cantidad'))['s'] or 0
         cant_ini_salidas = movs_previos.filter(tipo='SALIDA').aggregate(s=Sum('cantidad'))['s'] or 0
         cant_inicial = cant_ini_entradas - cant_ini_salidas
@@ -2721,11 +2939,14 @@ def reporte_dgcf_r105(request):
         val_ini_salidas = movs_previos.filter(tipo='SALIDA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
         saldo_inicial_bs = val_ini_entradas - val_ini_salidas
 
-        # Movimientos totales hasta la fecha de corte (Saldo Final)
+        # Movimientos hasta la fecha de corte
         movs_hasta_corte = MovimientoInventario.objects.filter(
             material__partida=p,
             fecha__date__lte=fecha_corte
         )
+        if almacen_seleccionado:
+            movs_hasta_corte = movs_hasta_corte.filter(almacen=almacen_seleccionado)
+
         cant_fin_entradas = movs_hasta_corte.filter(tipo='ENTRADA').aggregate(s=Sum('cantidad'))['s'] or 0
         cant_fin_salidas = movs_hasta_corte.filter(tipo='SALIDA').aggregate(s=Sum('cantidad'))['s'] or 0
         cant_final = cant_fin_entradas - cant_fin_salidas
@@ -2734,7 +2955,6 @@ def reporte_dgcf_r105(request):
         val_fin_salidas = movs_hasta_corte.filter(tipo='SALIDA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
         saldo_final_bs = val_fin_entradas - val_fin_salidas
 
-        # Solo listamos partidas que hayan tenido presupuesto, saldo o movimiento
         if cant_inicial != 0 or saldo_inicial_bs != Decimal('0.00') or cant_final != 0 or saldo_final_bs != Decimal('0.00'):
             filas.append({
                 'nro': correlativo,
@@ -2751,7 +2971,6 @@ def reporte_dgcf_r105(request):
             total_saldo_final += saldo_final_bs
             correlativo += 1
 
-    # Ruta absoluta del logo para que funcione tanto en HTML como al imprimir a PDF
     logo_path = os.path.join(settings.BASE_DIR, 'static', 'img', 'logo_gober_horizontal.png')
 
     context = {
@@ -2762,21 +2981,30 @@ def reporte_dgcf_r105(request):
         'total_saldo_inicial': total_saldo_inicial,
         'total_cant_final': total_cant_final,
         'total_saldo_final': total_saldo_final,
+        'almacenes_disponibles': almacenes_disponibles,
+        'almacen_seleccionado': almacen_seleccionado,
         'logo_path': logo_path if os.path.exists(logo_path) else None,
     }
     return render(request, 'inventario/reporte_dgcf_r105.html', context)
 
+
 @login_required
 def reporte_dgcf_r106(request):
     """
-    Formulario DGCF - R1.06: DETALLE DE ALMACENES (BIENES DE CONSUMO)
-    Desglose ítem por ítem: Cantidades (Saldo Inicial, Entradas, Salidas, Saldo Final) 
-    y Valores en Bs.
+    Formulario DGCF - R1.06: DETALLE DE ALMACENES (BIENES DE CONSUMO).
+    Soporta filtro por Almacén específico o Consolidado Institucional (todos).
     """
     gestion = int(request.GET.get('gestion', 2026))
     fecha_corte_str = request.GET.get('fecha_corte', f"{gestion}-12-31")
     fecha_corte = date.fromisoformat(fecha_corte_str)
     fecha_inicio = date(gestion, 1, 1)
+
+    # 1. Filtro opcional por Almacén
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
+    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+    almacen_seleccionado = None
+    if filtro_almacen_id:
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
 
     materiales = Material.objects.select_related('partida', 'unidad_medida_fk').order_by('partida__codigo', 'codigo')
 
@@ -2794,8 +3022,11 @@ def reporte_dgcf_r106(request):
 
     correlativo = 1
     for m in materiales:
-        # Movimientos previos a la gestión (Saldo Inicial)
+        # Movimientos previos (Saldo Inicial)
         movs_ini = MovimientoInventario.objects.filter(material=m, fecha__date__lt=fecha_inicio)
+        if almacen_seleccionado:
+            movs_ini = movs_ini.filter(almacen=almacen_seleccionado)
+
         cant_ini_in = movs_ini.filter(tipo='ENTRADA').aggregate(s=Sum('cantidad'))['s'] or 0
         cant_ini_out = movs_ini.filter(tipo='SALIDA').aggregate(s=Sum('cantidad'))['s'] or 0
         cant_inicial = cant_ini_in - cant_ini_out
@@ -2804,29 +3035,29 @@ def reporte_dgcf_r106(request):
         val_ini_out = movs_ini.filter(tipo='SALIDA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
         val_inicial = val_ini_in - val_ini_out
 
-        # Movimientos del periodo (Desde inicio hasta fecha_corte)
+        # Movimientos del periodo
         movs_periodo = MovimientoInventario.objects.filter(
             material=m,
             fecha__date__gte=fecha_inicio,
             fecha__date__lte=fecha_corte
         )
+        if almacen_seleccionado:
+            movs_periodo = movs_periodo.filter(almacen=almacen_seleccionado)
+
         cant_entradas = movs_periodo.filter(tipo='ENTRADA').aggregate(s=Sum('cantidad'))['s'] or 0
         cant_salidas = movs_periodo.filter(tipo='SALIDA').aggregate(s=Sum('cantidad'))['s'] or 0
         val_entradas = movs_periodo.filter(tipo='ENTRADA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
         val_salidas = movs_periodo.filter(tipo='SALIDA').aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
 
-        # Saldos Finales
         cant_final = cant_inicial + cant_entradas - cant_salidas
         val_final = val_inicial + val_entradas - val_salidas
 
-        # Precio Unitario promedio o referencial ponderado
         if (cant_inicial + cant_entradas) > 0:
             precio_unitario = (val_inicial + val_entradas) / Decimal(cant_inicial + cant_entradas)
         else:
             ultimo_mov = MovimientoInventario.objects.filter(material=m).order_by('-fecha').first()
             precio_unitario = ultimo_mov.costo_unitario if ultimo_mov else Decimal('0.00')
 
-        # Mostrar ítems que tengan saldo o hayan tenido movimientos en el periodo
         if cant_inicial != 0 or cant_entradas != 0 or cant_salidas != 0 or cant_final != 0 or val_final != Decimal('0.00'):
             u_med = m.unidad_medida_fk.codigo if m.unidad_medida_fk else (m.unidad_medida or 'UND')
             
@@ -2861,5 +3092,386 @@ def reporte_dgcf_r106(request):
         'fecha_corte': fecha_corte,
         'filas': filas,
         'totales': totales,
+        'almacenes_disponibles': almacenes_disponibles,
+        'almacen_seleccionado': almacen_seleccionado,
     }
     return render(request, 'inventario/reporte_dgcf_r106.html', context)
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+def reporte_consumo_unidades(request):
+    """
+    Consolidado Ejecutivo de Consumo Físico y Valorado por Secretaría y Unidad frente a su POA.
+    Soporta filtro por Secretaría, Unidad, Gestión, Fechas e Impresión PDF oficial.
+    """
+    from organizacion.models import Secretaria, UnidadOrganizacional
+    from presupuestos.models import POA
+
+    # 1. Filtros
+    sec_id = request.GET.get('secretaria_id', '').strip()
+    uni_id = request.GET.get('unidad_id', '').strip()
+    gestion = int(request.GET.get('gestion', 2026))
+    
+    desde_defecto = f"{gestion}-01-01"
+    hasta_defecto = f"{gestion}-12-31"
+    desde_str = request.GET.get('desde', desde_defecto).strip()
+    hasta_str = request.GET.get('hasta', hasta_defecto).strip()
+
+    desde = parse_date(desde_str) if desde_str else date(gestion, 1, 1)
+    hasta = parse_date(hasta_str) if hasta_str else date(gestion, 12, 31)
+
+    # 2. Catálogos para los selects
+    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
+    secretarias_query = secretarias
+    if sec_id:
+        secretarias_query = secretarias_query.filter(id=sec_id)
+
+    unidades_query = UnidadOrganizacional.objects.filter(is_active=True)
+    if sec_id:
+        unidades_query = unidades_query.filter(secretaria_id=sec_id)
+    if uni_id:
+        unidades_query = unidades_query.filter(id=uni_id)
+    unidades_query = unidades_query.order_by('nombre')
+
+    gestiones_disponibles = sorted(list(set(
+        list(POA.objects.values_list('gestion', flat=True).distinct()) + [date.today().year, 2026]
+    )), reverse=True)
+
+    # 3. Base de movimientos de salida en el periodo
+    salidas_periodo = MovimientoInventario.objects.filter(
+        tipo='SALIDA',
+        fecha__date__range=[desde, hasta]
+    )
+
+    datos_por_secretaria = []
+    total_general_fisico = 0
+    total_general_valorado = Decimal('0.00')
+    total_general_poa = Decimal('0.00')
+
+    for sec in secretarias_query:
+        unidades_sec = unidades_query.filter(secretaria=sec)
+        filas_unidades = []
+
+        total_sec_fisico = 0
+        total_sec_valorado = Decimal('0.00')
+        total_sec_poa = Decimal('0.00')
+
+        for u in unidades_sec:
+            salidas_u = salidas_periodo.filter(unidad_destino=u)
+            
+            tot_cant = salidas_u.aggregate(s=Sum('cantidad'))['s'] or 0
+            tot_val = salidas_u.aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
+
+            poas_u = POA.objects.filter(unidad=u, gestion=gestion)
+            poa_inicial = poas_u.aggregate(s=Sum('monto_inicial'))['s'] or Decimal('0.00')
+            poa_disponible = poas_u.aggregate(s=Sum('monto_disponible'))['s'] or Decimal('0.00')
+
+            pct_consumo = round((float(tot_val) / float(poa_inicial) * 100), 1) if poa_inicial > 0 else 0.0
+
+            total_sec_fisico += tot_cant
+            total_sec_valorado += tot_val
+            total_sec_poa += poa_inicial
+
+            top_materiales = salidas_u.values(
+                'material__codigo', 'material__nombre', 'material__unidad_medida'
+            ).annotate(
+                cant_total=Sum('cantidad'),
+                val_total=Sum('costo_total')
+            ).order_by('-val_total')[:4]
+
+            filas_unidades.append({
+                'unidad': u,
+                'total_cant': tot_cant,
+                'total_val': tot_val,
+                'poa_inicial': poa_inicial,
+                'poa_disponible': poa_disponible,
+                'pct_consumo': pct_consumo,
+                'top_materiales': top_materiales,
+                'tiene_consumo': (tot_cant > 0)
+            })
+
+        total_general_fisico += total_sec_fisico
+        total_general_valorado += total_sec_valorado
+        total_general_poa += total_sec_poa
+
+        pct_sec = round((float(total_sec_valorado) / float(total_sec_poa) * 100), 1) if total_sec_poa > 0 else 0.0
+
+        if filas_unidades:
+            datos_por_secretaria.append({
+                'secretaria': sec,
+                'unidades': filas_unidades,
+                'total_fisico': total_sec_fisico,
+                'total_valorado': total_sec_valorado,
+                'total_poa': total_sec_poa,
+                'pct_consumo': pct_sec,
+                'tiene_consumo': (total_sec_fisico > 0)
+            })
+
+    pct_global = round((float(total_general_valorado) / float(total_general_poa) * 100), 1) if total_general_poa > 0 else 0.0
+
+    context = {
+        'secretarias': secretarias,
+        'unidades': unidades_query,
+        'datos_por_secretaria': datos_por_secretaria,
+        'filtro_secretaria_id': sec_id,
+        'filtro_unidad_id': uni_id,
+        'gestion': gestion,
+        'gestiones_disponibles': gestiones_disponibles,
+        'desde': desde.strftime('%Y-%m-%d'),
+        'hasta': hasta.strftime('%Y-%m-%d'),
+        'total_general_fisico': total_general_fisico,
+        'total_general_valorado': total_general_valorado,
+        'total_general_poa': total_general_poa,
+        'pct_global': pct_global,
+    }
+
+    if request.GET.get('exportar') == 'pdf':
+        return render(request, 'inventario/consumo_unidades_pdf.html', context)
+
+    return render(request, 'inventario/consumo_unidades.html', context)
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+def reporte_consumo_dependencias(request):
+    """
+    Reporte para Almacenero (Físico) y Kardista (Valorado).
+    Desglose detallado de materiales despachados por Secretaría y Unidad Organizacional.
+    """
+    from organizacion.models import Secretaria, UnidadOrganizacional
+
+    sec_id = request.GET.get('secretaria', '').strip()
+    uni_id = request.GET.get('unidad', '').strip()
+    alm_id = request.GET.get('almacen', '').strip()
+    desde_str = request.GET.get('desde', f"{date.today().year}-01-01")
+    hasta_str = request.GET.get('hasta', f"{date.today().year}-12-31")
+    tipo_reporte = request.GET.get('tipo', 'VALORADO')
+
+    desde = parse_date(desde_str) if desde_str else date(date.today().year, 1, 1)
+    hasta = parse_date(hasta_str) if hasta_str else date(date.today().year, 12, 31)
+
+    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
+    almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
+    
+    unidades = UnidadOrganizacional.objects.filter(is_active=True)
+    if sec_id:
+        unidades = unidades.filter(secretaria_id=sec_id)
+    unidades = unidades.order_by('nombre')
+
+    salidas_qs = MovimientoInventario.objects.filter(
+        tipo='SALIDA',
+        fecha__date__range=[desde, hasta]
+    ).select_related('material', 'material__partida', 'material__unidad_medida_fk', 'unidad_destino', 'unidad_destino__secretaria', 'almacen')
+
+    if sec_id:
+        salidas_qs = salidas_qs.filter(unidad_destino__secretaria_id=sec_id)
+    if uni_id:
+        salidas_qs = salidas_qs.filter(unidad_destino_id=uni_id)
+    if alm_id:
+        salidas_qs = salidas_qs.filter(almacen_id=alm_id)
+
+    estructura_datos = []
+    total_general_cant = 0
+    total_general_bs = Decimal('0.00')
+
+    unidades_con_salidas = unidades.filter(consumos__in=salidas_qs).distinct()
+
+    for u in unidades_con_salidas:
+        movs_u = salidas_qs.filter(unidad_destino=u)
+        
+        resumen_materiales = movs_u.values(
+            'material__codigo', 
+            'material__nombre', 
+            'material__partida__codigo',
+            'material__unidad_medida',
+            'material__unidad_medida_fk__codigo'
+        ).annotate(
+            cant_total=Sum('cantidad'),
+            costo_total_bs=Sum('costo_total')
+        ).order_by('material__partida__codigo', 'material__nombre')
+
+        total_u_cant = sum(m['cant_total'] for m in resumen_materiales)
+        total_u_bs = sum(m['costo_total_bs'] for m in resumen_materiales)
+
+        total_general_cant += total_u_cant
+        total_general_bs += total_u_bs
+
+        estructura_datos.append({
+            'unidad': u,
+            'secretaria': u.secretaria,
+            'materiales': resumen_materiales,
+            'total_cant': total_u_cant,
+            'total_bs': total_u_bs,
+        })
+
+    context = {
+        'estructura_datos': estructura_datos,
+        'secretarias': secretarias,
+        'unidades': unidades,
+        'almacenes': almacenes,
+        'sec_id': sec_id,
+        'uni_id': uni_id,
+        'alm_id': alm_id,
+        'desde': desde.strftime('%Y-%m-%d'),
+        'hasta': hasta.strftime('%Y-%m-%d'),
+        'tipo_reporte': tipo_reporte,
+        'total_general_cant': total_general_cant,
+        'total_general_bs': total_general_bs,
+    }
+
+    return render(request, 'inventario/reporte_consumo_dependencias.html', context)
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'BIENES_SERVICIOS', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+def reporte_especificaciones_tecnicas(request):
+    """
+    Matriz de Especificaciones Técnicas y Consolidación de Demanda por Secretaría.
+    Cruza los Formularios 005 de una Partida contra TODAS las Secretarías de la Gobernación
+    (idéntico a la hoja física oficial para el DBC de contratación).
+    """
+    from presupuestos.models import POA, DetalleProgramacionPOA
+    from organizacion.models import Secretaria
+
+    gestion = int(request.GET.get('gestion', 2026))
+    
+    # Partidas disponibles en el POA de esta gestión
+    partidas_disponibles = PartidaPresupuestaria.objects.filter(
+        poas__gestion=gestion
+    ).distinct().order_by('codigo')
+
+    partida_id = request.GET.get('partida', '').strip()
+    partida_seleccionada = None
+    if partida_id:
+        partida_seleccionada = get_object_or_404(PartidaPresupuestaria, id=partida_id)
+    else:
+        partida_seleccionada = partidas_disponibles.filter(codigo='39500').first() or partidas_disponibles.first()
+
+    if not partida_seleccionada:
+        return render(request, 'inventario/reporte_especificaciones_tecnicas.html', {
+            'partidas_disponibles': [],
+            'error': 'No existen partidas con programación POA para esta gestión.'
+        })
+
+    # ========================================================
+    # 1. OBTENER TODAS LAS SECRETARÍAS DE LA GOBERNACIÓN
+    # (Para que salgan todas las columnas como en la hoja física)
+    # ========================================================
+    secretarias = list(Secretaria.objects.filter(is_active=True).order_by('id'))
+
+    # Si hay secretaría duplicada por nombre similar, nos aseguramos que sean únicas
+    secretarias_unicas = []
+    nombres_vistos = set()
+    for s in secretarias:
+        nom_norm = s.nombre.upper().strip()
+        if nom_norm not in nombres_vistos:
+            nombres_vistos.add(nom_norm)
+            secretarias_unicas.append(s)
+    secretarias = secretarias_unicas
+
+    # 2. Requerimientos programados en esta partida y gestión
+    detalles_partida = DetalleProgramacionPOA.objects.filter(
+        poa__partida=partida_seleccionada,
+        poa__gestion=gestion
+    ).select_related('poa__unidad__secretaria', 'material', 'material__unidad_medida_fk')
+
+    # 3. Materiales únicos demandados en esta partida
+    materiales_ids = detalles_partida.values_list('material_id', flat=True).distinct()
+    materiales = Material.objects.filter(id__in=materiales_ids).select_related('unidad_medida_fk').order_by('id')
+
+    # Si no hay ítems en DetalleProgramacionPOA, buscar los materiales catalogados en esa partida
+    if not materiales.exists():
+        materiales = Material.objects.filter(partida=partida_seleccionada, is_active=True).order_by('codigo')
+
+    # 4. Construcción de la matriz
+    matriz_filas = []
+    totales_por_secretaria = {sec.id: {'cant': 0, 'total_bs': Decimal('0.00')} for sec in secretarias}
+    gran_total_bs = Decimal('0.00')
+    gran_total_cant = 0
+
+    correlativo = 1
+    for mat in materiales:
+        dets_mat = detalles_partida.filter(material=mat)
+
+        primer_det = dets_mat.first()
+        precio_u = primer_det.precio_unitario_estimado if primer_det else Decimal('0.00')
+        u_medida = mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else (mat.unidad_medida or 'PZA')
+
+        columnas_sec = []
+        fila_total_cant = 0
+        fila_total_bs = Decimal('0.00')
+
+        for sec in secretarias:
+            # Buscar si alguna unidad de esta secretaría programó este material
+            dets_sec = dets_mat.filter(poa__unidad__secretaria=sec)
+            
+            # También soportar coincidencia por nombre si la secretaría se vinculó con id distinto
+            if not dets_sec.exists():
+                dets_sec = dets_mat.filter(poa__unidad__secretaria__nombre__iexact=sec.nombre)
+
+            cant_sec = sum(d.cantidad_programada for d in dets_sec)
+            subtotal_sec = sum(d.subtotal for d in dets_sec)
+
+            columnas_sec.append({
+                'secretaria_id': sec.id,
+                'cantidad': cant_sec,
+                'total_bs': subtotal_sec,
+            })
+
+            fila_total_cant += cant_sec
+            fila_total_bs += subtotal_sec
+
+            totales_por_secretaria[sec.id]['cant'] += cant_sec
+            totales_por_secretaria[sec.id]['total_bs'] += subtotal_sec
+
+        gran_total_cant += fila_total_cant
+        gran_total_bs += fila_total_bs
+
+        desc_tecnica = mat.descripcion if (mat.descripcion and len(mat.descripcion) > 15) else mat.nombre
+
+        matriz_filas.append({
+            'nro': correlativo,
+            'material': mat,
+            'desc_tecnica': desc_tecnica,
+            'unidad_medida': u_medida,
+            'precio_unitario': precio_u,
+            'valores_secretarias': columnas_sec,
+            'total_fila_bs': fila_total_bs,
+            'total_fila_cant': fila_total_cant,
+        })
+        correlativo += 1
+
+    resumen_columnas_totales = [totales_por_secretaria[sec.id] for sec in secretarias]
+
+    # Asignar nombres cortos/amigables a las cabeceras para que no se desborden
+    for sec in secretarias:
+        nom = sec.nombre.upper()
+        if "ADMINISTRATIVA" in nom:
+            sec.nombre_corto = "SEC. ADM. FINANCIERA"
+        elif "JURIDICA" in nom or "JURÍDICA" in nom:
+            sec.nombre_corto = "SEC. ASUNTOS JURÍDICOS"
+        elif "PLANIFICACION" in nom or "PLANIFICACIÓN" in nom:
+            sec.nombre_corto = "SEC. PLANIFICACIÓN"
+        elif "OBRAS" in nom:
+            sec.nombre_corto = "SEC. OBRAS PÚBLICAS"
+        elif "DESPACHO" in nom or "GOBERNADOR" in nom:
+            sec.nombre_corto = "DESPACHO GOBERNADOR"
+        elif "DESARROLLO PRODUCTIVO" in nom:
+            sec.nombre_corto = "SEC. DES. PRODUCTIVO"
+        elif "MINERIA" in nom or "MINERÍA" in nom:
+            sec.nombre_corto = "SEC. MINERÍA Y METALURGIA"
+        elif "TURISMO" in nom:
+            sec.nombre_corto = "SEC. TURISMO Y CULTURA"
+        else:
+            sec.nombre_corto = nom[:20]
+
+    context = {
+        'gestion': gestion,
+        'partida': partida_seleccionada,
+        'partidas_disponibles': partidas_disponibles,
+        'secretarias': secretarias,
+        'matriz_filas': matriz_filas,
+        'resumen_columnas_totales': resumen_columnas_totales,
+        'gran_total_cant': gran_total_cant,
+        'gran_total_bs': gran_total_bs,
+    }
+    return render(request, 'inventario/reporte_especificaciones_tecnicas.html', context)

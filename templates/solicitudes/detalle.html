@@ -51,15 +51,20 @@
 
             <!-- BOTONES DE ACCIÓN SEGÚN EL ROL Y CIRCUITO SABS -->
             <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <a 
-                    href="{% url 'solicitud_pdf' solicitud.id %}" 
-                    target="_blank" 
-                    class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition"
-                    title="Visualizar y mandar a imprimir el comprobante"
-                >
-                    <span class="material-symbols-outlined text-[16px]">visibility</span> 
-                    Vista Previa / Imprimir
+                <!-- BOTÓN CONDICIONADO A LA VERIFICACIÓN Y APROBACIÓN DE ALMACENES -->
+            {% if solicitud.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
+                <a href="{% url 'solicitud_pdf' solicitud.id %}" target="_blank" class="...">
+                    <span class="material-symbols-outlined text-[18px]">print</span>
+                    <span>Imprimir Pedido Oficial (PDF)</span>
                 </a>
+            {% else %}
+                <button disabled 
+                        class="bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-gray-600 px-4 py-2 text-xs font-bold rounded-xl cursor-not-allowed inline-flex items-center gap-1.5 border border-gray-300 dark:border-gray-700" 
+                        title="El formulario solo puede imprimirse tras la verificación y aprobación física del Almacenero (Estado: Preparada o Entregada).">
+                    <span class="material-symbols-outlined text-[18px]">lock</span>
+                    <span>Imprimir (Pendiente Aprobación)</span>
+                </button>
+            {% endif %}
                 
                 {% if solicitud.tiene_detalles %}
                     <!-- 1. REGISTRADA: AUTORIZACIÓN DEL JEFE DE UNIDAD -->
