@@ -23,10 +23,15 @@ class PartidaPresupuestaria(models.Model):
 class UnidadMedida(models.Model):
     codigo = models.CharField(max_length=10, unique=True)
     nombre = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True, help_text="Baja lógica de la unidad de medida")
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
-
+        
+    class Meta:
+        verbose_name = "Unidad de Medida"
+        verbose_name_plural = "Unidades de Medida"
+        ordering = ['codigo']
 
 class Almacen(models.Model):
     """
@@ -234,8 +239,6 @@ class Proveedor(models.Model):
 class NotaIngreso(models.Model):
     nro_nota = models.CharField(max_length=50, unique=True, help_text="Número correlativo de nota de ingreso")
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='notas_ingreso')
-    
-    # Tarjeta 7: Almacén destino de la recepción física de los bienes
     almacen_destino = models.ForeignKey(
         Almacen,
         on_delete=models.PROTECT,
@@ -248,6 +251,15 @@ class NotaIngreso(models.Model):
     c31 = models.CharField(max_length=50, blank=True, null=True, help_text="Documento de gasto SIGEP C-31")
     nota_entrega = models.CharField(max_length=50, blank=True, null=True, help_text="Número de Nota de Entrega o Remisión")
     factura = models.CharField(max_length=50, blank=True, null=True, help_text="Número de Factura de Compra")
+    
+    # NUEVO CAMPO: Número de Orden de Compra manual o vinculado
+    nro_orden_compra = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True, 
+        help_text="Ej: COMPRA 168/2026 o BB.SS. N° 081/2026"
+    )
+    
     reingreso = models.BooleanField(default=False, help_text="Indica si la entrada es por devolución/reingreso de oficina")
     fecha = models.DateField(help_text="Fecha de recepción física de los bienes")
     usuario = models.ForeignKey(User, on_delete=models.PROTECT, help_text="Almacenero que registra el ingreso")
@@ -260,14 +272,14 @@ class NotaIngreso(models.Model):
         related_name='notas_ingreso_asociadas',
         help_text="Orden de Compra origen emitida por Bienes y Servicios"
     )
+    observaciones = models.CharField(max_length=500, blank=True, null=True)
 
     def __str__(self):
-        return f"Nota de Ingreso Nro: {self.nro_nota} - {self.proveedor.razon_social} -> {self.almacen_destino.nombre if self.almacen_destino else 'Central'}"
+        return f"Nota de Ingreso Nro: {self.nro_nota} - {self.proveedor.razon_social}"
 
     class Meta:
         verbose_name = "Nota de Ingreso"
         verbose_name_plural = "Notas de Ingreso"
-
 
 class NotaIngresoDetalle(models.Model):
     nota_ingreso = models.ForeignKey(NotaIngreso, on_delete=models.CASCADE, related_name='detalles')
@@ -534,3 +546,39 @@ class ReporteCierreAuditado(models.Model):
 
     def __str__(self):
         return f"{self.codigo_documento} - {self.get_tipo_display()} ({self.fecha_fin})"
+
+class AsignacionEntradaUnidad(models.Model):
+    """
+    Desglosa la asignación física de una compra/entrada hacia Unidades Organizacionales específicas.
+    Sustituye la dependencia del POA: cada unidad solo puede pedir hasta el saldo que le fue asignado.
+    """
+    nota_ingreso_detalle = models.ForeignKey(
+        'NotaIngresoDetalle',
+        on_delete=models.CASCADE,
+        related_name='asignaciones_unidades'
+    )
+    unidad_organizacional = models.ForeignKey(
+        'organizacion.UnidadOrganizacional',
+        on_delete=models.PROTECT,
+        related_name='asignaciones_compras'
+    )
+    cantidad_asignada = models.IntegerField(
+        help_text="Cupo físico total asignado a esta oficina en esta compra"
+    )
+    cantidad_retirada = models.IntegerField(
+        default=0,
+        help_text="Cantidad física ya despachada mediante Solicitudes autorizadas"
+    )
+
+    @property
+    def saldo_disponible(self):
+        """Cantidad remanente que la oficina aún tiene derecho a solicitar."""
+        return max(0, self.cantidad_asignada - self.cantidad_retirada)
+
+    def __str__(self):
+        return f"{self.unidad_organizacional.nombre} - {self.nota_ingreso_detalle.material.nombre}: {self.saldo_disponible}/{self.cantidad_asignada}"
+
+    class Meta:
+        verbose_name = "Asignación de Entrada a Unidad"
+        verbose_name_plural = "Asignaciones de Entrada a Unidades"
+        unique_together = ('nota_ingreso_detalle', 'unidad_organizacional')

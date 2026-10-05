@@ -3,227 +3,329 @@
 {% block title %} Nuevo Pedido de Almacén {% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<div class="max-w-5xl mx-auto pb-16 px-3 sm:px-6">
+
+    <!-- TOAST CONTAINER (FEEDBACK MODERNO SIN ALERTAS INVASIVAS) -->
+    <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
     <!-- CABECERA -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
-                Pedido de Materiales y/o Bienes
+            <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-950/60 text-[#8b0000] dark:text-red-400 border border-red-200 dark:border-red-900/40">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#8b0000] dark:bg-red-400"></span> Formulario Oficial
+                </span>
+                <span class="text-xs text-gray-400 dark:text-gray-500">Gestión de Almacenes</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight font-['Outfit']">
+                Pedido de Materiales y Bienes
             </h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Solicitud de materiales existentes en almacén para consumo de oficina [Formulario Oficial]
+            <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                Solicitud para suministro y descargo de bienes existentes de uso de oficina.
             </p>
         </div>
-        <a href="{% url 'solicitudes' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+        <a href="{% url 'solicitudes' %}" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Volver a pedidos
         </a>
-    </div>
+    </header>
 
-    <!-- SELECTOR DE UNIDAD (SOLO MODO ADMINISTRADOR) -->
+    <!-- BANNER MODO ADMINISTRADOR -->
     {% if rol in 'ADMINISTRADOR,ADMIN_ALMACENES' %}
-    <div class="card p-4 rounded-2xl mb-6 border border-amber-200 bg-amber-50/50 dark:bg-slate-900 dark:border-amber-900/40">
+    <section class="card p-3.5 mb-6 rounded-2xl border border-amber-300/80 bg-amber-50/70 dark:bg-amber-950/20 dark:border-amber-900/50 shadow-sm">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-amber-600">manage_accounts</span>
-                <span class="text-xs font-bold uppercase text-amber-800 dark:text-amber-400">Modo Administrador: Tramitar pedido para</span>
-            </div>
-            <select 
-                onchange="window.location.href='?unidad_id=' + this.value;"
-                class="border border-amber-300 rounded-xl px-3 py-1.5 text-sm bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 font-medium focus:ring-amber-500"
-            >
-                {% for u in unidades_disponibles %}
-                    <option value="{{ u.id }}" {% if unidad_solicitante.id == u.id %}selected{% endif %}>
-                        {{ u.nombre }} {% if u.secretaria %}({{ u.secretaria.nombre }}){% endif %}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- FORMULARIO DEL SOLICITANTE (PASO ①) -->
-    <form method="POST" id="form-solicitud" class="card p-8 shadow-sm rounded-2xl">
-        {% csrf_token %}
-        <input type="hidden" name="unidad_solicitante_id" value="{{ unidad_solicitante.id }}">
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- UNIDAD SOLICITANTE (UNID. EJEC.) -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Unidad Solicitante (Unid. Ejec.)</label>
-                <div class="p-3 border border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-slate-900/50 text-sm font-bold text-[#8b0000] dark:text-red-400 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
-                    {{ unidad_solicitante.nombre }}
+            <div class="flex items-center gap-2.5">
+                <span class="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
+                    <span class="material-symbols-outlined text-[20px] block">manage_accounts</span>
+                </span>
+                <div>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300">Modo Administrador Activo</h2>
+                    <p class="text-[11px] text-amber-700 dark:text-amber-400/80">Estás tramitando un pedido en nombre de otra unidad ejecutora</p>
                 </div>
             </div>
+            <div class="w-full sm:w-auto">
+                <select 
+                    id="select_modo_admin"
+                    onchange="confirmarCambioUnidad(this.value)"
+                    class="w-full sm:w-80 border border-amber-300 dark:border-amber-800 rounded-xl px-3 py-2 text-xs bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer shadow-sm"
+                >
+                    {% for u in unidades_disponibles %}
+                        <option value="{{ u.id }}" {% if unidad_solicitante.id == u.id %}selected{% endif %}>
+                            {{ u.nombre }} {% if u.secretaria %}({{ u.secretaria.nombre }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
-            <!-- FECHA DEL PEDIDO -->
-            <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Fecha del Pedido</label>
-                <input type="text" value="{% now 'd/m/Y' %}" class="w-full border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-gray-50 dark:bg-slate-900/50 text-gray-500 font-medium focus:outline-none" readonly>
-                <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
+    <!-- FORMULARIO PRINCIPAL -->
+    <form method="POST" id="form-solicitud" onsubmit="return validarEnvioPedido(event)" class="space-y-6">
+        {% csrf_token %}
+        <input type="hidden" name="unidad_solicitante_id" value="{{ unidad_solicitante.id }}">
+        <input type="hidden" name="fecha" value="{% now 'Y-m-d' %}">
+        <div id="inputs_ocultos"></div>
+
+        <!-- 1. BLOQUE IDENTIFICACIÓN -->
+        <div class="card p-5 sm:p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 shadow-sm">
+            <h2 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-1.5 font-['Outfit']">
+                <span class="w-2 h-2 rounded-full bg-[#8b0000]"></span> Paso 1: Información de Emisión
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1.5 font-['Outfit']">
+                        Unidad Solicitante (Unid. Ejec.)
+                    </label>
+                    <div class="p-3 border border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/80 dark:bg-slate-800/40 text-sm font-semibold text-[#8b0000] dark:text-red-400 flex items-center gap-2.5">
+                        <span class="material-symbols-outlined text-gray-400 text-[20px]">account_balance</span>
+                        <span class="truncate">{{ unidad_solicitante.nombre }}</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1.5 font-['Outfit']">
+                        Fecha Oficial del Registro
+                    </label>
+                    <div class="p-3 border border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/80 dark:bg-slate-800/40 text-sm text-gray-700 dark:text-gray-300 font-medium flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-gray-400 text-[20px]">calendar_month</span>
+                            <span>{% now 'l, d \d\e F \d\e Y' %}</span>
+                        </div>
+                        <span class="text-[11px] font-mono font-bold text-gray-400 uppercase">Hoy</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. BLOQUE SELECCIÓN DE MATERIALES -->
+        <div class="card p-5 sm:p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1.5 font-['Outfit']">
+                    <span class="w-2 h-2 rounded-full bg-[#8b0000]"></span> Paso 2: Selección y Adición de Material
+                </h2>
+                <span class="text-xs text-gray-400 font-medium hidden sm:inline">Presione Enter para añadir tras digitar la cantidad</span>
             </div>
 
-            <!-- BUSCADOR PREDICTIVO Y MODERNO DE MATERIALES -->
-            <div class="md:col-span-2">
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit'] flex items-center justify-between">
-                    <span>Buscar Material Demandado</span>
-                    <span class="text-xs font-normal text-gray-400">Puede buscar por Código o Nombre</span>
-                </label>
-
-                <div class="grid grid-cols-12 gap-3 items-start relative">
-                    
-                    <!-- BUSCADOR CON COMBOBOX DINÁMICO -->
-                    <div class="col-span-12 sm:col-span-7 relative">
-                        <div class="relative">
-                            <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-[20px]">
-                                search
-                            </span>
-                            <input 
-                                type="text" 
-                                id="input_buscador_material" 
-                                placeholder="Escribe el código o nombre (ej: 32100, papel, lapicero)..." 
-                                autocomplete="off"
-                                onfocus="abrirDropdownCombobox()"
-                                oninput="filtrarMaterialesEnVivo(this.value)"
-                                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl pl-10 pr-10 py-3 text-sm focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition shadow-sm"
-                            >
-                            <button 
-                                type="button" 
-                                id="btn_limpiar_buscador" 
-                                onclick="limpiarSeleccionMaterial()" 
-                                class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hidden"
-                                title="Limpiar búsqueda"
-                            >
-                                <span class="material-symbols-outlined text-[18px]">cancel</span>
-                            </button>
-                        </div>
-
-                        <!-- MENÚ FLOTANTE DE RESULTADOS PREDICTIVOS -->
-                        <div 
-                            id="menu_resultados_combobox" 
-                            class="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl z-50 max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 hidden"
+            <!-- Buscador y Entradas -->
+            <div class="grid grid-cols-12 gap-3 items-start relative">
+                
+                <!-- Input de Búsqueda Predictiva -->
+                <div class="col-span-12 md:col-span-7 relative">
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px] pointer-events-none">
+                            search
+                        </span>
+                        <input 
+                            type="text" 
+                            id="input_buscador_material" 
+                            placeholder="Buscar por código SABS o nombre (ej: 32100, papel, toner)..." 
+                            autocomplete="off"
+                            onfocus="abrirDropdownCombobox()"
+                            oninput="filtrarMaterialesEnVivo(this.value)"
+                            onkeydown="manejarKeydownBuscador(event)"
+                            class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800/80 text-gray-800 dark:text-gray-100 rounded-xl pl-10 pr-9 py-2.5 text-sm focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition shadow-inner"
                         >
-                            <!-- Los resultados se inyectan automáticamente con JS -->
-                        </div>
-
-                        <!-- SELECT NATIVO OCULTO PARA MANTENER COMPATIBILIDAD -->
-                        <select id="material_select" class="hidden">
-                            <option value="">--</option>
-                            {% for m in materiales %}
-                            <option 
-                                value="{{ m.id }}" 
-                                data-nombre="{{ m.nombre }}"
-                                data-codigo="{{ m.codigo }}"
-                                data-unidad="{{ m.unidad_medida }}"
-                                data-stock="{{ m.stock_almacen }}"
-                                data-partida="{{ m.partida_codigo }} - {{ m.partida_nombre }}"
-                                data-max="{{ m.max_solicitable }}"
-                                data-modalidad="{{ m.modalidad }}"
-                                data-modalidad-label="{{ m.modalidad_label }}"
-                                data-cuota-saldo="{{ m.cuota_saldo }}"
-                            >
-                                {{ m.codigo }} - {{ m.nombre }}
-                            </option>
-                            {% endfor %}
-                        </select>
+                        <button 
+                            type="button" 
+                            id="btn_limpiar_buscador" 
+                            onclick="limpiarSeleccionMaterial()" 
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hidden transition p-1"
+                            title="Limpiar campo"
+                        >
+                            <span class="material-symbols-outlined text-[18px] block">close</span>
+                        </button>
                     </div>
 
-                    <!-- Cantidad Pedida -->
-                    <div class="col-span-8 sm:col-span-3">
+                    <!-- DROPDOWN FLOTANTE -->
+                    <div 
+                        id="menu_resultados_combobox" 
+                        class="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800/80 hidden transition-all"
+                    ></div>
+
+                    <!-- SELECT NATIVO OCULTO (ORIGEN DE DATOS) -->
+                    <select id="material_select" class="hidden">
+                        <option value="">--</option>
+                        {% for m in materiales %}
+                        <option 
+                            value="{{ m.id }}" 
+                            data-nombre="{{ m.nombre }}"
+                            data-codigo="{{ m.codigo }}"
+                            data-unidad="{{ m.unidad_medida }}"
+                            data-stock="{{ m.stock_almacen }}"
+                            data-partida="{{ m.partida_codigo }} - {{ m.partida_nombre }}"
+                            data-max="{{ m.max_solicitable }}"
+                            data-modalidad="{{ m.modalidad }}"
+                            data-modalidad-label="{{ m.modalidad_label }}"
+                            data-cuota-saldo="{{ m.cuota_saldo }}"
+                        >
+                            {{ m.codigo }} - {{ m.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Input Cantidad -->
+                <div class="col-span-7 md:col-span-3">
+                    <div class="relative">
                         <input 
                             type="number" 
                             id="cantidad_input" 
                             min="1" 
+                            step="1"
                             placeholder="Cant. Pedida" 
-                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-[#8b0000]"
+                            onkeydown="manejarKeydownCantidad(event)"
+                            class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800/80 text-gray-800 dark:text-gray-100 rounded-xl py-2.5 px-3 text-sm focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition shadow-inner font-semibold"
                         >
-                    </div>
-
-                    <!-- Botón Añadir -->
-                    <div class="col-span-4 sm:col-span-2">
-                        <button 
-                            type="button" 
-                            onclick="agregarMaterial()" 
-                            class="w-full h-[46px] bg-gray-900 dark:bg-slate-800 hover:bg-gray-800 text-white rounded-2xl flex items-center justify-center gap-1 transition shadow-sm cursor-pointer"
-                        >
-                            <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                            <span class="text-xs font-bold font-['Outfit']">Añadir</span>
-                        </button>
+                        <span id="unidad_badge_inline" class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400 uppercase pointer-events-none"></span>
                     </div>
                 </div>
 
-                <!-- FICHA TÉCNICA DEL MATERIAL SELECCIONADO -->
-                <div id="panel-info-poa" class="hidden mt-3 p-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-900/60 text-xs">
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Código SABS</span>
-                            <span id="info-codigo" class="font-bold text-[#8b0000] dark:text-red-400 font-mono"></span>
-                        </div>
-                        <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Unidad de Manejo</span>
-                            <span id="info-unidad" class="font-bold text-gray-700 dark:text-gray-200"></span>
-                        </div>
-                        <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Modalidad</span>
-                            <span id="badge-modalidad" class="inline-block font-bold"></span>
-                        </div>
-                        <div>
-                            <span class="text-gray-400 block uppercase font-bold text-[10px]">Tope Permitido</span>
-                            <span id="info-max" class="font-extrabold text-gray-800 dark:text-gray-100"></span>
-                        </div>
+                <!-- Botón Añadir -->
+                <div class="col-span-5 md:col-span-2">
+                    <button 
+                        type="button" 
+                        id="btn_agregar"
+                        onclick="agregarMaterial()" 
+                        class="w-full py-2.5 bg-gray-900 dark:bg-slate-800 hover:bg-[#8b0000] dark:hover:bg-[#8b0000] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer font-['Outfit'] h-[42px]"
+                    >
+                        <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                        <span>Añadir</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- FICHA TÉCNICA DINÁMICA DEL MATERIAL -->
+            <div id="panel-info-poa" class="hidden mt-4 p-4 rounded-xl border border-red-100 dark:border-red-950/40 bg-red-50/40 dark:bg-slate-800/50 transition">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Código SABS</span>
+                        <span id="info-codigo" class="font-bold text-[#8b0000] dark:text-red-400 font-mono text-xs"></span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Unidad de Medida</span>
+                        <span id="info-unidad" class="font-bold text-gray-700 dark:text-gray-200 text-xs"></span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Modalidad Asignada</span>
+                        <span id="badge-modalidad" class="text-xs font-bold"></span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 dark:text-gray-500 block uppercase font-bold text-[10px] tracking-wider">Tope Permitido</span>
+                        <span id="info-max" class="font-extrabold text-gray-900 dark:text-white text-xs"></span>
                     </div>
                 </div>
-
-                <div id="inputs_ocultos"></div>
             </div>
         </div>
 
-        <!-- TABLA ZONA ① DE LA BOLETA OFICIAL -->
-        <div class="mt-6 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 text-xs uppercase font-semibold">
-                    <tr>
-                        <th class="p-4 font-bold w-32">Código</th>
-                        <th class="p-4 font-bold">Descripción del Material</th>
-                        <th class="p-4 font-bold text-center w-32">Unidad Manejo</th>
-                        <th class="p-4 font-bold text-center w-32">Cantidad Pedida</th>
-                        <th class="p-4 font-bold text-center w-20">Acción</th>
-                    </tr>
-                </thead>
-                <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent"></tbody>
-            </table>
+        <!-- 3. DETALLE DE MATERIALES PEDIDOS -->
+        <div class="card rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+            <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        Paso 3: Detalle del Pedido
+                    </h2>
+                    <span id="badge_contador_items" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300">
+                        0 artículos
+                    </span>
+                </div>
+                <button type="button" onclick="vaciarCarrito()" id="btn_vaciar" class="text-xs text-red-600 hover:text-red-700 font-semibold hidden transition">
+                    Vaciar lista
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50/70 dark:bg-slate-800/40 text-gray-500 dark:text-gray-400 text-[11px] uppercase font-bold tracking-wider border-b border-gray-100 dark:border-gray-800">
+                        <tr>
+                            <th class="py-3 px-4 w-28">Código</th>
+                            <th class="py-3 px-4">Descripción del Material</th>
+                            <th class="py-3 px-4 text-center w-28">Unidad</th>
+                            <th class="py-3 px-4 text-center w-36">Cant. Solicitada</th>
+                            <th class="py-3 px-4 text-right w-20">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 font-medium"></tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- JUSTIFICACIÓN (ACTIVIDAD U OBRA DEL POA) -->
-        <div class="mt-6">
-            <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">
-                Justificación / Actividad u Obra del POA <span class="text-[#8b0000]">*</span>
-            </label>
-            <textarea name="justificacion" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] text-sm" rows="3" placeholder="Indique el uso institucional y la actividad u obra para la cual se solicita el material..." required></textarea>
+        <!-- 4. JUSTIFICACIÓN -->
+        <div class="card p-5 sm:p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+                <label for="justificacion" class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider font-['Outfit']">
+                    Justificación / Actividad u Obra del POA <span class="text-[#8b0000] font-bold">*</span>
+                </label>
+                <span id="contador_caracteres" class="text-[11px] text-gray-400">0 / 500</span>
+            </div>
+            <textarea 
+                id="justificacion"
+                name="justificacion" 
+                rows="3" 
+                maxlength="500"
+                oninput="actualizarContador(this)"
+                placeholder="Indique detalladamente el destino, actividad u obra del POA en la que se utilizarán los materiales solicitados..." 
+                class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800/80 text-gray-800 dark:text-gray-100 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition shadow-inner leading-relaxed resize-none" 
+                required
+            ></textarea>
         </div>
 
-        <!-- BOTONES DE ENVÍO -->
-        <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
-            <a href="{% url 'solicitudes' %}" class="text-center border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-2xl font-semibold text-sm transition">Cancelar</a>
-            <button type="submit" class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer">
+        <!-- ACCIONES DE FORMULARIO -->
+        <div class="pt-2 flex flex-col-reverse sm:flex-row justify-end items-center gap-3">
+            <a href="{% url 'solicitudes' %}" class="w-full sm:w-auto text-center px-6 py-3 border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-xs uppercase tracking-wider transition">
+                Cancelar
+            </a>
+            <button 
+                type="submit" 
+                id="btn_submit_pedido"
+                class="w-full sm:w-auto px-8 py-3 bg-[#8b0000] hover:bg-red-800 active:bg-red-900 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-950/20 hover:shadow-xl transition flex items-center justify-center gap-2 cursor-pointer"
+            >
                 <span class="material-symbols-outlined text-[18px]">send</span>
-                Enviar Pedido a Almacén
+                <span>Enviar Pedido a Almacén</span>
             </button>
         </div>
     </form>
 </div>
-<!-- 1. Django genera el JSON seguro fuera del script -->
+
+<!-- DATA OFICIAL DESDE DJANGO -->
 {{ materiales|json_script:"catalogo-materiales-data" }}
 
-<!-- 2. Tu script lee el JSON de forma 100% estándar (0 errores en VS Code) -->
 <script>
-const catalogoMateriales = JSON.parse(document.getElementById('catalogo-materiales-data').textContent);
-
+const catalogoMateriales = JSON.parse(document.getElementById('catalogo-materiales-data').textContent || '[]');
 let carrito = {};
 
 // -------------------------------------------------------------
-// CONTROL DEL BUSCADOR PREDICTIVO (COMBOBOX)
+// SISTEMA DE TOASTS LIGEROS (NOTIFICACIONES EN PANTALLA)
+// -------------------------------------------------------------
+function mostrarToast(mensaje, tipo = 'error') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    
+    const bg = tipo === 'error' 
+        ? 'bg-red-900/90 text-white border-red-700' 
+        : (tipo === 'warn' ? 'bg-amber-800/90 text-white border-amber-600' : 'bg-emerald-900/90 text-white border-emerald-700');
+    
+    const icono = tipo === 'error' ? 'error' : (tipo === 'warn' ? 'warning' : 'check_circle');
+
+    toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-sm text-xs font-semibold transform transition-all duration-200 translate-y-2 opacity-0 ${bg}`;
+    toast.innerHTML = `
+        <span class="material-symbols-outlined text-[18px]">${icono}</span>
+        <span class="flex-1">${mensaje}</span>
+    `;
+    
+    container.appendChild(toast);
+    requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+    });
+
+    setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-1');
+        setTimeout(() => toast.remove(), 250);
+    }, 3800);
+}
+
+// -------------------------------------------------------------
+// BUSCADOR PREDICTIVO / COMBOBOX
 // -------------------------------------------------------------
 function abrirDropdownCombobox() {
     filtrarMaterialesEnVivo(document.getElementById('input_buscador_material').value);
@@ -232,42 +334,45 @@ function abrirDropdownCombobox() {
 function filtrarMaterialesEnVivo(termino) {
     const menu = document.getElementById('menu_resultados_combobox');
     const btnLimpiar = document.getElementById('btn_limpiar_buscador');
-    const query = termino.toLowerCase().trim();
+    const query = (termino || '').toLowerCase().trim();
 
     btnLimpiar.classList.toggle('hidden', query.length === 0);
 
     const filtrados = catalogoMateriales.filter(m => 
-        m.codigo.toLowerCase().includes(query) || 
-        m.nombre.toLowerCase().includes(query)
+        (m.codigo || '').toLowerCase().includes(query) || 
+        (m.nombre || '').toLowerCase().includes(query)
     );
 
     if (filtrados.length === 0) {
         menu.innerHTML = `
-            <div class="p-4 text-center text-xs text-gray-400">
-                <span class="material-symbols-outlined text-xl mb-1 block">search_off</span>
-                No se encontraron materiales autorizados con "${termino}"
+            <div class="p-6 text-center text-xs text-gray-400 dark:text-gray-500">
+                <span class="material-symbols-outlined text-2xl mb-1 block opacity-50">search_off</span>
+                No se encontraron materiales autorizados con "${escapeHtml(termino)}"
             </div>
         `;
     } else {
-        menu.innerHTML = filtrados.map(m => `
+        menu.innerHTML = filtrados.slice(0, 30).map(m => `
             <div 
+                role="button"
+                tabindex="0"
                 onclick="seleccionarMaterialDesdeCombobox('${m.id}')"
-                class="p-3 hover:bg-red-50/60 dark:hover:bg-slate-800/80 cursor-pointer transition flex items-center justify-between gap-3 text-left"
+                onkeydown="if(event.key==='Enter') seleccionarMaterialDesdeCombobox('${m.id}')"
+                class="p-3 hover:bg-red-50/70 dark:hover:bg-slate-800/80 cursor-pointer transition flex items-center justify-between gap-3 text-left focus:bg-red-50 dark:focus:bg-slate-800 focus:outline-none"
             >
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                        <span class="font-mono text-xs font-bold text-[#8b0000] dark:text-red-400">${m.codigo}</span>
-                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">${m.nombre}</span>
+                        <span class="font-mono text-xs font-bold text-[#8b0000] dark:text-red-400 bg-red-100/60 dark:bg-red-950/60 px-1.5 py-0.5 rounded">${m.codigo}</span>
+                        <span class="text-xs font-semibold text-gray-800 dark:text-gray-100 truncate">${m.nombre}</span>
                     </div>
-                    <div class="text-[11px] text-gray-400 mt-0.5">
-                        Modalidad: <span class="font-bold ${m.modalidad === 'CUOTA_FISICA' ? 'text-purple-600' : 'text-blue-600'}">${m.modalidad_label}</span>
+                    <div class="text-[11px] text-gray-400 mt-1">
+                        Modalidad: <span class="font-bold ${m.modalidad === 'ASIGNACION_DIRECTA' ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}">${m.modalidad_label || m.modalidad}</span>
                     </div>
                 </div>
                 <div class="text-right shrink-0">
-                    <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 block">
+                    <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 block">
                         ${m.unidad_medida}
                     </span>
-                    <span class="text-[10px] text-gray-400 block mt-0.5">Disp: <strong>${m.max_solicitable}</strong></span>
+                    <span class="text-[10px] text-gray-400 block mt-0.5 font-medium">Tope: <strong>${m.max_solicitable}</strong></span>
                 </div>
             </div>
         `).join('');
@@ -277,30 +382,28 @@ function filtrarMaterialesEnVivo(termino) {
 }
 
 function seleccionarMaterialDesdeCombobox(materialId) {
-    // Usamos == para comparar string con número de forma segura
     const mat = catalogoMateriales.find(m => String(m.id) === String(materialId));
     if (!mat) return;
 
-    const select = document.getElementById('material_select');
-    select.value = mat.id;
-
-    const inputBuscador = document.getElementById('input_buscador_material');
-    inputBuscador.value = `${mat.codigo} — ${mat.nombre} (${mat.unidad_medida})`;
+    document.getElementById('material_select').value = mat.id;
+    document.getElementById('input_buscador_material').value = `${mat.codigo} — ${mat.nombre}`;
+    document.getElementById('unidad_badge_inline').innerText = mat.unidad_medida;
 
     document.getElementById('menu_resultados_combobox').classList.add('hidden');
     document.getElementById('btn_limpiar_buscador').classList.remove('hidden');
 
+    // Ficha técnica
     document.getElementById('info-codigo').innerText = mat.codigo;
     document.getElementById('info-unidad').innerText = mat.unidad_medida;
     document.getElementById('info-max').innerText = `${mat.max_solicitable} ${mat.unidad_medida}`;
 
     const badge = document.getElementById('badge-modalidad');
-    if (mat.modalidad === 'CUOTA_FISICA') {
-        badge.innerText = `Cuota Asignada (${mat.cuota_saldo} disp.)`;
-        badge.className = 'text-purple-700 dark:text-purple-400 font-bold';
+    if (mat.modalidad === 'ASIGNACION_DIRECTA' || mat.modalidad === 'CUOTA_FISICA') {
+        badge.innerText = `Física Directa (${mat.cuota_saldo || 0} disp.)`;
+        badge.className = 'text-amber-600 dark:text-amber-400 font-bold';
     } else {
-        badge.innerText = 'Bolsa Común (POA)';
-        badge.className = 'text-blue-700 dark:text-blue-400 font-bold';
+        badge.innerText = 'Bolsa Libre Almacén';
+        badge.className = 'text-blue-600 dark:text-blue-400 font-bold';
     }
 
     const cantidadInput = document.getElementById('cantidad_input');
@@ -317,130 +420,169 @@ function limpiarSeleccionMaterial() {
     inputBuscador.value = '';
     document.getElementById('btn_limpiar_buscador').classList.add('hidden');
     document.getElementById('panel-info-poa').classList.add('hidden');
-    
+    document.getElementById('unidad_badge_inline').innerText = '';
+
     const cantidadInput = document.getElementById('cantidad_input');
     cantidadInput.value = '';
     cantidadInput.removeAttribute('max');
     cantidadInput.placeholder = 'Cant. Pedida';
 
-    abrirDropdownCombobox();
+    document.getElementById('menu_resultados_combobox').classList.add('hidden');
     inputBuscador.focus();
 }
 
-document.addEventListener('click', (e) => {
-    const combobox = document.getElementById('menu_resultados_combobox');
-    const input = document.getElementById('input_buscador_material');
-    if (combobox && input && !combobox.contains(e.target) && e.target !== input) {
-        combobox.classList.add('hidden');
+function manejarKeydownBuscador(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('menu_resultados_combobox').classList.add('hidden');
     }
-});
+    if (e.key === 'Enter') {
+        e.preventDefault(); // Evita que se envíe el form
+    }
+}
 
+function manejarKeydownCantidad(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        agregarMaterial();
+    }
+}
+
+// -------------------------------------------------------------
+// CONTROL DEL CARRITO
+// -------------------------------------------------------------
 function agregarMaterial() {
     const select = document.getElementById('material_select');
     const cantidadInput = document.getElementById('cantidad_input');
     const materialId = select.value;
     const mat = catalogoMateriales.find(m => String(m.id) === String(materialId));
-    const cantidad = parseInt(cantidadInput.value);
+    const cantidad = parseInt(cantidadInput.value, 10);
 
     if (!materialId || !mat) {
-        alert("Por favor, busca y selecciona un material de la lista autorizada.");
+        mostrarToast('Busca y selecciona un material válido de la lista.', 'warn');
         document.getElementById('input_buscador_material').focus();
         return;
     }
 
     if (isNaN(cantidad) || cantidad <= 0) {
-        alert("Ingrese una cantidad válida mayor a 0.");
+        mostrarToast('La cantidad debe ser un número entero mayor a 0.', 'warn');
         cantidadInput.focus();
         return;
     }
 
-    if (cantidad > mat.max_solicitable) {
-        alert(`La cantidad pedida (${cantidad}) supera el tope permitido (${mat.max_solicitable} ${mat.unidad_medida}).`);
-        cantidadInput.value = mat.max_solicitable;
+    const yaEnCarrito = carrito[materialId] ? carrito[materialId].cantidad : 0;
+    const totalPropuesto = yaEnCarrito + cantidad;
+
+    if (totalPropuesto > mat.max_solicitable) {
+        mostrarToast(`Tope excedido. Solicitas ${totalPropuesto}, pero el máximo es ${mat.max_solicitable} ${mat.unidad_medida}.`, 'error');
+        cantidadInput.value = Math.max(1, mat.max_solicitable - yaEnCarrito);
         return;
     }
 
-    if (carrito[materialId]) {
-        const total = carrito[materialId].cantidad + cantidad;
-        if (total > mat.max_solicitable) {
-            alert(`El total acumulado (${total}) supera el tope permitido (${mat.max_solicitable} ${mat.unidad_medida}).`);
-            return;
-        }
-        carrito[materialId].cantidad = total;
-    } else {
-        carrito[materialId] = {
-            codigo: mat.codigo,
-            nombre: mat.nombre,
-            unidad: mat.unidad_medida,
-            cantidad: cantidad,
-            max: mat.max_solicitable
-        };
-    }
+    carrito[materialId] = {
+        codigo: mat.codigo,
+        nombre: mat.nombre,
+        unidad: mat.unidad_medida,
+        cantidad: totalPropuesto,
+        max: mat.max_solicitable
+    };
 
     renderTabla();
     renderInputs();
-
     limpiarSeleccionMaterial();
-    document.getElementById('menu_resultados_combobox').classList.add('hidden');
+    mostrarToast(`"${mat.nombre}" añadido al pedido.`, 'success');
 }
 
 function renderTabla() {
     const tabla = document.getElementById('tabla_materiales');
-    tabla.innerHTML = '';
+    const badgeContador = document.getElementById('badge_contador_items');
+    const btnVaciar = document.getElementById('btn_vaciar');
     const keys = Object.keys(carrito);
+
+    badgeContador.innerText = `${keys.length} ${keys.length === 1 ? 'artículo' : 'artículos'}`;
+    btnVaciar.classList.toggle('hidden', keys.length === 0);
 
     if (keys.length === 0) {
         tabla.innerHTML = `
             <tr>
-                <td colspan="5" class="p-8 text-center text-gray-400 dark:text-gray-500">
-                    Añada los materiales requeridos usando el buscador superior.
+                <td colspan="5" class="py-12 px-4 text-center">
+                    <div class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                        <span class="material-symbols-outlined text-4xl mb-2 stroke-[1.5]">inventory_2</span>
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">Ningún material añadido todavía</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Usa el buscador para seleccionar ítems autorizados para tu unidad.</p>
+                    </div>
                 </td>
             </tr>
         `;
         return;
     }
 
-    keys.forEach(id => {
+    tabla.innerHTML = keys.map(id => {
         const item = carrito[id];
-        tabla.innerHTML += `
-            <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
-                <td class="p-4 font-mono font-bold text-[#8b0000] dark:text-red-400">${item.codigo}</td>
-                <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">${item.nombre}</td>
-                <td class="p-4 text-center text-gray-600 dark:text-gray-400 font-bold text-xs">${item.unidad}</td>
-                <td class="p-4 text-center">
-                    <input 
-                        type="number" 
-                        value="${item.cantidad}" 
-                        min="1" 
-                        max="${item.max}" 
-                        onchange="editarCantidad('${id}', this)" 
-                        class="border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-1.5 w-24 text-center focus:ring-1 focus:ring-[#8b0000]"
-                    >
+        return `
+            <tr class="hover:bg-gray-50/60 dark:hover:bg-slate-800/40 transition">
+                <td class="py-3 px-4 font-mono font-bold text-xs text-[#8b0000] dark:text-red-400">${escapeHtml(item.codigo)}</td>
+                <td class="py-3 px-4 text-xs font-semibold text-gray-800 dark:text-gray-200">${escapeHtml(item.nombre)}</td>
+                <td class="py-3 px-4 text-center">
+                    <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400">
+                        ${escapeHtml(item.unidad)}
+                    </span>
                 </td>
-                <td class="p-4 text-center">
-                    <button type="button" onclick="eliminar('${id}')" class="text-red-600 hover:text-red-800 font-medium text-xs cursor-pointer">Eliminar</button>
+                <td class="py-3 px-4 text-center">
+                    <div class="inline-flex items-center gap-1.5">
+                        <input 
+                            type="number" 
+                            value="${item.cantidad}" 
+                            min="1" 
+                            max="${item.max}" 
+                            onchange="editarCantidad('${id}', this)" 
+                            class="border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-lg p-1.5 w-20 text-center font-bold text-xs focus:ring-1 focus:ring-[#8b0000]"
+                        >
+                        <span class="text-[10px] text-gray-400 font-medium">/ ${item.max}</span>
+                    </div>
+                </td>
+                <td class="py-3 px-4 text-right">
+                    <button 
+                        type="button" 
+                        onclick="eliminarItem('${id}')" 
+                        title="Eliminar de la lista"
+                        class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition"
+                    >
+                        <span class="material-symbols-outlined text-[18px] block">delete</span>
+                    </button>
                 </td>
             </tr>
         `;
-    });
+    }).join('');
 }
 
 function editarCantidad(id, input) {
-    let cant = parseInt(input.value) || 1;
+    let cant = parseInt(input.value, 10) || 1;
     const item = carrito[id];
+    
     if (cant > item.max) {
-        alert(`Supera el límite autorizado (${item.max} ${item.unidad}).`);
+        mostrarToast(`No puede superar el límite autorizado (${item.max} ${item.unidad}).`, 'warn');
         cant = item.max;
+    } else if (cant < 1) {
+        cant = 1;
     }
+
     item.cantidad = cant;
     input.value = cant;
     renderInputs();
 }
 
-function eliminar(id) {
+function eliminarItem(id) {
     delete carrito[id];
     renderTabla();
     renderInputs();
+}
+
+function vaciarCarrito() {
+    if (confirm('¿Deseas quitar todos los materiales seleccionados?')) {
+        carrito = {};
+        renderTabla();
+        renderInputs();
+    }
 }
 
 function renderInputs() {
@@ -452,6 +594,69 @@ function renderInputs() {
     contenedor.innerHTML = `<input type="hidden" name="payload" value='${JSON.stringify(payload)}'>`;
 }
 
-document.addEventListener('DOMContentLoaded', renderTabla);
+// -------------------------------------------------------------
+// VALIDACIÓN FINAL Y ENVÍO
+// -------------------------------------------------------------
+function validarEnvioPedido(e) {
+    if (Object.keys(carrito).length === 0) {
+        mostrarToast('Debes agregar al menos un material antes de enviar el pedido.', 'error');
+        e.preventDefault();
+        return false;
+    }
+
+    const justificacion = document.getElementById('justificacion').value.trim();
+    if (justificacion.length < 10) {
+        mostrarToast('La justificación del POA debe ser más detallada (mínimo 10 caracteres).', 'error');
+        document.getElementById('justificacion').focus();
+        e.preventDefault();
+        return false;
+    }
+
+    // Deshabilitar botón para evitar doble clic
+    const btnSubmit = document.getElementById('btn_submit_pedido');
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `
+        <span class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+        <span>Enviando pedido...</span>
+    `;
+    return true;
+}
+
+function actualizarContador(textarea) {
+    document.getElementById('contador_caracteres').innerText = `${textarea.value.length} / 500`;
+}
+
+function confirmarCambioUnidad(nuevaUnidadId) {
+    if (Object.keys(carrito).length > 0) {
+        if (!confirm('Cambiar de unidad reiniciará la lista de materiales actual. ¿Deseas continuar?')) {
+            return;
+        }
+    }
+    window.location.href = '?unidad_id=' + nuevaUnidadId;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Clic fuera del combobox para cerrarlo
+document.addEventListener('click', (e) => {
+    const combobox = document.getElementById('menu_resultados_combobox');
+    const input = document.getElementById('input_buscador_material');
+    if (combobox && input && !combobox.contains(e.target) && e.target !== input) {
+        combobox.classList.add('hidden');
+    }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderTabla();
+    renderInputs();
+});
 </script>
 {% endblock %}

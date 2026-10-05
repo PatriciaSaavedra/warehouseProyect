@@ -1320,7 +1320,15 @@ def entrada_inventario(request):
         almacenes = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
 
     proveedores = Proveedor.objects.all().order_by('razon_social')
-    materiales = Material.objects.all().order_by('nombre')
+    materiales = Material.objects.filter(is_active=True).order_by('nombre')
+    unidades_org = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
+
+    # Órdenes de compra autorizadas pendientes de ingreso físico
+    from compras.models import CompraMenor
+    compras_pendientes = CompraMenor.objects.filter(
+        tipo_orden='COMPRA',
+        completada=False
+    ).select_related('proveedor').order_by('-id')
 
     if request.method == 'POST':
         nro_nota = request.POST.get('nro_nota', '').strip()
@@ -1329,6 +1337,12 @@ def entrada_inventario(request):
         c31 = request.POST.get('c31', '').strip()
         nota_entrega = request.POST.get('nota_entrega', '').strip()
         factura = request.POST.get('factura', '').strip()
+        
+        # NUEVOS CAMPOS: Número de orden manual y vinculación con CompraMenor
+        nro_orden_compra = request.POST.get('nro_orden_compra', '').strip()
+        compra_id = request.POST.get('compra_id', '').strip()
+        observaciones = request.POST.get('observaciones', '').strip()
+
         reingreso = request.POST.get('reingreso') == 'true'
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get('payload')
@@ -1350,6 +1364,7 @@ def entrada_inventario(request):
 
         proveedor = get_object_or_404(Proveedor, id=proveedor_id)
         almacen = get_object_or_404(Almacen, id=almacen_id)
+        compra_origen = CompraMenor.objects.filter(id=compra_id).first() if compra_id else None
 
         if not perfil.tiene_acceso_almacen(almacen):
             messages.error(request, f"No tiene autorización para registrar ingresos en: {almacen.nombre}")
@@ -1361,6 +1376,10 @@ def entrada_inventario(request):
 
         try:
             with transaction.atomic():
+                # Si vino seleccionada una orden y no escribió orden manual, tomar el número oficial
+                if compra_origen and not nro_orden_compra:
+                    nro_orden_compra = compra_origen.nro_orden
+
                 nota = NotaIngreso.objects.create(
                     nro_nota=nro_nota,
                     proveedor=proveedor,
@@ -1368,10 +1387,21 @@ def entrada_inventario(request):
                     c31=c31,
                     nota_entrega=nota_entrega,
                     factura=factura,
+                    nro_orden_compra=nro_orden_compra,
+                    compra_menor_origen=compra_origen,
+                    observaciones=observaciones,
                     reingreso=reingreso,
                     fecha=fecha,
                     usuario=request.user
                 )
+
+                # Si estaba vinculada a una compra menor, actualizar su estado a RECEPCIONADA
+                if compra_origen:
+                    compra_origen.completada = True
+                    compra_origen.estado = 'RECEPCIONADA'
+                    compra_origen.save()
+
+                from inventario.models import AsignacionEntradaUnidad
 
                 for item_key, item_data in payload.items():
                     material = Material.objects.get(id=item_key)
@@ -1379,11 +1409,12 @@ def entrada_inventario(request):
                     precio_u = Decimal(str(item_data.get('precio_unitario', '0.00')))
 
                     if cantidad <= 0 or precio_u < 0:
-                        raise ValueError("Las cantidades y precios de los materiales deben ser mayores a cero.")
+                        raise ValueError(f"Las cantidades y precios de '{material.nombre}' deben ser mayores a cero.")
 
-                    precio_total = cantidad * precio_u
+                    precio_total = Decimal(cantidad) * precio_u
 
-                    NotaIngresoDetalle.objects.create(
+                    # 1. Crear el detalle de la nota de ingreso
+                    detalle_ingreso = NotaIngresoDetalle.objects.create(
                         nota_ingreso=nota,
                         material=material,
                         cantidad=cantidad,
@@ -1391,16 +1422,38 @@ def entrada_inventario(request):
                         precio_total=precio_total
                     )
 
+                    # 2. Guardar asignaciones directas a Unidades Organizacionales
+                    asignaciones = item_data.get('asignaciones', [])
+                    suma_asignada = 0
+                    for asig in asignaciones:
+                        u_id = asig.get('unidad_id')
+                        cant_asig = int(asig.get('cantidad', 0))
+                        if u_id and cant_asig > 0:
+                            suma_asignada += cant_asig
+                            AsignacionEntradaUnidad.objects.create(
+                                nota_ingreso_detalle=detalle_ingreso,
+                                unidad_organizacional_id=u_id,
+                                cantidad_asignada=cant_asig,
+                                cantidad_retirada=0
+                            )
+
+                    if suma_asignada > cantidad:
+                        raise ValueError(
+                            f"La suma de asignaciones ({suma_asignada}) de '{material.nombre}' "
+                            f"supera la cantidad total ingresada ({cantidad})."
+                        )
+
+                    # 3. Stock físico en Almacén
                     inv, created = InventarioAlmacen.objects.get_or_create(
                         material=material,
                         almacen=almacen,
                         defaults={'stock_fisico': 0, 'stock_reservado': 0}
                     )
-                    
                     stock_anterior = inv.stock_fisico
                     inv.stock_fisico += cantidad
                     inv.save()
 
+                    # 4. Kardex y Lote PEPS
                     fecha_venc_item = item_data.get('fecha_vencimiento') or None
                     if fecha_venc_item:
                         fecha_venc_item = parse_date(fecha_venc_item)
@@ -1416,16 +1469,19 @@ def entrada_inventario(request):
                         stock_resultante=inv.stock_fisico,
                         usuario=request.user,
                         saldo_disponible_lote=cantidad,
-                        fecha_vencimiento=fecha_venc_item 
+                        fecha_vencimiento=fecha_venc_item,
+                        referencia=f"INGRESO NOTA {nro_nota}"
                     )
+
+                orden_info = f" (Orden: {nro_orden_compra})" if nro_orden_compra else ""
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
-                    accion='Registrar Entrada',
-                    descripcion=f'Se registró la Nota de Ingreso {nro_nota} en el almacén {almacen.nombre}'
+                    accion='Registrar Entrada con Asignación Directa',
+                    descripcion=f'Se registró la Nota de Ingreso {nro_nota}{orden_info} en el almacén {almacen.nombre}'
                 )
 
-            messages.success(request, f"Nota de Ingreso {nro_nota} registrada con éxito en {almacen.nombre}.")
+            messages.success(request, f"Nota de Ingreso {nro_nota} y asignaciones directas guardadas con éxito.")
             return redirect('nota_ingreso_list')
 
         except Exception as e:
@@ -1435,9 +1491,10 @@ def entrada_inventario(request):
     return render(request, 'inventario/crear_entrada.html', {
         'almacenes': almacenes,
         'proveedores': proveedores,
-        'materiales': materiales
+        'materiales': materiales,
+        'unidades_org': unidades_org,
+        'compras_pendientes': compras_pendientes,
     })
-
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -2463,9 +2520,8 @@ def nota_recepcion_pdf(request, id):
     pdf.drawString(395, height - 104, f"{fecha_fac}")
 
     pdf.setFont("Helvetica-Bold", 7.5)
-    orden_txt = nota.compra_menor_origen.nro_orden if nota.compra_menor_origen else f"COMPRA {nota.id}/2026"
+    orden_txt = nota.nro_orden_compra or (nota.compra_menor_origen.nro_orden if nota.compra_menor_origen else f"COMPRA {nota.id}/2026")
     pdf.drawString(555, height - 104, f"Orden de: {orden_txt.upper()}")
-
     # ========================================================
     # 4. TABLA OFICIAL (10 COLUMNAS)
     # ========================================================
@@ -3475,3 +3531,138 @@ def reporte_especificaciones_tecnicas(request):
         'gran_total_bs': gran_total_bs,
     }
     return render(request, 'inventario/reporte_especificaciones_tecnicas.html', context)
+
+
+# ========================================================
+# CRUD UNIDADES DE MEDIDA CON BAJA LÓGICA
+# ========================================================
+
+@login_required
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO'])
+def unidad_medida_list(request):
+    """
+    Listado y gestión de Unidades de Medida con búsqueda y baja lógica.
+    """
+    query = request.GET.get('q', '').strip()
+    unidades = UnidadMedida.objects.all()
+
+    if query:
+        unidades = unidades.filter(
+            Q(codigo__icontains=query) | Q(nombre__icontains=query)
+        )
+
+    unidades = unidades.order_by('codigo')
+    paginator = Paginator(unidades, 15)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'inventario/unidad_medida_list.html', {
+        'page_obj': page_obj,
+        'query': query
+    })
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO'])
+def crear_unidad_medida(request):
+    """
+    Registra una nueva Unidad de Medida en el catálogo institucional.
+    """
+    if request.method == 'POST':
+        codigo = request.POST.get('codigo', '').strip().upper()
+        nombre = request.POST.get('nombre', '').strip()
+
+        if not codigo or not nombre:
+            messages.error(request, "El Código y el Nombre de la Unidad de Medida son obligatorios.")
+            return redirect('unidad_medida_list')
+
+        if UnidadMedida.objects.filter(codigo=codigo).exists():
+            messages.error(request, f"Ya existe una unidad de medida registrada con el código '{codigo}'.")
+            return redirect('unidad_medida_list')
+
+        try:
+            with transaction.atomic():
+                UnidadMedida.objects.create(
+                    codigo=codigo,
+                    nombre=nombre,
+                    is_active=True
+                )
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Crear Unidad de Medida',
+                    descripcion=f'Se dio de alta la unidad de medida {codigo} - {nombre}.'
+                )
+            messages.success(request, f"Unidad de Medida '{codigo}' ({nombre}) registrada correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error al registrar la unidad de medida: {str(e)}")
+
+    return redirect('unidad_medida_list')
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO'])
+def editar_unidad_medida(request, id):
+    """
+    Edita el código o nombre de una Unidad de Medida existente.
+    """
+    unidad = get_object_or_404(UnidadMedida, id=id)
+
+    if request.method == 'POST':
+        codigo = request.POST.get('codigo', '').strip().upper()
+        nombre = request.POST.get('nombre', '').strip()
+
+        if not codigo or not nombre:
+            messages.error(request, "Código y Nombre son campos requeridos.")
+            return redirect('unidad_medida_list')
+
+        if UnidadMedida.objects.filter(codigo=codigo).exclude(id=unidad.id).exists():
+            messages.error(request, f"El código '{codigo}' ya pertenece a otra unidad de medida.")
+            return redirect('unidad_medida_list')
+
+        try:
+            with transaction.atomic():
+                codigo_ant = unidad.codigo
+                unidad.codigo = codigo
+                unidad.nombre = nombre
+                unidad.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Inventario',
+                    accion='Editar Unidad de Medida',
+                    descripcion=f'Se modificó la unidad {codigo_ant} a {codigo} - {nombre}.'
+                )
+            messages.success(request, f"Unidad de Medida '{codigo}' actualizada con éxito.")
+        except Exception as e:
+            messages.error(request, f"Error al actualizar la unidad de medida: {str(e)}")
+
+    return redirect('unidad_medida_list')
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES'])
+def toggle_unidad_medida(request, id):
+    """
+    Baja lógica o reactivación de una Unidad de Medida sin romper referencias históricas.
+    """
+    unidad = get_object_or_404(UnidadMedida, id=id)
+    nuevo_estado = not unidad.is_active
+
+    try:
+        with transaction.atomic():
+            unidad.is_active = nuevo_estado
+            unidad.save()
+
+            estado_txt = "ACTIVADA" if nuevo_estado else "DADA DE BAJA (INACTIVA)"
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Inventario',
+                accion='Cambio Estado Unidad de Medida',
+                descripcion=f'La unidad de medida {unidad.codigo} fue {estado_txt}.'
+            )
+        messages.success(request, f"Unidad de Medida '{unidad.codigo}' { 'reactivada' if nuevo_estado else 'dada de baja' } exitosamente.")
+    except Exception as e:
+        messages.error(request, f"Error al modificar estado: {str(e)}")
+
+    return redirect('unidad_medida_list')

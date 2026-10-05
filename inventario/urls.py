@@ -45,4 +45,9 @@ urlpatterns = [
     path('reportes/dgcf-r106/', views.reporte_dgcf_r106, name='reporte_dgcf_r106'),
     path('reportes/consumo-dependencias/', views.reporte_consumo_unidades, name='reporte_consumo_dependencias'),
     path('reportes/especificaciones-tecnicas/', views.reporte_especificaciones_tecnicas, name='reporte_especificaciones_tecnicas'),
+# CRUD UNIDADES DE MEDIDA
+    path('unidades-medida/', views.unidad_medida_list, name='unidad_medida_list'),
+    path('unidades-medida/crear/', views.crear_unidad_medida, name='crear_unidad_medida'),
+    path('unidades-medida/editar/<int:id>/', views.editar_unidad_medida, name='editar_unidad_medida'),
+    path('unidades-medida/toggle/<int:id>/', views.toggle_unidad_medida, name='toggle_unidad_medida'),
 ]
