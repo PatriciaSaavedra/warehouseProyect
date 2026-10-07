@@ -1,0 +1,407 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %} Folio {{ proceso.codigo }} {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6 font-['Outfit']">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <a href="{% url 'adquisiciones_list' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition mb-2">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Adquisiciones
+            </a>
+            <div class="flex items-center gap-3">
+                <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">
+                    Folio: {{ proceso.codigo }}
+                </h1>
+                <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+                    {{ proceso.get_estado_display }}
+                </span>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Flujo 2: {{ proceso.get_tipo_display }} • Solicitado por {{ proceso.unidad_solicitante.nombre }}
+            </p>
+        </div>
+    </div>
+
+    <!-- DOCUMENTACIÓN OFICIAL GENERADA (BOTONES DE IMPRESIÓN DEL FLUJO) -->
+    <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm flex flex-wrap items-center gap-2 text-xs font-bold">
+        <span class="text-[10px] uppercase font-bold text-gray-400 mr-2 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px]">print</span> Documentos del Proceso:
+        </span>
+
+        <!-- 1. Solicitud de Bienes y Servicios -->
+        <a href="{% url 'doc_solicitud_adquisicion_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 text-gray-800 dark:text-gray-200 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">description</span>
+            <span>Solicitud BB.SS.</span>
+        </a>
+
+        <!-- 2. Checklist Verificado -->
+        <a href="{% url 'doc_checklist_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 text-gray-800 dark:text-gray-200 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">checklist</span>
+            <span>Checklist Documental</span>
+        </a>
+
+        <!-- 3. Nota dirigida a la SAF -->
+        {% if proceso.cite_nota_saf %}
+        <a href="{% url 'doc_nota_saf_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">mail</span>
+            <span>Nota a la SAF</span>
+        </a>
+        {% endif %}
+
+        <!-- 4. Certificación Presupuestaria -->
+        {% if proceso.certificacion_nro %}
+        <a href="{% url 'doc_certificacion_presupuestaria_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">verified</span>
+            <span>Certificación Presupuestaria</span>
+        </a>
+        {% endif %}
+
+        <!-- 5. Autorización RPA (Foto 2 - NOTA Nº 0199/2026) -->
+        {% if proceso.cite_aprobacion_rpa or proceso.estado in 'APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}
+        <a href="{% url 'doc_autorizacion_rpa_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">gavel</span>
+            <span>Autorización RPA</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- STEPPER ADMINISTRATIVO -->
+    <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm">
+        <div class="flex items-center justify-between text-[11px] font-bold text-gray-400 font-mono overflow-x-auto pb-2 gap-4">
+            <span class="{% if proceso.estado != 'INICIADA' %}text-emerald-600{% endif %}">1. Checklist OK</span>
+            <span>➔</span>
+            <span class="{% if proceso.estado in 'NOTA_SAF_EMITIDA,CERTIFICADA,APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}text-emerald-600{% endif %}">2. Nota SAF</span>
+            <span>➔</span>
+            <span class="{% if proceso.estado in 'CERTIFICADA,APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}text-emerald-600{% endif %}">3. Certificación Presupuestaria</span>
+            <span>➔</span>
+            <span class="{% if proceso.estado in 'APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}text-emerald-600{% endif %}">4. Aprobado RPA</span>
+            <span>➔</span>
+            <span class="{% if proceso.estado in 'ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}text-emerald-600{% endif %}">5. Orden Emitida</span>
+            <span>➔</span>
+            <span class="{% if proceso.estado == 'CONCLUIDA' %}text-emerald-600 font-black{% endif %}">6. Concluida</span>
+        </div>
+    </div>
+
+    <!-- PANEL DE ACCIÓN SEGÚN LA FASE ACTUAL -->
+    <div class="card p-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-slate-900 dark:to-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-3xl shadow-sm">
+        
+        <!-- FASE 2 -> PASO A NOTA SAF -->
+        {% if proceso.estado == 'CHECKLIST_VERIFICADO' %}
+        <form method="POST" action="{% url 'emitir_nota_saf' proceso.id %}" class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+            {% csrf_token %}
+            <div>
+                <span class="font-extrabold text-amber-900 dark:text-amber-300 text-sm block">Siguiente Paso: Remitir Nota a la SAF</span>
+                <span class="text-gray-500">Dirigida a: <strong>{{ proceso.autoridad_saf.nombre_completo }}</strong></span>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <input type="text" name="cite_nota_saf" placeholder="Ej: DGADP N.º 608/2026" required class="p-2 border rounded-xl bg-white text-xs font-mono font-bold">
+                <button type="submit" class="bg-[#8b0000] text-white px-5 py-2 rounded-xl font-bold shadow whitespace-nowrap cursor-pointer">
+                    Registrar y Enviar Nota SAF
+                </button>
+            </div>
+        </form>
+        {% endif %}
+
+        <!-- FASE NOTA SAF -> CERTIFICACIÓN PRESUPUESTARIA ÍTEM POR ÍTEM CON MONTO REFERENCIAL -->
+        {% if proceso.estado == 'NOTA_SAF_EMITIDA' %}
+        <form method="POST" action="{% url 'certificar_presupuesto_adquisicion' proceso.id %}" class="space-y-4 text-xs">
+            {% csrf_token %}
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-blue-200 pb-3">
+                <div>
+                    <span class="font-extrabold text-blue-900 dark:text-blue-300 text-sm block">Intervención de Presupuestos: Certificación Presupuestaria por Ítem</span>
+                    <span class="text-gray-500">Nota remitida con CITE: <strong>{{ proceso.cite_nota_saf }}</strong></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px]">N° Certificación *</label>
+                    <input type="text" name="certificacion_nro" placeholder="Ej: CP-2026-0412" required class="p-2 border rounded-xl font-mono font-bold bg-white text-xs w-44">
+                </div>
+            </div>
+
+            <!-- Tabla de Certificación por Ítem con Monto Referencial -->
+            <div class="overflow-x-auto rounded-xl border border-blue-200 dark:border-blue-900/50 bg-white dark:bg-slate-900">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-blue-50/80 dark:bg-slate-800 text-[10px] uppercase font-bold text-blue-900 dark:text-blue-300 border-b border-blue-200">
+                        <tr>
+                            <th class="p-2.5">Ítem / Descripción</th>
+                            <th class="p-2.5 text-center w-16">Cant.</th>
+                            <th class="p-2.5 w-40">Partida Presupuestaria *</th>
+                            <th class="p-2.5 w-32">Fuente Finan.</th>
+                            <th class="p-2.5 w-24">Org. Finan.</th>
+                            <th class="p-2.5 text-right w-28 text-gray-600 dark:text-gray-300">Monto Ref. (Bs.)</th>
+                            <th class="p-2.5 text-right w-32 text-blue-900 dark:text-blue-200">Monto Certificado (Bs.) *</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                        {% for it in proceso.items.all %}
+                        <tr>
+                            <td class="p-2.5 font-sans font-semibold text-gray-800 dark:text-gray-200">
+                                {{ it.descripcion }}
+                            </td>
+                            <td class="p-2.5 text-center font-bold">{{ it.cantidad }} {{ it.unidad_medida }}</td>
+                            <td class="p-2 font-sans">
+                                <select name="item_partida_{{ it.id }}" class="w-full border rounded-lg p-1.5 text-xs bg-white dark:bg-slate-900 font-mono">
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="1" {% if it.partida.codigo == '39100' or not it.partida %}selected{% endif %}>39100 - Material de Limpieza</option>
+                                    <option value="2" {% if it.partida.codigo == '39500' %}selected{% endif %}>39500 - Útiles de Escritorio</option>
+                                    <option value="3" {% if it.partida.codigo == '39700' %}selected{% endif %}>39700 - Material Eléctrico</option>
+                                    <option value="4" {% if it.partida.codigo == '39800' %}selected{% endif %}>39800 - Repuestos Computación</option>
+                                    <option value="5" {% if it.partida.codigo == '34300' %}selected{% endif %}>34300 - Llantas y Neumáticos</option>
+                                </select>
+                            </td>
+                            <td class="p-2">
+                                <input type="text" name="item_fuente_{{ it.id }}" value="{{ it.fuente_financiamiento|default:'20 - Recursos Específicos' }}" class="w-full border rounded-lg p-1.5 text-xs font-sans">
+                            </td>
+                            <td class="p-2">
+                                <input type="text" name="item_organismo_{{ it.id }}" value="{{ it.organismo_financiador|default:'111 - TGN' }}" class="w-full border rounded-lg p-1.5 text-xs font-sans">
+                            </td>
+                            <!-- Monto Referencial Estimado -->
+                            <td class="p-2.5 text-right text-gray-600 dark:text-gray-300 font-bold bg-gray-50/50 dark:bg-slate-800/50">
+                                Bs. {{ it.subtotal_referencial|floatformat:2 }}
+                            </td>
+                            <!-- Monto Certificado Editable -->
+                            <td class="p-2 text-right">
+                                <input type="number" step="0.01" name="item_monto_{{ it.id }}" 
+                                       value="{{ it.monto_certificado|default:it.subtotal_referencial }}" 
+                                       required 
+                                       class="w-full border rounded-lg p-1.5 text-xs text-right font-bold text-blue-900 dark:text-blue-200 bg-white dark:bg-slate-900 font-mono focus:ring-2 focus:ring-blue-500">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="bg-blue-50/50 dark:bg-slate-800/80 font-bold text-xs">
+                            <td colspan="5" class="p-2.5 text-right font-sans text-gray-600 dark:text-gray-300">TOTALES:</td>
+                            <td class="p-2.5 text-right font-mono text-gray-700 dark:text-gray-200">
+                                Bs. {{ total_referencial|floatformat:2 }}
+                            </td>
+                            <td class="p-2.5 text-right font-mono text-blue-900 dark:text-blue-300">
+                                (Suma al guardar)
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button type="submit" class="bg-blue-800 hover:bg-blue-900 text-white px-6 py-2.5 rounded-xl font-bold shadow cursor-pointer">
+                    Aprobar Certificación Presupuestaria
+                </button>
+            </div>
+        </form>
+        {% endif %}
+
+        <!-- FASE CERTIFICADA -> APROBACIÓN RPA -->
+        {% if proceso.estado == 'CERTIFICADA' %}
+        <form method="POST" action="{% url 'aprobar_rpa_adquisicion' proceso.id %}" class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+            {% csrf_token %}
+            <div>
+                <span class="font-extrabold text-purple-900 dark:text-purple-300 text-sm block">Aprobación de la Contratación por el RPA</span>
+                <span class="text-gray-500">RPA: <strong>{{ proceso.autoridad_rpa.nombre_completo }}</strong> • Certificación: <strong>{{ proceso.certificacion_nro }} (Bs. {{ proceso.monto_certificado_bs|floatformat:2 }})</strong></span>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <input type="text" name="cite_aprobacion_rpa" placeholder="CITE Nota RPA (Ej: 0199/2026)" class="p-2 border rounded-xl bg-white text-xs font-mono font-bold">
+                <button type="submit" class="bg-purple-800 hover:bg-purple-900 text-white px-6 py-2 rounded-xl font-bold shadow whitespace-nowrap cursor-pointer">
+                    Aprobar Proceso (RPA)
+                </button>
+            </div>
+        </form>
+        {% endif %}
+
+        <!-- FASE APROBADA RPA -> EMITIR ORDEN (BIENES Y SERVICIOS) -->
+        {% if proceso.estado == 'APROBADA_RPA' %}
+        <form method="POST" action="{% url 'emitir_orden_adquisicion' proceso.id %}" class="space-y-3 text-xs">
+            {% csrf_token %}
+            <div class="flex justify-between items-center border-b pb-2">
+                <span class="font-extrabold text-emerald-900 dark:text-emerald-300 text-sm">Bienes y Servicios: Emisión de Orden y Precio Oficial</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1">Proveedor Adjudicado *</label>
+                    <input type="text" name="proveedor_nombre" placeholder="Nombre o Razón Social" required class="w-full border rounded-xl p-2 bg-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1">N° Orden Compra / Contrato *</label>
+                    <input type="text" name="nro_orden_compra" placeholder="Ej: COMPRA 195/2026" required class="w-full border rounded-xl p-2 font-mono font-bold bg-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1">Precio Oficial Adjudicado (Bs.) *</label>
+                    <input type="number" step="0.01" name="precio_oficial_bs" value="{{ total_referencial }}" required class="w-full border rounded-xl p-2 font-mono font-bold text-right bg-white">
+                </div>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 text-white px-6 py-2 rounded-xl font-bold shadow cursor-pointer">
+                    Emitir Orden Oficial
+                </button>
+            </div>
+        </form>
+        {% endif %}
+
+        <!-- FASE ORDEN EMITIDA -> RECEPCIÓN DOCUMENTAL ALMACÉN (SIN KARDEX) -->
+        {% if proceso.estado == 'ORDEN_EMITIDA' %}
+        <form method="POST" action="{% url 'recepcion_documental_almacen' proceso.id %}" class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+            {% csrf_token %}
+            <div>
+                <span class="font-extrabold text-[#8b0000] dark:text-red-400 text-sm block">Almacenes: Recepción Documental y Entrega Directa</span>
+                <span class="text-gray-500">Orden: <strong>{{ proceso.nro_orden_compra }}</strong> • <span class="text-red-700 font-bold">REGLA: Tránsito Directo (No genera stock en Kardex)</span></span>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <input type="text" name="nro_nota_recepcion" placeholder="N° Acta/Recepción (Ej. 162)" class="p-2 border rounded-xl bg-white text-xs font-mono font-bold">
+                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-6 py-2 rounded-xl font-bold shadow whitespace-nowrap cursor-pointer">
+                    Concluir y Archivar Recepción
+                </button>
+            </div>
+        </form>
+        {% endif %}
+
+        <!-- TRÁMITE CONCLUIDO -->
+        {% if proceso.estado == 'CONCLUIDA' %}
+        <div class="flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-300">
+            <div>
+                <span class="font-extrabold text-sm block flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[20px]">task_alt</span>
+                    Trámite Concluido y Archivada la Recepción
+                </span>
+                <span>Acta/Nota N° <strong>{{ proceso.nro_nota_recepcion }}</strong> • Archivo documental completado sin afectación a stock.</span>
+            </div>
+            <span class="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-xl font-bold">Proceso Finalizado</span>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- DATOS GENERALES DEL TRÁMITE -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm space-y-4 text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <span class="text-gray-400 block uppercase font-bold text-[10px]">CITE Solicitud</span>
+                <span class="font-mono font-bold text-gray-800 dark:text-gray-200 text-sm">{{ proceso.cite_solicitud|default:'S/C' }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 block uppercase font-bold text-[10px]">Fecha Registro</span>
+                <span class="font-bold text-gray-800 dark:text-gray-200">{{ proceso.fecha_solicitud|date:"d/m/Y" }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 block uppercase font-bold text-[10px]">Monto Referencial Estimado</span>
+                <span class="font-mono font-black text-sm text-[#8b0000] dark:text-red-400">Bs. {{ total_referencial|floatformat:2 }}</span>
+            </div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-100 dark:border-gray-800">
+            <span class="text-gray-400 block uppercase font-bold text-[10px] mb-1">Objeto de Contratación</span>
+            <p class="font-semibold text-gray-900 dark:text-white text-sm">{{ proceso.objeto_contratacion }}</p>
+        </div>
+
+        <div class="pt-2">
+            <span class="text-gray-400 block uppercase font-bold text-[10px] mb-1">Justificación</span>
+            <p class="text-gray-600 dark:text-gray-300">{{ proceso.justificacion }}</p>
+        </div>
+    </div>
+
+    <!-- ÍTEMS DEMANDADOS -->
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+            <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">Ítems / Términos de Referencia Solicitados</h3>
+            {% if proceso.certificacion_nro %}
+                <span class="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200">
+                    Certificación: {{ proceso.certificacion_nro }} (Bs. {{ proceso.monto_certificado_bs|floatformat:2 }})
+                </span>
+            {% endif %}
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-gray-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-500 border-b">
+                    <tr>
+                        <th class="p-3 w-10 text-center">N°</th>
+                        <th class="p-3">Descripción Técnica</th>
+                        <th class="p-3 text-center w-24">U. Medida</th>
+                        <th class="p-3 text-center w-20">Cantidad</th>
+                        <th class="p-3 text-right w-28">P. Unit. Estimado</th>
+                        <th class="p-3 text-right w-32">Subtotal Estimado</th>
+                        {% if proceso.certificacion_nro %}
+                            <th class="p-3 text-right w-32 text-blue-800">Certificado (Bs.)</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                    {% for item in proceso.items.all %}
+                    <tr>
+                        <td class="p-3 text-center text-gray-400">{{ forloop.counter }}</td>
+                        <td class="p-3 font-sans font-semibold text-gray-900 dark:text-white">{{ item.descripcion }}</td>
+                        <td class="p-3 text-center font-bold text-gray-600 dark:text-gray-300">{{ item.unidad_medida }}</td>
+                        <td class="p-3 text-center font-bold">{{ item.cantidad }}</td>
+                        <td class="p-3 text-right">{{ item.precio_referencial_estimado|floatformat:2 }}</td>
+                        <td class="p-3 text-right font-bold text-[#8b0000] dark:text-red-400">Bs. {{ item.subtotal_referencial|floatformat:2 }}</td>
+                        {% if proceso.certificacion_nro %}
+                            <td class="p-3 text-right font-bold text-blue-800 bg-blue-50/30">Bs. {{ item.monto_certificado|floatformat:2 }}</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- CHECKLIST VERIFICADO POR ÍTEM -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
+        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px] text-emerald-600">checklist</span>
+            <span>Checklist Documental Verificado por Ítem</span>
+        </h3>
+
+        {% for item in proceso.items.all %}
+        <div class="p-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-800/30 space-y-3">
+            <div class="flex justify-between items-center text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-lg bg-[#8b0000] text-white flex items-center justify-center font-bold text-[11px]">
+                        {{ forloop.counter }}
+                    </span>
+                    <strong class="text-gray-900 dark:text-white text-sm font-bold">{{ item.descripcion }}</strong>
+                </div>
+                <span class="font-mono text-gray-500 font-bold">{{ item.cantidad }} {{ item.unidad_medida }}</span>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-100/70 dark:bg-slate-800 text-[9px] uppercase font-bold text-gray-500 border-b">
+                        <tr>
+                            <th class="p-2.5">Requisito Documental</th>
+                            <th class="p-2.5 text-center w-32">Estado</th>
+                            <th class="p-2.5 w-64">Documento / Folio Respaldo</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        {% for c in item.checklist_respuestas.all %}
+                        <tr>
+                            <td class="p-2.5 font-bold text-gray-800 dark:text-gray-200">{{ c.requisito.nombre }}</td>
+                            <td class="p-2.5 text-center">
+                                {% if c.estado == 'CUMPLE' %}
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">✔ Cumple</span>
+                                {% elif c.estado == 'NO_APLICA' %}
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-gray-100 text-gray-600">🚫 No Aplica</span>
+                                {% else %}
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-800">⏳ Pendiente</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-2.5 font-mono text-gray-500">{{ c.documento_respaldo|default:'—' }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="p-3 text-center text-gray-400">Sin requisitos asignados a este ítem.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

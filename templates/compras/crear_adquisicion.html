@@ -1,0 +1,568 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %} Iniciar Proceso de Adquisición {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6 font-['Outfit']">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <a href="{% url 'adquisiciones_list' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition mb-2">
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Adquisiciones
+            </a>
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">
+                Nueva Adquisición (Flujo 2)
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Requerimiento formal de Bienes o Servicios sin stockeo en estantería de almacén [D.S. 0181 / SABS].
+            </p>
+        </div>
+    </div>
+
+    <!-- FORMULARIO TRANSACCIONAL -->
+    <form method="POST" id="form-adquisicion" class="card p-8 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm space-y-8">
+        {% csrf_token %}
+
+        <!-- 1. TIPO DE ADQUISICIÓN Y AUTORIDADES VIGENTES -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 p-5 rounded-2xl bg-gray-50 dark:bg-slate-800/40 border border-gray-200 dark:border-gray-700 text-xs">
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px] mb-1.5">Tipo de Adquisición *</label>
+                <div class="flex gap-2">
+                    <label class="flex-1 flex items-center gap-2 p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-900 cursor-pointer font-bold">
+                        <input type="radio" name="tipo" value="BIEN" checked onchange="cambiarTipoAdquisicion('BIEN')" class="accent-[#8b0000]">
+                        <span>📦 Bien</span>
+                    </label>
+                    <label class="flex-1 flex items-center gap-2 p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-900 cursor-pointer font-bold">
+                        <input type="radio" name="tipo" value="SERVICIO" onchange="cambiarTipoAdquisicion('SERVICIO')" class="accent-[#8b0000]">
+                        <span>🛠️ Servicio</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px] mb-1.5">Unidad Solicitante</label>
+                <div class="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-100/70 dark:bg-slate-800 font-bold text-[#8b0000] dark:text-red-400 truncate">
+                    {{ unidad.nombre }}
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px] mb-1.5">N° CITE de Solicitud *</label>
+                <input type="text" name="cite_solicitud" placeholder="Ej: CITE-SIST-045/2026" required 
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono font-bold uppercase">
+            </div>
+
+            <div class="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-2 text-[11px] text-gray-500">
+                    <span class="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+                    <span>Secretario SAF Vigente: <strong>{{ autoridad_saf.nombre_completo|default:"No configurado" }}</strong></span>
+                </div>
+                <div class="flex items-center gap-2 text-[11px] text-gray-500">
+                    <span class="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+                    <span>RPA Vigente: <strong>{{ autoridad_rpa.nombre_completo|default:"No configurado" }}</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. OBJETO Y JUSTIFICACIÓN -->
+        <div class="grid grid-cols-1 gap-4 text-xs">
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px] mb-1">Objeto de la Adquisición o Contratación *</label>
+                <input type="text" name="objeto_contratacion" placeholder="Ej: Adquisición de útiles y material de escritorio complementario para secretaría" required 
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-3 font-semibold text-gray-900 dark:text-white">
+            </div>
+
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px] mb-1">Justificación Institucional de la Necesidad *</label>
+                <textarea name="justificacion" rows="2" placeholder="Detalle los motivos y la necesidad operativa que justifican este requerimiento..." required 
+                          class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-3 text-xs"></textarea>
+            </div>
+        </div>
+
+        <!-- 3. CATEGORÍA PROGRAMÁTICA (SUGERIDA POR DEFECTO, EDITABLE) -->
+        <div class="p-4 rounded-2xl bg-gray-50 dark:bg-slate-800/40 border border-gray-200 dark:border-gray-700 space-y-2 text-xs">
+            <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2">
+                <span class="font-bold text-gray-700 dark:text-gray-200 uppercase text-[10px] flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-blue-600">account_balance_wallet</span>
+                    Categoría Programática y Estructura Financiera
+                </span>
+                <span class="text-[10px] text-gray-400">Valores habituales precargados (editables si es proyecto o fondo especial)</span>
+            </div>
+            
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                    <label class="block font-bold text-gray-500 text-[10px] mb-1">Programa</label>
+                    <input type="text" name="programa" value="{{ proceso.programa|default:'000' }}" class="w-full border border-gray-300 dark:border-gray-700 rounded-xl p-2 font-mono font-bold bg-white dark:bg-slate-900 text-center text-xs">
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-500 text-[10px] mb-1">Proy. o Actividad</label>
+                    <input type="text" name="proyecto_actividad" value="{{ proceso.proyecto_actividad|default:'001' }}" class="w-full border border-gray-300 dark:border-gray-700 rounded-xl p-2 font-mono font-bold bg-white dark:bg-slate-900 text-center text-xs">
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-500 text-[10px] mb-1">Fuente</label>
+                    <input type="text" name="fuente_financiamiento" value="{{ proceso.fuente_financiamiento|default:'20' }}" class="w-full border border-gray-300 dark:border-gray-700 rounded-xl p-2 font-mono font-bold bg-white dark:bg-slate-900 text-center text-xs">
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-500 text-[10px] mb-1">Org. Financiador</label>
+                    <input type="text" name="organismo_financiador" value="{{ proceso.organismo_financiador|default:'220' }}" class="w-full border border-gray-300 dark:border-gray-700 rounded-xl p-2 font-mono font-bold bg-white dark:bg-slate-900 text-center text-xs">
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. DETALLE DE ÍTEMS CON CHECKLIST INDIVIDUAL -->
+        <div class="space-y-3">
+            <h3 class="text-sm font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-amber-600">format_list_bulleted</span>
+                <span id="titulo_seccion_items">Detalle de Bienes y Verificación Documental por Ítem</span>
+            </h3>
+
+            <!-- Fila de captura con autocompletado desde Catálogo Maestro -->
+            <div class="grid grid-cols-12 gap-2 p-3.5 rounded-2xl bg-gray-50 dark:bg-slate-800/40 border border-gray-200 dark:border-gray-700 items-end text-xs">
+                
+                <!-- Buscador Combobox -->
+                <div class="col-span-12 sm:col-span-5 relative">
+                    <label id="label_input_desc" class="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+                        Buscar en Catálogo o Descripción Libre *
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="input_desc" 
+                            autocomplete="off"
+                            placeholder="Escribe código o nombre (ej. papel, disco) o descripción libre..." 
+                            oninput="filtrarCatalogoEnVivo(this.value)"
+                            class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#8b0000]"
+                        >
+                        <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[16px]">search</span>
+                    </div>
+
+                    <!-- Panel Flotante del Catálogo -->
+                    <div id="dropdown_catalogo_adq" class="hidden absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-gray-100 dark:divide-gray-800">
+                    </div>
+                    <input type="hidden" id="selected_material_id" value="">
+                </div>
+
+                <div class="col-span-4 sm:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">U. Medida *</label>
+                    <select id="input_um" class="w-full border rounded-xl p-2 bg-white dark:bg-slate-900 font-semibold">
+                        {% for u in unidades_medida %}
+                            <option value="{{ u.codigo }}">{{ u.codigo }} - {{ u.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-span-4 sm:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad *</label>
+                    <input type="number" min="1" value="1" id="input_cant" class="w-full border rounded-xl p-2 bg-white dark:bg-slate-900 text-center font-bold">
+                </div>
+
+                <div class="col-span-4 sm:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">P. Unit. Estimado (Bs.)</label>
+                    <input type="number" step="0.01" min="0" id="input_precio" placeholder="0.00" class="w-full border rounded-xl p-2 bg-white dark:bg-slate-900 text-right font-mono font-bold">
+                </div>
+
+                <div class="col-span-12 sm:col-span-1">
+                    <button type="button" onclick="agregarItemFila()" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2 rounded-xl text-xs font-bold flex items-center justify-center h-[34px] shadow cursor-pointer" title="Agregar ítem con checklist">
+                        <span class="material-symbols-outlined text-[18px]">add</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla de Ítems -->
+            <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-500 border-b">
+                        <tr>
+                            <th class="p-3.5 w-10 text-center">N°</th>
+                            <th class="p-3.5">Descripción Técnica / TDR</th>
+                            <th class="p-3.5 text-center w-20">U. Medida</th>
+                            <th class="p-3.5 text-center w-16">Cantidad</th>
+                            <th class="p-3.5 text-right w-24">P. Unit. (Bs.)</th>
+                            <th class="p-3.5 text-right w-28">Subtotal (Bs.)</th>
+                            <th class="p-3.5 text-center w-48 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300">Checklist del Ítem</th>
+                            <th class="p-3.5 text-center w-12">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla_items_body" class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                        <tr>
+                            <td colspan="8" class="p-8 text-center text-gray-400 font-sans">
+                                Agregue al menos un bien o servicio para verificar su checklist documental individual.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center text-xs">
+                <span class="font-bold text-gray-500">Monto Total Referencial Estimado:</span>
+                <span id="label_total_items" class="text-xl font-black font-mono text-[#8b0000] dark:text-red-400">Bs. 0.00</span>
+            </div>
+        </div>
+
+        <input type="hidden" name="payload_items" id="payload_items" value="{}">
+
+        <!-- BOTONES FINALES -->
+        <div class="flex justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-800">
+            <a href="{% url 'adquisiciones_list' %}" class="px-6 py-2.5 rounded-xl border text-xs font-bold text-gray-600 hover:bg-gray-100">Cancelar</a>
+            <button type="submit" onclick="return validarAntesDeEnviar()" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-8 py-2.5 rounded-xl text-xs font-bold shadow-lg transition cursor-pointer">
+                Guardar Requerimiento Oficial
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- MODAL DE CHECKLIST INDIVIDUAL POR ÍTEM -->
+<div id="modalChecklistItem" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+        
+        <div class="flex justify-between items-start border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div>
+                <span class="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">Verificación Documental del Ítem</span>
+                <h3 id="modalItemTitulo" class="text-base font-extrabold text-gray-900 dark:text-white">Nombre Ítem</h3>
+                <span id="modalItemSub" class="text-xs text-gray-400 font-mono">1 Unidad</span>
+            </div>
+            <button type="button" onclick="cerrarModalChecklist()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <p class="text-[11px] text-gray-500">
+            Indique el cumplimiento de los requisitos de contratación específicos para este bien/servicio según el RE-SABS.
+        </p>
+
+        <div id="modalChecklistBody" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <button type="button" onclick="guardarChecklistItem()" class="px-6 py-2.5 bg-[#8b0000] hover:bg-[#6b0000] text-white font-bold rounded-xl text-xs shadow cursor-pointer">
+                Confirmar Verificación del Ítem
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- DATA SEGURA DEL CATÁLOGO Y REQUISITOS PARA JS -->
+{{ materiales_catalogo|json_script:"catalogo-maestro-data" }}
+<script id="requisitos-catalogo-data" type="application/json">
+[
+    {% for r in requisitos %}
+    {
+        "id": {{ r.id }},
+        "nombre": "{{ r.nombre|escapejs }}",
+        "descripcion": "{{ r.descripcion|default:''|escapejs }}",
+        "aplica_a": "{{ r.aplica_a }}",
+        "es_obligatorio": {{ r.es_obligatorio|yesno:"true,false" }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+
+<script>
+let itemsCarrito = {};
+let tipoActual = 'BIEN';
+let catalogoMaestro = [];
+let requisitosCatalogo = [];
+let itemKeyEditandoChecklist = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        catalogoMaestro = JSON.parse(document.getElementById('catalogo-maestro-data').textContent) || [];
+        requisitosCatalogo = JSON.parse(document.getElementById('requisitos-catalogo-data').textContent) || [];
+    } catch(e) {
+        console.error("Error cargando catálogos JSON", e);
+    }
+});
+
+function cambiarTipoAdquisicion(tipo) {
+    tipoActual = tipo;
+    const titulo = document.getElementById('titulo_seccion_items');
+    const labelDesc = document.getElementById('label_input_desc');
+    const inputDesc = document.getElementById('input_desc');
+    
+    if (tipo === 'SERVICIO') {
+        titulo.innerText = 'Detalle de Servicios y Términos de Referencia (TDR)';
+        labelDesc.innerText = 'Términos de Referencia / Objeto del Servicio *';
+        inputDesc.placeholder = 'Ej: Servicio de mantenimiento correctivo de redes y fibra óptica...';
+    } else {
+        titulo.innerText = 'Detalle de Bienes Requeridos';
+        labelDesc.innerText = 'Buscar en Catálogo o Descripción Libre *';
+        inputDesc.placeholder = 'Escribe código o nombre (ej. papel, disco) o descripción libre...';
+    }
+}
+
+function filtrarCatalogoEnVivo(termino) {
+    if (tipoActual === 'SERVICIO') {
+        document.getElementById('dropdown_catalogo_adq').classList.add('hidden');
+        return;
+    }
+
+    const dropdown = document.getElementById('dropdown_catalogo_adq');
+    const q = termino.trim().toLowerCase();
+
+    if (q.length < 2) {
+        dropdown.innerHTML = '';
+        dropdown.classList.add('hidden');
+        return;
+    }
+
+    const matches = catalogoMaestro.filter(m => 
+        m.nombre.toLowerCase().includes(q) || m.codigo.toLowerCase().includes(q)
+    ).slice(0, 10);
+
+    if (matches.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+
+    let html = '';
+    matches.forEach(m => {
+        html += `
+            <div onclick="seleccionarCatalogoAdq(${m.id})" 
+                 class="p-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer flex justify-between items-center text-xs transition select-none">
+                <div>
+                    <span class="font-bold text-gray-800 dark:text-gray-100">${m.nombre}</span>
+                    <span class="text-[10px] text-gray-400 font-mono block">Cód SABS: ${m.codigo}</span>
+                </div>
+                <span class="px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-[10px] font-bold font-mono">
+                    ${m.unidad_medida}
+                </span>
+            </div>
+        `;
+    });
+
+    dropdown.innerHTML = html;
+    dropdown.classList.remove('hidden');
+}
+
+function seleccionarCatalogoAdq(id) {
+    const mat = catalogoMaestro.find(m => m.id === id);
+    if (!mat) return;
+
+    document.getElementById('input_desc').value = `${mat.codigo} - ${mat.nombre}`;
+    document.getElementById('selected_material_id').value = mat.id;
+
+    const selUm = document.getElementById('input_um');
+    for (let i = 0; i < selUm.options.length; i++) {
+        if (selUm.options[i].value.toUpperCase() === mat.unidad_medida.toUpperCase()) {
+            selUm.selectedIndex = i;
+            break;
+        }
+    }
+
+    document.getElementById('dropdown_catalogo_adq').classList.add('hidden');
+    document.getElementById('input_cant').focus();
+}
+
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('dropdown_catalogo_adq');
+    const input = document.getElementById('input_desc');
+    if (dropdown && !dropdown.contains(e.target) && e.target !== input) {
+        dropdown.classList.add('hidden');
+    }
+});
+
+function agregarItemFila() {
+    const desc = document.getElementById('input_desc').value.trim();
+    const um = document.getElementById('input_um').value.trim();
+    const cant = parseInt(document.getElementById('input_cant').value, 10) || 1;
+    const precio = parseFloat(document.getElementById('input_precio').value) || 0.00;
+    const matId = document.getElementById('selected_material_id').value;
+
+    if (!desc) {
+        alert("La descripción técnica o TDR es obligatoria.");
+        document.getElementById('input_desc').focus();
+        return;
+    }
+    if (cant <= 0) {
+        alert("La cantidad debe ser mayor a 0.");
+        return;
+    }
+
+    const checklistInicial = {};
+    requisitosCatalogo.forEach(req => {
+        if (req.aplica_a === 'AMBOS' || req.aplica_a === tipoActual) {
+            checklistInicial[req.id] = {
+                estado: 'CUMPLE',
+                doc_respaldo: '',
+                observacion: ''
+            };
+        }
+    });
+
+    const key = Date.now().toString();
+    itemsCarrito[key] = {
+        material_id: matId || null,
+        descripcion: desc,
+        unidad_medida: um,
+        cantidad: cant,
+        precio_unitario: precio,
+        checklist: checklistInicial
+    };
+
+    document.getElementById('input_desc').value = '';
+    document.getElementById('selected_material_id').value = '';
+    document.getElementById('input_cant').value = '1';
+    document.getElementById('input_precio').value = '';
+
+    renderizarTablaItems();
+    document.getElementById('input_desc').focus();
+}
+
+function eliminarItemFila(key) {
+    delete itemsCarrito[key];
+    renderizarTablaItems();
+}
+
+function abrirModalChecklist(key) {
+    const it = itemsCarrito[key];
+    if (!it) return;
+
+    itemKeyEditandoChecklist = key;
+    document.getElementById('modalItemTitulo').textContent = it.descripcion;
+    document.getElementById('modalItemSub').textContent = `${it.cantidad} ${it.unidad_medida}`;
+
+    const body = document.getElementById('modalChecklistBody');
+    body.innerHTML = '';
+
+    requisitosCatalogo.forEach(req => {
+        if (req.aplica_a === 'AMBOS' || req.aplica_a === tipoActual) {
+            const resp = it.checklist[req.id] || { estado: 'CUMPLE', doc_respaldo: '', observacion: '' };
+
+            body.innerHTML += `
+                <div class="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-800/40 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center text-xs">
+                    <div class="sm:col-span-5">
+                        <span class="font-bold text-gray-900 dark:text-white block">${req.nombre}</span>
+                        <span class="text-[9px] text-gray-400 block">${req.descripcion}</span>
+                    </div>
+                    <div class="sm:col-span-3">
+                        <select id="modal_req_est_${req.id}" class="w-full border rounded-xl p-1.5 font-bold bg-white dark:bg-slate-900 text-xs">
+                            <option value="CUMPLE" ${resp.estado === 'CUMPLE' ? 'selected' : ''}>✔ Cumple</option>
+                            <option value="NO_CUMPLE" ${resp.estado === 'NO_CUMPLE' ? 'selected' : ''}>⏳ Pendiente</option>
+                            <option value="NO_APLICA" ${resp.estado === 'NO_APLICA' ? 'selected' : ''}>🚫 No Aplica</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-4">
+                        <input type="text" id="modal_req_doc_${req.id}" value="${resp.doc_respaldo || ''}" placeholder="N° CITE / Folio de Respaldo" 
+                               class="w-full border rounded-xl p-1.5 text-xs bg-white dark:bg-slate-900 font-mono">
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    document.getElementById('modalChecklistItem').classList.remove('hidden');
+}
+
+function cerrarModalChecklist() {
+    document.getElementById('modalChecklistItem').classList.add('hidden');
+    itemKeyEditandoChecklist = null;
+}
+
+function guardarChecklistItem() {
+    if (!itemKeyEditandoChecklist || !itemsCarrito[itemKeyEditandoChecklist]) return;
+
+    const it = itemsCarrito[itemKeyEditandoChecklist];
+    requisitosCatalogo.forEach(req => {
+        if (req.aplica_a === 'AMBOS' || req.aplica_a === tipoActual) {
+            const selEst = document.getElementById(`modal_req_est_${req.id}`);
+            const inputDoc = document.getElementById(`modal_req_doc_${req.id}`);
+            if (selEst) {
+                it.checklist[req.id] = {
+                    estado: selEst.value,
+                    doc_respaldo: inputDoc ? inputDoc.value.trim() : '',
+                    observacion: ''
+                };
+            }
+        }
+    });
+
+    cerrarModalChecklist();
+    renderizarTablaItems();
+}
+
+function renderizarTablaItems() {
+    const tbody = document.getElementById('tabla_items_body');
+    const labelTotal = document.getElementById('label_total_items');
+    const inputHidden = document.getElementById('payload_items');
+
+    tbody.innerHTML = '';
+    const keys = Object.keys(itemsCarrito);
+    let total = 0.0;
+
+    if (keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-gray-400 font-sans">Agregue al menos un bien o servicio para verificar su checklist documental individual.</td></tr>';
+        labelTotal.textContent = 'Bs. 0.00';
+        inputHidden.value = '{}';
+        return;
+    }
+
+    keys.forEach((k, idx) => {
+        const it = itemsCarrito[k];
+        const subtot = it.cantidad * it.precio_unitario;
+        total += subtot;
+
+        const checkKeys = Object.keys(it.checklist || {});
+        let totalRequisitos = checkKeys.length;
+        let cumplidos = 0;
+        let pendientes = 0;
+
+        checkKeys.forEach(reqId => {
+            const est = it.checklist[reqId].estado;
+            if (est === 'CUMPLE' || est === 'NO_APLICA') cumplidos++;
+            else pendientes++;
+        });
+
+        let badgeChecklist = '';
+        if (pendientes === 0) {
+            badgeChecklist = `
+                <button type="button" onclick="abrirModalChecklist('${k}')" 
+                        class="px-2.5 py-1 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-200 transition text-[11px] flex items-center gap-1 mx-auto cursor-pointer">
+                    <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                    <span>Requisitos OK (${cumplidos}/${totalRequisitos})</span>
+                </button>
+            `;
+        } else {
+            badgeChecklist = `
+                <button type="button" onclick="abrirModalChecklist('${k}')" 
+                        class="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-800 border border-amber-300 font-bold hover:bg-amber-200 transition text-[11px] flex items-center gap-1 mx-auto cursor-pointer">
+                    <span class="material-symbols-outlined text-[14px]">warning</span>
+                    <span>${pendientes} Pendiente(s)</span>
+                </button>
+            `;
+        }
+
+        tbody.innerHTML += `
+            <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                <td class="p-3 text-center text-gray-400 font-mono">${idx + 1}</td>
+                <td class="p-3 font-sans font-semibold text-gray-900 dark:text-white">${it.descripcion}</td>
+                <td class="p-3 text-center font-bold text-gray-600 dark:text-gray-300">${it.unidad_medida}</td>
+                <td class="p-3 text-center font-bold">${it.cantidad}</td>
+                <td class="p-3 text-right font-mono">${it.precio_unitario.toFixed(2)}</td>
+                <td class="p-3 text-right font-bold font-mono text-[#8b0000] dark:text-red-400">Bs. ${subtot.toFixed(2)}</td>
+                <td class="p-3 text-center bg-amber-50/20 dark:bg-amber-950/10 font-sans">
+                    ${badgeChecklist}
+                </td>
+                <td class="p-3 text-center">
+                    <button type="button" onclick="eliminarItemFila('${k}')" class="text-red-500 hover:text-red-700">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    labelTotal.textContent = `Bs. ${total.toFixed(2)}`;
+    inputHidden.value = JSON.stringify(itemsCarrito);
+}
+
+function validarAntesDeEnviar() {
+    const keys = Object.keys(itemsCarrito);
+    if (keys.length === 0) {
+        alert("Debe agregar al menos un ítem al requerimiento.");
+        return false;
+    }
+    return true;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,808 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>CheckList Oficial de Adquisición - {{ proceso.codigo }}</title>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 0.8cm 1cm 1cm 1cm;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 8px;
+            color: #000;
+            margin: 0;
+            padding: 10px;
+            background: #f8fafc;
+        }
+
+        /* BARRA SUPERIOR (NO SE IMPRIME) */
+        .toolbar-top {
+            max-width: 900px;
+            margin: 0 auto 12px auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn-action-save {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-action-save:hover { background-color: #0369a1; }
+        .btn-action-print {
+            background-color: #8b0000;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-action-print:hover { background-color: #6b0000; }
+
+        /* HOJA DEL DOCUMENTO */
+        .sheet-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            padding: 20px 25px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .header { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        .header td { vertical-align: middle; }
+        .logo { width: 18%; }
+        .logo img { max-height: 48px; }
+        .titulo { width: 64%; text-align: center; }
+        .titulo h1 { margin: 0; font-family: 'Brush Script MT', cursive, Georgia, serif; font-size: 26px; }
+        .titulo h2 { margin: 1px 0; font-size: 9.5px; font-weight: 800; letter-spacing: 0.3px; }
+
+        .meta-box { border: 1px solid #000; padding: 4px 6px; margin-bottom: 6px; font-size: 8px; }
+        .meta-box table { width: 100%; border-collapse: collapse; }
+        .meta-box td { padding: 1.5px 2px; }
+
+        table.check-table { width: 100%; border-collapse: collapse; font-size: 7.2px; }
+        table.check-table th, table.check-table td { border: 0.5px solid #000; padding: 2px 3px; }
+        table.check-table th { background: #f1f5f9; text-align: center; font-weight: bold; }
+        .seccion-parte { background: #e2e8f0; font-weight: bold; text-align: center; padding: 3px; font-size: 8px; }
+        .area-header { background: #cbd5e1; font-weight: bold; text-align: left; padding: 2.5px 4px; font-size: 7.5px; }
+        .text-center { text-align: center; font-weight: bold; }
+
+        /* CONTROLES EDITABLES EN PANTALLA */
+        .select-check {
+            border: 1px dashed #94a3b8;
+            background: #f8fafc;
+            font-size: 8px;
+            font-weight: bold;
+            padding: 1px;
+            width: 100%;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .select-check:focus { outline: none; border-color: #0284c7; background: #fff; }
+
+        .input-obs {
+            border: 1px dashed #94a3b8;
+            background: #f8fafc;
+            font-size: 7px;
+            padding: 1px 4px;
+            width: 95%;
+            border-radius: 4px;
+        }
+        .input-obs:focus { outline: none; border-color: #0284c7; background: #fff; }
+
+        .nota-legal {
+            border: 0.5px solid #000;
+            padding: 5px;
+            margin-top: 10px;
+            font-size: 6.8px;
+            text-align: justify;
+            line-height: 1.25;
+        }
+
+        .firmas { width: 100%; border-collapse: collapse; margin-top: 35px; page-break-inside: avoid; }
+        .firmas td { width: 50%; text-align: center; vertical-align: top; padding: 0 40px; }
+        .linea-firma { border-top: 1px solid #000; padding-top: 3px; font-weight: bold; font-size: 8px; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .no-print { display: none !important; }
+            .sheet-container { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+            .select-check, .input-obs {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+                appearance: none !important;
+                font-family: Arial, sans-serif !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <form method="POST" action="{% url 'actualizar_checklist_oficial' proceso.id %}">
+        {% csrf_token %}
+
+        <!-- BARRA SUPERIOR DE ACCIONES -->
+        <div class="toolbar-top no-print">
+            <div style="font-size: 11px; color: #475569;">
+                <strong style="color: #0284c7;">CheckList Oficial Interactivo:</strong> Puedes modificar las casillas de control (✓, N/C, blanco) y la columna de Observaciones.
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="btn-action-save">
+                    💾 Guardar Cambios
+                </button>
+                <button type="button" onclick="window.print()" class="btn-action-print">
+                    🖨️ Imprimir CheckList Oficial
+                </button>
+            </div>
+        </div>
+
+        <div class="sheet-container">
+            <!-- ENCABEZADO OFICIAL (FOTO 1 / FOTO 4) -->
+            <table class="header">
+                <tr>
+                    <td class="logo">
+                        <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo">
+                    </td>
+                    <td class="titulo">
+                        <h1>Check List</h1>
+                        <h2>DE SOLICITUD DE ADQUISICIÓN Y PAGO DE BIENES Y SERVICIOS DE Bs. 1.- A 20.000.-</h2>
+                    </td>
+                    <td style="width: 18%; text-align: right; font-weight: bold; font-size: 8px;">
+                        <span style="font-size: 16px; font-weight: 900; letter-spacing: -1px;">AD</span><br>
+                        SDAF • GADP
+                    </td>
+                </tr>
+            </table>
+
+            <!-- METADATOS OBJETO Y UNIDAD -->
+            <div class="meta-box">
+                <table>
+                    <tr>
+                        <td style="width: 25%;"><strong>OBJETO DE CONTRATACIÓN:</strong></td>
+                        <td style="width: 75%; font-weight: bold;">{{ proceso.objeto_contratacion|upper }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>UNIDAD SOLICITANTE:</strong></td>
+                        <td style="font-weight: bold;">{{ proceso.unidad_solicitante.nombre|upper }}</td>
+                    </tr>
+                </table>
+                <div style="border-top: 0.5px solid #000; margin-top: 3px; padding-top: 2px; font-size: 7px;">
+                    Con documento, marcar: <strong>✓</strong> &nbsp;&nbsp;&nbsp;&nbsp;
+                    No corresponde, marcar: <strong>N/C</strong> &nbsp;&nbsp;&nbsp;&nbsp;
+                    Falta de documento, dejar en blanco: <strong>[ &nbsp; ]</strong>
+                </div>
+            </div>
+
+            <!-- TABLA PRINCIPAL EN ORDEN EXACTO DEL DOCUMENTO FÍSICO (12 AL 1) -->
+            <table class="check-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 3%;">N°</th>
+                        <th rowspan="2" style="width: 65%;">DESCRIPCIÓN DE DOCUMENTOS (OBLIGATORIOS) / RESPONSABLES</th>
+                        <th colspan="3" style="width: 32%;">CONTROL</th>
+                    </tr>
+                    <tr>
+                        <th style="width: 8%;">US</th>
+                        <th style="width: 8%;">SDAF</th>
+                        <th style="width: 16%;">OBS.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="seccion-parte">PARTE I</td>
+                    </tr>
+
+                    <!-- UNIDAD FINANCIERA - AREA DE CONTABILIDAD -->
+                    <tr>
+                        <td colspan="5" class="area-header">UNIDAD FINANCIERA - ÁREA DE CONTABILIDAD</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">12</td>
+                        <td>Comprobante C-31 Original.</td>
+                        <td>
+                            <select name="chk_us_12" class="select-check">
+                                <option value=" " {% if chk.us_12 == ' ' or not chk.us_12 %}selected{% endif %}>&nbsp;</option>
+                                <option value="✓" {% if chk.us_12 == '✓' %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_12 == 'N/C' %}selected{% endif %}>N/C</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_12" class="select-check">
+                                <option value=" " {% if chk.sdaf_12 == ' ' or not chk.sdaf_12 %}selected{% endif %}>&nbsp;</option>
+                                <option value="✓" {% if chk.sdaf_12 == '✓' %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_12 == 'N/C' %}selected{% endif %}>N/C</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_12" value="{{ chk.obs_12|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <!-- UNIDAD ADMINISTRATIVA - AREA DE BIENES Y SERVICIOS -->
+                    <tr>
+                        <td colspan="5" class="area-header">UNIDAD ADMINISTRATIVA - ÁREA DE BIENES Y SERVICIOS</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">11</td>
+                        <td>Informe del Área de Bienes y Servicios (BB. SS.).</td>
+                        <td>
+                            <select name="chk_us_11" class="select-check">
+                                <option value=" " {% if chk.us_11 == ' ' or not chk.us_11 %}selected{% endif %}>&nbsp;</option>
+                                <option value="✓" {% if chk.us_11 == '✓' %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_11 == 'N/C' %}selected{% endif %}>N/C</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_11" class="select-check">
+                                <option value="✓" {% if chk.sdaf_11 == '✓' or not chk.sdaf_11 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_11 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_11 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_11" value="{{ chk.obs_11|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <!-- RESPONSABLE DE RECEPCION - COMISION DE RECEPCION -->
+                    <tr>
+                        <td colspan="5" class="area-header">RESPONSABLE DE RECEPCIÓN - COMISIÓN DE RECEPCIÓN</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">10</td>
+                        <td>Informe de Conformidad para Servicios y Reporte Fotográfico, adjuntando cuando corresponda en virtud a la PARTE II: inciso A) o B).</td>
+                        <td>
+                            <select name="chk_us_10" class="select-check">
+                                <option value="N/C" {% if chk.us_10 == 'N/C' or not chk.us_10 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_10 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_10 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_10" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_10 == 'N/C' or not chk.sdaf_10 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_10 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_10 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_10" value="{{ chk.obs_10|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">9</td>
+                        <td>Acta de Recepción para Bienes y Obras, Reporte Fotográfico, adjuntando cuando corresponda en virtud a la PARTE II: inciso A) o B).</td>
+                        <td>
+                            <select name="chk_us_9" class="select-check">
+                                <option value="✓" {% if chk.us_9 == '✓' or not chk.us_9 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_9 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_9 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_9" class="select-check">
+                                <option value="✓" {% if chk.sdaf_9 == '✓' or not chk.sdaf_9 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_9 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_9 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_9" value="{{ chk.obs_9|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <!-- UNIDAD JURIDICA -->
+                    <tr>
+                        <td colspan="5" class="area-header">UNIDAD JURÍDICA</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">8</td>
+                        <td>Informe Legal y Contrato elaborado por la Secretaría Departamental Jurídica, suscripción del Contrato por la MAE; cuando el tiempo de entrega sea mayor a 15 días calendario.</td>
+                        <td>
+                            <select name="chk_us_8" class="select-check">
+                                <option value="N/C" {% if chk.us_8 == 'N/C' or not chk.us_8 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_8 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_8 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_8" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_8 == 'N/C' or not chk.sdaf_8 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_8 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_8 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_8" value="{{ chk.obs_8|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <!-- UNIDAD ADMINISTRATIVA - AREA DE BIENES Y SERVICIOS -->
+                    <tr>
+                        <td colspan="5" class="area-header">UNIDAD ADMINISTRATIVA - ÁREA DE BIENES Y SERVICIOS</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">7</td>
+                        <td>Orden de Compra/Servicio cuando el tiempo de entrega sea menor o igual a 15 días calendario, suscrito por el Jefe de la Unidad Administrativa y autorizado por el RPA.</td>
+                        <td>
+                            <select name="chk_us_7" class="select-check">
+                                <option value="✓" {% if chk.us_7 == '✓' or not chk.us_7 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_7 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_7 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_7" class="select-check">
+                                <option value="✓" {% if chk.sdaf_7 == '✓' or not chk.sdaf_7 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_7 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_7 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_7" value="{{ chk.obs_7|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">6</td>
+                        <td>Cuadro Comparativo de precios de acuerdo a cotizaciones emitidas el Área de Bienes y Servicios, reporte Mercado virtual.</td>
+                        <td>
+                            <select name="chk_us_6" class="select-check">
+                                <option value="✓" {% if chk.us_6 == '✓' or not chk.us_6 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_6 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_6 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_6" class="select-check">
+                                <option value="✓" {% if chk.sdaf_6 == '✓' or not chk.sdaf_6 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_6 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_6 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_6" value="{{ chk.obs_6|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">5</td>
+                        <td>Certificación Presupuestaria Original (Emitido por el Área de Presupuestos).</td>
+                        <td>
+                            <select name="chk_us_5" class="select-check">
+                                <option value="✓" {% if chk.us_5 == '✓' or not chk.us_5 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_5 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_5 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_5" class="select-check">
+                                <option value="✓" {% if chk.sdaf_5 == '✓' or not chk.sdaf_5 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_5 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_5 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_5" value="{{ chk.obs_5|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <!-- UNIDAD SOLICITANTE -->
+                    <tr>
+                        <td colspan="5" class="area-header">UNIDAD SOLICITANTE</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">4</td>
+                        <td>Solicitud de Certificación Presupuestaria, dirigido al SDAF.</td>
+                        <td>
+                            <select name="chk_us_4" class="select-check">
+                                <option value=" " {% if chk.us_4 == ' ' or not chk.us_4 %}selected{% endif %}>&nbsp;</option>
+                                <option value="✓" {% if chk.us_4 == '✓' %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_4 == 'N/C' %}selected{% endif %}>N/C</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_4" class="select-check">
+                                <option value=" " {% if chk.sdaf_4 == ' ' or not chk.sdaf_4 %}selected{% endif %}>&nbsp;</option>
+                                <option value="✓" {% if chk.sdaf_4 == '✓' %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_4 == 'N/C' %}selected{% endif %}>N/C</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_4" value="{{ chk.obs_4|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">3</td>
+                        <td>Formulario de Solicitud de Bienes y Servicios dirigido al RPA firmado por el Jefe de Unidad o Secretario Dptal. (para bienes con sello de no existencia por almacenes o Activos Fijos).</td>
+                        <td>
+                            <select name="chk_us_3" class="select-check">
+                                <option value="✓" {% if chk.us_3 == '✓' or not chk.us_3 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_3 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_3 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_3" class="select-check">
+                                <option value="✓" {% if chk.sdaf_3 == '✓' or not chk.sdaf_3 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_3 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_3 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_3" value="{{ chk.obs_3|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">*</td>
+                        <td>Formulario 170 Declaratoria Desierta, Compro Hecho en Bolivia, para bienes (D.S.4505) (Cuando se haya publicado en el SICOES). (si corresponde)</td>
+                        <td>
+                            <select name="chk_us_f170" class="select-check">
+                                <option value="✓" {% if chk.us_f170 == '✓' or not chk.us_f170 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_f170 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_f170 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_f170" class="select-check">
+                                <option value="✓" {% if chk.sdaf_f170 == '✓' or not chk.sdaf_f170 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_f170 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_f170 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_f170" value="{{ chk.obs_f170|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">*</td>
+                        <td>Reporte de Elaborado en el Catálogo del Compro Hecho en Bolivia a través del Perfil 998 y captura de la Búsqueda del Catalogo Electrónico, para bienes (D.S.4505). (BIENES) (V°B° del inmediato superior). (si corresponde).</td>
+                        <td>
+                            <select name="chk_us_chb" class="select-check">
+                                <option value="✓" {% if chk.us_chb == '✓' or not chk.us_chb %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_chb == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_chb == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_chb" class="select-check">
+                                <option value="✓" {% if chk.sdaf_chb == '✓' or not chk.sdaf_chb %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_chb == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_chb == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_chb" value="{{ chk.obs_chb|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">2</td>
+                        <td><strong>Informe Técnico por el Área correspondiente de acuerdo al Tipo de Contratación (Activos fijos - Sistemas - Mantenimiento - Maestranza), tomando en cuenta:</strong></td>
+                        <td>
+                            <select name="chk_us_2" class="select-check">
+                                <option value="✓" {% if chk.us_2 == '✓' or not chk.us_2 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_2 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_2 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_2" class="select-check">
+                                <option value="✓" {% if chk.sdaf_2 == '✓' or not chk.sdaf_2 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_2 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_2 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_2" value="{{ chk.obs_2|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">**</td>
+                        <td style="padding-left: 10px;">Formulario de Verificación de la Unidad de Comunicación: Sonido, Luces, Pantalla Led, Plataforma, Gradas, Estructura De Techo, Jingle, pauteos, microdocumentales, documentales y similares.</td>
+                        <td>
+                            <select name="chk_us_com" class="select-check">
+                                <option value="N/C" {% if chk.us_com == 'N/C' or not chk.us_com %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_com == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_com == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_com" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_com == 'N/C' or not chk.sdaf_com %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_com == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_com == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_com" value="{{ chk.obs_com|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">**</td>
+                        <td style="padding-left: 10px;">Informe Técnico Mecánico elaborado por Maestranza en original para compra de: (llantas, repuestos, aceites, etc.). (cuando corresponda)</td>
+                        <td>
+                            <select name="chk_us_mae" class="select-check">
+                                <option value="{% if 'LLANTA' in proceso.objeto_contratacion|upper or 'REPUESTO' in proceso.objeto_contratacion|upper %}✓{% else %}N/C{% endif %}" selected>
+                                    {% if 'LLANTA' in proceso.objeto_contratacion|upper or 'REPUESTO' in proceso.objeto_contratacion|upper %}✓{% else %}N/C{% endif %}
+                                </option>
+                                <option value="✓">✓</option>
+                                <option value="N/C">N/C</option>
+                                <option value=" ">&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_mae" class="select-check">
+                                <option value="{% if 'LLANTA' in proceso.objeto_contratacion|upper or 'REPUESTO' in proceso.objeto_contratacion|upper %}✓{% else %}N/C{% endif %}" selected>
+                                    {% if 'LLANTA' in proceso.objeto_contratacion|upper or 'REPUESTO' in proceso.objeto_contratacion|upper %}✓{% else %}N/C{% endif %}
+                                </option>
+                                <option value="✓">✓</option>
+                                <option value="N/C">N/C</option>
+                                <option value=" ">&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_mae" value="{{ chk.obs_mae|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">**</td>
+                        <td style="padding-left: 10px;">Especificaciones Técnicas elaboradas por la Unidad de Sistemas en original, para compra de: (equipos tecnológicos, computadoras, cámaras de filmación, cámaras fotográficas, etc.).(cuando corresponda)</td>
+                        <td>
+                            <select name="chk_us_sis" class="select-check">
+                                <option value="N/C" {% if chk.us_sis == 'N/C' or not chk.us_sis %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_sis == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_sis == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_sis" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_sis == 'N/C' or not chk.sdaf_sis %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_sis == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_sis == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_sis" value="{{ chk.obs_sis|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">**</td>
+                        <td style="padding-left: 10px;">Documento que respalde la estimación del Precio Referencial.</td>
+                        <td>
+                            <select name="chk_us_pref" class="select-check">
+                                <option value="✓" {% if chk.us_pref == '✓' or not chk.us_pref %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_pref == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_pref == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_pref" class="select-check">
+                                <option value="✓" {% if chk.sdaf_pref == '✓' or not chk.sdaf_pref %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_pref == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_pref == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_pref" value="{{ chk.obs_pref|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">1</td>
+                        <td>Informe Técnico de Justificación de la Unidad Solicitante (si corresponde - previa coordinación con el Área de Bienes y Servicios), adjuntando cuando corresponda:</td>
+                        <td>
+                            <select name="chk_us_1" class="select-check">
+                                <option value="✓" {% if chk.us_1 == '✓' or not chk.us_1 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_1 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_1 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_1" class="select-check">
+                                <option value="✓" {% if chk.sdaf_1 == '✓' or not chk.sdaf_1 %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_1 == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_1 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_1" value="{{ chk.obs_1|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <!-- PASO A PÁGINA 2 (FOTO 2) -->
+                    <tr>
+                        <td class="text-center">i)</td>
+                        <td style="padding-left: 10px;">Material de Impresión, adjuntar CD.</td>
+                        <td>
+                            <select name="chk_us_cd" class="select-check">
+                                <option value="N/C" {% if chk.us_cd == 'N/C' or not chk.us_cd %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_cd == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_cd == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_cd" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_cd == 'N/C' or not chk.sdaf_cd %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_cd == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_cd == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_cd" value="{{ chk.obs_cd|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">ii)</td>
+                        <td style="padding-left: 10px;">Servicio de Mantenimiento de Bienes, adjuntar: Asignación de Activos Fijos, especificar en el Informe de Justificación el Código del bien y el Responsable del Bien.</td>
+                        <td>
+                            <select name="chk_us_act" class="select-check">
+                                <option value="N/C" {% if chk.us_act == 'N/C' or not chk.us_act %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_act == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_act == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_act" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_act == 'N/C' or not chk.sdaf_act %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_act == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_act == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_act" value="{{ chk.obs_act|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <!-- PARTE II (FOTO 2) -->
+                    <tr>
+                        <td colspan="5" class="seccion-parte">PARTE II</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" class="area-header">A) PARA BIENES (Cuando corresponda)</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">•</td>
+                        <td>Ingreso a almacenes Kardex (grupo 30000 Material y Suministro) Cuando corresponda - Para control de BB SS, adjuntando factura.</td>
+                        <td>
+                            <select name="chk_us_p2_kar" class="select-check">
+                                <option value="✓" {% if chk.us_p2_kar == '✓' or not chk.us_p2_kar %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.us_p2_kar == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.us_p2_kar == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_p2_kar" class="select-check">
+                                <option value="✓" {% if chk.sdaf_p2_kar == '✓' or not chk.sdaf_p2_kar %}selected{% endif %}>✓</option>
+                                <option value="N/C" {% if chk.sdaf_p2_kar == 'N/C' %}selected{% endif %}>N/C</option>
+                                <option value=" " {% if chk.sdaf_p2_kar == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_p2_kar" value="{{ chk.obs_p2_kar|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">•</td>
+                        <td>Ingreso a Activos (grupo 40000 Activos reales) Cuando corresponda- Para Control de Activos Fijos, adjuntando factura.</td>
+                        <td>
+                            <select name="chk_us_p2_act" class="select-check">
+                                <option value="N/C" {% if chk.us_p2_act == 'N/C' or not chk.us_p2_act %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_p2_act == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_p2_act == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_p2_act" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_p2_act == 'N/C' or not chk.sdaf_p2_act %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_p2_act == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_p2_act == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_p2_act" value="{{ chk.obs_p2_act|default:'' }}" class="input-obs"></td>
+                    </tr>
+
+                    <tr>
+                        <td colspan="5" class="area-header">B) PARA SERVICIOS (Cuando corresponda)</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">•</td>
+                        <td>Acta de Verificación de Almacenes: impresión de trípticos, afiches, folders, libros, etc.; para servicio de Medios de Comunicación: periódico, revistas, similares.</td>
+                        <td>
+                            <select name="chk_us_s1" class="select-check">
+                                <option value="N/C" {% if chk.us_s1 == 'N/C' or not chk.us_s1 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_s1 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_s1 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_s1" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_s1 == 'N/C' or not chk.sdaf_s1 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_s1 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_s1 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_s1" value="{{ chk.obs_s1|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">•</td>
+                        <td>Reporte fotográfico de servicio de: artista, amplificación, alimentación, talleres, banners.</td>
+                        <td>
+                            <select name="chk_us_s2" class="select-check">
+                                <option value="N/C" {% if chk.us_s2 == 'N/C' or not chk.us_s2 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_s2 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_s2 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_s2" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_s2 == 'N/C' or not chk.sdaf_s2 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_s2 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_s2 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_s2" value="{{ chk.obs_s2|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">•</td>
+                        <td>Planillas firmadas por participantes original de servicios de: refrigerio, transporte, capacitación, etc.).</td>
+                        <td>
+                            <select name="chk_us_s3" class="select-check">
+                                <option value="N/C" {% if chk.us_s3 == 'N/C' or not chk.us_s3 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_s3 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_s3 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_s3" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_s3 == 'N/C' or not chk.sdaf_s3 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_s3 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_s3 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_s3" value="{{ chk.obs_s3|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">•</td>
+                        <td>Un ejemplar original: impresión de trípticos, afiches, folders, libros, etc.; para servicio de Medios de Comunicación: periódico, revistas, similares.</td>
+                        <td>
+                            <select name="chk_us_s4" class="select-check">
+                                <option value="N/C" {% if chk.us_s4 == 'N/C' or not chk.us_s4 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_s4 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_s4 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_s4" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_s4 == 'N/C' or not chk.sdaf_s4 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_s4 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_s4 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_s4" value="{{ chk.obs_s4|default:'' }}" class="input-obs"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">•</td>
+                        <td>CD/DVD: Jingle, pauteos, microdocumentales, documentales y similares.</td>
+                        <td>
+                            <select name="chk_us_s5" class="select-check">
+                                <option value="N/C" {% if chk.us_s5 == 'N/C' or not chk.us_s5 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.us_s5 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.us_s5 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="chk_sdaf_s5" class="select-check">
+                                <option value="N/C" {% if chk.sdaf_s5 == 'N/C' or not chk.sdaf_s5 %}selected{% endif %}>N/C</option>
+                                <option value="✓" {% if chk.sdaf_s5 == '✓' %}selected{% endif %}>✓</option>
+                                <option value=" " {% if chk.sdaf_s5 == ' ' %}selected{% endif %}>&nbsp;</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="chk_obs_s5" value="{{ chk.obs_s5|default:'' }}" class="input-obs"></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- NOTA LEGAL OFICIAL D.S. 0181 (EXACTA DE LA FOTO 2) -->
+            <div class="nota-legal">
+                <strong>Nota:</strong> El Responsable de recepción de Bienes, será conforme El Responsable de Almacenes, cuando se trate de Contratación Menor, salvo que la compra necesite verificación técnica el D.S. 0181, Subsistema de Bienes, Art. 127, inciso b) El Responsable de Almacenes, cuando se trate de Contratación Menor, salvo que la compra necesite verificación técnica y Art. 145, parágrafo I. La recepción de estos bienes para su incorporación al activo fijo de la entidad, será realizada por la Unidad o Responsable de Activos Fijos.
+            </div>
+
+            <!-- FIRMAS EXACTAS DE LA FOTO 2 -->
+            <table class="firmas">
+                <tr>
+                    <td>
+                        <div class="linea-firma">
+                            UNIDAD SOLICITANTE (US)<br>
+                            FIRMA Y SELLO
+                        </div>
+                    </td>
+                    <td>
+                        <div class="linea-firma">
+                            SDAF (ANALISTA)<br>
+                            FIRMA Y SELLO
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </form>
+
+</body>
+</html>

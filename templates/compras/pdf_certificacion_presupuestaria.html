@@ -1,0 +1,373 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificación Presupuestaria - {{ proceso.codigo|default:"ADQ-2026-0004" }}</title>
+    <style>
+        /* CONFIGURACIÓN DE IMPRESIÓN FÍSICA */
+        @page {
+            size: letter landscape;
+            margin: 1cm 1.2cm 1cm 1.2cm;
+        }
+
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+
+        /* FONDO GENERAL EN PANTALLA (CANVAS GRIS VISOR DE HOJA) */
+        body {
+            background-color: #eaedf1;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 9.5px;
+            color: #000;
+            margin: 0;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* BARRA SUPERIOR FLOTANTE */
+        .top-action-bar {
+            width: 100%;
+            max-width: 1050px;
+            background: #ffffff;
+            border: 1px solid #d5d9df;
+            border-radius: 14px;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+        .action-text {
+            color: #047857;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-print {
+            background-color: #8b0000;
+            color: #ffffff;
+            border: none;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-print:hover {
+            background-color: #6b0000;
+        }
+
+        /* HOJA BLANCA PRINCIPAL FLOTANDO AL MEDIO */
+        .document-page {
+            width: 100%;
+            max-width: 1050px;
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 2px;
+            padding: 28px 34px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0,0,0,0.04);
+            margin: 0 auto;
+        }
+
+        /* CABECERA OFICIAL */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        .header-table td {
+            vertical-align: middle;
+        }
+        .logo-box img {
+            max-height: 55px;
+            width: auto;
+            display: block;
+        }
+        .header-title {
+            text-align: center;
+        }
+        .header-title h3 {
+            margin: 0;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .header-title h2 {
+            margin: 3px 0 2px 0;
+            font-size: 13.5px;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+        }
+        .header-title p {
+            margin: 0;
+            font-size: 8.5px;
+            font-weight: bold;
+            color: #333;
+            letter-spacing: 0.4px;
+        }
+        .doc-meta-box {
+            border: 1px solid #000;
+            text-align: center;
+            padding: 6px 10px;
+            width: 140px;
+            margin-left: auto;
+        }
+        .doc-meta-box .label {
+            font-size: 8px;
+            font-weight: bold;
+            display: block;
+        }
+        .doc-meta-box .val-cert {
+            font-size: 10px;
+            font-weight: bold;
+            color: #047857;
+            font-family: monospace;
+            margin: 1px 0;
+        }
+        .doc-meta-box .val-codigo {
+            font-size: 8.5px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        /* DATOS DEL TRÁMITE */
+        .info-tramite {
+            background-color: #fafafa;
+            border: 1px solid #000;
+            padding: 6px 10px;
+            margin-bottom: 12px;
+            font-size: 8.5px;
+            line-height: 1.4;
+        }
+
+        /* TABLA DE CERTIFICACIÓN */
+        table.data {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000;
+            margin: 10px 0 15px 0;
+            font-size: 8.5px;
+        }
+        table.data th, table.data td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+        }
+        table.data th {
+            background-color: #f3f4f6;
+            font-weight: bold;
+            text-align: center;
+            font-size: 8px;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+        table.data td.text-center { text-align: center; }
+        table.data td.text-right { text-align: right; }
+        table.data td.font-mono { font-family: monospace; }
+
+        .total-row {
+            background-color: #f9fafb;
+            font-weight: bold;
+        }
+
+        /* SECCIÓN DE FIRMAS */
+        .firmas {
+            width: 100%;
+            margin-top: 55px;
+            border-collapse: collapse;
+            page-break-inside: avoid;
+        }
+        .firmas td {
+            width: 50%;
+            text-align: center;
+            padding: 0 45px;
+            vertical-align: top;
+        }
+        .linea {
+            border-top: 1px dashed #000;
+            padding-top: 4px;
+            font-weight: bold;
+            font-size: 8.5px;
+            line-height: 1.3;
+        }
+        .cargo-sub {
+            font-size: 7.5px;
+            font-weight: normal;
+            display: block;
+            margin-top: 2px;
+            color: #222;
+        }
+
+        /* COMPORTAMIENTO AL IMPRIMIR */
+        @media print {
+            body {
+                background: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                display: block;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .document-page {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+            }
+            table.data th {
+                background-color: #eee !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .info-tramite {
+                background-color: #fff !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA SUPERIOR DE ACCIONES -->
+    <div class="top-action-bar no-print">
+        <div class="action-text">
+            <span>✔ Documento Oficial:</span> Certificación Presupuestaria Aprobada para Trámite
+        </div>
+        <div>
+            <button class="btn-print" onclick="window.print()">
+                🖨️ Imprimir Certificación Oficial
+            </button>
+        </div>
+    </div>
+
+    <!-- HOJA CENTRADA -->
+    <div class="document-page">
+
+        <!-- CABECERA -->
+        <table class="header-table">
+            <tr>
+                <td style="width: 20%;" class="logo-box">
+                    <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo Institucional" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Escudo_de_Bolivia.svg/240px-Escudo_de_Bolivia.svg.png'">
+                </td>
+                <td style="width: 60%;" class="header-title">
+                    <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
+                    <h2>CERTIFICACIÓN PRESUPUESTARIA OFICIAL</h2>
+                    <p>UNIDAD DE PRESUPUESTOS • DIRECCIÓN DEPARTAMENTAL DE FINANZAS</p>
+                </td>
+                <td style="width: 20%;">
+                    <div class="doc-meta-box">
+                        <span class="label">N° CERTIFICACIÓN:</span>
+                        <div class="val-cert">{{ proceso.certificacion_nro|default:"1156/2026" }}</div>
+                        <span class="val-codigo">{{ proceso.codigo|default:"ADQ-2026-0004" }}</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- DATOS DEL PROCESO -->
+        <div class="info-tramite">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 65%; vertical-align: top;">
+                        <strong>Unidad Solicitante:</strong> {{ proceso.unidad_solicitante.nombre|default:"Unidad Administrativa" }}<br>
+                        <strong>Objeto de Contratación:</strong> {{ proceso.objeto_contratacion|default:"Adquisición de Basureros y Levantadores de Basura" }}
+                    </td>
+                    <td style="width: 35%; vertical-align: top; text-align: right;">
+                        <strong>CITE Nota SAF:</strong> {{ proceso.cite_nota_saf|default:"CITE-SAF-090/2026" }}<br>
+                        <strong>Fecha Emisión:</strong> {{ proceso.fecha_solicitud|date:"d/m/Y"|default:"07/10/2026" }}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- TABLA DE PARTIDAS E ÍTEMS -->
+        <table class="data">
+            <thead>
+                <tr>
+                    <th style="width: 25px;">N°</th>
+                    <th>Descripción del Ítem</th>
+                    <th style="width: 80px;">Cant. / Medida</th>
+                    <th style="width: 85px;">Partida</th>
+                    <th style="width: 130px;">Fuente Financiamiento</th>
+                    <th style="width: 110px;">Organismo Fin.</th>
+                    <th style="width: 100px;">Monto Certificado (Bs.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in proceso.items.all %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td>{{ it.descripcion }}</td>
+                    <td class="text-center">{{ it.cantidad }} {{ it.unidad_medida }}</td>
+                    <td class="text-center font-mono" style="font-weight: bold;">{{ it.partida.codigo|default:'39100' }}</td>
+                    <td class="text-center">{{ it.fuente_financiamiento|default:'20 - Recursos Específicos' }}</td>
+                    <td class="text-center">{{ it.organismo_financiador|default:'220 - Otros Rec.' }}</td>
+                    <td class="text-right font-mono" style="font-weight: bold;">{{ it.monto_certificado|default:it.subtotal_referencial|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td class="text-center">1</td>
+                    <td>39100-003 - BASURERO TIPO CANASTILLO CIRCULAR DE PLASTICO</td>
+                    <td class="text-center">1 PIEZA</td>
+                    <td class="text-center font-mono" style="font-weight: bold;">39100</td>
+                    <td class="text-center">20 - Recursos Específicos</td>
+                    <td class="text-center">220 - Otros Rec.</td>
+                    <td class="text-right font-mono" style="font-weight: bold;">40,00</td>
+                </tr>
+                <tr>
+                    <td class="text-center">2</td>
+                    <td>39100-015 - LEVANTADOR DE BASURA PLASTICO CON MANGO (TAMAÑO MEDIANO)</td>
+                    <td class="text-center">1 PIEZA</td>
+                    <td class="text-center font-mono" style="font-weight: bold;">39100</td>
+                    <td class="text-center">20 - Recursos Específicos</td>
+                    <td class="text-center">220 - Otros Rec.</td>
+                    <td class="text-right font-mono" style="font-weight: bold;">50,00</td>
+                </tr>
+                {% endfor %}
+
+                <!-- FILA TOTAL -->
+                <tr class="total-row">
+                    <td colspan="6" class="text-right" style="font-weight: bold;">TOTAL CERTIFICADO:</td>
+                    <td class="text-right font-mono" style="font-weight: bold; color: #000;">
+                        Bs. {{ proceso.monto_certificado_bs|default:"90,00"|floatformat:2 }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- SECCIÓN DE FIRMAS -->
+        <table class="firmas">
+            <tr>
+                <td>
+                    <div class="linea">
+                        Responsable de Elaboración
+                        <span class="cargo-sub">ANALISTA DE PRESUPUESTOS<br>Unidad de Presupuestos</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="linea">
+                        Jefatura de Presupuestos
+                        <span class="cargo-sub">DIRECCIÓN DEPARTAMENTAL DE FINANZAS<br>Gobierno Autónomo Departamental de Potosí</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+    </div>
+
+</body>
+</html>
