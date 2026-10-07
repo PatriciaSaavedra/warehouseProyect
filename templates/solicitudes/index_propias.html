@@ -1,161 +1,161 @@
 {% extends 'base.html' %}
 
-{% block title %} Mis Solicitudes {% endblock %}
+{% block title %} Mis Requerimientos Personales {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-8">
+<div class="max-w-7xl mx-auto space-y-6 font-['Outfit']">
 
-    <!-- CABECERA -->
-    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
-        <div class="min-w-0">
-            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">Mis Requerimientos Personales</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Consulte el estado, descargue sus comprobantes o edite sus solicitudes registradas.</p>
+    <!-- CABECERA CON ACCIONES RÁPIDAS -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">
+                Mis Requerimientos Personales
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Consulte el estado de sus pedidos de almacén y gestione sus trámites de nuevas adquisiciones.
+            </p>
         </div>
-        
-        <!-- Tarjeta 1 y 3: Separación de botones desde el origen -->
-        {% if request.user.perfilusuario.rol == 'UNIDAD_SOLICITANTE' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto self-start lg:self-center">
-                <!-- Botón 1: Consumo directo de stock -->
-                <a href="{% url 'nuevo_pedido_almacen' %}" class="bg-gray-950 hover:bg-gray-900 text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
-                    <span class="material-symbols-outlined text-[18px]">warehouse</span> Pedir de Almacén
-                </a>
 
-                <!-- Botón 2: Adquisición o servicio con partida y precio referencial -->
-                <a href="{% url 'nueva_solicitud_compra' %}" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
-                    <span class="material-symbols-outlined text-[18px]">shopping_cart</span> Requerimiento / POA
-                </a>
-            </div>
-        {% endif %}
-    </div>
-
-    <!-- PESTAÑAS DE NAVEGACIÓN (Tabs de la Gobernación) -->
-    <div class="border-b border-gray-200 dark:border-gray-800 flex gap-6">
-        <!-- PESTAÑA 1: ACTIVA -->
-        <a href="{% url 'solicitudes' %}" class="border-b-2 border-[#580000] text-[#580000] dark:text-red-400 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit']">
-            <span class="material-symbols-outlined text-[18px]">person</span> Mis Solicitudes
-        </a>
-        <!-- PESTAÑA 2: INACTIVA -->
-        {% if rol != 'UNIDAD_SOLICITANTE' %}
-            <a href="{% url 'solicitudes_general' %}" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 pb-3 text-sm font-bold flex items-center gap-1.5 font-['Outfit'] transition">
-                <span class="material-symbols-outlined text-[18px]">warehouse</span> Bandeja de Gestión
+        <div class="flex items-center gap-2">
+            <!-- Botón Flujo 1 -->
+            <a href="{% url 'nuevo_pedido_almacen' %}" 
+               class="bg-[#1e293b] hover:bg-black text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">inventory</span>
+                <span>Pedir de Almacén</span>
             </a>
+
+            <!-- Botón Flujo 2 -->
+            <a href="{% url 'crear_adquisicion' %}" 
+               class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">shopping_cart_checkout</span>
+                <span>Nueva Adquisición (Flujo 2)</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- PESTAÑAS SELECTORAS -->
+    <div class="flex border-b border-gray-200 dark:border-gray-800 text-xs font-bold gap-6">
+        <a href="?tab=pedidos" 
+           class="pb-3 border-b-2 flex items-center gap-2 transition {% if tab_activa == 'pedidos' %}border-[#8b0000] text-[#8b0000] dark:text-red-400{% else %}border-transparent text-gray-400 hover:text-gray-600{% endif %}">
+            <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+            <span>Pedidos de Almacén (Flujo 1)</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-gray-100 dark:bg-slate-800 text-gray-600">{{ total_pedidos }}</span>
+        </a>
+
+        <a href="?tab=adquisiciones" 
+           class="pb-3 border-b-2 flex items-center gap-2 transition {% if tab_activa == 'adquisiciones' %}border-[#8b0000] text-[#8b0000] dark:text-red-400{% else %}border-transparent text-gray-400 hover:text-gray-600{% endif %}">
+            <span class="material-symbols-outlined text-[18px]">shopping_bag</span>
+            <span>Nuevas Adquisiciones (Flujo 2)</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900">{{ total_adquisiciones }}</span>
+        </a>
+
+        {% if rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,JEFE_INMEDIATO,SECRETARIO_SAF,RPA' %}
+        <a href="{% url 'solicitudes_general' %}" 
+           class="pb-3 border-b-2 border-transparent text-gray-400 hover:text-gray-600 flex items-center gap-2 ml-auto">
+            <span class="material-symbols-outlined text-[18px]">dashboard_customize</span>
+            <span>Bandeja de Gestión Institucional</span>
+        </a>
         {% endif %}
     </div>
 
-    <!-- TABLA DE MIS SOLICITUDES -->
-    <div class="card p-8 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 shadow-sm rounded-2xl">
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-[900px]">
-                <thead class="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-gray-800">
-                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">
-                        <th class="px-6 py-4 w-36">Folio</th>
-                        <!-- Tarjeta 6: Mostrar tipo y flujo asignado en el listado -->
-                        <th class="px-6 py-4 w-44">Flujo / Tipo</th>
-                        <th class="px-6 py-4">Justificación</th>
-                        <th class="px-6 py-4 w-40">Fecha</th>
-                        <th class="px-6 py-4 text-center w-36">Estado</th>
-                        <th class="px-6 py-4 text-right pr-8 w-24">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
-                    {% for sol in page_obj %}
-                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-100">{{ sol.codigo }}</td>
-                        
-                        <!-- Tarjeta 6: Visualizar Tipo y Flujo asignado en cada fila -->
-                        <td class="px-6 py-4 whitespace-nowrap text-xs">
-                            <span class="block font-bold text-gray-700 dark:text-gray-200">
-                                {{ sol.get_flujo_atencion_display|default:"Salida de Almacén" }}
-                            </span>
-                            <span class="text-[10px] text-gray-400 block mt-0.5 uppercase tracking-wider">
-                                {{ sol.get_tipo_requerimiento_display|default:"Bien" }}
-                            </span>
-                        </td>
-
-                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-350 truncate max-w-[250px]" title="{{ sol.justificacion }}">{{ sol.justificacion }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ sol.fecha|date:"d/m/Y" }}</td>
-                        <td class="px-6 py-4 text-center text-xs font-bold">
-                            <!-- Badges unificados con el flujo oficial -->
-                            {% if sol.estado == 'REGISTRADA' %}
-                                <span class="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30">Registrada</span>
-                            {% elif sol.estado == 'REVISADA' %}
-                                <span class="px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/30">Revisada</span>
-                            {% elif sol.estado == 'VALIDADA_SAF' %}
-                                <span class="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30">Validada SAF</span>
-                            {% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}
-                                <span class="px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">Aprobada (POA)</span>
-                            {% elif sol.estado == 'VALIDADA_RPA' %}
-                                <span class="px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">Aprobada RPA</span>
-                            {% elif sol.estado == 'VALIDADA_JEFATURA' %}
-                                <span class="px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30">Aprobada Jefe</span>
-                            {% elif sol.estado == 'PREPARADA' %}
-                                <span class="px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30">Preparada</span>
-                            {% elif sol.estado == 'ENTREGADA' %}
-                                <span class="px-3 py-1 rounded-full bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/30">Entregada</span>
-                            {% elif sol.estado == 'CERRADA' %}
-                                <span class="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">Cerrada</span>
-                            {% else %}
-                                <span class="px-3 py-1 rounded-full bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30">Rechazada</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 text-right pr-8">
-                            <div class="flex justify-end gap-2">
-                                <a href="{% url 'detalle_solicitud' sol.id %}" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center justify-center transition" title="Ver Detalle"><span class="material-symbols-outlined text-gray-600 dark:text-gray-400 text-[20px]">visibility</span></a>
-                                <a href="{% url 'solicitud_pdf' sol.id %}" target="_blank" class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition" title="Descargar PDF"><span class="material-symbols-outlined text-red-600 dark:text-red-400 text-[20px]">picture_as_pdf</span></a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-['Outfit']">No se registran solicitudes personales creadas.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        {% if page_obj.has_other_pages %}
-        <div class="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 font-['Outfit']">
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-                Mostrando del <strong>{{ page_obj.start_index }}</strong> al <strong>{{ page_obj.end_index }}</strong> de <strong>{{ page_obj.paginator.count }}</strong> requerimientos personales totales [28].
-            </div>
-            
-            <div class="flex items-center gap-1 text-xs">
-                {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
-                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
-                    </a>
-                {% else %}
-                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
-                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
-                    </span>
-                {% endif %}
-                
-                {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <span class="w-8 h-8 rounded-xl bg-[#580000] text-white flex items-center justify-center font-bold shadow-sm select-none">
-                            {{ num }}
-                        </span>
-                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 font-semibold transition">
-                            {{ num }}
-                        </a>
-                    {% endif %}
-                {% endfor %}
-                
-                {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-gray-400 transition">
-                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-                    </a>
-                {% else %}
-                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
-                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-                    </span>
-                {% endif %}
+    <!-- TABLA SEGÚN LA PESTAÑA ACTIVA -->
+    {% if tab_activa == 'pedidos' %}
+        <!-- ============================================== -->
+        <!-- TABLA FLUJO 1: PEDIDOS DE ALMACÉN -->
+        <!-- ============================================== -->
+        <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 dark:bg-slate-800/60 text-[10px] uppercase font-bold text-gray-500 border-b">
+                        <tr>
+                            <th class="px-6 py-3.5 w-32">Folio</th>
+                            <th class="px-6 py-3.5">Justificación del Requerimiento</th>
+                            <th class="px-6 py-3.5 text-center w-28">Fecha</th>
+                            <th class="px-6 py-3.5 text-center w-36">Estado</th>
+                            <th class="px-6 py-3.5 text-right w-24 pr-8">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                        {% for s in page_pedidos %}
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30">
+                            <td class="px-6 py-4 font-bold text-[#8b0000]">{{ s.codigo }}</td>
+                            <td class="px-6 py-4 font-sans font-medium text-gray-800 dark:text-gray-200">{{ s.justificacion|truncatechars:70 }}</td>
+                            <td class="px-6 py-4 text-center font-sans text-gray-500">{{ s.fecha|date:"d/m/Y" }}</td>
+                            <td class="px-6 py-4 text-center font-sans">
+                                <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 block">
+                                    {{ s.get_estado_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-right pr-8 font-sans">
+                                <a href="{% url 'detalle_solicitud' s.id %}" class="p-2 border rounded-xl hover:bg-gray-100 text-xs font-bold">Ver</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-12 text-center text-gray-400 font-sans">
+                                No se registran pedidos de almacén creados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-        {% endif %}
 
-    </div>
+    {% else %}
+        <!-- ============================================== -->
+        <!-- TABLA FLUJO 2: ADQUISICIONES (COMPRAS / SERVICIOS) -->
+        <!-- ============================================== -->
+        <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 dark:bg-slate-800/60 text-[10px] uppercase font-bold text-gray-500 border-b">
+                        <tr>
+                            <th class="px-6 py-3.5 w-32">Código</th>
+                            <th class="px-6 py-3.5">Objeto de Contratación</th>
+                            <th class="px-6 py-3.5 text-center w-24">Tipo</th>
+                            <th class="px-6 py-3.5 text-center w-28">Fecha</th>
+                            <th class="px-6 py-3.5 text-center w-36">Estado</th>
+                            <th class="px-6 py-3.5 text-right w-24 pr-8">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                        {% for a in page_adq %}
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30">
+                            <td class="px-6 py-4 font-bold text-[#8b0000]">{{ a.codigo }}</td>
+                            <td class="px-6 py-4 font-sans font-medium text-gray-800 dark:text-gray-200">
+                                <div>{{ a.objeto_contratacion|truncatechars:70 }}</div>
+                                <span class="text-[10px] text-gray-400 font-mono">CITE: {{ a.cite_solicitud|default:'S/C' }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-center font-sans">
+                                {% if a.tipo == 'BIEN' %}
+                                    <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">Bien</span>
+                                {% else %}
+                                    <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold">Servicio</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-center font-sans text-gray-500">{{ a.fecha_solicitud|date:"d/m/Y" }}</td>
+                            <td class="px-6 py-4 text-center font-sans">
+                                <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 block">
+                                    {{ a.get_estado_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-right pr-8 font-sans">
+                                <a href="{% url 'detalle_adquisicion' a.id %}" class="p-2 border rounded-xl hover:bg-gray-100 text-xs font-bold">Ver</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="p-12 text-center text-gray-400 font-sans">
+                                No se registran procesos de adquisición creados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
 </div>
 {% endblock %}

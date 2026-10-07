@@ -78,42 +78,47 @@ def redirigir_despues_de_accion(request, solicitud):
 @login_required
 def solicitudes(request):
     """
-    Pestaña Personal: Mis Solicitudes creadas por el usuario autenticado.
+    Pestaña Personal: Centraliza tanto los Pedidos de Almacén (Flujo 1)
+    como las Nuevas Adquisiciones sin stock (Flujo 2).
     """
     perfil = getattr(request.user, 'perfilusuario', None)
-    if not perfil:
-        return render(request, 'solicitudes/index_propias.html', {'solicitudes': []})
+    rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+    unidad = perfil.unidad if perfil else None
 
+    tab_activa = request.GET.get('tab', 'pedidos')  # 'pedidos' o 'adquisiciones'
+
+    # 1. Flujo 1: Pedidos normales de almacén
     solicitudes_query = Solicitud.objects.filter(solicitante=request.user)
+    
+    # 2. Flujo 2: Adquisiciones (Compras / Servicios)
+    from compras.models import ProcesoAdquisicion
+    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS']:
+        adquisiciones_query = ProcesoAdquisicion.objects.all()
+    else:
+        adquisiciones_query = ProcesoAdquisicion.objects.filter(solicitante=request.user)
 
     query = request.GET.get('q', '').strip()
-    filtro_estado = request.GET.get('estado', '').strip()
-    desde_str = request.GET.get('desde', '').strip()
-    hasta_str = request.GET.get('hasta', '').strip()
-
     if query:
         solicitudes_query = solicitudes_query.filter(Q(codigo__icontains=query) | Q(justificacion__icontains=query))
-    if filtro_estado:
-        solicitudes_query = solicitudes_query.filter(estado=filtro_estado)
-    if desde_str:
-        solicitudes_query = solicitudes_query.filter(fecha__gte=desde_str)
-    if hasta_str:
-        solicitudes_query = solicitudes_query.filter(fecha__lte=hasta_str)
+        adquisiciones_query = adquisiciones_query.filter(Q(codigo__icontains=query) | Q(objeto_contratacion__icontains=query))
 
     solicitudes_query = solicitudes_query.order_by('-id')
+    adquisiciones_query = adquisiciones_query.order_by('-id')
 
-    paginator = Paginator(solicitudes_query, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    paginator_pedidos = Paginator(solicitudes_query, 10)
+    page_pedidos = paginator_pedidos.get_page(request.GET.get('page_pedidos'))
+
+    paginator_adq = Paginator(adquisiciones_query, 10)
+    page_adq = paginator_adq.get_page(request.GET.get('page_adq'))
 
     return render(request, 'solicitudes/index_propias.html', {
-        'page_obj': page_obj,
+        'page_pedidos': page_pedidos,
+        'page_adq': page_adq,
+        'tab_activa': tab_activa,
         'query': query,
-        'filtro_estado': filtro_estado,
-        'desde': desde_str,
-        'hasta': hasta_str,
-        'estados': ESTADOS_SOLICITUD,
-        'rol': perfil.rol,
+        'total_pedidos': solicitudes_query.count(),
+        'total_adquisiciones': adquisiciones_query.count(),
+        'rol': rol,
     })
 
 

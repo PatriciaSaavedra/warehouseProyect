@@ -4,6 +4,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q
+from django.core.paginator import Paginator
+from django.utils import timezone
+
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from inventario.models import PartidaPresupuestaria, Proveedor
@@ -16,8 +19,11 @@ from usuarios.decorators import rol_requerido
 from django.utils import html
 import json
 from .models import ActaConformidad, CompraMenor
-
-from inventario.models import Material
+from compras.models import (
+    ProcesoAdquisicion, ProcesoChecklistDetalle, ProcesoItemDetalle,
+    RequisitoCatalogo, AutoridadInstitucional
+)
+from inventario.models import Material, UnidadMedida, PartidaPresupuestaria
 from .models import CompraMenor, DetalleCompraMenor
 # ========================================================
 # 1. GESTIÓN DE ÓRDENES DE COMPRA Y SERVICIO
@@ -599,3 +605,558 @@ def compra_pdf(request, id):
 
     pdf.save()
     return response
+
+@login_required
+def adquisiciones_list(request):
+    """
+    Bandeja de Procesos de Adquisición (Flujo 2 - Sin Stockeo en Almacén).
+    """
+    perfil = getattr(request.user, 'perfilusuario', None)
+    rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+    unidad = perfil.unidad if perfil else None
+
+    # Si es unidad solicitante, solo ve sus trámites. Si es revisor/admin, ve todos.
+    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS', 'SECRETARIO_SAF', 'RPA', 'PRESUPUESTOS', 'ALMACENERO']:
+        procesos_qs = ProcesoAdquisicion.objects.all()
+    else:
+        procesos_qs = ProcesoAdquisicion.objects.filter(unidad_solicitante=unidad)
+
+    query = request.GET.get('q', '').strip()
+    filtro_tipo = request.GET.get('tipo', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+
+    if query:
+        procesos_qs = procesos_qs.filter(
+            Q(codigo__icontains=query) |
+            Q(objeto_contratacion__icontains=query) |
+            Q(cite_solicitud__icontains=query) |
+            Q(unidad_solicitante__nombre__icontains=query)
+        )
+    if filtro_tipo:
+        procesos_qs = procesos_qs.filter(tipo=filtro_tipo)
+    if filtro_estado:
+        procesos_qs = procesos_qs.filter(estado=filtro_estado)
+
+    procesos_qs = procesos_qs.select_related('unidad_solicitante', 'solicitante').order_by('-id')
+
+    paginator = Paginator(procesos_qs, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'compras/adquisiciones_list.html', {
+        'page_obj': page_obj,
+        'query': query,
+        'filtro_tipo': filtro_tipo,
+        'filtro_estado': filtro_estado,
+        'estados': ProcesoAdquisicion.ESTADOS_CHOICES,
+        'rol': rol,
+    })
+
+
+@login_required
+def crear_adquisicion(request):
+    """
+    Formulario de Inicio del Flujo 2:
+    - Selección Bien o Servicio.
+    - Datos generales y CITE de la solicitud.
+    - Carga de Ítems (desde catálogo o descripción libre/TDR).
+    - Checklist Dinámico de Requisitos Documentales por Ítem.
+    """
+    perfil = getattr(request.user, 'perfilusuario', None)
+    unidad = perfil.unidad if perfil else None
+
+    if not unidad:
+        messages.error(request, "Su usuario no tiene una Unidad Organizacional asignada para tramitar adquisiciones.")
+        return redirect('adquisiciones_list')
+
+    # Autoridades vigentes automáticas
+    autoridad_saf = AutoridadInstitucional.objects.filter(cargo='SAF', is_active=True).first()
+    autoridad_rpa = AutoridadInstitucional.objects.filter(cargo='RPA', is_active=True).first()
+
+    # Requisitos activos del catálogo
+    requisitos_db = RequisitoCatalogo.objects.filter(is_active=True).order_by('id')
+    materiales_catalogo = Material.objects.filter(is_active=True).values('id', 'codigo', 'nombre', 'unidad_medida')
+    unidades_medida = UnidadMedida.objects.filter(is_active=True).order_by('nombre')
+
+    if request.method == 'POST':
+        tipo = request.POST.get('tipo', 'BIEN')
+        objeto = request.POST.get('objeto_contratacion', '').strip()
+        justificacion = request.POST.get('justificacion', '').strip()
+        cite_solicitud = request.POST.get('cite_solicitud', '').strip()
+        payload_items_raw = request.POST.get('payload_items', '{}')
+
+        if not objeto or not justificacion:
+            messages.error(request, "El Objeto de Contratación y la Justificación son campos obligatorios.")
+            return redirect('crear_adquisicion')
+
+        try:
+            payload_items = json.loads(payload_items_raw)
+        except json.JSONDecodeError:
+            payload_items = {}
+
+        if not payload_items:
+            messages.error(request, "Debe agregar al menos un bien o servicio a la solicitud de adquisición.")
+            return redirect('crear_adquisicion')
+
+        try:
+            with transaction.atomic():
+                # Correlativo único (ej: ADQ-2026-0001)
+                anio = timezone.now().year
+                ultimo = ProcesoAdquisicion.objects.select_for_update().order_by('id').last()
+                numero = (ultimo.id + 1) if ultimo else 1
+                codigo = f"ADQ-{anio}-{numero:04d}"
+
+                # 1. Crear Cabecera del Proceso
+                proceso = ProcesoAdquisicion.objects.create(
+                    codigo=codigo,
+                    tipo=tipo,
+                    unidad_solicitante=unidad,
+                    solicitante=request.user,
+                    objeto_contratacion=objeto,
+                    justificacion=justificacion,
+                    cite_solicitud=cite_solicitud,
+                    autoridad_saf=autoridad_saf,
+                    autoridad_rpa=autoridad_rpa,
+                    # Categoría Programática
+                    programa=request.POST.get('programa', '000').strip(),
+                    proyecto_actividad=request.POST.get('proyecto_actividad', '001').strip(),
+                    fuente_financiamiento=request.POST.get('fuente_financiamiento', '20').strip(),
+                    organismo_financiador=request.POST.get('organismo_financiador', '220').strip(),
+                    estado='CHECKLIST_VERIFICADO'
+                )
+
+                # 2. Guardar Ítems Demandados y su Checklist Individual
+                total_estimado = Decimal('0.00')
+                for _, item_data in payload_items.items():
+                    cant = int(item_data.get('cantidad', 1))
+                    precio_ref = Decimal(str(item_data.get('precio_unitario', '0.00')))
+                    mat_id = item_data.get('material_id')
+
+                    subtot = Decimal(cant) * precio_ref
+                    total_estimado += subtot
+
+                    # Crear ítem
+                    item_obj = ProcesoItemDetalle.objects.create(
+                        proceso=proceso,
+                        material_id=mat_id if mat_id else None,
+                        descripcion=item_data.get('descripcion', '').strip(),
+                        unidad_medida=item_data.get('unidad_medida', 'PIEZA').strip(),
+                        cantidad=cant,
+                        precio_referencial_estimado=precio_ref,
+                        precio_oficial_unitario=Decimal('0.00')
+                    )
+
+                    # Guardar Checklist exclusivo de ESTE ítem
+                    checklist_dict = item_data.get('checklist', {})
+                    for req_id_str, resp in checklist_dict.items():
+                        req_id = int(req_id_str)
+                        ProcesoChecklistDetalle.objects.create(
+                            proceso=proceso,
+                            item_adquisicion=item_obj,
+                            requisito_id=req_id,
+                            estado=resp.get('estado', 'CUMPLE'),
+                            documento_respaldo=resp.get('doc_respaldo', '').strip(),
+                            observaciones=resp.get('observacion', '').strip()
+                        )
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Compras',
+                    accion='Iniciar Proceso Adquisición (Flujo 2)',
+                    descripcion=f'Se inició el proceso {codigo} ({tipo}): {objeto[:80]}. Total ref: Bs. {total_estimado:.2f}.'
+                )
+
+            messages.success(request, f"Proceso de Adquisición {codigo} registrado con éxito. Checklist verificado.")
+            return redirect('detalle_adquisicion', id=proceso.id)
+
+        except Exception as e:
+            messages.error(request, f"Error al procesar el requerimiento: {str(e)}")
+            return redirect('crear_adquisicion')
+
+    return render(request, 'compras/crear_adquisicion.html', {
+        'unidad': unidad,
+        'autoridad_saf': autoridad_saf,
+        'autoridad_rpa': autoridad_rpa,
+        'requisitos': requisitos_db,
+        'materiales_catalogo': list(materiales_catalogo),
+        'unidades_medida': unidades_medida,
+    })
+@login_required
+def detalle_adquisicion(request, id):
+    """
+    Ficha de Control del Proceso de Adquisición (Flujo 2).
+    Muestra la línea de tiempo de los 8 pasos, el Checklist verificado, los ítems
+    y las acciones disponibles según el rol institucional.
+    """
+    proceso = get_object_or_404(
+        ProcesoAdquisicion.objects.select_related(
+            'unidad_solicitante', 'solicitante', 'autoridad_saf', 'autoridad_rpa', 'proveedor', 'partida'
+        ).prefetch_related('items__material', 'checklist_respuestas__requisito'),
+        id=id
+    )
+
+    perfil = getattr(request.user, 'perfilusuario', None)
+    rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+
+    total_referencial = sum(i.subtotal_referencial for i in proceso.items.all())
+    total_oficial = sum(i.subtotal_oficial for i in proceso.items.all())
+
+    return render(request, 'compras/detalle_adquisicion.html', {
+        'proceso': proceso,
+        'total_referencial': total_referencial,
+        'total_oficial': total_oficial,
+        'rol': rol,
+    })
+
+
+# ========================================================
+# TRANSICIONES ADMINISTRATIVAS DEL FLUJO 2
+# ========================================================
+
+@login_required
+def emitir_nota_saf(request, id):
+    """Paso 3: Registra el CITE de la nota enviada al Secretario SAF."""
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    if request.method == 'POST':
+        cite_saf = request.POST.get('cite_nota_saf', '').strip()
+        if not cite_saf:
+            messages.error(request, "Debe ingresar el CITE oficial de la nota enviada a la SAF.")
+            return redirect('detalle_adquisicion', id=proceso.id)
+
+        proceso.cite_nota_saf = cite_saf
+        proceso.estado = 'NOTA_SAF_EMITIDA'
+        proceso.save()
+        messages.success(request, f"Nota formal {cite_saf} registrada y remitida a la SAF.")
+    return redirect('detalle_adquisicion', id=proceso.id)
+
+
+@login_required
+@rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
+def certificar_presupuesto_adquisicion(request, id):
+    """Paso 4: El área de Presupuestos registra la Certificación Presupuestaria."""
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    if request.method == 'POST':
+        cert_nro = request.POST.get('certificacion_nro', '').strip()
+        fuente = request.POST.get('fuente_financiamiento', '').strip()
+        organismo = request.POST.get('organismo_financiador', '').strip()
+        monto_str = request.POST.get('monto_certificado_bs', '0').strip()
+
+        if not cert_nro:
+            messages.error(request, "El número de Certificación Presupuestaria es obligatorio.")
+            return redirect('detalle_adquisicion', id=proceso.id)
+
+        proceso.certificacion_nro = cert_nro
+        proceso.fuente_financiamiento = fuente
+        proceso.organismo_financiador = organismo
+        proceso.monto_certificado_bs = Decimal(monto_str)
+        proceso.estado = 'CERTIFICADA'
+        proceso.save()
+        messages.success(request, f"Certificación Presupuestaria {cert_nro} registrada exitosamente.")
+    return redirect('detalle_adquisicion', id=proceso.id)
+
+
+@login_required
+@rol_requerido(['RPA', 'ADMINISTRADOR'])
+def aprobar_rpa_adquisicion(request, id):
+    """Paso 5: El RPA autoriza la contratación."""
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    if request.method == 'POST':
+        cite_rpa = request.POST.get('cite_aprobacion_rpa', '').strip()
+        proceso.cite_aprobacion_rpa = cite_rpa or "PROVEÍDO RPA"
+        proceso.estado = 'APROBADA_RPA'
+        proceso.save()
+        messages.success(request, f"Proceso {proceso.codigo} aprobado formalmente por el RPA.")
+    return redirect('detalle_adquisicion', id=proceso.id)
+
+
+@login_required
+@rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
+def emitir_orden_adquisicion(request, id):
+    """Paso 6: Bienes y Servicios registra proveedor, precio adjudicado y emite Orden."""
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    if request.method == 'POST':
+        proveedor_id = request.POST.get('proveedor')
+        nro_orden = request.POST.get('nro_orden_compra', '').strip()
+        precio_oficial = Decimal(request.POST.get('precio_oficial_bs', '0'))
+        hecho_bolivia = request.POST.get('hecho_en_bolivia', 'NO_APLICA')
+        doc_hb = request.POST.get('documento_hecho_en_bolivia', '').strip()
+
+        if not proveedor_id or not nro_orden or precio_oficial <= 0:
+            messages.error(request, "Proveedor, N° de Orden y Precio Oficial son obligatorios.")
+            return redirect('detalle_adquisicion', id=proceso.id)
+
+        proceso.proveedor_id = proveedor_id
+        proceso.nro_orden_compra = nro_orden
+        proceso.precio_oficial_adjudicado_bs = precio_oficial
+        proceso.hecho_en_bolivia = hecho_bolivia
+        proceso.documento_hecho_en_bolivia = doc_hb
+        proceso.estado = 'ORDEN_EMITIDA'
+        proceso.save()
+        messages.success(request, f"Orden {nro_orden} emitida con precio oficial de Bs. {precio_oficial:.2f}.")
+    return redirect('detalle_adquisicion', id=proceso.id)
+
+
+@login_required
+@rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+def recepcion_documental_almacen(request, id):
+    """Paso 7: Almacenes registra la recepción documental (REGLA: CERO STOCK / CERO KARDEX)."""
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    if request.method == 'POST':
+        nro_recepcion = request.POST.get('nro_nota_recepcion', '').strip()
+        obs = request.POST.get('observaciones_recepcion', '').strip()
+
+        proceso.recepcion_conforme = True
+        proceso.fecha_recepcion = timezone.now().date()
+        proceso.nro_nota_recepcion = nro_recepcion or f"REC-DOC-{proceso.id}"
+        proceso.observaciones_recepcion = obs
+        proceso.estado = 'CONCLUIDA'
+        proceso.save()
+
+        # OJO: AQUÍ NO SE CREA MovimientoInventario NI SE SUMA InventarioAlmacen
+        messages.success(request, f"Recepción documental {proceso.nro_nota_recepcion} concluida. Trámite archivado sin afectación a stock.")
+    return redirect('detalle_adquisicion', id=proceso.id)    
+
+@login_required
+@rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
+def certificar_presupuesto_adquisicion(request, id):
+    """
+    Paso 4: El área de Presupuestos registra el N° de Certificación y
+    asigna Partida, Fuente, Organismo y Monto Certificado A CADA ÍTEM.
+    """
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+
+    if request.method == 'POST':
+        cert_nro = request.POST.get('certificacion_nro', '').strip()
+        if not cert_nro:
+            messages.error(request, "El número de Certificación Presupuestaria es obligatorio.")
+            return redirect('detalle_adquisicion', id=proceso.id)
+
+        try:
+            with transaction.atomic():
+                total_certificado = Decimal('0.00')
+
+                # Procesar cada ítem individualmente
+                for item in proceso.items.all():
+                    partida_id = request.POST.get(f'item_partida_{item.id}')
+                    fuente = request.POST.get(f'item_fuente_{item.id}', '20 - Recursos Específicos').strip()
+                    organismo = request.POST.get(f'item_organismo_{item.id}', '111 - TGN').strip()
+                    monto_str = request.POST.get(f'item_monto_{item.id}', '0').strip()
+
+                    monto_item = Decimal(monto_str) if monto_str else item.subtotal_referencial
+
+                    item.partida_id = partida_id if partida_id else None
+                    item.fuente_financiamiento = fuente
+                    item.organismo_financiador = organismo
+                    item.monto_certificado = monto_item
+                    item.save()
+
+                    total_certificado += monto_item
+
+                proceso.certificacion_nro = cert_nro
+                proceso.monto_certificado_bs = total_certificado
+                proceso.estado = 'CERTIFICADA'
+                proceso.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Compras',
+                    accion='Certificación Presupuestaria por Ítem',
+                    descripcion=f'Presupuestos emitió la certificación {cert_nro} para {proceso.codigo} por Bs. {total_certificado:.2f}.'
+                )
+
+            messages.success(request, f"Certificación Presupuestaria {cert_nro} aprobada por un total de Bs. {total_certificado:.2f}.")
+        except Exception as e:
+            messages.error(request, f"Error al guardar certificación presupuestaria: {str(e)}")
+
+    return redirect('detalle_adquisicion', id=proceso.id)
+
+
+# ========================================================
+# GENERADORES DE DOCUMENTOS OFICIALES (PDF / IMPRIMIBLES)
+# ========================================================
+
+@login_required
+def doc_solicitud_adquisicion_pdf(request, id):
+    """1. Formulario de Solicitud de Bienes y Servicios / TDR"""
+    proceso = get_object_or_404(ProcesoAdquisicion.objects.select_related('unidad_solicitante', 'solicitante', 'autoridad_saf'), id=id)
+    return render(request, 'compras/pdf_solicitud_bienes_servicios.html', {'proceso': proceso})
+
+
+@login_required
+def doc_checklist_pdf(request, id):
+    """2. Formulario de Checklist Documental Verificado por Ítem"""
+    proceso = get_object_or_404(ProcesoAdquisicion.objects.select_related('unidad_solicitante', 'solicitante'), id=id)
+    return render(request, 'compras/pdf_checklist.html', {'proceso': proceso})
+
+
+@login_required
+def doc_nota_saf_pdf(request, id):
+    """3. Nota Oficial de Remisión dirigida a la Secretaría SAF"""
+    proceso = get_object_or_404(
+        ProcesoAdquisicion.objects.select_related('unidad_solicitante', 'solicitante', 'autoridad_saf'), 
+        id=id
+    )
+    total_referencial = sum(i.subtotal_referencial for i in proceso.items.all())
+    return render(request, 'compras/pdf_nota_saf.html', {
+        'proceso': proceso,
+        'total_referencial': total_referencial,
+    })
+
+
+@login_required
+def doc_certificacion_presupuestaria_pdf(request, id):
+    """4. Certificación Presupuestaria Oficial desglosada por Ítem"""
+    proceso = get_object_or_404(ProcesoAdquisicion.objects.select_related('unidad_solicitante'), id=id)
+    return render(request, 'compras/pdf_certificacion_presupuestaria.html', {'proceso': proceso})
+
+# ========================================================
+# GESTIÓN INSTITUCIONAL DE AUTORIDADES (RPA / SAF / MAE)
+# ========================================================
+
+@login_required
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS'])
+def autoridades_list(request):
+    """
+    Panel de gestión de autoridades institucionales y vigencias de designación.
+    """
+    autoridades = AutoridadInstitucional.objects.all().order_by('cargo', '-is_active', '-fecha_designacion')
+    
+    return render(request, 'compras/autoridades_list.html', {
+        'autoridades': autoridades,
+        'cargos': AutoridadInstitucional.CARGOS_CHOICES,
+    })
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def crear_autoridad(request):
+    """
+    Registra una nueva autoridad. Si se marca como activa, desactiva automáticamente
+    la autoridad anterior de ese mismo cargo.
+    """
+    if request.method == 'POST':
+        cargo = request.POST.get('cargo')
+        nombre = request.POST.get('nombre_completo', '').strip()
+        resolucion = request.POST.get('resolucion_designacion', '').strip()
+        fecha_desig = request.POST.get('fecha_designacion')
+        fecha_venc = request.POST.get('fecha_vencimiento') or None
+        is_active = request.POST.get('is_active') == 'on'
+
+        if not cargo or not nombre or not resolucion or not fecha_desig:
+            messages.error(request, "Todos los campos con asterisco son obligatorios.")
+            return redirect('autoridades_list')
+
+        try:
+            with transaction.atomic():
+                # Si se marca como activa, desactivar las otras del mismo cargo
+                if is_active:
+                    AutoridadInstitucional.objects.filter(cargo=cargo).update(is_active=False)
+
+                AutoridadInstitucional.objects.create(
+                    cargo=cargo,
+                    nombre_completo=nombre,
+                    resolucion_designacion=resolucion,
+                    fecha_designacion=fecha_desig,
+                    fecha_vencimiento=fecha_venc,
+                    is_active=is_active
+                )
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Compras',
+                    accion='Registrar Autoridad Institucional',
+                    descripcion=f'Se designó a {nombre} en el cargo de {cargo} ({resolucion}).'
+                )
+            messages.success(request, f"Autoridad '{nombre}' registrada con éxito.")
+        except Exception as e:
+            messages.error(request, f"Error al registrar la autoridad: {str(e)}")
+
+    return redirect('autoridades_list')
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def editar_autoridad(request, id):
+    autoridad = get_object_or_404(AutoridadInstitucional, id=id)
+
+    if request.method == 'POST':
+        autoridad.nombre_completo = request.POST.get('nombre_completo', '').strip()
+        autoridad.resolucion_designacion = request.POST.get('resolucion_designacion', '').strip()
+        autoridad.fecha_designacion = request.POST.get('fecha_designacion')
+        autoridad.fecha_vencimiento = request.POST.get('fecha_vencimiento') or None
+        
+        is_active = request.POST.get('is_active') == 'on'
+        if is_active and not autoridad.is_active:
+            AutoridadInstitucional.objects.filter(cargo=autoridad.cargo).update(is_active=False)
+        autoridad.is_active = is_active
+        autoridad.save()
+
+        messages.success(request, f"Datos de la autoridad '{autoridad.nombre_completo}' actualizados.")
+        return redirect('autoridades_list')
+
+    return redirect('autoridades_list')
+
+
+@login_required
+@rol_requerido(['ADMINISTRADOR'])
+def toggle_autoridad(request, id):
+    autoridad = get_object_or_404(AutoridadInstitucional, id=id)
+    if not autoridad.is_active:
+        # Si se va a activar, desactivar las otras del mismo cargo para que solo haya 1 en funciones
+        AutoridadInstitucional.objects.filter(cargo=autoridad.cargo).update(is_active=False)
+        autoridad.is_active = True
+        autoridad.save()
+        messages.success(request, f"{autoridad.nombre_completo} ahora está en funciones como {autoridad.get_cargo_display()}.")
+    else:
+        autoridad.is_active = False
+        autoridad.save()
+        messages.info(request, f"Se marcó como inactiva a la autoridad {autoridad.nombre_completo}.")
+
+    return redirect('autoridades_list')
+
+@login_required
+def actualizar_datos_solicitud_bbss(request, id):
+    """
+    Permite guardar las correcciones realizadas directamente en el Formulario
+    de Solicitud de Bienes y Servicios antes de imprimir.
+    """
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+
+    if request.method == 'POST':
+        proceso.programa = request.POST.get('programa', '000').strip()
+        proceso.proyecto_actividad = request.POST.get('proyecto_actividad', '001').strip()
+        proceso.fuente_financiamiento = request.POST.get('fuente_financiamiento', '20').strip()
+        proceso.organismo_financiador = request.POST.get('organismo_financiador', '220').strip()
+        
+        # Tipo Bien o Servicio
+        proceso.tipo = request.POST.get('tipo', proceso.tipo)
+        proceso.save()
+
+        messages.success(request, "Datos del formulario oficial actualizados y guardados correctamente.")
+
+    return redirect('doc_solicitud_adquisicion_pdf', id=proceso.id)
+@login_required
+def actualizar_checklist_oficial(request, id):
+    """Guarda las marcas de US, SDAF y Observaciones del CheckList Oficial."""
+    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+
+    if request.method == 'POST':
+        datos = {}
+        for key, value in request.POST.items():
+            if key.startswith('chk_'):
+                datos[key.replace('chk_', '')] = value.strip()
+
+        proceso.checklist_matriz_data = datos
+        proceso.save()
+        messages.success(request, "CheckList Oficial guardado y actualizado con éxito.")
+
+    return redirect('doc_checklist_pdf', id=proceso.id)
+
+@login_required
+def doc_autorizacion_rpa_pdf(request, id):
+    """
+    Nota Oficial de Autorización de Inicio de Contratación emitida por el RPA (Foto 2 - NOTA Nº 0199/2026).
+    """
+    proceso = get_object_or_404(
+        ProcesoAdquisicion.objects.select_related('unidad_solicitante', 'autoridad_rpa'), 
+        id=id
+    )
+    return render(request, 'compras/pdf_autorizacion_rpa.html', {'proceso': proceso})

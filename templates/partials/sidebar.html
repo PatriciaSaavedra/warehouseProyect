@@ -31,7 +31,7 @@
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
         <details 
             class="group" 
-            {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path or '/inventario/unidades-medida/' in request.path %}open{% endif %}
+            {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path or '/inventario/unidades-medida/' in request.path or '/compras/autoridades/' in request.path %}open{% endif %}
         >
             <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none [&::-webkit-details-marker]:hidden">
                 <div class="flex items-center">
@@ -72,7 +72,7 @@
                     Almacenes
                 </a>
 
-                <!-- Unidades de Medida (CRUD oficial) -->
+                <!-- Unidades de Medida -->
                 <a 
                     href="{% url 'unidad_medida_list' %}"
                     class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
@@ -80,6 +80,16 @@
                 >
                     <span class="material-symbols-outlined mr-2 text-[18px]">straighten</span>
                     Unidades de Medida
+                </a>
+
+                <!-- Autoridades Oficiales (RPA / SAF) -->
+                <a 
+                    href="{% url 'autoridades_list' %}"
+                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
+                    {% if '/compras/autoridades/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[18px]">badge</span>
+                    Autoridades (RPA / SAF)
                 </a>
 
                 <!-- Usuarios -->
@@ -235,45 +245,15 @@
         </details>
         {% endif %}
 
-        <!-- 5️⃣ PRESUPUESTOS (POA) — DESACTIVADO TEMPORALMENTE (ENFOQUE ASIGNACIÓN DIRECTA) -->
-        {% comment %}
-        {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
-        <details class="group" {% if '/presupuestos/' in request.path %}open{% endif %}>
-            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none [&::-webkit-details-marker]:hidden">
-                <div class="flex items-center">
-                    <span class="material-symbols-outlined mr-3 text-[22px]">account_balance</span>
-                    Presupuestos
-                </div>
-                <span class="material-symbols-outlined text-[18px] transition duration-200 group-open:rotate-180 text-gray-400">expand_more</span>
-            </summary>
-            
-            <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <a href="/presupuestos/" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">payments</span>
-                    Techos POA
-                </a>
-                <a href="{% url 'reporte_presupuestos' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">monitoring</span>
-                    Ejecución POA
-                </a>
-                <a href="{% url 'reporte_consumo_unidades' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">pie_chart</span>
-                    Consumo por Oficina
-                </a>
-            </div>
-        </details>
-        {% endif %}
-        {% endcomment %}
-
-        <!-- 6️⃣ COMPRAS / BIENES Y SERVICIOS -->
-        {% if request.user.perfilusuario.rol == 'BIENES_SERVICIOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
+        <!-- 6️⃣ COMPRAS / BIENES Y SERVICIOS (FLUJO 2) -->
+        {% if request.user.perfilusuario.rol in 'BIENES_SERVICIOS,ADMINISTRADOR,ADMIN_ALMACENES' %}
         <a 
-            href="/compras/"
+            href="{% url 'adquisiciones_list' %}"
             class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
             {% if '/compras/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
-            <span class="material-symbols-outlined mr-3 text-[22px]">shopping_cart</span>
-            Compras
+            <span class="material-symbols-outlined mr-3 text-[22px]">shopping_bag</span>
+            Adquisiciones
         </a>
         {% endif %}
 

@@ -37,3 +37,4 @@ htmlcov/
 *.sql
 respaldo_antes_de_prueba.*
 datos_respaldo.json  respaldo_previo_limpieza.json
+respaldo_previo_limpieza.json

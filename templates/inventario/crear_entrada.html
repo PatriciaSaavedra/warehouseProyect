@@ -690,9 +690,11 @@ function cargarDatosOrdenCompra(compraId) {
         renderizarTabla();
         return;
     }
+
     if (data.nro_orden) {
-            document.getElementById('input_nro_orden').value = data.nro_orden;
-        }
+        document.getElementById('input_nro_orden').value = data.nro_orden;
+    }    
+
     fetch(`/inventario/api/items-compra/?compra_id=${compraId}`)
         .then(res => res.json())
         .then(data => {
