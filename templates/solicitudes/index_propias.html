@@ -49,13 +49,7 @@
             <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900">{{ total_adquisiciones }}</span>
         </a>
 
-        {% if rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,JEFE_INMEDIATO,SECRETARIO_SAF,RPA' %}
-        <a href="{% url 'solicitudes_general' %}" 
-           class="pb-3 border-b-2 border-transparent text-gray-400 hover:text-gray-600 flex items-center gap-2 ml-auto">
-            <span class="material-symbols-outlined text-[18px]">dashboard_customize</span>
-            <span>Bandeja de Gestión Institucional</span>
-        </a>
-        {% endif %}
+        
     </div>
 
     <!-- TABLA SEGÚN LA PESTAÑA ACTIVA -->

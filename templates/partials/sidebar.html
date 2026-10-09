@@ -1,6 +1,6 @@
 <aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] shadow-sm select-none sidebar-custom transition-all duration-200">
 
-    <!-- LOGO (Branding Dinámico según Almacén) -->
+    <!-- LOGO INSTITUCIONAL -->
     <div class="p-6 flex flex-col items-center border-b border-[var(--border-color)] mb-4">
         <h1 class="text-2xl font-extrabold text-[var(--primary)] dark:text-red-500 font-['Outfit'] tracking-wide text-center">
             {% if request.user.perfilusuario.rol == 'ALMACENERO' and request.user.perfilusuario.almacenes_autorizados.first %}
@@ -14,7 +14,7 @@
         </p>
     </div>
 
-    <!-- MENU -->
+    <!-- MENU PRINCIPAL -->
     <nav class="flex-1 px-4 space-y-1.5 overflow-y-auto">
 
         <!-- 1️⃣ DASHBOARD -->
@@ -28,10 +28,10 @@
         </a>
 
         <!-- 2️⃣ ADMINISTRACIÓN -->
-        {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
+        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES' %}
         <details 
             class="group" 
-            {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path or '/inventario/unidades-medida/' in request.path or '/compras/autoridades/' in request.path %}open{% endif %}
+            {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path or '/inventario/unidades-medida/' in request.path or '/compras/autoridades/' in request.path or '/compras/proveedores/' in request.path %}open{% endif %}
         >
             <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none [&::-webkit-details-marker]:hidden">
                 <div class="flex items-center">
@@ -42,63 +42,32 @@
             </summary>
             
             <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <!-- Secretarías -->
-                <a 
-                    href="{% url 'secretaria_list' %}" 
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/organizacion/secretarias/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'secretaria_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">corporate_fare</span>
                     Secretarías
                 </a>
-
-                <!-- Unidades Organizacionales -->
-                <a 
-                    href="{% url 'unidad_list' %}" 
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/organizacion/unidades/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'unidad_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">account_tree</span>
                     Unidades Org.
                 </a>
-
-                <!-- Almacenes -->
-                <a 
-                    href="{% url 'almacen_list' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/almacenes/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'almacen_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">warehouse</span>
                     Almacenes
                 </a>
-
-                <!-- Unidades de Medida -->
-                <a 
-                    href="{% url 'unidad_medida_list' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/unidades-medida/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'unidad_medida_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">straighten</span>
                     Unidades de Medida
                 </a>
-
-                <!-- Autoridades Oficiales (RPA / SAF) -->
-                <a 
-                    href="{% url 'autoridades_list' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/compras/autoridades/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'autoridades_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">badge</span>
                     Autoridades (RPA / SAF)
                 </a>
-
-                <!-- Usuarios -->
+                <a href="{% url 'proveedores_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[18px]">storefront</span>
+                    Proveedores
+                </a>
                 {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                <a 
-                    href="/usuarios/"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/usuarios/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="/usuarios/" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">group</span>
                     Usuarios
                 </a>
@@ -107,17 +76,36 @@
         </details>
         {% endif %}
 
-        <!-- 3️⃣ SOLICITUDES -->
+        <!-- 3️⃣ TRÁMITES Y SOLICITUDES -->
+        <div class="pt-2 pb-1 px-4">
+            <p class="text-[9px] font-extrabold uppercase tracking-wider text-[var(--secondary)] dark:text-amber-500">
+                Trámites y Solicitudes
+            </p>
+        </div>
+
+        <!-- 1. MIS SOLICITUDES PERSONALES (Para todos los funcionarios) -->
         <a 
-            href="/solicitudes/"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/solicitudes/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
+            href="{% url 'solicitudes' %}"
+            class="flex items-center px-4 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
+            {% if request.path == '/solicitudes/' %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
-            <span class="material-symbols-outlined mr-3 text-[22px]">description</span>
-            Solicitudes
+            <span class="material-symbols-outlined mr-3 text-[20px]">person</span>
+            Mis Solicitudes
         </a>
 
-        <!-- 4️⃣ INVENTARIO -->
+        <!-- 2. BANDEJA DE GESTIÓN INSTITUCIONAL (Revisores, RPA, SAF, Presupuestos, Almacén) -->
+        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,RPA,SECRETARIO_SAF,PRESUPUESTOS,BIENES_SERVICIOS,ALMACENERO,KARDISTA,JEFE_INMEDIATO,JEFE_ADMINISTRATIVO' %}
+        <a 
+            href="{% url 'solicitudes_general' %}"
+            class="flex items-center px-4 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
+            {% if '/solicitudes/bandeja/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-3 text-[20px]">inbox</span>
+            Bandeja de Gestión
+        </a>
+        {% endif %}
+
+        <!-- 4️⃣ INVENTARIO (Solo Almacén y Administradores) -->
         {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,KARDISTA' %}
         <details 
             class="group" 
@@ -132,112 +120,49 @@
             </summary>
             
             <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <!-- Existencias -->
-                <a 
-                    href="{% url 'inventario' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if request.path == '/inventario/' %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'inventario' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">fact_check</span>
                     Existencias
                 </a>
-                
-                <!-- Stock por Unidad -->
-                <a 
-                    href="{% url 'inventario_por_unidad' %}" 
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/stock-unidad/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'inventario_por_unidad' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">domain</span>
                     Stock por Unidad
                 </a>
-
-                <!-- Entradas (Ingresos) -->
-                <a 
-                    href="{% url 'nota_ingreso_list' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/entradas/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'nota_ingreso_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">input</span>
                     Entradas (Ingresos)
                 </a>
-
-                <!-- Salidas (Egresos) -->
-                <a 
-                    href="{% url 'nota_salida_list' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/salidas/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'nota_salida_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">output</span>
                     Salidas (Egresos)
                 </a>
-
-                <!-- Lotes Activos PEPS -->
-                <a 
-                    href="{% url 'lotes_list' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/inventario/lotes/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'lotes_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">layers</span>
                     Lotes Activos (PEPS)
                 </a>
-
-                <!-- Movimientos Históricos -->
-                <a 
-                    href="{% url 'movimientos' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/movimientos/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                >
+                <a href="{% url 'movimientos' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">swap_horiz</span>
                     Movimientos
                 </a>
 
-                <!-- SECCIÓN AUDITORÍA / CIERRE DGCF -->
                 <div class="pt-2.5 pb-1 px-2 border-t border-[var(--border-color)]/60 mt-1.5">
                     <p class="text-[9px] font-extrabold uppercase tracking-wider text-[var(--secondary)] dark:text-amber-500">
                         Cierre / Auditoría DGCF
                     </p>
                 </div>
-
-                <!-- Resumen por Partida (R1.05) -->
-                <a 
-                    href="{% url 'reporte_dgcf_r105' %}"
-                    target="_blank"
-                    class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/reportes/dgcf-r105/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                    title="Resumen de Almacenes por Partida Presupuestaria"
-                >
+                <a href="{% url 'reporte_dgcf_r105' %}" target="_blank" class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">receipt_long</span>
                     Resumen Partidas (R1.05)
                 </a>
-
-                <!-- Detalle Valorado Ítem por Ítem (R1.06) -->
-                <a 
-                    href="{% url 'reporte_dgcf_r106' %}"
-                    target="_blank"
-                    class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150
-                    {% if '/reportes/dgcf-r106/' in request.path %}text-[var(--primary)] dark:text-red-400 font-bold bg-neutral-500/10{% else %}text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5{% endif %}"
-                    title="Detalle Físico-Valorado por Ítem"
-                >
+                <a href="{% url 'reporte_dgcf_r106' %}" target="_blank" class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">table_view</span>
                     Kardex Valorado (R1.06)
                 </a>
-
-                <!-- Consumo por Dependencias -->
-                <a 
-                    href="{% url 'reporte_consumo_dependencias' %}"
-                    class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5"
-                >
+                <a href="{% url 'reporte_consumo_dependencias' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">account_balance_wallet</span>
                     Consumo por Dependencias
                 </a>
-
-                <!-- Matriz de Especificaciones Técnicas (DBC) -->
-                <a 
-                    href="{% url 'reporte_especificaciones_tecnicas' %}"
-                    target="_blank"
-                    class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5"
-                >
+                <a href="{% url 'reporte_especificaciones_tecnicas' %}" target="_blank" class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
                     <span class="material-symbols-outlined mr-2 text-[18px]">view_column</span>
                     Matriz Especif. Técnicas
                 </a>
@@ -245,19 +170,7 @@
         </details>
         {% endif %}
 
-        <!-- 6️⃣ COMPRAS / BIENES Y SERVICIOS (FLUJO 2) -->
-        {% if request.user.perfilusuario.rol in 'BIENES_SERVICIOS,ADMINISTRADOR,ADMIN_ALMACENES' %}
-        <a 
-            href="{% url 'adquisiciones_list' %}"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/compras/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
-        >
-            <span class="material-symbols-outlined mr-3 text-[22px]">shopping_bag</span>
-            Adquisiciones
-        </a>
-        {% endif %}
-
-        <!-- 7️⃣ AUDITORÍA -->
+        <!-- 5️⃣ AUDITORÍA -->
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <a 
             href="/auditoria/"

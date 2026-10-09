@@ -64,12 +64,38 @@
         </a>
         {% endif %}
 
-        <!-- 5. Autorización RPA (Foto 2 - NOTA Nº 0199/2026) -->
+        <!-- 5. Autorización RPA -->
         {% if proceso.cite_aprobacion_rpa or proceso.estado in 'APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}
         <a href="{% url 'doc_autorizacion_rpa_pdf' proceso.id %}" target="_blank" 
            class="px-3.5 py-2 rounded-xl bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200 transition flex items-center gap-1.5 shadow-sm">
             <span class="material-symbols-outlined text-[16px]">gavel</span>
             <span>Autorización RPA</span>
+        </a>
+        {% endif %}
+
+        <!-- 6. Orden de Compra Oficial (NUEVO) -->
+        {% if proceso.nro_orden_compra or proceso.estado in 'ORDEN_EMITIDA,CONCLUIDA' %}
+        <a href="{% url 'doc_orden_compra_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">shopping_bag</span>
+            <span>Orden de Compra</span>
+        </a>
+        {% endif %}
+
+        <!-- 7. Nota de Recepción Documental (NUEVO) -->
+        {% if proceso.estado == 'CONCLUIDA' %}
+        <a href="{% url 'doc_nota_recepcion_adq_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-red-50 text-[#8b0000] hover:bg-red-100 border border-red-200 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">receipt</span>
+            <span>Nota Recepción N° 162</span>
+        </a>
+        {% endif %}
+        <!-- 8. Formulario de Pedido (Paso 8) -->
+        {% if proceso.estado in 'ORDEN_EMITIDA,CONCLUIDA' %}
+        <a href="{% url 'doc_formulario_pedido_adq_pdf' proceso.id %}" target="_blank" 
+           class="px-3.5 py-2 rounded-xl bg-orange-50 text-orange-950 hover:bg-orange-100 border border-orange-300 transition flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">assignment</span>
+            <span>Formulario Pedido </span>
         </a>
         {% endif %}
     </div>
@@ -215,29 +241,93 @@
         {% endif %}
 
         <!-- FASE APROBADA RPA -> EMITIR ORDEN (BIENES Y SERVICIOS) -->
+        <!-- FASE APROBADA RPA -> EMISIÓN DE ORDEN CON HECHO EN BOLIVIA Y PRECIOS POR ÍTEM -->
         {% if proceso.estado == 'APROBADA_RPA' %}
-        <form method="POST" action="{% url 'emitir_orden_adquisicion' proceso.id %}" class="space-y-3 text-xs">
+        <form method="POST" action="{% url 'emitir_orden_adquisicion' proceso.id %}" class="space-y-4 text-xs">
             {% csrf_token %}
-            <div class="flex justify-between items-center border-b pb-2">
-                <span class="font-extrabold text-emerald-900 dark:text-emerald-300 text-sm">Bienes y Servicios: Emisión de Orden y Precio Oficial</span>
+            <div class="flex justify-between items-center border-b border-emerald-200 pb-2">
+                <span class="font-extrabold text-emerald-900 dark:text-emerald-300 text-sm">Bienes y Servicios: Adjudicación, Verificación D.S. 4505 y Orden Oficial</span>
+                <span class="text-gray-500 font-mono">RPA: {{ proceso.autoridad_rpa.nombre_completo }}</span>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+            <!-- Verificación Hecho en Bolivia (D.S. 4505) -->
+            <div class="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                 <div>
-                    <label class="block text-[10px] font-bold text-gray-500 mb-1">Proveedor Adjudicado *</label>
-                    <input type="text" name="proveedor_nombre" placeholder="Nombre o Razón Social" required class="w-full border rounded-xl p-2 bg-white font-bold">
+                    <label class="block font-bold text-gray-700 dark:text-gray-200 text-[10px] uppercase mb-1">
+                        ¿Existe producción nacional? (Hecho en Bolivia - D.S. 4505) *
+                    </label>
+                    <select name="hecho_en_bolivia" required class="w-full border rounded-xl p-2 bg-white dark:bg-slate-950 font-bold text-xs">
+                        <option value="SI">🇧🇴 Sí, existe producción nacional (Adjudicación preferente)</option>
+                        <option value="NO">🌍 No existe producción nacional (Importado / Convocatoria desierta)</option>
+                        <option value="NO_APLICA" {% if proceso.tipo == 'SERVICIO' %}selected{% endif %}>🚫 No Aplica (Servicios generales / consultorías)</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-gray-500 mb-1">N° Orden Compra / Contrato *</label>
-                    <input type="text" name="nro_orden_compra" placeholder="Ej: COMPRA 195/2026" required class="w-full border rounded-xl p-2 font-mono font-bold bg-white">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-500 mb-1">Precio Oficial Adjudicado (Bs.) *</label>
-                    <input type="number" step="0.01" name="precio_oficial_bs" value="{{ total_referencial }}" required class="w-full border rounded-xl p-2 font-mono font-bold text-right bg-white">
+                    <label class="block font-bold text-gray-700 dark:text-gray-200 text-[10px] uppercase mb-1">
+                        Respaldo Promueve Bolivia / Certificado Electrónico
+                    </label>
+                    <input type="text" name="documento_hecho_en_bolivia" placeholder="Ej: CERT-PB-2026-8954 o Formulario 170" class="w-full border rounded-xl p-2 bg-white dark:bg-slate-950 font-mono text-xs">
                 </div>
             </div>
+
+            <!-- Datos Generales de la Orden -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-[10px] font-bold text-gray-500">Proveedor Adjudicado *</label>
+                        <button type="button" onclick="abrirModalRapidoProveedor()" class="text-[10px] font-bold text-[#8b0000] hover:underline flex items-center gap-0.5">
+                            <span class="material-symbols-outlined text-[13px]">add_circle</span>
+                            <span>Nuevo Proveedor</span>
+                        </button>
+                    </div>
+                    <select name="proveedor" id="select_proveedor_orden" required class="w-full border rounded-xl p-2 bg-white font-bold text-xs">
+                        <option value="">-- Seleccionar Proveedor --</option>
+                        {% for prov in proveedores_list %}
+                            <option value="{{ prov.id }}">{{ prov.razon_social }} (NIT: {{ prov.nit }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1">N° Orden Compra / Contrato Oficial *</label>
+                    <input type="text" name="nro_orden_compra" placeholder="Ej: COMPRA 195/2026" required class="w-full border rounded-xl p-2 font-mono font-bold bg-white dark:bg-slate-900 text-xs text-[#8b0000]">
+                </div>
+            </div>
+
+            <!-- Tabla de Precios Oficiales por Ítem -->
+            <div class="overflow-x-auto rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-emerald-50/80 dark:bg-slate-800 text-[10px] uppercase font-bold text-emerald-900 dark:text-emerald-300 border-b border-emerald-200">
+                        <tr>
+                            <th class="p-2.5">Ítem / Descripción Adjudicada</th>
+                            <th class="p-2.5 text-center w-20">U. Med.</th>
+                            <th class="p-2.5 text-center w-16">Cant.</th>
+                            <th class="p-2.5 text-right w-28 text-gray-500">P. Ref. Estimado</th>
+                            <th class="p-2.5 text-right w-36 text-emerald-900">Precio Oficial Unitario (Bs.) *</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-mono">
+                        {% for it in proceso.items.all %}
+                        <tr>
+                            <td class="p-2.5 font-sans font-semibold text-gray-800 dark:text-gray-200">{{ it.descripcion }}</td>
+                            <td class="p-2.5 text-center font-bold text-gray-500">{{ it.unidad_medida }}</td>
+                            <td class="p-2.5 text-center font-bold">{{ it.cantidad }}</td>
+                            <td class="p-2.5 text-right text-gray-400">Bs. {{ it.precio_referencial_estimado|floatformat:2 }}</td>
+                            <td class="p-2 text-right">
+                                <input type="number" step="0.01" name="item_precio_oficial_{{ it.id }}" 
+                                       value="{{ it.precio_oficial_unitario|default:it.precio_referencial_estimado }}" 
+                                       required 
+                                       class="w-full border rounded-lg p-1.5 text-xs text-right font-bold text-emerald-900 bg-emerald-50/30 font-mono">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
             <div class="flex justify-end pt-2">
-                <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 text-white px-6 py-2 rounded-xl font-bold shadow cursor-pointer">
-                    Emitir Orden Oficial
+                <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 text-white px-7 py-2.5 rounded-xl font-bold shadow cursor-pointer">
+                    Emitir Orden Oficial y Adjudicar
                 </button>
             </div>
         </form>
@@ -404,4 +494,78 @@
     </div>
 
 </div>
+<!-- MODAL RÁPIDO PARA CREAR PROVEEDOR AL VUELO -->
+<div id="modalRapidoProveedor" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3 text-xs">
+        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white border-b pb-2">Registrar Nuevo Proveedor</h3>
+        <div class="space-y-2.5">
+            <div>
+                <label class="block font-bold text-gray-500 text-[10px] mb-1">NIT / C.I. *</label>
+                <input type="text" id="rapido_nit" placeholder="Ej: 1020304050" class="w-full border rounded-xl p-2 font-mono font-bold">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-500 text-[10px] mb-1">Razón Social *</label>
+                <input type="text" id="rapido_razon" placeholder="Ej: TALLERES SAN CRISTÓBAL S.R.L." class="w-full border rounded-xl p-2 font-bold uppercase">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-500 text-[10px] mb-1">Teléfono</label>
+                <input type="text" id="rapido_tel" placeholder="Ej: 62-24589" class="w-full border rounded-xl p-2">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-500 text-[10px] mb-1">Dirección</label>
+                <input type="text" id="rapido_dir" placeholder="Ej: Av. Murillo N° 300" class="w-full border rounded-xl p-2">
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2 border-t">
+            <button type="button" onclick="cerrarModalRapidoProveedor()" class="px-3 py-1.5 border rounded-xl text-gray-600">Cancelar</button>
+            <button type="button" onclick="guardarProveedorRapido()" class="px-4 py-1.5 bg-[#8b0000] text-white font-bold rounded-xl shadow">Guardar y Seleccionar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function abrirModalRapidoProveedor() { document.getElementById('modalRapidoProveedor').classList.remove('hidden'); }
+    function cerrarModalRapidoProveedor() { document.getElementById('modalRapidoProveedor').classList.add('hidden'); }
+
+    function guardarProveedorRapido() {
+        const nit = document.getElementById('rapido_nit').value.trim();
+        const razon = document.getElementById('rapido_razon').value.trim().toUpperCase();
+        const tel = document.getElementById('rapido_tel').value.trim();
+        const dir = document.getElementById('rapido_dir').value.trim();
+
+        if (!nit || !razon) {
+            alert("NIT y Razón Social son obligatorios.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('nit', nit);
+        formData.append('razon_social', razon);
+        formData.append('telefono', tel);
+        formData.append('direccion', dir);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch("{% url 'crear_proveedor' %}", {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                // Agregar al select y seleccionarlo automáticamente
+                const sel = document.getElementById('select_proveedor_orden');
+                const opt = document.createElement('option');
+                opt.value = data.id;
+                opt.textContent = `${data.razon_social} (NIT: ${data.nit})`;
+                opt.selected = true;
+                sel.appendChild(opt);
+                cerrarModalRapidoProveedor();
+            } else {
+                alert(data.error || "Error al registrar el proveedor.");
+            }
+        })
+        .catch(err => alert("Error de comunicación con el servidor."));
+    }
+</script>
 {% endblock %}

@@ -1,0 +1,267 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Nota de Recepción Documental - {{ proceso.nro_nota_recepcion }}</title>
+    <style>
+        @page {
+            size: letter landscape;
+            margin: 0.8cm 1.2cm 1cm 1.2cm;
+        }
+
+        /* LIENZO GRIS DE FONDO EN PANTALLA */
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 8.5px;
+            color: #000;
+            margin: 0;
+            padding: 20px;
+            background-color: #f1f5f9; /* Fondo gris suave */
+        }
+
+        /* BARRA SUPERIOR DE ACCIONES (NO SE IMPRIME) */
+        .toolbar-top {
+            max-width: 1060px;
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn-action-print {
+            background-color: #8b0000;
+            color: white;
+            border: none;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-action-print:hover {
+            background-color: #6b0000;
+        }
+
+        /* HOJA BLANCA APAISADA (CANVAS / SHEET) */
+        .sheet-container {
+            max-width: 1060px;
+            margin: 0 auto;
+            background: #ffffff; /* Hoja blanca */
+            border: 1px solid #cbd5e1;
+            padding: 25px 35px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            border-radius: 4px;
+        }
+
+        .header {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+        .header td {
+            vertical-align: middle;
+        }
+        .logo img {
+            max-height: 48px;
+            width: auto;
+        }
+        .titulo {
+            text-align: center;
+        }
+        .titulo h3 {
+            margin: 0;
+            font-size: 10px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .titulo h4 {
+            margin: 1px 0;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .titulo h2 {
+            margin: 3px 0;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        table.meta {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 8px;
+        }
+        table.meta td {
+            padding: 2px 3px;
+        }
+
+        table.data {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7.5px;
+        }
+        table.data th, table.data td {
+            border: 0.5px solid #000;
+            padding: 3.5px 5px;
+        }
+        table.data th {
+            background: #f1f5f9;
+            font-weight: bold;
+            text-align: center;
+        }
+        .row-total {
+            background: #eee;
+            font-weight: bold;
+        }
+
+        .firmas {
+            width: 100%;
+            margin-top: 55px;
+            border-collapse: collapse;
+            page-break-inside: avoid;
+        }
+        .firmas td {
+            width: 33.33%;
+            text-align: center;
+            vertical-align: top;
+            padding: 0 25px;
+        }
+        .linea {
+            border-top: 1px solid #000;
+            padding-top: 4px;
+            font-weight: bold;
+            font-size: 8px;
+            line-height: 1.3;
+        }
+
+        /* REGLAS DE IMPRESIÓN (ELIMINA EL LIENZO GRIS Y AJUSTA LA PÁGINA) */
+        @media print {
+            body {
+                background: white !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .sheet-container {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                background: white !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA SUPERIOR DE ACCIONES (SOLO PANTALLA) -->
+    <div class="toolbar-top no-print">
+        <div style="font-size: 11px; color: #475569;">
+            <strong style="color: #8b0000;">Recepción Documental:</strong> Vista previa oficial (Tránsito Directo / Sin Kardex).
+        </div>
+        <button type="button" onclick="window.print()" class="btn-action-print">
+            🖨️ Imprimir Nota de Recepción Documental
+        </button>
+    </div>
+
+    <!-- LIENZO / HOJA DEL DOCUMENTO (LANDSCAPE) -->
+    <div class="sheet-container">
+
+        <!-- CABECERA INSTITUCIONAL CON AMBOS ESCUDOS -->
+        <table class="header">
+            <tr>
+                <td style="width: 15%;" class="logo">
+                    <img src="{% static 'img/Escudo-de-Bolivia.gif' %}" alt="Bolivia">
+                </td>
+                <td class="titulo" style="width: 70%;">
+                    <h3>GOBIERNO AUTÓNOMO DEL DEPARTAMENTO DE POTOSÍ</h3>
+                    <h4>UNIDAD DE ALMACENES</h4>
+                    <h2>N O T A &nbsp;&nbsp; D E &nbsp;&nbsp; R E C E P C I Ó N</h2>
+                    <span style="font-size: 8px; font-weight: bold; color: #8b0000;">
+                        [TRÁNSITO DIRECTO / ADQUISICIÓN NO DESTINADA A STOCKEO EN ALMACÉN]
+                    </span>
+                </td>
+                <td style="width: 15%; text-align: right; font-weight: bold; font-size: 11px;">
+                    Nº. {{ proceso.nro_nota_recepcion|default:"162" }}
+                </td>
+            </tr>
+        </table>
+
+        <!-- METADATOS DEL PROVEEDOR, ORDEN Y DESTINO -->
+        <table class="meta">
+            <tr>
+                <td style="width: 50%;"><strong>Proveedor:</strong> {{ proceso.proveedor.razon_social|upper }}</td>
+                <td style="width: 25%;"><strong>C.I. / NIT Nº:</strong> {{ proceso.proveedor.nit }}</td>
+                <td style="width: 25%;"><strong>Fecha Recepción:</strong> {{ proceso.fecha_recepcion|date:"d/m/Y" }}</td>
+            </tr>
+            <tr>
+                <td><strong>Orden de:</strong> {{ proceso.nro_orden_compra|upper }}</td>
+                <td><strong>Certificación:</strong> {{ proceso.certificacion_nro }}</td>
+                <td><strong>Destino:</strong> {{ proceso.unidad_solicitante.nombre|upper }}</td>
+            </tr>
+        </table>
+
+        <!-- TABLA OFICIAL DE ÍTEMS RECEPCIONADOS -->
+        <table class="data">
+            <thead>
+                <tr>
+                    <th style="width: 4%;">ITEM</th>
+                    <th style="width: 46%;">DESCRIPCION DE BIENES / SERVICIOS</th>
+                    <th style="width: 10%;">UNIDAD MANEJO</th>
+                    <th style="width: 10%;">PEDIDO</th>
+                    <th style="width: 10%;">ENTREGADO</th>
+                    <th style="width: 10%;">COSTO UNITARIO</th>
+                    <th style="width: 10%;">COSTO TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in proceso.items.all %}
+                <tr>
+                    <td style="text-align: center;">{{ forloop.counter }}</td>
+                    <td style="font-weight: bold;">{{ it.descripcion }}</td>
+                    <td style="text-align: center;">{{ it.unidad_medida }}</td>
+                    <td style="text-align: center;">{{ it.cantidad }}</td>
+                    <td style="text-align: center; font-weight: bold;">{{ it.cantidad }}</td>
+                    <td style="text-align: right;">{{ it.precio_oficial_unitario|floatformat:2 }}</td>
+                    <td style="text-align: right; font-weight: bold;">{{ it.subtotal_oficial|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="row-total">
+                    <td colspan="5" style="text-align: left;">
+                        DESTINO: ENTREGA INMEDIATA A {{ proceso.unidad_solicitante.nombre|upper }} (SIN ALMACENAMIENTO)
+                    </td>
+                    <td style="text-align: right;">COSTO TOTAL:</td>
+                    <td style="text-align: right;">Bs. {{ total_oficial|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- OBSERVACIONES FORMALES -->
+        <div style="margin-top: 10px; font-size: 7.5px;">
+            <strong>Observaciones:</strong> {{ proceso.observaciones_recepcion|default:"Recepción conforme de bienes adquiridos bajo modalidad Contratación Menor. Se entrega directamente a la Unidad Solicitante sin incorporación a inventario de consumo de almacén." }}
+        </div>
+
+        <!-- FIRMAS OFICIALES REGLAMENTARIAS -->
+        <table class="firmas">
+            <tr>
+                <td><div class="linea">Responsable Almacenes<br>Recepción Conforme</div></td>
+                <td><div class="linea">Responsable Bienes y Servicios<br>Supervisión de Adquisición</div></td>
+                <td><div class="linea">Unidad Solicitante<br>Recepción Definitiva de Bienes</div></td>
+            </tr>
+        </table>
+
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,261 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Orden de Compra - {{ proceso.nro_orden_compra }}</title>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 1.2cm 1.5cm 1.5cm 1.5cm;
+        }
+
+        /* FONDO GRIS (LIENZO / CANVAS EN PANTALLA) */
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 9.5px;
+            color: #000;
+            margin: 0;
+            padding: 20px;
+            background-color: #f1f5f9; /* Fondo gris suave */
+        }
+
+        /* BARRA SUPERIOR DE ACCIONES (NO SE IMPRIME) */
+        .toolbar-top {
+            max-width: 850px;
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn-action-print {
+            background-color: #8b0000;
+            color: white;
+            border: none;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-action-print:hover {
+            background-color: #6b0000;
+        }
+
+        /* HOJA BLANCA DEL DOCUMENTO (CANVAS / SHEET) */
+        .sheet-container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: #ffffff; /* Hoja blanca */
+            border: 1px solid #cbd5e1;
+            padding: 35px 40px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            border-radius: 4px;
+        }
+
+        .header {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .header td {
+            vertical-align: middle;
+        }
+        .logo img {
+            max-height: 55px;
+            width: auto;
+        }
+        .titulo {
+            text-align: center;
+        }
+        .titulo h3 {
+            margin: 0;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .titulo h2 {
+            margin: 3px 0;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+        .titulo p {
+            margin: 0;
+            font-size: 8.5px;
+            color: #333;
+        }
+
+        .box-info {
+            border: 1px solid #000;
+            padding: 8px 10px;
+            margin-bottom: 14px;
+            font-size: 8.5px;
+            line-height: 1.6;
+        }
+
+        table.data {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 8.5px;
+        }
+        table.data th, table.data td {
+            border: 0.5px solid #000;
+            padding: 5px 6px;
+        }
+        table.data th {
+            background: #f1f5f9;
+            font-weight: bold;
+            text-align: center;
+        }
+        .row-total {
+            background: #eee;
+            font-weight: bold;
+        }
+
+        .firmas {
+            width: 100%;
+            margin-top: 75px;
+            border-collapse: collapse;
+            page-break-inside: avoid;
+        }
+        .firmas td {
+            width: 33.33%;
+            text-align: center;
+            vertical-align: top;
+            padding: 0 15px;
+        }
+        .linea {
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            font-weight: bold;
+            font-size: 8px;
+            line-height: 1.3;
+        }
+
+        /* REGLAS DE IMPRESIÓN (ELIMINA EL FONDO GRIS Y LOS BORDES) */
+        @media print {
+            body {
+                background: white !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .sheet-container {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                background: white !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA SUPERIOR DE ACCIONES (SOLO PANTALLA) -->
+    <div class="toolbar-top no-print">
+        <div style="font-size: 11px; color: #475569;">
+            <strong style="color: #8b0000;">Documento Oficial:</strong> Vista previa de Orden de Compra y Servicio.
+        </div>
+        <button type="button" onclick="window.print()" class="btn-action-print">
+            🖨️ Imprimir Orden de Compra
+        </button>
+    </div>
+
+    <!-- LIENZO / HOJA DEL DOCUMENTO -->
+    <div class="sheet-container">
+
+        <!-- CABECERA -->
+        <table class="header">
+            <tr>
+                <td style="width: 20%;" class="logo">
+                    <img src="{% static 'img/logo_gober_horizontal.png' %}" alt="Logo">
+                </td>
+                <td class="titulo" style="width: 60%;">
+                    <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
+                    <h2>ORDEN DE COMPRA Y SERVICIO OFICIAL</h2>
+                    <p>UNIDAD DE BIENES Y SERVICIOS • MODALIDAD CONTRATACIÓN MENOR (D.S. 0181)</p>
+                </td>
+                <td style="width: 20%; text-align: right; font-weight: bold; font-size: 9px; line-height: 1.4;">
+                    N°: {{ proceso.nro_orden_compra }}<br>
+                    <span style="color: #555; font-size: 8px;">{{ proceso.codigo }}</span>
+                </td>
+            </tr>
+        </table>
+
+        <!-- INFORMACIÓN DEL PROCESO Y PROVEEDOR -->
+        <div class="box-info">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 60%;"><strong>PROVEEDOR ADJUDICADO:</strong> {{ proceso.proveedor.razon_social|upper }}</td>
+                    <td style="width: 40%;"><strong>NIT / C.I.:</strong> {{ proceso.proveedor.nit }}</td>
+                </tr>
+                <tr>
+                    <td><strong>UNIDAD SOLICITANTE:</strong> {{ proceso.unidad_solicitante.nombre|upper }}</td>
+                    <td><strong>FECHA EMISIÓN:</strong> {{ proceso.fecha_solicitud|date:"d/m/Y" }}</td>
+                </tr>
+                <tr>
+                    <td><strong>OBJETO:</strong> {{ proceso.objeto_contratacion|upper }}</td>
+                    <td><strong>PRODUCCIÓN NACIONAL:</strong> {{ proceso.get_hecho_en_bolivia_display }}</td>
+                </tr>
+                <tr>
+                    <td colspan="2"><strong>CERTIFICACIÓN PRESUPUESTARIA:</strong> N° {{ proceso.certificacion_nro }} (Monto: Bs. {{ proceso.monto_certificado_bs|floatformat:2 }})</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- TABLA DE ÍTEMS ADJUDICADOS -->
+        <table class="data">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">N°</th>
+                    <th style="width: 50%;">Descripción del Ítem Adjudicado</th>
+                    <th style="width: 12%;">U. Medida</th>
+                    <th style="width: 10%;">Cantidad</th>
+                    <th style="width: 11%;">P. Unit. Oficial (Bs.)</th>
+                    <th style="width: 12%;">Total Oficial (Bs.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in proceso.items.all %}
+                <tr>
+                    <td style="text-align: center;">{{ forloop.counter }}</td>
+                    <td>{{ it.descripcion }}</td>
+                    <td style="text-align: center;">{{ it.unidad_medida }}</td>
+                    <td style="text-align: center; font-weight: bold;">{{ it.cantidad }}</td>
+                    <td style="text-align: right;">{{ it.precio_oficial_unitario|floatformat:2 }}</td>
+                    <td style="text-align: right; font-weight: bold;">{{ it.subtotal_oficial|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="row-total">
+                    <td colspan="5" style="text-align: right;">MONTO TOTAL ADJUDICADO:</td>
+                    <td style="text-align: right;">Bs. {{ total_oficial|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- FIRMAS OFICIALES -->
+        <table class="firmas">
+            <tr>
+                <td><div class="linea">Responsable Bienes y Servicios<br>Elaboración de Orden</div></td>
+                <td><div class="linea">Responsable del Proceso (RPA)<br>Autorización de Contratación</div></td>
+                <td><div class="linea">Proveedor Adjudicado<br>Aceptación y Compromiso</div></td>
+            </tr>
+        </table>
+
+    </div>
+
+</body>
+</html>

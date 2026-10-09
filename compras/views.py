@@ -211,14 +211,27 @@ def detalle_compra(request, id):
 # ========================================================
 
 @login_required
-@rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS'])
 def proveedores_list(request):
-  """Directorio de Proveedores administrado por Bienes y Servicios."""
-  proveedores = Proveedor.objects.all().order_by('razon_social')
-  return render(
-      request, 'compras/proveedores_list.html', {'proveedores': proveedores}
-  )
+    """Listado y búsqueda de proveedores del Estado."""
+    query = request.GET.get('q', '').strip()
+    proveedores = Proveedor.objects.all()
 
+    if query:
+        proveedores = proveedores.filter(
+            Q(razon_social__icontains=query) |
+            Q(nit__icontains=query) |
+            Q(telefono__icontains=query)
+        )
+
+    proveedores = proveedores.order_by('razon_social')
+    paginator = Paginator(proveedores, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'compras/proveedores_list.html', {
+        'page_obj': page_obj,
+        'query': query,
+    })
 
 @login_required
 @rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
@@ -269,51 +282,81 @@ def crear_proveedor(request):
 
 
 @login_required
-@rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
-def editar_proveedor(request, id):
-  proveedor = get_object_or_404(Proveedor, id=id)
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS'])
+def crear_proveedor(request):
+    """Crea un nuevo proveedor desde el formulario o vía AJAX modal."""
+    if request.method == 'POST':
+        nit = request.POST.get('nit', '').strip()
+        razon_social = request.POST.get('razon_social', '').strip().upper()
+        telefono = request.POST.get('telefono', '').strip()
+        direccion = request.POST.get('direccion', '').strip()
 
-  if request.method == 'POST':
-    nit = request.POST.get('nit', '').strip()
-    razon_social = request.POST.get('razon_social', '').strip()
+        if not nit or not razon_social:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'ok': False, 'error': 'NIT y Razón Social son obligatorios.'}, status=400)
+            messages.error(request, "NIT y Razón Social son campos requeridos.")
+            return redirect('proveedores_list')
 
-    if not nit or not razon_social:
-      messages.error(request, 'El NIT y la Razón Social son campos obligatorios.')
-      return redirect('editar_proveedor', id=id)
+        if Proveedor.objects.filter(nit=nit).exists():
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'ok': False, 'error': f'Ya existe un proveedor con el NIT {nit}.'}, status=400)
+            messages.error(request, f"Ya existe un proveedor registrado con el NIT {nit}.")
+            return redirect('proveedores_list')
 
-    if Proveedor.objects.filter(nit=nit).exclude(id=id).exists():
-      messages.error(
-          request, 'El NIT ingresado ya pertenece a otro proveedor.'
-      )
-      return redirect('editar_proveedor', id=id)
-
-    try:
-      with transaction.atomic():
-        proveedor.nit = nit
-        proveedor.razon_social = razon_social
-        proveedor.telefono = request.POST.get('telefono', '').strip() or None
-        proveedor.direccion = request.POST.get('direccion', '').strip() or None
-        proveedor.save()
+        proveedor = Proveedor.objects.create(
+            nit=nit,
+            razon_social=razon_social,
+            telefono=telefono,
+            direccion=direccion
+        )
 
         Bitacora.objects.create(
             usuario=request.user,
             modulo='Compras',
-            accion='Editar Proveedor',
-            descripcion=(
-                f'Se modificaron los datos del proveedor: {razon_social}'
-            ),
+            accion='Registrar Proveedor',
+            descripcion=f'Se registró al proveedor {razon_social} (NIT: {nit}).'
         )
 
-      messages.success(request, 'Proveedor actualizado correctamente.')
-      return redirect('proveedores_list')
+        # Respuesta rápida si se llamó desde el modal en plena adjudicación
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'ok': True,
+                'id': proveedor.id,
+                'razon_social': proveedor.razon_social,
+                'nit': proveedor.nit
+            })
 
-    except Exception as e:
-      messages.error(request, f'Error al actualizar el proveedor: {str(e)}')
-      return redirect('editar_proveedor', id=id)
+        messages.success(request, f"Proveedor '{razon_social}' registrado correctamente.")
+        return redirect('proveedores_list')
 
-  return render(request, 'compras/editar_proveedor.html', {'proveedor': proveedor})
+    return redirect('proveedores_list')
 
 
+@login_required
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS'])
+def editar_proveedor(request, id):
+    """Actualiza datos del proveedor."""
+    proveedor = get_object_or_404(Proveedor, id=id)
+
+    if request.method == 'POST':
+        nit = request.POST.get('nit', '').strip()
+        razon_social = request.POST.get('razon_social', '').strip().upper()
+        telefono = request.POST.get('telefono', '').strip()
+        direccion = request.POST.get('direccion', '').strip()
+
+        if Proveedor.objects.filter(nit=nit).exclude(id=proveedor.id).exists():
+            messages.error(request, f"El NIT {nit} ya pertenece a otro proveedor registrado.")
+            return redirect('proveedores_list')
+
+        proveedor.nit = nit
+        proveedor.razon_social = razon_social
+        proveedor.telefono = telefono
+        proveedor.direccion = direccion
+        proveedor.save()
+
+        messages.success(request, f"Proveedor '{razon_social}' actualizado exitosamente.")
+
+    return redirect('proveedores_list')
 # ========================================================
 # 3. GENERADOR DE ÓRDENES PDF (COMPRA / SERVICIO)
 # ========================================================
@@ -609,14 +652,20 @@ def compra_pdf(request, id):
 @login_required
 def adquisiciones_list(request):
     """
-    Bandeja de Procesos de Adquisición (Flujo 2 - Sin Stockeo en Almacén).
+    Bandeja de Procesos de Adquisición (Flujo 2).
+    Permite acceso institucional a RPA, SAF, Presupuestos, Bienes y Servicios y Almacenes.
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
     unidad = perfil.unidad if perfil else None
 
-    # Si es unidad solicitante, solo ve sus trámites. Si es revisor/admin, ve todos.
-    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS', 'SECRETARIO_SAF', 'RPA', 'PRESUPUESTOS', 'ALMACENERO']:
+    # Roles institucionales globales que ven todo el flujo de la Gobernación
+    roles_globales = [
+        'ADMINISTRADOR', 'ADMIN_ALMACENES', 'RPA', 'SECRETARIO_SAF', 
+        'PRESUPUESTOS', 'BIENES_SERVICIOS', 'ALMACENERO', 'KARDISTA'
+    ]
+
+    if rol in roles_globales:
         procesos_qs = ProcesoAdquisicion.objects.all()
     else:
         procesos_qs = ProcesoAdquisicion.objects.filter(unidad_solicitante=unidad)
@@ -639,6 +688,9 @@ def adquisiciones_list(request):
 
     procesos_qs = procesos_qs.select_related('unidad_solicitante', 'solicitante').order_by('-id')
 
+    # Métricas útiles para el RPA o revisores
+    pendientes_rpa = ProcesoAdquisicion.objects.filter(estado='CERTIFICADA').count()
+
     paginator = Paginator(procesos_qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -647,10 +699,10 @@ def adquisiciones_list(request):
         'query': query,
         'filtro_tipo': filtro_tipo,
         'filtro_estado': filtro_estado,
+        'pendientes_rpa': pendientes_rpa,
         'estados': ProcesoAdquisicion.ESTADOS_CHOICES,
         'rol': rol,
     })
-
 
 @login_required
 def crear_adquisicion(request):
@@ -784,8 +836,6 @@ def crear_adquisicion(request):
 def detalle_adquisicion(request, id):
     """
     Ficha de Control del Proceso de Adquisición (Flujo 2).
-    Muestra la línea de tiempo de los 8 pasos, el Checklist verificado, los ítems
-    y las acciones disponibles según el rol institucional.
     """
     proceso = get_object_or_404(
         ProcesoAdquisicion.objects.select_related(
@@ -799,15 +849,15 @@ def detalle_adquisicion(request, id):
 
     total_referencial = sum(i.subtotal_referencial for i in proceso.items.all())
     total_oficial = sum(i.subtotal_oficial for i in proceso.items.all())
+    proveedores_list = Proveedor.objects.all().order_by('razon_social')
 
     return render(request, 'compras/detalle_adquisicion.html', {
         'proceso': proceso,
         'total_referencial': total_referencial,
         'total_oficial': total_oficial,
+        'proveedores_list': proveedores_list,
         'rol': rol,
     })
-
-
 # ========================================================
 # TRANSICIONES ADMINISTRATIVAS DEL FLUJO 2
 # ========================================================
@@ -871,29 +921,91 @@ def aprobar_rpa_adquisicion(request, id):
 @login_required
 @rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
 def emitir_orden_adquisicion(request, id):
-    """Paso 6: Bienes y Servicios registra proveedor, precio adjudicado y emite Orden."""
+    """
+    Paso 6: Bienes y Servicios verifica 'Hecho en Bolivia' (D.S. 4505),
+    adjudica al Proveedor y fija el Precio Oficial por Ítem.
+    """
     proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+
     if request.method == 'POST':
         proveedor_id = request.POST.get('proveedor')
         nro_orden = request.POST.get('nro_orden_compra', '').strip()
-        precio_oficial = Decimal(request.POST.get('precio_oficial_bs', '0'))
         hecho_bolivia = request.POST.get('hecho_en_bolivia', 'NO_APLICA')
         doc_hb = request.POST.get('documento_hecho_en_bolivia', '').strip()
 
-        if not proveedor_id or not nro_orden or precio_oficial <= 0:
-            messages.error(request, "Proveedor, N° de Orden y Precio Oficial son obligatorios.")
+        if not proveedor_id or not nro_orden:
+            messages.error(request, "Debe seleccionar un Proveedor y registrar el N° oficial de Orden de Compra / Contrato.")
             return redirect('detalle_adquisicion', id=proceso.id)
 
-        proceso.proveedor_id = proveedor_id
-        proceso.nro_orden_compra = nro_orden
-        proceso.precio_oficial_adjudicado_bs = precio_oficial
-        proceso.hecho_en_bolivia = hecho_bolivia
-        proceso.documento_hecho_en_bolivia = doc_hb
-        proceso.estado = 'ORDEN_EMITIDA'
-        proceso.save()
-        messages.success(request, f"Orden {nro_orden} emitida con precio oficial de Bs. {precio_oficial:.2f}.")
-    return redirect('detalle_adquisicion', id=proceso.id)
+        try:
+            with transaction.atomic():
+                total_oficial = Decimal('0.00')
 
+                # Guardar el precio oficial adjudicado para cada ítem
+                for item in proceso.items.all():
+                    precio_str = request.POST.get(f"item_precio_oficial_{item.id}", '0').strip()
+                    precio_oficial = Decimal(precio_str) if precio_str else item.precio_referencial_estimado
+                    item.precio_oficial_unitario = precio_oficial
+                    item.save()
+                    total_oficial += item.subtotal_oficial
+
+                proceso.proveedor_id = proveedor_id
+                proceso.nro_orden_compra = nro_orden
+                proceso.precio_oficial_adjudicado_bs = total_oficial
+                proceso.hecho_en_bolivia = hecho_bolivia
+                proceso.documento_hecho_en_bolivia = doc_hb
+                proceso.estado = 'ORDEN_EMITIDA'
+                proceso.save()
+
+                Bitacora.objects.create(
+                    usuario=request.user,
+                    modulo='Compras',
+                    accion='Emitir Orden de Compra/Servicio',
+                    descripcion=f'Se emitió la Orden {nro_orden} para {proceso.codigo} con precio oficial adjudicado de Bs. {total_oficial:.2f}.'
+                )
+
+            messages.success(request, f"Orden de Compra {nro_orden} emitida con éxito por un total oficial de Bs. {total_oficial:.2f}.")
+        except Exception as e:
+            messages.error(request, f"Error al emitir la orden: {str(e)}")
+
+    return redirect('detalle_adquisicion', id=proceso.id)
+@login_required
+def doc_orden_compra_pdf(request, id):
+    """Genera la Orden de Compra / Servicio Oficial en formato imprimible."""
+    proceso = get_object_or_404(
+        ProcesoAdquisicion.objects.select_related('unidad_solicitante', 'proveedor', 'autoridad_rpa'),
+        id=id
+    )
+    total_oficial = sum(i.subtotal_oficial for i in proceso.items.all())
+    return render(request, 'compras/pdf_orden_compra.html', {
+        'proceso': proceso,
+        'total_oficial': total_oficial,
+    })
+@login_required
+def doc_nota_recepcion_adq_pdf(request, id):
+    """Genera la Nota de Recepción Documental Oficial (Doc. N° 162 - Tránsito Directo)."""
+    proceso = get_object_or_404(
+        ProcesoAdquisicion.objects.select_related('unidad_solicitante', 'proveedor', 'autoridad_rpa'),
+        id=id
+    )
+    total_oficial = sum(i.subtotal_oficial for i in proceso.items.all())
+    return render(request, 'compras/pdf_nota_recepcion_adq.html', {
+        'proceso': proceso,
+        'total_oficial': total_oficial,
+    })
+
+@login_required
+def doc_formulario_pedido_adq_pdf(request, id):
+    """Paso 8: Genera el Formulario de Pedido Oficial marcado como Nueva Adquisición/Tránsito."""
+    proceso = get_object_or_404(
+        ProcesoAdquisicion.objects.select_related('unidad_solicitante', 'solicitante', 'autoridad_rpa'),
+        id=id
+    )
+    total_oficial = sum(i.subtotal_oficial for i in proceso.items.all()) or proceso.total_referencial
+    return render(request, 'compras/pdf_formulario_pedido_adq.html', {
+        'proceso': proceso,
+        'total_oficial': total_oficial,
+    })
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])

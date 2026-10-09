@@ -78,37 +78,37 @@ def redirigir_despues_de_accion(request, solicitud):
 @login_required
 def solicitudes(request):
     """
-    Pestaña Personal: Centraliza tanto los Pedidos de Almacén (Flujo 1)
-    como las Nuevas Adquisiciones sin stock (Flujo 2).
+    Pestaña Personal: Muestra ÚNICAMENTE las solicitudes creadas por el usuario autenticado
+    (tanto Pedidos de Almacén como Nuevas Adquisiciones propias).
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
-    unidad = perfil.unidad if perfil else None
 
-    tab_activa = request.GET.get('tab', 'pedidos')  # 'pedidos' o 'adquisiciones'
-
-    # 1. Flujo 1: Pedidos normales de almacén
-    solicitudes_query = Solicitud.objects.filter(solicitante=request.user)
-    
-    # 2. Flujo 2: Adquisiciones (Compras / Servicios)
-    from compras.models import ProcesoAdquisicion
-    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS']:
-        adquisiciones_query = ProcesoAdquisicion.objects.all()
-    else:
-        adquisiciones_query = ProcesoAdquisicion.objects.filter(solicitante=request.user)
-
+    tab_activa = request.GET.get('tab', 'pedidos')
     query = request.GET.get('q', '').strip()
+
+    # 1. Flujo 1 PROPIO: Solo lo creado por este usuario
+    pedidos_qs = Solicitud.objects.filter(solicitante=request.user)
+
+    # 2. Flujo 2 PROPIO: Solo lo creado por este usuario (¡SIN EXCEPCIÓN DE ROL!)
+    from compras.models import ProcesoAdquisicion
+    adquisiciones_qs = ProcesoAdquisicion.objects.filter(solicitante=request.user)
+
     if query:
-        solicitudes_query = solicitudes_query.filter(Q(codigo__icontains=query) | Q(justificacion__icontains=query))
-        adquisiciones_query = adquisiciones_query.filter(Q(codigo__icontains=query) | Q(objeto_contratacion__icontains=query))
+        pedidos_qs = pedidos_qs.filter(
+            Q(codigo__icontains=query) | Q(justificacion__icontains=query)
+        )
+        adquisiciones_qs = adquisiciones_qs.filter(
+            Q(codigo__icontains=query) | Q(objeto_contratacion__icontains=query)
+        )
 
-    solicitudes_query = solicitudes_query.order_by('-id')
-    adquisiciones_query = adquisiciones_query.order_by('-id')
+    pedidos_qs = pedidos_qs.order_by('-id')
+    adquisiciones_qs = adquisiciones_qs.order_by('-id')
 
-    paginator_pedidos = Paginator(solicitudes_query, 10)
-    page_pedidos = paginator_pedidos.get_page(request.GET.get('page_pedidos'))
+    paginator_ped = Paginator(pedidos_qs, 10)
+    page_pedidos = paginator_ped.get_page(request.GET.get('page_ped'))
 
-    paginator_adq = Paginator(adquisiciones_query, 10)
+    paginator_adq = Paginator(adquisiciones_qs, 10)
     page_adq = paginator_adq.get_page(request.GET.get('page_adq'))
 
     return render(request, 'solicitudes/index_propias.html', {
@@ -116,84 +116,178 @@ def solicitudes(request):
         'page_adq': page_adq,
         'tab_activa': tab_activa,
         'query': query,
-        'total_pedidos': solicitudes_query.count(),
-        'total_adquisiciones': adquisiciones_query.count(),
+        'total_pedidos': pedidos_qs.count(),
+        'total_adquisiciones': adquisiciones_qs.count(),
         'rol': rol,
     })
-
-
 @login_required
 @rol_requerido([
     'JEFE_INMEDIATO', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'RPA', 
     'JEFE_ADMINISTRATIVO', 'ALMACENERO', 'KARDISTA', 'ADMINISTRADOR',
-    'ADMIN_ALMACENES'
+    'ADMIN_ALMACENES', 'BIENES_SERVICIOS'
 ])
 def solicitudes_general(request):
     """
-    Bandeja de Gestión: Permite a los revisores y a los encargados de almacén auditar folios.
+    Bandeja de Gestión Institucional: Audita y gestiona trámites de ambos flujos
+    con trazabilidad visual y acciones contextuales por rol.
     """
     perfil = request.user.perfilusuario
     rol = perfil.rol
     unidad = perfil.unidad
 
-    # Acceso global para administradores y personal de almacenes
-    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO', 'KARDISTA']:
-        solicitudes_query = Solicitud.objects.all()
-    else:
-        solicitudes_query = Solicitud.objects.filter(unidad_solicitante=unidad)
-
+    # 1. Captura de filtros desde la URL
     query = request.GET.get('q', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
-    filtro_flujo = request.GET.get('flujo', '').strip()
     desde_str = request.GET.get('desde', '').strip()
     hasta_str = request.GET.get('hasta', '').strip()
 
+    # 2. Control inteligente de pestañas según competencia del Rol
+    roles_solo_compras = ['RPA', 'BIENES_SERVICIOS', 'PRESUPUESTOS', 'SECRETARIO_SAF']
+    roles_almacen = ['ALMACENERO', 'KARDISTA']
+
+    mostrar_tab_pedidos = True
+    mostrar_tab_adquisiciones = True
+
+    if rol in roles_solo_compras:
+        mostrar_tab_pedidos = False          # Ocultar Flujo 1 para RPA, SAF, Presupuestos y BBSS
+        tab_defecto = 'adquisiciones'
+    elif rol in roles_almacen:
+        tab_defecto = 'pedidos'              # Almacén trabaja principalmente en Flujo 1
+    else:
+        tab_defecto = 'pedidos'
+
+    tab_activa = request.GET.get('tab', tab_defecto)
+    if not mostrar_tab_pedidos and tab_activa == 'pedidos':
+        tab_activa = 'adquisiciones'
+
+    roles_globales = [
+        'ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO', 'KARDISTA',
+        'RPA', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'BIENES_SERVICIOS'
+    ]
+
+    # =========================================================
+    # 3. CONSULTA FLUJO 1 (PEDIDOS DE ALMACÉN)
+    # =========================================================
+    if rol in roles_globales:
+        pedidos_qs = Solicitud.objects.all()
+    else:
+        pedidos_qs = Solicitud.objects.filter(unidad_solicitante=unidad)
+
     if query:
-        solicitudes_query = solicitudes_query.filter(
+        pedidos_qs = pedidos_qs.filter(
             Q(codigo__icontains=query) |
             Q(solicitante__username__icontains=query) |
             Q(unidad_solicitante__nombre__icontains=query) |
             Q(justificacion__icontains=query)
         )
     if filtro_estado:
-        solicitudes_query = solicitudes_query.filter(estado=filtro_estado)
-    if filtro_flujo:
-        solicitudes_query = solicitudes_query.filter(flujo_atencion=filtro_flujo)
+        pedidos_qs = pedidos_qs.filter(estado=filtro_estado)
     if desde_str:
-        solicitudes_query = solicitudes_query.filter(fecha__gte=desde_str)
+        pedidos_qs = pedidos_qs.filter(fecha__gte=desde_str)
     if hasta_str:
-        solicitudes_query = solicitudes_query.filter(fecha__lte=hasta_str)
+        pedidos_qs = pedidos_qs.filter(fecha__lte=hasta_str)
 
-    solicitudes_query = solicitudes_query.select_related('solicitante', 'unidad_solicitante').order_by('-id')
+    pedidos_qs = pedidos_qs.select_related('solicitante', 'unidad_solicitante').order_by('-id')
 
+    # =========================================================
+    # 4. CONSULTA FLUJO 2 (NUEVAS ADQUISICIONES SABS)
+    # =========================================================
+    from compras.models import ProcesoAdquisicion
+    if rol in roles_globales:
+        adquisiciones_qs = ProcesoAdquisicion.objects.all()
+    else:
+        adquisiciones_qs = ProcesoAdquisicion.objects.filter(unidad_solicitante=unidad)
+
+    if query:
+        adquisiciones_qs = adquisiciones_qs.filter(
+            Q(codigo__icontains=query) |
+            Q(objeto_contratacion__icontains=query) |
+            Q(cite_solicitud__icontains=query) |
+            Q(unidad_solicitante__nombre__icontains=query)
+        )
+    if filtro_estado:
+        adquisiciones_qs = adquisiciones_qs.filter(estado=filtro_estado)
+    if desde_str:
+        adquisiciones_qs = adquisiciones_qs.filter(fecha_solicitud__gte=desde_str)
+    if hasta_str:
+        adquisiciones_qs = adquisiciones_qs.filter(fecha_solicitud__lte=hasta_str)
+
+    adquisiciones_qs = adquisiciones_qs.select_related('solicitante', 'unidad_solicitante', 'autoridad_rpa').prefetch_related('items').order_by('-id')
+
+    # =========================================================
+    # 5. KPIS CONTEXTUALES SEGÚN EL ROL
+    # =========================================================
     hoy = timezone.now().date()
-    primer_dia_mes = hoy.replace(day=1)
     
-    pendientes_count = Solicitud.objects.filter(estado='REGISTRADA').count()
-    preparacion_count = Solicitud.objects.filter(estado__in=['APROBADA', 'PREPARADA']).count()
-    entregas_hoy_count = Solicitud.objects.filter(estado='ENTREGADA', fecha_entrega__date=hoy).count()
-    total_folios_count = Solicitud.objects.filter(fecha_registro__date__gte=primer_dia_mes).count()
+    if rol == 'RPA':
+        pendientes_accion = ProcesoAdquisicion.objects.filter(estado='CERTIFICADA').count()
+        accion_label = "Esperando su Aprobación RPA"
+        en_curso = ProcesoAdquisicion.objects.filter(estado__in=['CHECKLIST_VERIFICADO', 'NOTA_SAF_EMITIDA', 'CERTIFICADA', 'APROBADA_RPA', 'ORDEN_EMITIDA']).count()
+        concluidos_mes = ProcesoAdquisicion.objects.filter(estado='CONCLUIDA', fecha_recepcion__month=hoy.month).count()
+        total_gestion = adquisiciones_qs.count()
 
-    paginator = Paginator(solicitudes_query, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    elif rol == 'PRESUPUESTOS':
+        pendientes_accion = ProcesoAdquisicion.objects.filter(estado='NOTA_SAF_EMITIDA').count()
+        accion_label = "Pendientes de Certificación"
+        en_curso = ProcesoAdquisicion.objects.filter(estado__in=['NOTA_SAF_EMITIDA', 'CERTIFICADA']).count()
+        concluidos_mes = ProcesoAdquisicion.objects.filter(estado='CONCLUIDA', fecha_recepcion__month=hoy.month).count()
+        total_gestion = adquisiciones_qs.count()
+
+    elif rol == 'SECRETARIO_SAF':
+        pendientes_accion = ProcesoAdquisicion.objects.filter(estado='CHECKLIST_VERIFICADO').count()
+        accion_label = "Pendientes Revisión SAF"
+        en_curso = ProcesoAdquisicion.objects.filter(estado__in=['CHECKLIST_VERIFICADO', 'NOTA_SAF_EMITIDA']).count()
+        concluidos_mes = ProcesoAdquisicion.objects.filter(estado='CONCLUIDA', fecha_recepcion__month=hoy.month).count()
+        total_gestion = adquisiciones_qs.count()
+
+    elif rol == 'BIENES_SERVICIOS':
+        pendientes_accion = ProcesoAdquisicion.objects.filter(estado='APROBADA_RPA').count()
+        accion_label = "Listos para Emitir Orden"
+        en_curso = ProcesoAdquisicion.objects.filter(estado__in=['APROBADA_RPA', 'ORDEN_EMITIDA']).count()
+        concluidos_mes = ProcesoAdquisicion.objects.filter(estado='CONCLUIDA', fecha_recepcion__month=hoy.month).count()
+        total_gestion = adquisiciones_qs.count()
+
+    elif rol in ['ALMACENERO', 'KARDISTA']:
+        pendientes_accion = Solicitud.objects.filter(estado='PREPARADA').count() + ProcesoAdquisicion.objects.filter(estado='ORDEN_EMITIDA').count()
+        accion_label = "Listos para Entrega/Recepción"
+        en_curso = Solicitud.objects.filter(estado__in=['REVISADA', 'PREPARADA']).count()
+        concluidos_mes = Solicitud.objects.filter(estado='ENTREGADA', fecha_entrega__month=hoy.month).count()
+        total_gestion = pedidos_qs.count()
+
+    else:
+        pendientes_accion = Solicitud.objects.filter(estado='REGISTRADA').count()
+        accion_label = "Requieren Revisión Inicial"
+        en_curso = Solicitud.objects.filter(estado__in=['REVISADA', 'PREPARADA']).count() + ProcesoAdquisicion.objects.filter(estado__in=['CERTIFICADA', 'APROBADA_RPA', 'ORDEN_EMITIDA']).count()
+        concluidos_mes = Solicitud.objects.filter(estado='ENTREGADA', fecha_entrega__month=hoy.month).count() + ProcesoAdquisicion.objects.filter(estado='CONCLUIDA', fecha_recepcion__month=hoy.month).count()
+        total_gestion = pedidos_qs.count() + adquisiciones_qs.count()
+
+    # 6. Paginación independiente
+    paginator_ped = Paginator(pedidos_qs, 10)
+    page_pedidos = paginator_ped.get_page(request.GET.get('page_ped'))
+
+    paginator_adq = Paginator(adquisiciones_qs, 10)
+    page_adq = paginator_adq.get_page(request.GET.get('page_adq'))
 
     return render(request, 'solicitudes/index_general.html', {
-        'solicitudes': page_obj, 
+        'page_pedidos': page_pedidos,
+        'page_adq': page_adq,
+        'tab_activa': tab_activa,
+        'mostrar_tab_pedidos': mostrar_tab_pedidos,
+        'mostrar_tab_adquisiciones': mostrar_tab_adquisiciones,
         'rol': rol,
-        'kpi_pendientes': pendientes_count,
-        'kpi_preparacion': preparacion_count,
-        'kpi_entregas_hoy': entregas_hoy_count,
-        'kpi_total_folios': total_folios_count,
         'query': query,
         'filtro_estado': filtro_estado,
-        'filtro_flujo': filtro_flujo,
         'desde': desde_str,
         'hasta': hasta_str,
-        'estados': ESTADOS_SOLICITUD,
-        'flujos': FLUJOS_ATENCION
+        # KPIs ajustados al Rol
+        'kpi_pendientes': pendientes_accion,
+        'accion_label': accion_label,
+        'kpi_en_curso': en_curso,
+        'kpi_concluidos': concluidos_mes,
+        'kpi_total': total_gestion,
+        'total_pedidos': pedidos_qs.count(),
+        'total_adquisiciones': adquisiciones_qs.count(),
     })
-
 
 @login_required
 def buscar_materiales(request):
