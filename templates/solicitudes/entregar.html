@@ -1,166 +1,186 @@
 {% extends 'base.html' %}
 
-{% block title %} Despacho Físico de Materiales {% endblock %}
+{% block title %} Despacho Físico de Materiales - {{ solicitud.codigo }} {% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto">
+<div class="max-w-6xl mx-auto space-y-6 font-['Outfit'] pb-12">
 
     <!-- CABECERA -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit'] flex items-center gap-3">
-                <span class="material-symbols-outlined text-[#8b0000] text-3xl">output</span>
-                Despacho Físico de Materiales
+            <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-[#7c121e]/10 text-[#7c121e] dark:bg-red-950/60 dark:text-red-400 border border-[#7c121e]/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#7c121e]"></span> Ventanilla de Almacén
+                </span>
+                <span class="text-xs text-gray-400 font-mono">{{ almacen.nombre }}</span>
+            </div>
+            <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white">
+                Despacho y Entrega Física • {{ solicitud.codigo }}
             </h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Paso ③ y ④: Confirmación de entrega física, validación de POA y emisión de salida valorada
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Destino: <strong>{{ solicitud.unidad_solicitante.nombre }}</strong> • Solicitado por: {{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username }}
             </p>
         </div>
-        <a href="{% url 'detalle_solicitud' solicitud.id %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl text-sm font-semibold transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver al Detalle
+
+        <a href="{% url 'detalle_solicitud' solicitud.id %}" class="px-4 py-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold transition">
+            Volver al Trámite
         </a>
     </div>
 
-    <!-- TARJETA DE METADATOS DEL REQUERIMIENTO -->
-    <div class="card p-6 rounded-2xl mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 shadow-sm">
-        <div>
-            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Folio de Pedido</span>
-            <span class="text-base font-extrabold text-[#8b0000] dark:text-red-400 font-mono">{{ solicitud.codigo }}</span>
-        </div>
-        <div>
-            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Unidad Solicitante</span>
-            <span class="text-sm font-bold text-gray-800 dark:text-gray-200">{{ solicitud.unidad_solicitante.nombre }}</span>
-        </div>
-        <div>
-            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Almacén Despachador</span>
-            <span class="text-sm font-bold text-purple-700 dark:text-purple-400">📍 {{ almacen.nombre }}</span>
-        </div>
-    </div>
-
-    <!-- MENSAJES -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="p-4 mb-4 rounded-xl text-sm {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-
-    <!-- FORMULARIO DE ENTREGA -->
-    <form method="POST" class="card p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-slate-900">
+    <!-- FORMULARIO DE DESPACHO / DEVOLUCIÓN -->
+    <form method="POST" id="form-despacho" class="space-y-6">
         {% csrf_token %}
 
-        <div class="mb-4">
-            <h2 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit']">
-                Verificación de Ítems a Entregar
-            </h2>
-            <p class="text-xs text-gray-500">
-                Ajuste la cantidad que entregará físicamente en estantería. El sistema verificará la concordancia con el presupuesto POA.
-            </p>
-        </div>
+        <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm">
+            <div class="px-6 py-4 bg-stone-50/70 dark:bg-slate-800/40 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    Artículos Autorizados para Entrega Física
+                </h2>
+                <span class="text-[11px] text-gray-400">Si un material no se entrega, márcalo para devolverlo a estantería</span>
+            </div>
 
-        <div class="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800 mb-6">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 dark:bg-slate-800/60 text-[11px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                        <th class="p-4">Material / Código</th>
-                        <th class="p-4 text-center">Unidad de Manejo</th>
-                        <th class="p-4 text-center">Cant. Pedida</th>
-                        <th class="p-4 text-center">Stock Almacén</th>
-                        <th class="p-4 text-center w-36">Cant. a Entregar</th>
-                        <th class="p-4">Conformidad con el POA</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    {% for item in items_despacho %}
-                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
-                        <!-- Código y Nombre -->
-                        <td class="p-4">
-                            <span class="font-mono text-xs font-bold text-[#8b0000] dark:text-red-400">{{ item.material.codigo }}</span>
-                            <div class="font-semibold text-gray-800 dark:text-gray-200">{{ item.material.nombre }}</div>
-                        </td>
+            <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                {% for item in items_despacho %}
+                <div class="p-5 sm:p-6 transition hover:bg-gray-50/50 dark:hover:bg-slate-800/20" id="fila-item-{{ item.detalle.id }}">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        
+                        <!-- Datos del Material -->
+                        <div class="space-y-1 flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-red-50 text-[#7c121e] dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-900">
+                                    {{ item.material.codigo }}
+                                </span>
+                                <h3 class="text-sm font-bold text-gray-900 dark:text-white">
+                                    {{ item.material.nombre }}
+                                </h3>
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-3">
+                                <span>U. Manejo: <strong>{{ item.unidad_manejo }}</strong></span>
+                                <span>•</span>
+                                <span>Autorizado a entregar: <strong class="text-gray-800 dark:text-gray-200">{{ item.cant_aprobada }} u.</strong></span>
+                                <span>•</span>
+                                <span>Existencia física en estantería: <strong class="text-emerald-700 dark:text-emerald-400">{{ item.stock_disponible }} u.</strong></span>
+                            </div>
+                        </div>
 
-                        <!-- Unidad de Manejo -->
-                        <td class="p-4 text-center font-bold text-xs text-gray-600 dark:text-gray-300">
-                            <span class="px-2.5 py-1 bg-gray-100 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                                {{ item.unidad_manejo }}
-                            </span>
-                        </td>
+                        <!-- Controles de Cantidad y Botón Devolver -->
+                        <div class="flex flex-wrap items-center gap-3 shrink-0">
+                            <!-- Input Cantidad a Entregar -->
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cant. a Despachar</label>
+                                <input 
+                                    type="number" 
+                                    id="entregado_{{ item.detalle.id }}"
+                                    name="entregado_{{ item.detalle.id }}" 
+                                    value="{{ item.cant_aprobada }}" 
+                                    min="0" 
+                                    max="{{ item.cant_aprobada }}"
+                                    data-aprobada="{{ item.cant_aprobada }}"
+                                    oninput="verificarCambioCantidad('{{ item.detalle.id }}')"
+                                    class="w-24 text-center font-bold text-sm border-gray-300 dark:border-gray-700 rounded-xl"
+                                >
+                            </div>
 
-                        <!-- Cantidad Pedida -->
-                        <td class="p-4 text-center text-gray-500 font-bold">
-                            {{ item.cant_sugerida }}
-                        </td>
+                            <!-- Botón Toggle Devolución Completa -->
+                            <div class="pt-4">
+                                <input type="hidden" name="devolver_{{ item.detalle.id }}" id="devolver_flag_{{ item.detalle.id }}" value="false">
+                                <button 
+                                    type="button" 
+                                    id="btn_devolver_{{ item.detalle.id }}"
+                                    onclick="toggleDevolucion('{{ item.detalle.id }}')"
+                                    class="px-3 py-2 rounded-xl text-xs font-bold border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950/40 transition flex items-center gap-1 cursor-pointer"
+                                    title="Devolver este material a la estantería"
+                                >
+                                    <span class="material-symbols-outlined text-[16px]">undo</span>
+                                    <span>Devolver Ítem</span>
+                                </button>
+                            </div>
+                        </div>
 
-                        <!-- Stock en Almacén -->
-                        <td class="p-4 text-center text-xs font-semibold text-gray-600">
-                            {{ item.stock_disponible }}
-                        </td>
+                    </div>
 
-                        <!-- INPUT CANTIDAD A ENTREGAR (EDITABLE POR ALMACENERO) -->
-                        <td class="p-4 text-center">
-                            <input 
-                            type="number" 
-                            name="entregado_{{ item.detalle.id }}" 
-                            value="{{ item.cant_sugerida }}" 
-                            min="0" 
-                            max="{{ item.cant_sugerida }}" 
-                            oninput="validarTopeEntrega(this)"
-                            required
-                            class="w-24 text-center border-2 border-[#8b0000]/40 rounded-xl p-2 font-extrabold text-base bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-[#8b0000] focus:outline-none"
+                    <!-- CAMPO DE JUSTIFICATIVO DE DEVOLUCIÓN (Se despliega automáticamente si se entrega menos) -->
+                    <div id="caja_justificativo_{{ item.detalle.id }}" class="hidden mt-3 pt-3 border-t border-amber-200/60 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20 p-3 rounded-xl space-y-1">
+                        <label class="block text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[16px]">warning</span>
+                            Justificativo de devolución o reducción de cantidad (Obligatorio) *
+                        </label>
+                        <input 
+                            type="text" 
+                            name="justificativo_{{ item.detalle.id }}" 
+                            id="justificativo_{{ item.detalle.id }}"
+                            placeholder="Ej: Solicitado por error por la oficina / El funcionario decidió no retirar este material."
+                            class="w-full text-xs border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 rounded-xl"
                         >
-                        <span class="text-[10px] text-gray-400 font-bold block mt-1">Máx: {{ item.cant_sugerida }}</span>
-                        </td>
+                    </div>
 
-                        <!-- SEMÁFORO DE CONFORMIDAD CON POA -->
-                        <td class="p-4 text-xs">
-                            {% if item.conforme_poa %}
-                                <div class="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-bold">
-                                    <span class="material-symbols-outlined text-[18px]">verified</span>
-                                    <span>Conforme al POA</span>
-                                </div>
-                                <span class="text-[10px] text-gray-400 block mt-0.5">{{ item.mensaje_poa }}</span>
-                            {% else %}
-                                <div class="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold">
-                                    <span class="material-symbols-outlined text-[18px]">warning</span>
-                                    <span>Observación POA</span>
-                                </div>
-                                <span class="text-[10px] text-red-500 block mt-0.5">{{ item.mensaje_poa }}</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                </div>
+                {% endfor %}
+            </div>
         </div>
 
-        <!-- BOTÓN DE CONFIRMACIÓN -->
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-            <span class="text-xs text-gray-400">
-                Al confirmar, se emitirá la <strong>Nota de Salida oficial</strong>, se descontará el stock físico por PEPS y se consolidará el gasto real en el POA.
-            </span>
+        <!-- ACCIONES FINALES -->
+        <div class="flex flex-col sm:flex-row justify-end items-center gap-3">
+            <a href="{% url 'detalle_solicitud' solicitud.id %}" class="w-full sm:w-auto px-6 py-3 border border-gray-300 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 text-center transition">
+                Cancelar
+            </a>
             <button 
                 type="submit" 
-                onclick="return confirm('¿Confirma la entrega física de estos materiales y las cantidades establecidas?')"
-                class="btn-primary px-6 py-3 rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
+                class="w-full sm:w-auto px-8 py-3 bg-[#7c121e] hover:bg-[#610c16] text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-950/20 transition flex items-center justify-center gap-2 cursor-pointer"
             >
-                <span class="material-symbols-outlined text-[20px]">local_shipping</span>
-                Confirmar Despacho y Entrega Física
+                <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                <span>Confirmar Entrega y Reajustar Stock</span>
             </button>
         </div>
     </form>
-</div>
-<script>
-function validarTopeEntrega(input) {
-    const max = parseInt(input.max) || 0;
-    let valor = parseInt(input.value);
 
-    if (valor > max) {
-        alert(`No puede entregar más de lo pedido/autorizado. El límite máximo es de ${max} unidades.`);
-        input.value = max;
-    } else if (valor < 0) {
-        input.value = 0;
+</div>
+
+<!-- SCRIPT DINÁMICO DE CONTROL DE DEVOLUCIONES -->
+<script>
+    function verificarCambioCantidad(id) {
+        const inputCant = document.getElementById('entregado_' + id);
+        const cantAprobada = parseInt(inputCant.dataset.aprobada, 10);
+        const cantActual = parseInt(inputCant.value, 10) || 0;
+        const cajaJustif = document.getElementById('caja_justificativo_' + id);
+        const inputJustif = document.getElementById('justificativo_' + id);
+        const btnDevolver = document.getElementById('btn_devolver_' + id);
+        const flagDevolver = document.getElementById('devolver_flag_' + id);
+
+        if (cantActual < cantAprobada) {
+            cajaJustif.classList.remove('hidden');
+            inputJustif.required = true;
+            if (cantActual === 0) {
+                flagDevolver.value = 'true';
+                btnDevolver.classList.add('bg-amber-600', 'text-white');
+                btnDevolver.classList.remove('text-amber-700');
+            } else {
+                flagDevolver.value = 'false';
+                btnDevolver.classList.remove('bg-amber-600', 'text-white');
+                btnDevolver.classList.add('text-amber-700');
+            }
+        } else {
+            cajaJustif.classList.add('hidden');
+            inputJustif.required = false;
+            flagDevolver.value = 'false';
+            btnDevolver.classList.remove('bg-amber-600', 'text-white');
+            btnDevolver.classList.add('text-amber-700');
+        }
     }
-}
+
+    function toggleDevolucion(id) {
+        const inputCant = document.getElementById('entregado_' + id);
+        const cantAprobada = parseInt(inputCant.dataset.aprobada, 10);
+        const flagDevolver = document.getElementById('devolver_flag_' + id);
+
+        if (flagDevolver.value === 'true') {
+            // Cancelar devolución -> restablecer cantidad original
+            inputCant.value = cantAprobada;
+        } else {
+            // Marcar devolución completa -> cantidad a entregar 0
+            inputCant.value = 0;
+        }
+        verificarCambioCantidad(id);
+    }
 </script>
 {% endblock %}

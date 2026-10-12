@@ -1140,153 +1140,127 @@ def movimientos(request):
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def inventario_por_unidad(request):
     """
-    Tarjeta 4.5: Consulta de Stock y Cuotas del Formulario 005.
-    FILTRO EN CASCADA:
-    - Almacén -> Filtra Secretarías y Unidades que están autorizadas a ser atendidas por ese depósito.
-    - Secretaría -> Filtra Unidades pertenecientes a esa secretaría.
-    - Unidad -> Cruza existencias de ese almacén con las cuotas del Formulario 005 de su POA 2026.
+    Consulta de Stock y Cuotas por Estructura Organizacional.
+    - Carga TODAS las Secretarías y Unidades de la Gobernación en los selectores.
+    - Si se selecciona una oficina: AISLAMIENTO ESTRICTO. Muestra ÚNICAMENTE los materiales
+      que le fueron asignados físicamente en compras (si tiene 0 asignados, muestra 0).
     """
-    from presupuestos.models import POA, DetalleProgramacionPOA
-    from inventario.models import PartidaPresupuestaria
+    from inventario.models import AsignacionEntradaUnidad, PartidaPresupuestaria
+    from organizacion.models import Secretaria, UnidadOrganizacional
 
     perfil = request.user.perfilusuario
     rol = perfil.rol
 
-    # 1. Almacenes a los que el usuario tiene acceso
+    # 1. Almacenes autorizados
     almacenes_usuario = obtener_almacenes_usuario(request.user)
-    es_admin = (rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'])
+    es_admin = (rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or request.user.is_superuser)
+    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre') if es_admin else almacenes_usuario
 
-    if es_admin:
-        almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
-    else:
-        almacenes_disponibles = almacenes_usuario
-
-    # Captura de almacén seleccionado
     filtro_almacen_id = request.GET.get('almacen_id', '').strip()
     almacen_seleccionado = None
 
     if filtro_almacen_id:
         almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
         if not es_admin and not perfil.tiene_acceso_almacen(almacen_seleccionado):
-            messages.error(request, f"No tiene autorización para ver: {almacen_seleccionado.nombre}")
             almacen_seleccionado = almacenes_disponibles.first()
     else:
-        # Por defecto Almacén Central o el asignado al encargado
         almacen_central = Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
-        if almacen_central and (es_admin or perfil.tiene_acceso_almacen(almacen_central)):
-            almacen_seleccionado = almacen_central
-            filtro_almacen_id = str(almacen_central.id)
-        else:
-            almacen_seleccionado = almacenes_disponibles.first()
-            if almacen_seleccionado:
-                filtro_almacen_id = str(almacen_seleccionado.id)
+        almacen_seleccionado = almacen_central if (almacen_central and (es_admin or perfil.tiene_acceso_almacen(almacen_central))) else almacenes_disponibles.first()
+        if almacen_seleccionado:
+            filtro_almacen_id = str(almacen_seleccionado.id)
 
     almacenes_a_consultar = [almacen_seleccionado] if almacen_seleccionado else almacenes_disponibles
 
-    # ========================================================
-    # 2. FILTRADO EN CASCADA: DEPENDENCIAS ATENDIDAS POR ESTE ALMACÉN
-    # ========================================================
-    if almacen_seleccionado:
-        if almacen_seleccionado.tipo == 'CENTRAL':
-            # Central atiende a todas las unidades salvo que tenga asignación restrictiva
-            if almacen_seleccionado.unidades_atendidas.exists():
-                unidades_del_almacen = almacen_seleccionado.unidades_atendidas.filter(is_active=True)
-            else:
-                unidades_del_almacen = UnidadOrganizacional.objects.filter(is_active=True)
-        else:
-            # Subalmacén (SIGEPRO, UNASBA): SOLO atiende a sus unidades asignadas y a su propia unidad
-            unidades_ids = list(almacen_seleccionado.unidades_atendidas.filter(is_active=True).values_list('id', flat=True))
-            if almacen_seleccionado.unidad_organizacional_id:
-                unidades_ids.append(almacen_seleccionado.unidad_organizacional_id)
-            unidades_del_almacen = UnidadOrganizacional.objects.filter(id__in=unidades_ids, is_active=True)
-    else:
-        unidades_del_almacen = UnidadOrganizacional.objects.filter(is_active=True)
-
-    # Secretarías que tienen oficinas atendidas por este almacén
-    secretarias = Secretaria.objects.filter(
-        unidades_organizacionales__in=unidades_del_almacen,
-        is_active=True
-    ).distinct().order_by('nombre')
-
+    # 2. SELECTORES COMPLETOS: TODAS LAS SECRETARÍAS Y UNIDADES DE LA GOBERNACIÓN
     filtro_secretaria_id = request.GET.get('secretaria_id', '').strip()
     filtro_unidad_id = request.GET.get('unidad_id', '').strip()
 
-    # Si cambió de almacén y la secretaría previa ya no corresponde, se resetea
-    if filtro_secretaria_id and not secretarias.filter(id=filtro_secretaria_id).exists():
-        filtro_secretaria_id = ''
-
-    # Unidades dependientes de la secretaría seleccionada
+    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
+    
     if filtro_secretaria_id:
-        unidades_query = unidades_del_almacen.filter(secretaria_id=filtro_secretaria_id).order_by('nombre')
+        unidades_query = UnidadOrganizacional.objects.filter(secretaria_id=filtro_secretaria_id, is_active=True).order_by('nombre')
     else:
-        unidades_query = unidades_del_almacen.order_by('nombre')
-
-    # Si la unidad previa ya no pertenece a este almacén/secretaría, se resetea
-    if filtro_unidad_id and not unidades_query.filter(id=filtro_unidad_id).exists():
-        filtro_unidad_id = ''
+        unidades_query = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
 
     secretaria_seleccionada = Secretaria.objects.filter(id=filtro_secretaria_id).first() if filtro_secretaria_id else None
     unidad_seleccionada = UnidadOrganizacional.objects.filter(id=filtro_unidad_id).first() if filtro_unidad_id else None
 
-    # ========================================================
-    # 3. BASE DE INVENTARIO: AISLADO AL ALMACÉN Y AL POA DE LA UNIDAD
-    # ========================================================
-    inventario_qs = InventarioAlmacen.objects.filter(
+    # Si se seleccionó una unidad y tiene secretaría, sincronizar el select
+    if unidad_seleccionada and not secretaria_seleccionada and unidad_seleccionada.secretaria:
+        secretaria_seleccionada = unidad_seleccionada.secretaria
+        filtro_secretaria_id = str(secretaria_seleccionada.id)
+
+    # 3. Base de existencias físicas reales del Almacén consultado
+    inventario_base = InventarioAlmacen.objects.filter(
         almacen__in=almacenes_a_consultar,
         stock_fisico__gt=0
-    )
+    ).select_related('material', 'material__partida', 'material__unidad_medida_fk', 'almacen')
 
+    # =========================================================================
+    # REGLA MAESTRA DE ASIGNACIÓN DIRECTA:
+    # Si se selecciona una Oficina -> SOLO materiales que tienen compra asignada para ella
+    # =========================================================================
     if unidad_seleccionada:
-        partidas_poa_ids = POA.objects.filter(
-            unidad=unidad_seleccionada,
-            gestion=2026
-        ).values_list('partida_id', flat=True)
+        asigs_unidad = AsignacionEntradaUnidad.objects.filter(
+            unidad_organizacional=unidad_seleccionada,
+            nota_ingreso_detalle__nota_ingreso__almacen_destino__in=almacenes_a_consultar
+        )
+        materiales_asig_ids = list(asigs_unidad.values_list('nota_ingreso_detalle__material_id', flat=True).distinct())
 
-        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_poa_ids)
+        # AISLAMIENTO TOTAL: No se muestran materiales de otras unidades
+        inventario_qs = inventario_base.filter(material_id__in=materiales_asig_ids)
 
     elif secretaria_seleccionada:
-        unidades_sec = unidades_del_almacen.filter(secretaria=secretaria_seleccionada)
-        partidas_poa_sec = POA.objects.filter(
-            unidad__in=unidades_sec,
-            gestion=2026
-        ).values_list('partida_id', flat=True)
+        unidades_sec_ids = list(unidades_query.values_list('id', flat=True))
+        asigs_sec = AsignacionEntradaUnidad.objects.filter(
+            unidad_organizacional_id__in=unidades_sec_ids,
+            nota_ingreso_detalle__nota_ingreso__almacen_destino__in=almacenes_a_consultar
+        )
+        materiales_sec_ids = list(asigs_sec.values_list('nota_ingreso_detalle__material_id', flat=True).distinct())
+        inventario_qs = inventario_base.filter(material_id__in=materiales_sec_ids)
 
-        inventario_qs = inventario_qs.filter(material__partida_id__in=partidas_poa_sec)
+    else:
+        # Modo General: Sin oficina seleccionada, muestra las existencias globales de estantería
+        inventario_qs = inventario_base
 
-    # Métricas superiores
-    total_materiales = inventario_qs.values('material_id').distinct().count()
-    total_almacenes = len(almacenes_a_consultar)
-    total_stock_fisico = inventario_qs.aggregate(total=Sum('stock_fisico'))['total'] or 0
-
-    # 4. Agrupación por Partidas
+    # 4. Agrupación por Partidas Presupuestarias y Cálculos de Cupo
     partidas_ids = inventario_qs.values_list('material__partida_id', flat=True).distinct()
     partidas_en_inventario = PartidaPresupuestaria.objects.filter(id__in=partidas_ids).order_by('codigo')
 
     grupos_por_partida = []
+    total_unidades_kpi = 0
 
     for part in partidas_en_inventario:
-        items_partida = inventario_qs.filter(material__partida=part).select_related(
-            'almacen', 'material', 'material__unidad_medida_fk'
-        ).order_by('material__nombre')
-
+        items_partida = inventario_qs.filter(material__partida=part).order_by('material__nombre')
         filas = []
+
         for inv in items_partida:
             mat = inv.material
-            item_005 = None
-            poa_partida = None
+            stock_almacen_disp = inv.stock_disponible
+
+            cant_asig = 0
+            cant_ret = 0
+            saldo_disp_unidad = 0
+            tiene_asignacion = False
 
             if unidad_seleccionada:
-                item_005 = DetalleProgramacionPOA.objects.filter(
-                    poa__unidad=unidad_seleccionada,
-                    poa__gestion=2026,
-                    material=mat
-                ).first()
-
-                poa_partida = POA.objects.filter(
-                    unidad=unidad_seleccionada,
-                    partida=mat.partida,
-                    gestion=2026
-                ).first()
+                asigs = AsignacionEntradaUnidad.objects.filter(
+                    unidad_organizacional=unidad_seleccionada,
+                    nota_ingreso_detalle__material=mat,
+                    nota_ingreso_detalle__nota_ingreso__almacen_destino__in=almacenes_a_consultar
+                )
+                if asigs.exists():
+                    cant_asig = asigs.aggregate(s=Sum('cantidad_asignada'))['s'] or 0
+                    cant_ret = asigs.aggregate(s=Sum('cantidad_retirada'))['s'] or 0
+                    saldo_disp_unidad = max(0, cant_asig - cant_ret)
+                    tiene_asignacion = (cant_asig > 0)
+                
+                # El tope legal es el saldo de asignación de la oficina
+                tope_permitido = min(stock_almacen_disp, saldo_disp_unidad)
+                total_unidades_kpi += saldo_disp_unidad
+            else:
+                tope_permitido = stock_almacen_disp
+                total_unidades_kpi += stock_almacen_disp
 
             lote_activo = MovimientoInventario.objects.filter(
                 material=mat,
@@ -1296,38 +1270,34 @@ def inventario_por_unidad(request):
             ).order_by('fecha', 'id').first()
             costo_ref = lote_activo.costo_unitario if lote_activo else Decimal('0.00')
 
-            stock_disp = inv.stock_disponible
-            if item_005:
-                saldo_cuota = item_005.cantidad_disponible
-                tope_permitido = min(stock_disp, saldo_cuota)
-                tiene_cuota = True
-            else:
-                saldo_cuota = None
-                tope_permitido = stock_disp
-                tiene_cuota = False
-
             filas.append({
                 'inventario': inv,
                 'material': mat,
                 'almacen': inv.almacen,
                 'stock_fisico': inv.stock_fisico,
-                'stock_disponible': stock_disp,
-                'item_005': item_005,
-                'tiene_cuota': tiene_cuota,
-                'cuota_programada': item_005.cantidad_programada if item_005 else None,
-                'cuota_consumida': item_005.cantidad_consumida if item_005 else 0,
-                'saldo_cuota': saldo_cuota,
+                'stock_disponible': stock_almacen_disp,
+                'tiene_asignacion': tiene_asignacion,
+                'cant_asignada': cant_asig,
+                'cant_retirada': cant_ret,
+                'saldo_disp_unidad': saldo_disp_unidad,
                 'tope_permitido': tope_permitido,
                 'costo_referencial': costo_ref,
-                'saldo_poa': poa_partida.monto_disponible if poa_partida else None
             })
 
-        grupos_por_partida.append({
-            'partida': part,
-            'items': filas,
-            'total_items': len(filas),
-            'stock_total_partida': sum(f['stock_disponible'] for f in filas)
-        })
+        if filas:
+            grupos_por_partida.append({
+                'partida': part,
+                'items': filas,
+                'total_items': len(filas),
+                'stock_total_partida': sum(f['tope_permitido'] for f in filas)
+            })
+
+    # KPIs Superiores adaptados
+    total_materiales = inventario_qs.values('material_id').distinct().count()
+    if not unidad_seleccionada and not secretaria_seleccionada:
+        total_stock_kpi = inventario_base.aggregate(total=Sum('stock_fisico'))['total'] or 0
+    else:
+        total_stock_kpi = total_unidades_kpi
 
     return render(request, 'inventario/stock_por_unidad.html', {
         'secretarias': secretarias,
@@ -1341,11 +1311,10 @@ def inventario_por_unidad(request):
         'filtro_unidad_id': filtro_unidad_id,
         'grupos_por_partida': grupos_por_partida,
         'total_materiales': total_materiales,
-        'total_stock_fisico': total_stock_fisico,
-        'total_almacenes': total_almacenes,
+        'total_stock_fisico': total_stock_kpi,
+        'total_almacenes': len(almacenes_a_consultar),
         'es_admin': es_admin,
     })
-
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def entrada_inventario(request):

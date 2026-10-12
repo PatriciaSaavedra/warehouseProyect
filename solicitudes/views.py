@@ -1039,6 +1039,11 @@ def preparar_solicitud(request, id):
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def entregar_solicitud(request, id):
+    """
+    Despacho Físico de Materiales con Sistema de Devolución/Retiro de Ítems.
+    Si un ítem es retirado o se entrega menos de lo aprobado, libera automáticamente
+    la reserva física de almacén y exige justificativo obligatorio.
+    """
     solicitud = get_object_or_404(Solicitud, id=id)
 
     if solicitud.flujo_atencion == 'CONTRATACION_SERVICIO':
@@ -1051,25 +1056,25 @@ def entregar_solicitud(request, id):
 
     almacen_origen = solicitud.almacen_origen
     if not almacen_origen:
-        messages.error(request, "No se encontró un Almacén Central activo configurado en el sistema.")
+        messages.error(request, "No se encontró un Almacén activo asignado para esta solicitud.")
         return redirigir_despues_de_accion(request, solicitud)
 
     detalles = solicitud.detalles.select_related('material', 'material__partida', 'material__unidad_medida_fk')
     from inventario.models import AsignacionEntradaUnidad, NotaSalida, NotaSalidaDetalle
 
     # =========================================================
-    # GET: PANTALLA DE DESPACHO CON CONTROL DE CUPO ASIGNADO
+    # GET: PANTALLA DE DESPACHO CON CONTROL DE DEVOLUCIONES
     # =========================================================
     if request.method == 'GET':
         items_despacho = []
         for det in detalles:
             material = det.material
-            cant_sugerida = det.cantidad_aprobada if det.cantidad_aprobada is not None else det.cantidad_solicitada
+            cant_aprobada = det.cantidad_aprobada if det.cantidad_aprobada is not None else det.cantidad_solicitada
 
             inv = InventarioAlmacen.objects.filter(material=material, almacen=almacen_origen).first()
             stock_disp = inv.stock_fisico if inv else 0
 
-            # Consultar cupo asignado en entradas para esta oficina
+            # Consultar cupo asignado
             asigs = AsignacionEntradaUnidad.objects.filter(
                 unidad_organizacional=solicitud.unidad_solicitante,
                 nota_ingreso_detalle__material=material,
@@ -1079,18 +1084,14 @@ def entregar_solicitud(request, id):
             tot_ret = asigs.aggregate(s=Sum('cantidad_retirada'))['s'] or 0
             saldo_cupo = max(0, tot_asig - tot_ret)
 
-            conforme_cupo = (saldo_cupo >= cant_sugerida) or (saldo_cupo > 0)
-            mensaje_cupo = f"Cupo Asignado: {saldo_cupo} u. disponibles" if saldo_cupo > 0 else "Bolsa Libre de Almacén (Sin asignación previa)"
-
             items_despacho.append({
                 'detalle': det,
                 'material': material,
                 'unidad_manejo': material.unidad_medida_fk.codigo if material.unidad_medida_fk else material.unidad_medida,
-                'cant_sugerida': cant_sugerida,
+                'cant_aprobada': cant_aprobada,
                 'stock_disponible': stock_disp,
-                'conforme_poa': conforme_cupo, # mantiene nombre de variable para no romper el template
-                'mensaje_poa': mensaje_cupo,
-                'saldo_cupo': saldo_cupo
+                'saldo_cupo': saldo_cupo,
+                'conforme_poa': (saldo_cupo >= cant_aprobada or saldo_cupo > 0),
             })
 
         return render(request, 'solicitudes/entregar.html', {
@@ -1100,107 +1101,146 @@ def entregar_solicitud(request, id):
         })
 
     # =========================================================
-    # POST: EJECUCIÓN DEL DESPACHO FÍSICO Y DESCUENTO DE CUPOS
+    # POST: DESPACHO CON LIBERACIÓN DE STOCK Y JUSTIFICATIVO
     # =========================================================
     try:
         with transaction.atomic():
             solicitud_lock = Solicitud.objects.select_for_update().get(id=id)
 
-            ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
-            nro_salida_num = (ultima_salida.id + 1) if ultima_salida else 1
-            nro_nota_salida = f"NS-{nro_salida_num:05d}"
+            # Validar primero si hay devoluciones sin justificar
+            for detalle in detalles:
+                cant_aprobada = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
+                es_devolucion = request.POST.get(f"devolver_{detalle.id}") == 'true'
+                cant_post = request.POST.get(f"entregado_{detalle.id}", '').strip()
+                
+                cant_real = 0 if es_devolucion else (int(cant_post) if cant_post else cant_aprobada)
+                justificativo = request.POST.get(f"justificativo_{detalle.id}", '').strip()
 
-            nota_salida = NotaSalida.objects.create(
-                nro_nota=nro_nota_salida,
-                solicitud_origen=solicitud_lock,
-                almacen_origen=almacen_origen,
-                unidad_destino=solicitud_lock.unidad_solicitante,
-                fecha=timezone.now().date(),
-                usuario=request.user
-            )
+                if cant_real < cant_aprobada and len(justificativo) < 5:
+                    raise ValueError(
+                        f"Debe indicar el justificativo de devolución o reducción para '{detalle.material.nombre}' "
+                        f"(Aprobado: {cant_aprobada} u. -> Entregando: {cant_real} u.)."
+                    )
 
+            # Crear Nota de Salida solo si se entrega al menos 1 material
+            items_a_entregar = []
+            for detalle in detalles:
+                es_devolucion = request.POST.get(f"devolver_{detalle.id}") == 'true'
+                cant_post = request.POST.get(f"entregado_{detalle.id}", '').strip()
+                cant_aprobada = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
+                cant_real = 0 if es_devolucion else (int(cant_post) if cant_post else cant_aprobada)
+                if cant_real > 0:
+                    items_a_entregar.append((detalle, cant_real))
+
+            nota_salida = None
+            if items_a_entregar:
+                ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
+                nro_salida_num = (ultima_salida.id + 1) if ultima_salida else 1
+                nro_nota_salida = f"NS-{nro_salida_num:05d}"
+
+                nota_salida = NotaSalida.objects.create(
+                    nro_nota=nro_nota_salida,
+                    solicitud_origen=solicitud_lock,
+                    almacen_origen=almacen_origen,
+                    unidad_destino=solicitud_lock.unidad_solicitante,
+                    fecha=timezone.now().date(),
+                    usuario=request.user
+                )
+
+            # Procesar cada material (Despacho real o Devolución/Liberación)
             for detalle in detalles:
                 material = Material.objects.select_for_update().get(id=detalle.material.id)
-                
-                cant_post = request.POST.get(f"entregado_{detalle.id}")
-                try:
-                    cantidad_despacho = int(cant_post) if cant_post else (detalle.cantidad_aprobada or detalle.cantidad_solicitada)
-                except ValueError:
-                    cantidad_despacho = detalle.cantidad_aprobada or detalle.cantidad_solicitada
-
-                if cantidad_despacho <= 0:
-                    continue
+                cant_aprobada = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
+                es_devolucion = request.POST.get(f"devolver_{detalle.id}") == 'true'
+                cant_post = request.POST.get(f"entregado_{detalle.id}", '').strip()
+                cant_despacho = 0 if es_devolucion else (int(cant_post) if cant_post else cant_aprobada)
+                justificativo = request.POST.get(f"justificativo_{detalle.id}", '').strip()
 
                 inv = InventarioAlmacen.objects.select_for_update().filter(material=material, almacen=almacen_origen).first()
-                if not inv or inv.stock_fisico < cantidad_despacho:
-                    raise ValueError(f"Stock físico insuficiente en {almacen_origen.nombre} para '{material.nombre}'.")
+                diferencia_devuelta = max(0, cant_aprobada - cant_despacho)
 
-                # 1. Ejecutar salida PEPS y descontar stock de estantería
-                mov = registrar_salida_valorada_peps(
-                    material=material,
-                    almacen=almacen_origen,
-                    cantidad_salida=cantidad_despacho,
-                    tipo_movimiento='SALIDA',
-                    referencia=f"DESPACHO: {solicitud_lock.codigo}",
-                    usuario=request.user,
-                    unidad_destino=solicitud_lock.unidad_solicitante,
-                    descontar_reserva=True
-                )
+                # 1. CASO DEVOLUCIÓN TOTAL O PARCIAL: Liberar reserva de stock a estantería
+                if diferencia_devuelta > 0 and inv:
+                    inv.stock_reservado = max(0, inv.stock_reservado - diferencia_devuelta)
+                    inv.save()
+                    
+                    detalle.observacion = (
+                        f"DEVOLUCIÓN EN VENTANILLA: {diferencia_devuelta} u. devueltas/canceladas al stock. "
+                        f"Motivo: {justificativo}"
+                    )
 
-                # 2. DESCONTAR CUPO ASIGNADO EN ENTRADAS A ESTA OFICINA (FIFO)
-                asignaciones_oficina = AsignacionEntradaUnidad.objects.select_for_update().filter(
-                    unidad_organizacional=solicitud_lock.unidad_solicitante,
-                    nota_ingreso_detalle__material=material,
-                    cantidad_asignada__gt=F('cantidad_retirada')
-                ).order_by('id')
+                # 2. CASO ENTREGA FÍSICA: Descontar de estantería y registrar salida PEPS
+                if cant_despacho > 0:
+                    mov = registrar_salida_valorada_peps(
+                        material=material,
+                        almacen=almacen_origen,
+                        cantidad_salida=cant_despacho,
+                        tipo_movimiento='SALIDA',
+                        referencia=f"DESPACHO: {solicitud_lock.codigo}",
+                        usuario=request.user,
+                        unidad_destino=solicitud_lock.unidad_solicitante,
+                        descontar_reserva=True
+                    )
 
-                cant_a_descontar_cupo = cantidad_despacho
-                for asig in asignaciones_oficina:
-                    if cant_a_descontar_cupo <= 0:
-                        break
-                    disp = asig.saldo_disponible
-                    if disp >= cant_a_descontar_cupo:
-                        asig.cantidad_retirada += cant_a_descontar_cupo
-                        asig.save()
-                        cant_a_descontar_cupo = 0
-                    else:
-                        asig.cantidad_retirada += disp
-                        asig.save()
-                        cant_a_descontar_cupo -= disp
+                    # Descontar del cupo asignado a la oficina
+                    asignaciones_oficina = AsignacionEntradaUnidad.objects.select_for_update().filter(
+                        unidad_organizacional=solicitud_lock.unidad_solicitante,
+                        nota_ingreso_detalle__material=material,
+                        cantidad_asignada__gt=F('cantidad_retirada')
+                    ).order_by('id')
 
-                # 3. Guardar detalle de salida
-                detalle.cantidad_entregada = cantidad_despacho
-                detalle.precio_unitario_referencial = mov.costo_unitario
+                    cant_a_descontar = cant_despacho
+                    for asig in asignaciones_oficina:
+                        if cant_a_descontar <= 0:
+                            break
+                        disp = asig.saldo_disponible
+                        if disp >= cant_a_descontar:
+                            asig.cantidad_retirada += cant_a_descontar
+                            asig.save()
+                            cant_a_descontar = 0
+                        else:
+                            asig.cantidad_retirada += disp
+                            asig.save()
+                            cant_a_descontar -= disp
+
+                    detalle.cantidad_entregada = cant_despacho
+                    detalle.precio_unitario_referencial = mov.costo_unitario
+
+                    NotaSalidaDetalle.objects.create(
+                        nota_salida=nota_salida,
+                        material=material,
+                        cantidad=cant_despacho,
+                        costo_unitario_real=mov.costo_unitario,
+                        costo_total_real=mov.costo_total
+                    )
+                else:
+                    detalle.cantidad_entregada = 0
+
                 detalle.save()
 
-                NotaSalidaDetalle.objects.create(
-                    nota_salida=nota_salida,
-                    material=material,
-                    cantidad=cantidad_despacho,
-                    costo_unitario_real=mov.costo_unitario,
-                    costo_total_real=mov.costo_total
-                )
-
-            # 4. Finalizar trámite
+            # 3. Finalizar estado del trámite
             solicitud_lock.estado = 'ENTREGADA'
             solicitud_lock.entregado_por = request.user
             solicitud_lock.fecha_entrega = timezone.now()
             solicitud_lock.save()
 
+            salida_info = f" con Nota de Salida {nota_salida.nro_nota}" if nota_salida else " (Trámite sin ítems despachados/totalmente devuelto)"
             Bitacora.objects.create(
                 usuario=request.user,
                 modulo='Inventario',
-                accion='Despacho Físico Procesado',
-                descripcion=f'Se emitió la Nota de Salida {nro_nota_salida} para el folio {solicitud_lock.codigo} con descuento de asignaciones.'
+                accion='Entrega Física con Control de Devolución',
+                descripcion=f'Se procesó el despacho del pedido {solicitud_lock.codigo}{salida_info}. Stock reservado reajustado.'
             )
 
-        messages.success(request, f"Despacho procesado exitosamente. Se generó la Nota de Salida {nro_nota_salida}.")
+        messages.success(request, f"Entrega procesada correctamente. Stock y devoluciones registradas con éxito.")
         return redirect('detalle_solicitud', id=solicitud.id)
 
-    except Exception as e:
-        messages.error(request, f"Error al procesar la entrega: {str(e)}")
+    except ValueError as e:
+        messages.error(request, str(e))
         return redirect('entregar_solicitud', id=solicitud.id)
-
+    except Exception as e:
+        messages.error(request, f"Error al procesar el despacho: {str(e)}")
+        return redirect('entregar_solicitud', id=solicitud.id)
 @login_required
 def cerrar_solicitud(request, id):
     if not tiene_rol(request.user, ['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
