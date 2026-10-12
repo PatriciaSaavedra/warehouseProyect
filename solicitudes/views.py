@@ -128,8 +128,9 @@ def solicitudes(request):
 ])
 def solicitudes_general(request):
     """
-    Bandeja de Gestión Institucional: Audita y gestiona trámites de ambos flujos
-    con trazabilidad visual y acciones contextuales por rol.
+    Bandeja de Gestión Institucional:
+    AISLAMIENTO ESTRICTO: Los Subalmacenes (ej. SIGEPRO, UNASBA) SOLO ven y despachan
+    solicitudes de las unidades organizacionales autorizadas bajo su custodia.
     """
     perfil = request.user.perfilusuario
     rol = perfil.rol
@@ -141,7 +142,7 @@ def solicitudes_general(request):
     desde_str = request.GET.get('desde', '').strip()
     hasta_str = request.GET.get('hasta', '').strip()
 
-    # 2. Control inteligente de pestañas según competencia del Rol
+    # 2. Control de pestañas según competencia de Rol
     roles_solo_compras = ['RPA', 'BIENES_SERVICIOS', 'PRESUPUESTOS', 'SECRETARIO_SAF']
     roles_almacen = ['ALMACENERO', 'KARDISTA']
 
@@ -149,10 +150,10 @@ def solicitudes_general(request):
     mostrar_tab_adquisiciones = True
 
     if rol in roles_solo_compras:
-        mostrar_tab_pedidos = False          # Ocultar Flujo 1 para RPA, SAF, Presupuestos y BBSS
+        mostrar_tab_pedidos = False
         tab_defecto = 'adquisiciones'
     elif rol in roles_almacen:
-        tab_defecto = 'pedidos'              # Almacén trabaja principalmente en Flujo 1
+        tab_defecto = 'pedidos'
     else:
         tab_defecto = 'pedidos'
 
@@ -160,18 +161,47 @@ def solicitudes_general(request):
     if not mostrar_tab_pedidos and tab_activa == 'pedidos':
         tab_activa = 'adquisiciones'
 
-    roles_globales = [
-        'ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO', 'KARDISTA',
-        'RPA', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'BIENES_SERVICIOS'
+    # Roles con supervisión administrativa general
+    roles_supervisores = [
+        'ADMINISTRADOR', 'ADMIN_ALMACENES', 'RPA', 
+        'SECRETARIO_SAF', 'PRESUPUESTOS', 'BIENES_SERVICIOS'
     ]
 
     # =========================================================
-    # 3. CONSULTA FLUJO 1 (PEDIDOS DE ALMACÉN)
+    # 3. DETERMINAR UNIDADES ATENDIDAS POR EL ALMACÉN DEL USUARIO
     # =========================================================
-    if rol in roles_globales:
-        pedidos_qs = Solicitud.objects.all()
+    almacenes_usuario = perfil.almacenes_autorizados.filter(is_active=True)
+    if not almacenes_usuario.exists():
+        almacenes_usuario = Almacen.objects.filter(responsable=request.user, is_active=True)
+    if perfil.unidad and not almacenes_usuario.exists():
+        almacenes_usuario = Almacen.objects.filter(unidad_organizacional=perfil.unidad, is_active=True)
+
+    es_central = (
+        almacenes_usuario.filter(tipo='CENTRAL').exists() or 
+        rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']
+    )
+
+    unidades_subalmacen_ids = set()
+    if not es_central and rol in roles_almacen:
+        for alm in almacenes_usuario:
+            unidades_subalmacen_ids.update(alm.unidades_atendidas.filter(is_active=True).values_list('id', flat=True))
+            if alm.unidad_organizacional_id:
+                unidades_subalmacen_ids.add(alm.unidad_organizacional_id)
+
+    # =========================================================
+    # 4. CONSULTA FLUJO 1 (PEDIDOS DE ALMACÉN) - AISLADO
+    # =========================================================
+    if rol in roles_supervisores or (rol in roles_almacen and es_central):
+        # Administradores y Almacén Central ven el universo general
+        pedidos_base = Solicitud.objects.all()
+    elif rol in roles_almacen and not es_central:
+        # SUBALMACÉN (SIGEPRO, UNASBA): SOLO solicitudes de SUS unidades atendidas
+        pedidos_base = Solicitud.objects.filter(unidad_solicitante_id__in=unidades_subalmacen_ids)
     else:
-        pedidos_qs = Solicitud.objects.filter(unidad_solicitante=unidad)
+        # Jefe inmediato u oficina solicitante: solo su unidad
+        pedidos_base = Solicitud.objects.filter(unidad_solicitante=unidad)
+
+    pedidos_qs = pedidos_base
 
     if query:
         pedidos_qs = pedidos_qs.filter(
@@ -190,13 +220,18 @@ def solicitudes_general(request):
     pedidos_qs = pedidos_qs.select_related('solicitante', 'unidad_solicitante').order_by('-id')
 
     # =========================================================
-    # 4. CONSULTA FLUJO 2 (NUEVAS ADQUISICIONES SABS)
+    # 5. CONSULTA FLUJO 2 (NUEVAS ADQUISICIONES SABS) - AISLADO
     # =========================================================
     from compras.models import ProcesoAdquisicion
-    if rol in roles_globales:
-        adquisiciones_qs = ProcesoAdquisicion.objects.all()
+
+    if rol in roles_supervisores or (rol in roles_almacen and es_central):
+        adquisiciones_base = ProcesoAdquisicion.objects.all()
+    elif rol in roles_almacen and not es_central:
+        adquisiciones_base = ProcesoAdquisicion.objects.filter(unidad_solicitante_id__in=unidades_subalmacen_ids)
     else:
-        adquisiciones_qs = ProcesoAdquisicion.objects.filter(unidad_solicitante=unidad)
+        adquisiciones_base = ProcesoAdquisicion.objects.filter(unidad_solicitante=unidad)
+
+    adquisiciones_qs = adquisiciones_base
 
     if query:
         adquisiciones_qs = adquisiciones_qs.filter(
@@ -215,7 +250,7 @@ def solicitudes_general(request):
     adquisiciones_qs = adquisiciones_qs.select_related('solicitante', 'unidad_solicitante', 'autoridad_rpa').prefetch_related('items').order_by('-id')
 
     # =========================================================
-    # 5. KPIS CONTEXTUALES SEGÚN EL ROL
+    # 6. KPIS CONTEXTUALES ACOTADOS A LA JURISDICCIÓN DEL ROL
     # =========================================================
     hoy = timezone.now().date()
     
@@ -247,21 +282,22 @@ def solicitudes_general(request):
         concluidos_mes = ProcesoAdquisicion.objects.filter(estado='CONCLUIDA', fecha_recepcion__month=hoy.month).count()
         total_gestion = adquisiciones_qs.count()
 
-    elif rol in ['ALMACENERO', 'KARDISTA']:
-        pendientes_accion = Solicitud.objects.filter(estado='PREPARADA').count() + ProcesoAdquisicion.objects.filter(estado='ORDEN_EMITIDA').count()
+    elif rol in roles_almacen:
+        # Aislado al depósito del almacenero/kardista
+        pendientes_accion = pedidos_base.filter(estado='PREPARADA').count() + adquisiciones_base.filter(estado='ORDEN_EMITIDA').count()
         accion_label = "Listos para Entrega/Recepción"
-        en_curso = Solicitud.objects.filter(estado__in=['REVISADA', 'PREPARADA']).count()
-        concluidos_mes = Solicitud.objects.filter(estado='ENTREGADA', fecha_entrega__month=hoy.month).count()
+        en_curso = pedidos_base.filter(estado__in=['REVISADA', 'PREPARADA']).count()
+        concluidos_mes = pedidos_base.filter(estado='ENTREGADA', fecha_entrega__month=hoy.month).count()
         total_gestion = pedidos_qs.count()
 
     else:
-        pendientes_accion = Solicitud.objects.filter(estado='REGISTRADA').count()
+        pendientes_accion = pedidos_base.filter(estado='REGISTRADA').count()
         accion_label = "Requieren Revisión Inicial"
-        en_curso = Solicitud.objects.filter(estado__in=['REVISADA', 'PREPARADA']).count() + ProcesoAdquisicion.objects.filter(estado__in=['CERTIFICADA', 'APROBADA_RPA', 'ORDEN_EMITIDA']).count()
-        concluidos_mes = Solicitud.objects.filter(estado='ENTREGADA', fecha_entrega__month=hoy.month).count() + ProcesoAdquisicion.objects.filter(estado='CONCLUIDA', fecha_recepcion__month=hoy.month).count()
+        en_curso = pedidos_base.filter(estado__in=['REVISADA', 'PREPARADA']).count()
+        concluidos_mes = pedidos_base.filter(estado='ENTREGADA', fecha_entrega__month=hoy.month).count()
         total_gestion = pedidos_qs.count() + adquisiciones_qs.count()
 
-    # 6. Paginación independiente
+    # 7. Paginación
     paginator_ped = Paginator(pedidos_qs, 10)
     page_pedidos = paginator_ped.get_page(request.GET.get('page_ped'))
 
@@ -279,7 +315,6 @@ def solicitudes_general(request):
         'filtro_estado': filtro_estado,
         'desde': desde_str,
         'hasta': hasta_str,
-        # KPIs ajustados al Rol
         'kpi_pendientes': pendientes_accion,
         'accion_label': accion_label,
         'kpi_en_curso': en_curso,

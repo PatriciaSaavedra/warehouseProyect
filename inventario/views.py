@@ -920,11 +920,16 @@ def reporte_inventario(request):
     desde = parse_date(desde_str) if desde_str else datetime.date(2026, 1, 1)
     hasta = parse_date(hasta_str) if hasta_str else datetime.date(2026, 12, 31)
 
-    # 1. Resolver almacén
-    almacen_seleccionado = None
-    if filtro_almacen_id:
-        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
+    # 1. REEMPLAZAR LA RESOLUCIÓN DE ALMACÉN EN reporte_inventario:
+    almacen_fijado, es_central_o_admin = resolver_almacen_operativo(request)
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
 
+    if not es_central_o_admin and almacen_fijado:
+        # SUBALMACÉN: OBLIGATORIO forzar su depósito (prohibido consolidado general)
+        almacen_seleccionado = almacen_fijado
+    else:
+        # CENTRAL / ADMIN: puede elegir un almacén o dejar vacío para Consolidado General
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id) if filtro_almacen_id else None
     materiales = Material.objects.filter(is_active=True).select_related('unidad_medida_fk', 'partida').order_by('partida__codigo', 'codigo')
 
     headers_1 = ['Código', 'Descripción del Material', 'Unid.', 'Saldo Inicial / Apertura', '', 'Entradas del Periodo', '', 'Salidas del Periodo', '', 'Saldos de Cierre', '']
@@ -1113,10 +1118,24 @@ def reporte_inventario_oficial_pdf(request):
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def movimientos(request):
-    movimientos = MovimientoInventario.objects.all().order_by('-id')
-    return render(request, 'inventario/movimientos.html', {'movimientos': movimientos})
+    almacenes_user = obtener_almacenes_usuario(request.user)
+    es_admin = (request.user.perfilusuario.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or request.user.is_superuser)
 
+    # SUBALMACÉN: Solo audita movimientos ocurridos en su depósito
+    if es_admin:
+        movimientos_qs = MovimientoInventario.objects.all()
+    else:
+        movimientos_qs = MovimientoInventario.objects.filter(almacen__in=almacenes_user)
 
+    movimientos_qs = movimientos_qs.select_related('material', 'almacen', 'usuario', 'unidad_destino').order_by('-id')
+    
+    paginator = Paginator(movimientos_qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'inventario/movimientos.html', {
+        'movimientos': page_obj,
+        'page_obj': page_obj
+    })
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def inventario_por_unidad(request):
@@ -1883,28 +1902,44 @@ def toggle_material(request, id):
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def lotes_list(request):
+    """
+    Aislamiento estricto de lotes PEPS: Un subalmacén solo puede auditar
+    las capas de inventario físicas que están dentro de su propio depósito.
+    """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+    es_admin = (rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or request.user.is_superuser)
     
-    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
-        almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
-    else:
-        almacenes_disponibles = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
+    # 1. Almacenes a los que el usuario tiene derecho
+    almacenes_disponibles = obtener_almacenes_usuario(request.user)
 
     filtro_almacen_id = request.GET.get('almacen', '').strip()
     query_busqueda = request.GET.get('q', '').strip()
 
-    lotes_query = MovimientoInventario.objects.filter(
-        tipo='ENTRADA',
-        saldo_disponible_lote__gt=0
-    ).select_related('material', 'almacen', 'usuario')
+    # 2. Base de consulta limitada estrictamente a los almacenes del usuario
+    if es_admin:
+        lotes_query = MovimientoInventario.objects.filter(tipo='ENTRADA', saldo_disponible_lote__gt=0)
+    else:
+        lotes_query = MovimientoInventario.objects.filter(
+            tipo='ENTRADA',
+            saldo_disponible_lote__gt=0,
+            almacen__in=almacenes_disponibles
+        )
 
+    # 3. Filtrado por almacén específico si se seleccionó uno
+    almacen_seleccionado = None
     if filtro_almacen_id:
         almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
-        if not perfil.tiene_acceso_almacen(almacen_seleccionado):
-            messages.error(request, f"No tiene autorización para auditar lotes en: {almacen_seleccionado.nombre}")
-            return redirect('lotes_list')
+        if not es_admin and not almacenes_disponibles.filter(id=almacen_seleccionado.id).exists():
+            messages.error(request, f"No tiene autorización para ver lotes de: {almacen_seleccionado.nombre}")
+            almacen_seleccionado = almacenes_disponibles.first()
+        if almacen_seleccionado:
+            lotes_query = lotes_query.filter(almacen=almacen_seleccionado)
+    elif not es_admin and almacenes_disponibles.count() == 1:
+        # Para subalmacén con 1 solo depósito asignado, filtrar automáticamente a ese depósito
+        almacen_seleccionado = almacenes_disponibles.first()
         lotes_query = lotes_query.filter(almacen=almacen_seleccionado)
+        filtro_almacen_id = str(almacen_seleccionado.id)
 
     if query_busqueda:
         lotes_query = lotes_query.filter(
@@ -1913,18 +1948,18 @@ def lotes_list(request):
             Q(referencia__icontains=query_busqueda)
         )
 
-    lotes_query = lotes_query.order_by('fecha', 'id')
+    lotes_query = lotes_query.select_related('material', 'almacen', 'usuario').order_by('fecha', 'id')
     paginator = Paginator(lotes_query, 15)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'inventario/lotes_list.html', {
         'page_obj': page_obj,
         'almacenes_disponibles': almacenes_disponibles,
+        'almacen_seleccionado': almacen_seleccionado,
         'filtro_almacen_id': filtro_almacen_id,
         'query_busqueda': query_busqueda,
+        'es_admin': es_admin,
     })
-
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def reporte_consumo_unidades(request):
@@ -1948,17 +1983,26 @@ def reporte_consumo_unidades(request):
     hasta = parse_date(hasta_str) if hasta_str else date(gestion, 12, 31)
 
     # 2. Catálogos
-    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
-    secretarias_query = secretarias
-    if sec_id:
-        secretarias_query = secretarias_query.filter(id=sec_id)
+    almacen_fijado, es_central_o_admin = resolver_almacen_operativo(request)
 
-    unidades_query = UnidadOrganizacional.objects.filter(is_active=True)
-    if sec_id:
-        unidades_query = unidades_query.filter(secretaria_id=sec_id)
-    if uni_id:
-        unidades_query = unidades_query.filter(id=uni_id)
-    unidades_query = unidades_query.order_by('nombre')
+    if not es_central_o_admin and almacen_fijado:
+        # SUBALMACÉN: Solo audita consumo de sus oficinas atendidas y su propia unidad
+        unidades_autorizadas_ids = list(almacen_fijado.unidades_atendidas.filter(is_active=True).values_list('id', flat=True))
+        if almacen_fijado.unidad_organizacional_id:
+            unidades_autorizadas_ids.append(almacen_fijado.unidad_organizacional_id)
+        
+        unidades_query = UnidadOrganizacional.objects.filter(id__in=unidades_autorizadas_ids, is_active=True)
+        secretarias_ids = unidades_query.values_list('secretaria_id', flat=True).distinct()
+        secretarias = Secretaria.objects.filter(id__in=secretarias_ids, is_active=True).order_by('nombre')
+    else:
+        secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
+        unidades_query = UnidadOrganizacional.objects.filter(is_active=True)
+        if sec_id:
+            unidades_query = unidades_query.filter(secretaria_id=sec_id)
+        if uni_id:
+            unidades_query = unidades_query.filter(id=uni_id)
+
+    secretarias_query = secretarias
 
     # 3. Movimientos de salida física en el periodo
     salidas_periodo = MovimientoInventario.objects.filter(
@@ -2191,44 +2235,59 @@ def inventario_por_almacen(request):
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def nota_ingreso_list(request):
     query = request.GET.get('q', '').strip()
-    notas = NotaIngreso.objects.select_related('proveedor', 'usuario').all()
+    almacenes_user = obtener_almacenes_usuario(request.user)
+    es_admin = (request.user.perfilusuario.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or request.user.is_superuser)
+
+    # SUBALMACÉN: Solo ve ingresos físicos destinados a su almacén
+    if es_admin:
+        notas = NotaIngreso.objects.all()
+    else:
+        notas = NotaIngreso.objects.filter(almacen_destino__in=almacenes_user)
+
+    notas = notas.select_related('proveedor', 'usuario', 'almacen_destino')
 
     if query:
         notas = notas.filter(
             Q(nro_nota__icontains=query) |
             Q(proveedor__razon_social__icontains=query) |
-            Q(factura__icontains=query)
+            Q(factura__icontains=query) |
+            Q(c31__icontains=query)
         )
 
     notas = notas.order_by('-id')
     paginator = Paginator(notas, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'inventario/entrada_list.html', {'page_obj': page_obj, 'query': query})
-
 
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def nota_salida_list(request):
     query = request.GET.get('q', '').strip()
     from .models import NotaSalida
-    notas = NotaSalida.objects.select_related('unidad_destino', 'usuario').all()
+    almacenes_user = obtener_almacenes_usuario(request.user)
+    es_admin = (request.user.perfilusuario.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or request.user.is_superuser)
+
+    # SUBALMACÉN: Solo ve notas de salida despachadas desde su almacén
+    if es_admin:
+        notas = NotaSalida.objects.all()
+    else:
+        notas = NotaSalida.objects.filter(almacen_origen__in=almacenes_user)
+
+    notas = notas.select_related('unidad_destino', 'usuario', 'almacen_origen', 'solicitud_origen')
 
     if query:
         notas = notas.filter(
             Q(nro_nota__icontains=query) |
-            Q(unidad_destino__nombre__icontains=query)
+            Q(unidad_destino__nombre__icontains=query) |
+            Q(solicitud_origen__codigo__icontains=query)
         )
 
     notas = notas.order_by('-id')
     paginator = Paginator(notas, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'inventario/salida_list.html', {'page_obj': page_obj, 'query': query})
-
-
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def detalle_nota_ingreso(request, id):
@@ -2913,11 +2972,29 @@ def reporte_dgcf_r105(request):
     fecha_inicio = date(gestion, 1, 1)
 
     # 1. Filtro opcional por Almacén
+    # LÓGICA BLINDADA:
+    es_admin_o_central = (
+        request.user.perfilusuario.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'PRESUPUESTOS', 'SECRETARIO_SAF'] or 
+        request.user.is_superuser
+    )
+
+    almacenes_usuario = obtener_almacenes_usuario(request.user)
+    if not es_admin_o_central and almacenes_usuario.filter(tipo='CENTRAL').exists():
+        es_admin_o_central = True
+
     filtro_almacen_id = request.GET.get('almacen', '').strip()
-    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
-    almacen_seleccionado = None
-    if filtro_almacen_id:
-        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
+
+    if es_admin_o_central:
+        # Administradores y Central pueden ver consolidado y todos los almacenes
+        almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id) if filtro_almacen_id else None
+        puede_ver_consolidado = True
+    else:
+        # SUBALMACÉN (SIGEPRO): Solo ve su propio almacén, forzado obligatoriamente
+        almacenes_disponibles = almacenes_usuario
+        almacen_seleccionado = almacenes_usuario.first()
+        filtro_almacen_id = str(almacen_seleccionado.id) if almacen_seleccionado else ''
+        puede_ver_consolidado = False
 
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
     filas = []
@@ -3006,12 +3083,29 @@ def reporte_dgcf_r106(request):
     fecha_inicio = date(gestion, 1, 1)
 
     # 1. Filtro opcional por Almacén
-    filtro_almacen_id = request.GET.get('almacen', '').strip()
-    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
-    almacen_seleccionado = None
-    if filtro_almacen_id:
-        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id)
+    # LÓGICA BLINDADA:
+    es_admin_o_central = (
+        request.user.perfilusuario.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'PRESUPUESTOS', 'SECRETARIO_SAF'] or 
+        request.user.is_superuser
+    )
 
+    almacenes_usuario = obtener_almacenes_usuario(request.user)
+    if not es_admin_o_central and almacenes_usuario.filter(tipo='CENTRAL').exists():
+        es_admin_o_central = True
+
+    filtro_almacen_id = request.GET.get('almacen', '').strip()
+
+    if es_admin_o_central:
+        # Administradores y Central pueden ver consolidado y todos los almacenes
+        almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
+        almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id) if filtro_almacen_id else None
+        puede_ver_consolidado = True
+    else:
+        # SUBALMACÉN (SIGEPRO): Solo ve su propio almacén, forzado obligatoriamente
+        almacenes_disponibles = almacenes_usuario
+        almacen_seleccionado = almacenes_usuario.first()
+        filtro_almacen_id = str(almacen_seleccionado.id) if almacen_seleccionado else ''
+        puede_ver_consolidado = False
     materiales = Material.objects.select_related('partida', 'unidad_medida_fk').order_by('partida__codigo', 'codigo')
 
     filas = []
@@ -3100,6 +3194,7 @@ def reporte_dgcf_r106(request):
         'totales': totales,
         'almacenes_disponibles': almacenes_disponibles,
         'almacen_seleccionado': almacen_seleccionado,
+        'puede_ver_consolidado': puede_ver_consolidado,
     }
     return render(request, 'inventario/reporte_dgcf_r106.html', context)
 
@@ -3488,33 +3583,58 @@ def toggle_unidad_medida(request, id):
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES', 'PRESUPUESTOS', 'BIENES_SERVICIOS', 'SECRETARIO_SAF', 'RPA'])
 def hub_reportes(request):
     """
-    TARJETA 3: Centro de Mando Centralizado de Reportes y Auditoría.
-    Permite auditar cualquier gestión fiscal (2025, 2026, 2027, etc.) de forma dinámica.
+    Centro de Mando de Reportes adaptado a la jerarquía del usuario:
+    Si es Subalmacén, todos los enlaces se bloquean a su propio depósito.
     """
     from datetime import date
     from .models import MovimientoInventario, Material, Almacen
 
-    # 1. Obtener gestiones que tienen movimientos registrados en el sistema
     anios_db = list(MovimientoInventario.objects.dates('fecha', 'year').values_list('fecha__year', flat=True).distinct())
     anio_actual = date.today().year
-    
-    # 2. Lista de gestiones ordenada descendente
     gestiones_disponibles = sorted(list(set(anios_db + [anio_actual, 2026])), reverse=True)
-
-    # 3. Gestión seleccionada (por defecto la primera disponible o la actual)
     gestion_sel = int(request.GET.get('gestion', gestiones_disponibles[0]))
 
-    almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
-    
-    # Materiales para el generador rápido de Kardex
-    materiales = Material.objects.filter(is_active=True).select_related('partida', 'unidad_medida_fk').order_by('codigo')
+    almacen_fijado, es_central_o_admin = resolver_almacen_operativo(request)
+
+    # Materiales disponibles para el generador rápido de Kardex
+    if not es_central_o_admin and almacen_fijado:
+        # Solo materiales con presencia o asignación en este subalmacén
+        materiales = Material.objects.filter(
+            is_active=True,
+            inventarios_almacen__almacen=almacen_fijado
+        ).select_related('partida', 'unidad_medida_fk').distinct().order_by('codigo')
+        if not materiales.exists():
+            materiales = Material.objects.filter(is_active=True).select_related('partida', 'unidad_medida_fk').order_by('codigo')
+    else:
+        materiales = Material.objects.filter(is_active=True).select_related('partida', 'unidad_medida_fk').order_by('codigo')
 
     context = {
         'gestion_sel': gestion_sel,
         'gestiones_disponibles': gestiones_disponibles,
-        'almacenes': almacenes,
+        'almacen_fijado': almacen_fijado,
+        'es_central_o_admin': es_central_o_admin,
         'materiales': materiales,
         'desde_defecto': f"{gestion_sel}-01-01",
         'hasta_defecto': f"{gestion_sel}-12-31",
     }
     return render(request, 'inventario/reportes_hub.html', context)
+def resolver_almacen_operativo(request):
+    """
+    Retorna (almacen_fijado, es_central_o_admin).
+    Si el usuario es de un SUBALMACÉN, 'es_central_o_admin' es False
+    y 'almacen_fijado' SIEMPRE será su propio subalmacén sin excepciones.
+    """
+    perfil = getattr(request.user, 'perfilusuario', None)
+    if not perfil:
+        return None, False
+
+    if perfil.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'SECRETARIO_SAF', 'PRESUPUESTOS'] or request.user.is_superuser:
+        return None, True
+
+    almacenes_user = obtener_almacenes_usuario(request.user)
+    if almacenes_user.filter(tipo='CENTRAL').exists():
+        return None, True
+
+    # Es un SUBALMACÉN (SIGEPRO, UNASBA, etc.)
+    subalmacen = almacenes_user.first()
+    return subalmacen, False
