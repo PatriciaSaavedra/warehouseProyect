@@ -221,12 +221,12 @@ class MovimientoInventario(models.Model):
         # ========================================================
 # 4. COMPRAS (ENTRADAS DE ALMACÉN)
 # ========================================================
-
 class Proveedor(models.Model):
     nit = models.CharField(max_length=20, unique=True, help_text="NIT o documento de identificación")
     razon_social = models.CharField(max_length=200)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     direccion = models.CharField(max_length=300, blank=True, null=True)
+    is_active = models.BooleanField(default=True, help_text="Indica si el proveedor está habilitado para contrataciones")
 
     def __str__(self):
         return self.razon_social

@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+
+{% block title %} Centro de Mando de Reportes y Auditoría {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8 font-['Outfit'] pb-12">
+
+    <!-- 1. HERO BANNER PRINCIPAL (CABECERA EJECUTIVA) -->
+    <div class="relative overflow-hidden rounded-3xl border border-gray-200/80 dark:border-gray-800 bg-gradient-to-r from-white via-stone-50/60 to-red-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-red-950/20 p-6 sm:p-8 shadow-sm">
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            
+            <div class="space-y-2 max-w-2xl">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-[#8b0000]/10 text-[#8b0000] dark:bg-red-950/60 dark:text-red-400 border border-[#8b0000]/20">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#8b0000] dark:bg-red-400 animate-pulse"></span>
+                        Auditoría Gubernamental
+                    </span>
+                    <span class="text-xs text-gray-400 font-mono">D.S. 0181 • SABS • DGCF</span>
+                </div>
+
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                    Centro de Mando de Reportes y Cierres
+                </h1>
+                
+                <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                    Emisión de estados financieros de almacenes, libros de kárdex valorados y consolidados institucionales para rendición de cuentas.
+                </p>
+            </div>
+
+            <!-- SELECTOR DE GESTIÓN TIPO PÍLDORA MODERNA -->
+            <div class="flex items-center gap-3 p-1.5 bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
+                <div class="flex items-center gap-2 pl-3">
+                    <span class="material-symbols-outlined text-[20px] text-[#d97706]">calendar_month</span>
+                    <span class="text-xs font-bold text-gray-600 dark:text-gray-300">Gestión:</span>
+                </div>
+                <select 
+                    id="selector-gestion"
+                    onchange="cambiarGestion(this.value)"
+                    class="border-0 bg-gray-50 dark:bg-slate-900 font-extrabold text-sm text-[#8b0000] dark:text-red-400 rounded-xl px-4 py-2 focus:ring-2 focus:ring-[#8b0000] cursor-pointer transition shadow-inner"
+                >
+                    {% for g in gestiones_disponibles %}
+                        <option value="{{ g }}" {% if g == gestion_sel %}selected{% endif %}>
+                            Gestión Fiscal {{ g }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Marca de agua institucional sutil en fondo -->
+        <span class="material-symbols-outlined absolute -right-6 -bottom-8 text-[160px] text-gray-900/5 dark:text-white/5 pointer-events-none select-none">
+            assessment
+        </span>
+    </div>
+
+    <!-- 2. SECCIÓN: CIERRES FISCALES Y ESTADOS DE ALMACÉN DGCF -->
+    {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,KARDISTA,PRESUPUESTOS,SECRETARIO_SAF' %}
+    <section class="space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-red-100/70 dark:bg-red-950/60 text-[#8b0000] dark:text-red-400 flex items-center justify-center shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">account_balance</span>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                        Cierres Fiscales y Auditoría DGCF
+                    </h2>
+                    <span class="text-[11px] text-gray-400">Dirección General de Contabilidad Fiscal • Bolivia</span>
+                </div>
+            </div>
+            <span class="text-xs font-mono font-bold text-gray-400 bg-gray-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
+                Período {{ gestion_sel }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            
+            <!-- TARJETA 1: DGCF R1.05 -->
+            <div class="group relative card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md hover:border-[#8b0000]/40 transition-all duration-200 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="w-11 h-11 rounded-2xl bg-stone-100 dark:bg-slate-800 text-[#8b0000] dark:text-red-400 flex items-center justify-center group-hover:bg-[#8b0000] group-hover:text-white transition-all duration-200">
+                            <span class="material-symbols-outlined text-[24px]">receipt_long</span>
+                        </span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-red-50 text-[#8b0000] dark:bg-red-950/50 dark:text-red-300 border border-red-200/60 dark:border-red-900/40">
+                            DGCF - R1.05
+                        </span>
+                    </div>
+
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white group-hover:text-[#8b0000] dark:group-hover:text-red-400 transition">
+                        Resumen por Partidas
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                        Existencias iniciales, compras del período, despachos y saldos finales clasificados por objeto del gasto presupuestario.
+                    </p>
+                </div>
+
+                <div class="pt-5 mt-5 border-t border-gray-100 dark:border-gray-800/80">
+                    <a href="{% url 'reporte_dgcf_r105' %}?gestion={{ gestion_sel }}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-[#8b0000] hover:text-white dark:bg-slate-800 dark:hover:bg-[#8b0000] transition flex items-center justify-center gap-2 group-hover:bg-[#8b0000] group-hover:text-white shadow-sm">
+                        <span>Generar Formulario R1.05</span>
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- TARJETA 2: DGCF R1.06 -->
+            <div class="group relative card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md hover:border-[#8b0000]/40 transition-all duration-200 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="w-11 h-11 rounded-2xl bg-stone-100 dark:bg-slate-800 text-[#d97706] dark:text-amber-400 flex items-center justify-center group-hover:bg-[#d97706] group-hover:text-white transition-all duration-200">
+                            <span class="material-symbols-outlined text-[24px]">table_view</span>
+                        </span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-50 text-[#d97706] dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/40">
+                            DGCF - R1.06
+                        </span>
+                    </div>
+
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white group-hover:text-[#d97706] dark:group-hover:text-amber-400 transition">
+                        Detalle de Almacenes por Ítem
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                        Inventario pormenorizado subartículo por subartículo con precios ponderados y trazabilidad contable completa.
+                    </p>
+                </div>
+
+                <div class="pt-5 mt-5 border-t border-gray-100 dark:border-gray-800/80">
+                    <a href="{% url 'reporte_dgcf_r106' %}?gestion={{ gestion_sel }}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-[#d97706] hover:text-white dark:bg-slate-800 dark:hover:bg-[#d97706] transition flex items-center justify-center gap-2 group-hover:bg-[#d97706] group-hover:text-white shadow-sm">
+                        <span>Generar Formulario R1.06</span>
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- TARJETA 3: INVENTARIO VALORADO (PDF OFICIAL) -->
+            <div class="group relative card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md hover:border-[#8b0000]/40 transition-all duration-200 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-950/50 text-[#8b0000] dark:text-red-400 flex items-center justify-center group-hover:bg-[#8b0000] group-hover:text-white transition-all duration-200">
+                            <span class="material-symbols-outlined text-[24px]">picture_as_pdf</span>
+                        </span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-red-100/70 text-[#8b0000] dark:bg-red-950/60 dark:text-red-300 border border-red-300/60 dark:border-red-900/60">
+                            OFICIAL PDF
+                        </span>
+                    </div>
+
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white group-hover:text-[#8b0000] transition">
+                        Inventario Físico Valorado
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                        Documento oficial impreso con escudo departamental, clasificado por partidas presupuestarias con subtotales y total general.
+                    </p>
+                </div>
+
+                <div class="pt-5 mt-5 border-t border-gray-100 dark:border-gray-800/80">
+                    <a href="{% url 'reporte_inventario' %}?desde={{ desde_defecto }}&hasta={{ hasta_defecto }}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#8b0000] hover:bg-[#700000] transition flex items-center justify-center gap-2 shadow-sm">
+                        <span class="material-symbols-outlined text-[16px]">download</span>
+                        <span>Descargar PDF {{ gestion_sel }}</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- 3. SECCIÓN: CONSUMO POR DEPENDENCIAS Y MATRIZ DBC -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- BLOQUE: CONSUMO POR DEPENDENCIAS -->
+        <div class="card p-6 sm:p-7 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm flex flex-col justify-between">
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-[#d97706] dark:text-amber-400 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[22px]">corporate_fare</span>
+                    </span>
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-50 text-[#d97706] dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60">
+                        CONTROL PEPS
+                    </span>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                        Consumo por Dependencias y Secretarías
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                        Informe comparativo de Asignación Física Directa recibida en compras versus retiros físicos y el importe valorado (Bs.) consumido por cada oficina.
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-6 mt-6 border-t border-gray-100 dark:border-gray-800/80 flex items-center gap-3">
+                <a href="{% url 'reporte_consumo_unidades' %}?gestion={{ gestion_sel }}" class="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gray-900 dark:bg-slate-800 hover:bg-[#8b0000] transition flex items-center justify-center gap-2 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">visibility</span>
+                    <span>Ver Consolidado Web</span>
+                </a>
+                
+                <a href="{% url 'reporte_consumo_unidades' %}?gestion={{ gestion_sel }}&exportar=pdf" target="_blank" class="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-[#8b0000] hover:border-[#8b0000] transition flex items-center justify-center" title="Descargar versión PDF oficial">
+                    <span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- BLOQUE: MATRIZ DE CONTRATACIÓN DBC -->
+        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,BIENES_SERVICIOS,ALMACENERO,KARDISTA,RPA' %}
+        <div class="card p-6 sm:p-7 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm flex flex-col justify-between">
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="w-10 h-10 rounded-2xl bg-stone-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[22px]">view_column</span>
+                    </span>
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-stone-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        CONTRATACIONES
+                    </span>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                        Matriz de Especificaciones Técnicas (DBC)
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                        Cuadro comparativo que cruza la demanda consolidada de todas las Secretarías departamentales por partida presupuestaria para compras masivas.
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-6 mt-6 border-t border-gray-100 dark:border-gray-800/80">
+                <a href="{% url 'reporte_especificaciones_tecnicas' %}?gestion={{ gestion_sel }}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gray-900 dark:bg-slate-800 hover:bg-[#8b0000] transition flex items-center justify-center gap-2 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                    <span>Abrir Matriz Oficial DBC {{ gestion_sel }}</span>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+    </section>
+
+    <!-- 4. SECCIÓN: AUDITORÍA RÁPIDA DE KÁRDEX POR MATERIAL -->
+    <section class="card p-6 sm:p-7 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
+        <div class="flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-xl bg-amber-100/70 dark:bg-amber-950/60 text-[#d97706] dark:text-amber-400 flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">menu_book</span>
+            </span>
+            <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                    Consulta Exprés de Kárdex por Material (Gestión {{ gestion_sel }})
+                </h2>
+                <span class="text-[11px] text-gray-400">Auditoría directa sin salir del Centro de Mando</span>
+            </div>
+        </div>
+
+        <div class="p-3 bg-gray-50/70 dark:bg-slate-800/50 rounded-2xl border border-gray-200/70 dark:border-gray-700/60">
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <!-- Select de Materiales -->
+                <div class="sm:col-span-8">
+                    <select 
+                        id="select-material-kardex" 
+                        class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-900 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 dark:text-gray-200 font-semibold focus:ring-2 focus:ring-[#8b0000] cursor-pointer"
+                    >
+                        <option value="">-- Buscar por código SABS o nombre de subartículo --</option>
+                        {% for mat in materiales %}
+                            <option value="{{ mat.id }}">
+                                {{ mat.codigo }} — {{ mat.nombre }} [Partida {{ mat.partida.codigo|default:'S/P' }}]
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Botón Kárdex Web -->
+                <div class="sm:col-span-2">
+                    <button 
+                        type="button" 
+                        onclick="abrirKardex('web')" 
+                        class="w-full py-2.5 bg-gray-900 hover:bg-gray-800 dark:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 h-[40px] cursor-pointer shadow-sm active:scale-95"
+                    >
+                        <span class="material-symbols-outlined text-[16px]">visibility</span>
+                        <span>Ver Kárdex</span>
+                    </button>
+                </div>
+
+                <!-- Botón Kárdex PDF Valorado -->
+                <div class="sm:col-span-2">
+                    <button 
+                        type="button" 
+                        onclick="abrirKardex('pdf')" 
+                        class="w-full py-2.5 bg-[#8b0000] hover:bg-[#700000] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 h-[40px] cursor-pointer shadow-sm active:scale-95"
+                    >
+                        <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                        <span>PDF Valorado</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- SCRIPT DE NAVEGACIÓN -->
+<script>
+    function cambiarGestion(gestion) {
+        window.location.href = "?gestion=" + gestion;
+    }
+
+    function abrirKardex(tipo) {
+        const matId = document.getElementById('select-material-kardex').value;
+        const gestion = '{{ gestion_sel }}';
+        if (!matId) {
+            alert('Por favor, selecciona primero un material de la lista.');
+            return;
+        }
+
+        if (tipo === 'web') {
+            window.location.href = `/inventario/kardex/${matId}/?gestion=${gestion}`;
+        } else {
+            window.open(`/inventario/kardex/pdf/${matId}/?gestion=${gestion}`, '_blank');
+        }
+    }
+</script>
+{% endblock %}

@@ -59,7 +59,7 @@
             </td>
             <td class="title-box">
                 <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
-                <h2>INFORME EJECUTIVO DE CONSUMO DE MATERIALES Y EJECUCIÓN POA</h2>
+                <h2>INFORME EJECUTIVO DE ASIGNACIÓN Y CONSUMO FÍSICO-VALORADO</h2>
                 <p>Gestión Fiscal: {{ gestion }} • Período: Del {{ desde }} al {{ hasta }}</p>
                 <p><em>(Valores monetarios expresados en Bolivianos - Costeo PEPS)</em></p>
             </td>
@@ -78,32 +78,29 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width: 40%;">Unidad / Área Organizacional</th>
-                    <th style="width: 12%;">Cant. Retirada</th>
-                    <th style="width: 15%;">Gasto Real (Bs.)</th>
-                    <th style="width: 15%;">Presupuesto POA</th>
-                    <th style="width: 15%;">Saldo Remanente</th>
-                    <th style="width: 10%;">% Ejecución</th>
+                    <th style="width: 38%;">Unidad / Área Organizacional</th>
+                    <th style="width: 15%;">Cant. Asignada</th>
+                    <th style="width: 15%;">Cant. Retirada</th>
+                    <th style="width: 15%;">Saldo Pendiente</th>
+                    <th style="width: 17%;">Valorado Retirado (Bs.)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in grupo.unidades %}
                 <tr>
                     <td class="text-left font-bold">{{ u.unidad.nombre }}</td>
-                    <td class="text-center">{{ u.total_cant }} u.</td>
-                    <td class="text-right font-bold">Bs. {{ u.total_val|floatformat:2 }}</td>
-                    <td class="text-right">Bs. {{ u.poa_inicial|floatformat:2 }}</td>
-                    <td class="text-right">Bs. {{ u.poa_disponible|floatformat:2 }}</td>
-                    <td class="text-center font-bold">{{ u.pct_consumo }}%</td>
+                    <td class="text-center">{{ u.cant_asignada }} u.</td>
+                    <td class="text-center font-bold">{{ u.cant_retirada }} u.</td>
+                    <td class="text-center">{{ u.saldo_pendiente }} u.</td>
+                    <td class="text-right font-bold">Bs. {{ u.val_retirado|floatformat:2 }}</td>
                 </tr>
                 {% endfor %}
                 <tr class="row-total">
                     <td class="text-right">SUBTOTAL SECRETARÍA:</td>
-                    <td class="text-center">{{ grupo.total_fisico }} u.</td>
+                    <td class="text-center">{{ grupo.total_asignado }} u.</td>
+                    <td class="text-center">{{ grupo.total_retirado }} u.</td>
+                    <td class="text-center">{{ grupo.total_pendiente }} u.</td>
                     <td class="text-right">Bs. {{ grupo.total_valorado|floatformat:2 }}</td>
-                    <td class="text-right">Bs. {{ grupo.total_poa|floatformat:2 }}</td>
-                    <td class="text-right">—</td>
-                    <td class="text-center">{{ grupo.pct_consumo }}%</td>
                 </tr>
             </tbody>
         </table>

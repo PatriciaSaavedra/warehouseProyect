@@ -1,29 +1,74 @@
-<aside class="flex flex-col h-screen fixed left-0 top-0 z-40 w-[260px] bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] shadow-sm select-none sidebar-custom transition-all duration-200">
+<!-- BACKDROP OSCURO PARA MÓVILES -->
+<div 
+    id="sidebar-backdrop" 
+    class="fixed inset-0 bg-black/60 z-40 hidden lg:hidden backdrop-blur-sm transition-opacity duration-300"
+    onclick="toggleSidebarMobile()"
+></div>
 
-    <!-- LOGO INSTITUCIONAL -->
-    <div class="p-6 flex flex-col items-center border-b border-[var(--border-color)] mb-4">
-        <h1 class="text-2xl font-extrabold text-[var(--primary)] dark:text-red-500 font-['Outfit'] tracking-wide text-center">
-            {% if request.user.perfilusuario.rol == 'ALMACENERO' and request.user.perfilusuario.almacenes_autorizados.first %}
-                {{ request.user.perfilusuario.almacenes_autorizados.first.nombre }}
-            {% else %}
-                Almacén Central
-            {% endif %}
-        </h1>
-        <p class="text-[11px] font-bold text-[var(--secondary)] dark:text-amber-500 uppercase tracking-widest mt-1">
-            Gestión Gubernamental
-        </p>
+<aside 
+    id="main-sidebar" 
+    class="flex flex-col h-screen fixed left-0 top-0 z-50 w-[260px] bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] shadow-xl lg:shadow-none select-none sidebar-custom transition-transform duration-300 -translate-x-full lg:translate-x-0"
+>
+
+    <!-- CABECERA ADAPTABLE AL ALMACÉN / ÁREA DEL USUARIO -->
+    <div class="p-5 border-b border-[var(--border-color)] bg-gradient-to-b from-stone-50/50 to-transparent dark:from-slate-900/40">
+        <div class="flex items-start justify-between gap-2">
+            <div class="flex flex-col min-w-0">
+                
+                <!-- BADGE DE TIPO DE ALMACÉN O UNIDAD -->
+                {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES' %}
+                    <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-[#d97706] dark:text-amber-400 font-mono mb-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#d97706]"></span> Sedes Multi-Almacén
+                    </span>
+                    <h1 class="text-lg font-extrabold text-[var(--secondary)] dark:text-amber-400 font-['Outfit'] tracking-tight truncate" title="Administración Central">
+                        Almacén Central
+                    </h1>
+                {% elif request.user.perfilusuario.rol in 'ALMACENERO,KARDISTA' %}
+                    <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-mono mb-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> 
+                        {{ almacen_usuario.get_tipo_display|default:"Depósito Asignado" }}
+                    </span>
+                    <h1 class="text-base font-extrabold text-[var(--secondary)] dark:text-amber-400 font-['Outfit'] tracking-tight truncate" title="{{ almacen_usuario.nombre|default:'Almacén Operativo' }}">
+                        {{ almacen_usuario.nombre|default:"Sin Almacén Asignado" }}
+                    </h1>
+                {% else %}
+                    <!-- Para Unidad Solicitante, RPA, Presupuestos, etc. -->
+                    <span class="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-[#7c121e] dark:text-red-400 font-mono mb-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#7c121e]"></span> 
+                        {{ request.user.perfilusuario.unidad.sigla|default:"Unidad Ejecutora" }}
+                    </span>
+                    <h1 class="text-sm font-extrabold text-[var(--secondary)] dark:text-amber-400 font-['Outfit'] tracking-tight truncate" title="{{ request.user.perfilusuario.unidad.nombre }}">
+                        {{ request.user.perfilusuario.unidad.nombre|default:"Oficina Solicitante"|truncatechars:24 }}
+                    </h1>
+                {% endif %}
+
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                    GAD Potosí • 2026
+                </p>
+            </div>
+
+            <!-- Botón cerrar (Solo en móviles) -->
+            <button 
+                type="button" 
+                onclick="toggleSidebarMobile()" 
+                class="lg:hidden p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                aria-label="Cerrar menú"
+            >
+                <span class="material-symbols-outlined text-[20px]">close</span>
+            </button>
+        </div>
     </div>
 
-    <!-- MENU PRINCIPAL -->
-    <nav class="flex-1 px-4 space-y-1.5 overflow-y-auto">
+    <!-- MENÚ PRINCIPAL -->
+    <nav class="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
 
         <!-- 1️⃣ DASHBOARD -->
         <a 
             href="/dashboard/"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
-            {% if '/dashboard/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
+            class="flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
+            {% if request.path == '/dashboard/' %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
-            <span class="material-symbols-outlined mr-3 text-[22px]">dashboard</span>
+            <span class="material-symbols-outlined mr-2.5 text-[20px]">dashboard</span>
             Panel de control
         </a>
 
@@ -33,43 +78,36 @@
             class="group" 
             {% if '/usuarios/' in request.path or '/inventario/almacenes/' in request.path or '/organizacion/' in request.path or '/inventario/unidades-medida/' in request.path or '/compras/autoridades/' in request.path or '/compras/proveedores/' in request.path %}open{% endif %}
         >
-            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none [&::-webkit-details-marker]:hidden">
+            <summary class="flex items-center justify-between px-3.5 py-2.5 rounded-2xl font-semibold text-xs text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none [&::-webkit-details-marker]:hidden">
                 <div class="flex items-center">
-                    <span class="material-symbols-outlined mr-3 text-[22px]">settings_applications</span>
+                    <span class="material-symbols-outlined mr-2.5 text-[20px]">settings_applications</span>
                     Administración
                 </div>
-                <span class="material-symbols-outlined text-[18px] transition duration-200 group-open:rotate-180 text-gray-400">expand_more</span>
+                <span class="material-symbols-outlined text-[16px] transition duration-200 group-open:rotate-180 text-gray-400">expand_more</span>
             </summary>
             
-            <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <a href="{% url 'secretaria_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">corporate_fare</span>
-                    Secretarías
+            <div class="pl-6 pr-2 mt-1 space-y-1 border-l-2 border-[var(--border-color)] ml-4">
+                <a href="{% url 'secretaria_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">corporate_fare</span> Secretarías
                 </a>
-                <a href="{% url 'unidad_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">account_tree</span>
-                    Unidades Org.
+                <a href="{% url 'unidad_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">account_tree</span> Unidades Org.
                 </a>
-                <a href="{% url 'almacen_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">warehouse</span>
-                    Almacenes
+                <a href="{% url 'almacen_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">warehouse</span> Almacenes
                 </a>
-                <a href="{% url 'unidad_medida_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">straighten</span>
-                    Unidades de Medida
+                <a href="{% url 'unidad_medida_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">straighten</span> Unidades Medida
                 </a>
-                <a href="{% url 'autoridades_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">badge</span>
-                    Autoridades (RPA / SAF)
+                <a href="{% url 'autoridades_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">badge</span> Autoridades
                 </a>
-                <a href="{% url 'proveedores_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">storefront</span>
-                    Proveedores
+                <a href="{% url 'proveedores_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">storefront</span> Proveedores
                 </a>
                 {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                <a href="/usuarios/" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">group</span>
-                    Usuarios
+                <a href="/usuarios/" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">group</span> Usuarios
                 </a>
                 {% endif %}
             </div>
@@ -77,128 +115,126 @@
         {% endif %}
 
         <!-- 3️⃣ TRÁMITES Y SOLICITUDES -->
-        <div class="pt-2 pb-1 px-4">
-            <p class="text-[9px] font-extrabold uppercase tracking-wider text-[var(--secondary)] dark:text-amber-500">
+        <div class="pt-2 pb-0.5 px-3">
+            <p class="text-[9px] font-black uppercase tracking-wider text-[var(--gold)] font-mono">
                 Trámites y Solicitudes
             </p>
         </div>
 
-        <!-- 1. MIS SOLICITUDES PERSONALES (Para todos los funcionarios) -->
         <a 
             href="{% url 'solicitudes' %}"
-            class="flex items-center px-4 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
+            class="flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
             {% if request.path == '/solicitudes/' %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
-            <span class="material-symbols-outlined mr-3 text-[20px]">person</span>
+            <span class="material-symbols-outlined mr-2.5 text-[20px]">person</span>
             Mis Solicitudes
         </a>
 
-        <!-- 2. BANDEJA DE GESTIÓN INSTITUCIONAL (Revisores, RPA, SAF, Presupuestos, Almacén) -->
         {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,RPA,SECRETARIO_SAF,PRESUPUESTOS,BIENES_SERVICIOS,ALMACENERO,KARDISTA,JEFE_INMEDIATO,JEFE_ADMINISTRATIVO' %}
         <a 
             href="{% url 'solicitudes_general' %}"
-            class="flex items-center px-4 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
+            class="flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
             {% if '/solicitudes/bandeja/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
-            <span class="material-symbols-outlined mr-3 text-[20px]">inbox</span>
+            <span class="material-symbols-outlined mr-2.5 text-[20px]">inbox</span>
             Bandeja de Gestión
         </a>
         {% endif %}
 
-        <!-- 4️⃣ INVENTARIO (Solo Almacén y Administradores) -->
+        <!-- Proveedores directos para Bienes y Servicios -->
+        {% if request.user.perfilusuario.rol == 'BIENES_SERVICIOS' %}
+        <a 
+            href="{% url 'proveedores_list' %}"
+            class="flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
+            {% if '/compras/proveedores/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-2.5 text-[20px]">storefront</span>
+            Proveedores
+        </a>
+        {% endif %}
+
+        <!-- 4️⃣ INVENTARIO VINCULADO AL ALMACÉN ESPECÍFICO -->
         {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,KARDISTA' %}
         <details 
             class="group" 
-            {% if '/inventario/' in request.path and '/inventario/almacenes/' not in request.path and '/inventario/unidades-medida/' not in request.path %}open{% elif '/movimientos/' in request.path %}open{% endif %}
+            {% if '/inventario/' in request.path and '/inventario/reportes/' not in request.path and '/inventario/almacenes/' not in request.path and '/inventario/unidades-medida/' not in request.path and '/inventario/cierre/' not in request.path %}open{% elif '/movimientos/' in request.path %}open{% endif %}
         >
-            <summary class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none [&::-webkit-details-marker]:hidden">
+            <summary class="flex items-center justify-between px-3.5 py-2.5 rounded-2xl font-semibold text-xs text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)] cursor-pointer transition duration-150 list-none select-none [&::-webkit-details-marker]:hidden">
                 <div class="flex items-center">
-                    <span class="material-symbols-outlined mr-3 text-[22px]">inventory_2</span>
-                    Inventario
+                    <span class="material-symbols-outlined mr-2.5 text-[20px]">inventory_2</span>
+                    Inventario Operativo
                 </div>
-                <span class="material-symbols-outlined text-[18px] transition duration-200 group-open:rotate-180 text-gray-400">expand_more</span>
+                <span class="material-symbols-outlined text-[16px] transition duration-200 group-open:rotate-180 text-gray-400">expand_more</span>
             </summary>
             
-            <div class="pl-8 pr-2 mt-1.5 space-y-1 border-l-2 border-[var(--border-color)] ml-6">
-                <a href="{% url 'inventario' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">fact_check</span>
-                    Existencias
+            <div class="pl-6 pr-2 mt-1 space-y-1 border-l-2 border-[var(--border-color)] ml-4">
+                <!-- Enlaces pre-filtrados por el almacén del usuario -->
+                <a href="{% url 'inventario' %}{% if almacen_usuario %}?almacen={{ almacen_usuario.id }}{% endif %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">fact_check</span> Existencias
                 </a>
-                <a href="{% url 'inventario_por_unidad' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">domain</span>
-                    Stock por Unidad
+                <a href="{% url 'inventario_por_unidad' %}{% if almacen_usuario %}?almacen_id={{ almacen_usuario.id }}{% endif %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">domain</span> Stock por Unidad
                 </a>
-                <a href="{% url 'nota_ingreso_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">input</span>
-                    Entradas (Ingresos)
+                <a href="{% url 'nota_ingreso_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">input</span> Entradas
                 </a>
-                <a href="{% url 'nota_salida_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">output</span>
-                    Salidas (Egresos)
+                <a href="{% url 'nota_salida_list' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">output</span> Salidas
                 </a>
-                <a href="{% url 'lotes_list' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">layers</span>
-                    Lotes Activos (PEPS)
+                <a href="{% url 'lotes_list' %}{% if almacen_usuario %}?almacen={{ almacen_usuario.id }}{% endif %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">layers</span> Lotes PEPS
                 </a>
-                <a href="{% url 'movimientos' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">swap_horiz</span>
-                    Movimientos
+                <a href="{% url 'movimientos' %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">swap_horiz</span> Movimientos
                 </a>
-
-                <div class="pt-2.5 pb-1 px-2 border-t border-[var(--border-color)]/60 mt-1.5">
-                    <p class="text-[9px] font-extrabold uppercase tracking-wider text-[var(--secondary)] dark:text-amber-500">
-                        Cierre / Auditoría DGCF
-                    </p>
-                </div>
-                <a href="{% url 'reporte_dgcf_r105' %}" target="_blank" class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">receipt_long</span>
-                    Resumen Partidas (R1.05)
-                </a>
-                <a href="{% url 'reporte_dgcf_r106' %}" target="_blank" class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">table_view</span>
-                    Kardex Valorado (R1.06)
-                </a>
-                <a href="{% url 'reporte_consumo_dependencias' %}" class="flex items-center px-4 py-2.5 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">account_balance_wallet</span>
-                    Consumo por Dependencias
-                </a>
-                <a href="{% url 'reporte_especificaciones_tecnicas' %}" target="_blank" class="flex items-center px-4 py-2 rounded-xl font-medium text-xs transition duration-150 text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-neutral-500/5">
-                    <span class="material-symbols-outlined mr-2 text-[18px]">view_column</span>
-                    Matriz Especif. Técnicas
+                <a href="{% url 'cierre_conciliacion' %}{% if almacen_usuario %}?almacen={{ almacen_usuario.id }}{% endif %}" class="flex items-center px-3 py-2 rounded-xl font-medium text-xs transition text-amber-700 dark:text-amber-400 hover:bg-amber-500/10">
+                    <span class="material-symbols-outlined mr-2 text-[16px]">lock_reset</span> Conciliación Física
                 </a>
             </div>
         </details>
         {% endif %}
 
-        <!-- 5️⃣ AUDITORÍA -->
+        <!-- 5️⃣ CENTRO DE MANDO DE REPORTES Y AUDITORÍA -->
+        {% if request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,ALMACENERO,KARDISTA,PRESUPUESTOS,BIENES_SERVICIOS,SECRETARIO_SAF,RPA' %}
+        <a 
+            href="{% url 'hub_reportes' %}"
+            class="flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
+            {% if '/inventario/reportes/' in request.path or '/inventario/reporte' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
+        >
+            <span class="material-symbols-outlined mr-2.5 text-[20px] text-[var(--gold)]">bar_chart</span>
+            <span>Reportes y Auditoría</span>
+        </a>
+        {% endif %}
+
+        <!-- 6️⃣ BITÁCORA DE AUDITORÍA -->
         {% if request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
         <a 
             href="/auditoria/"
-            class="flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition duration-150
+            class="flex items-center px-3.5 py-2.5 rounded-2xl font-semibold text-xs transition duration-150
             {% if '/auditoria/' in request.path %}sidebar-active{% else %}text-[var(--text-muted)] hover:bg-neutral-500/10 hover:text-[var(--text-heading)]{% endif %}"
         >
-            <span class="material-symbols-outlined mr-3 text-[22px]">security</span>
-            Auditoría
+            <span class="material-symbols-outlined mr-2.5 text-[20px]">security</span>
+            Bitácora de Auditoría
         </a>
         {% endif %}
 
     </nav>
 
-    <!-- FOOTER CON USUARIO Y SALIDA -->
-    <div class="p-4 border-t border-[var(--border-color)] bg-neutral-500/5">
-        <div class="px-4 mb-3">
-            <p class="font-bold text-[var(--text-main)] text-sm font-['Outfit'] truncate">
+    <!-- PIE DEL SIDEBAR (USUARIO Y SALIDA) -->
+    <div class="p-3 border-t border-[var(--border-color)] bg-neutral-500/5">
+        <div class="px-3 mb-2">
+            <p class="font-bold text-[var(--text-main)] text-xs font-['Outfit'] truncate">
                 {{ request.user.get_full_name|default:request.user.username }}
             </p>
-            <p class="text-[10px] font-bold text-[var(--secondary)] dark:text-amber-500 uppercase tracking-wider mt-0.5">
+            <p class="text-[9px] font-bold text-[var(--gold)] uppercase tracking-wider">
                 {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
             </p>
         </div>
 
         <form method="POST" action="{% url 'logout' %}">
             {% csrf_token %}
-            <button type="submit" class="w-full flex items-center px-4 py-2.5 text-red-700 dark:text-red-400 hover:bg-red-500/10 rounded-2xl transition font-semibold text-sm cursor-pointer">
-                <span class="material-symbols-outlined mr-3 text-[22px]">logout</span>
+            <button type="submit" class="w-full flex items-center px-3 py-2 text-red-700 dark:text-red-400 hover:bg-red-500/10 rounded-xl transition font-semibold text-xs cursor-pointer">
+                <span class="material-symbols-outlined mr-2 text-[18px]">logout</span>
                 Cerrar Sesión
             </button>
         </form>

@@ -50,4 +50,6 @@ urlpatterns = [
     path('unidades-medida/crear/', views.crear_unidad_medida, name='crear_unidad_medida'),
     path('unidades-medida/editar/<int:id>/', views.editar_unidad_medida, name='editar_unidad_medida'),
     path('unidades-medida/toggle/<int:id>/', views.toggle_unidad_medida, name='toggle_unidad_medida'),
+
+    path('reportes/', views.hub_reportes, name='hub_reportes'),
 ]

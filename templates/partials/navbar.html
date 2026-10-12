@@ -1,13 +1,16 @@
 <!-- HEADER: Se agregó la clase 'navbar-custom' al final para anular el fondo blanco y bordes en modo oscuro -->
-<header class="fixed top-0 right-0 w-full lg:w-[calc(100%-260px)] h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm transition-all duration-300 navbar-custom">
-
+<!-- HEADER FIJO SIN SUPERPOSICIONES -->
+<header class="fixed top-0 right-0 w-full lg:w-[calc(100%-260px)] h-16 sm:h-[68px] bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm transition-all duration-300 navbar-custom">
     <!-- LADO IZQUIERDO: ACCESOS Y TÍTULO -->
     <div class="flex items-center gap-2 min-w-0">
         
         <!-- Botón Hamburguesa de Menú para pantallas táctiles/móviles -->
+        <!-- Botón Hamburguesa de Menú para pantallas táctiles/móviles -->
         <button 
             type="button"
-            class="lg:hidden p-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 flex items-center justify-center transition duration-150 cursor-pointer"
+            id="btn-sidebar-toggle"
+            onclick="toggleSidebarMobile()"
+            class="lg:hidden p-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-900 flex items-center justify-center transition duration-150 cursor-pointer"
             aria-label="Abrir menú"
         >
             <span class="material-symbols-outlined text-[24px]">

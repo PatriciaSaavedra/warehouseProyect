@@ -146,19 +146,19 @@
                     </div>
                 </div>
 
-                <!-- OFICINAS CON POA HABILITADO -->
+                <!-- OFICINAS CON ASIGNACIÓN DIRECTA -->
                 <div class="pt-2.5 border-t border-gray-200/60 dark:border-gray-800 flex flex-wrap items-center gap-1.5 text-xs">
                     <span class="text-[10px] font-bold uppercase text-gray-500 flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[14px] text-green-600">verified_user</span>
-                        Oficinas con POA Habilitado:
+                        <span class="material-symbols-outlined text-[15px] text-amber-600">assignment_turned_in</span>
+                        Oficinas con Asignación Directa:
                     </span>
-                    {% for poa in grupo.poas_habilitados %}
-                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800" title="Saldo disponible en POA: Bs. {{ poa.monto_disponible|floatformat:2 }}">
-                            <strong>{{ poa.unidad.nombre }}</strong>
-                            <span class="font-mono text-[9px] opacity-80">(Bs. {{ poa.monto_disponible|floatformat:2 }})</span>
+                    {% for asig in grupo.oficinas_asignadas %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800" title="Total asignado en compras: {{ asig.cantidad_asignada }} u.">
+                            <strong>{{ asig.nombre }}</strong>
+                            <span class="font-mono text-[9px] opacity-90">({{ asig.cantidad_disponible }} u. disp.)</span>
                         </span>
                     {% empty %}
-                        <span class="text-[10px] text-amber-600 italic">Ninguna unidad tiene saldo presupuestado en esta partida para 2026</span>
+                        <span class="text-[10px] text-gray-400 italic">Sin cuotas directas registradas (disponible en bolsa general del almacén)</span>
                     {% endfor %}
                 </div>
             </div>

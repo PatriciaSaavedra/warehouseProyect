@@ -254,7 +254,7 @@
         <div class="card p-5 sm:p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-slate-900 shadow-sm">
             <div class="flex items-center justify-between mb-2">
                 <label for="justificacion" class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider font-['Outfit']">
-                    Justificación / Actividad u Obra del POA <span class="text-[#8b0000] font-bold">*</span>
+                    Justificación / Destino del Material <span class="text-[#8b0000] font-bold">*</span>
                 </label>
                 <span id="contador_caracteres" class="text-[11px] text-gray-400">0 / 500</span>
             </div>
@@ -264,7 +264,7 @@
                 rows="3" 
                 maxlength="500"
                 oninput="actualizarContador(this)"
-                placeholder="Indique detalladamente el destino, actividad u obra del POA en la que se utilizarán los materiales solicitados..." 
+                placeholder="Indique detalladamente el destino, uso previsto o justificativo institucional del pedido de materiales..." 
                 class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800/80 text-gray-800 dark:text-gray-100 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition shadow-inner leading-relaxed resize-none" 
                 required
             ></textarea>
@@ -606,12 +606,11 @@ function validarEnvioPedido(e) {
 
     const justificacion = document.getElementById('justificacion').value.trim();
     if (justificacion.length < 10) {
-        mostrarToast('La justificación del POA debe ser más detallada (mínimo 10 caracteres).', 'error');
+        mostrarToast('La justificación / destino del material debe ser más detallada (mínimo 10 caracteres).', 'error');
         document.getElementById('justificacion').focus();
         e.preventDefault();
         return false;
     }
-
     // Deshabilitar botón para evitar doble clic
     const btnSubmit = document.getElementById('btn_submit_pedido');
     btnSubmit.disabled = true;

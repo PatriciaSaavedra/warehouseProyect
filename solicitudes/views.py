@@ -288,7 +288,6 @@ def solicitudes_general(request):
         'total_pedidos': pedidos_qs.count(),
         'total_adquisiciones': adquisiciones_qs.count(),
     })
-
 @login_required
 def buscar_materiales(request):
     q = request.GET.get('q', '').strip()

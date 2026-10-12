@@ -209,18 +209,32 @@ def inventario_view(request):
             total_articulos_global += len(materiales_data)
             total_stock_fisico_almacen += stock_partida_en_almacen
 
-            poas_partida = POA.objects.filter(
-                partida=part,
-                gestion=2026,
-                monto_disponible__gt=0
-            ).select_related('unidad', 'unidad__secretaria').order_by('unidad__nombre')
+            # NUEVO: Oficinas con asignación física directa registrada en entradas de esta partida
+            from inventario.models import AsignacionEntradaUnidad
+
+            asignaciones_qs = AsignacionEntradaUnidad.objects.filter(
+                nota_ingreso_detalle__material__partida=part
+            ).values('unidad_organizacional__nombre').annotate(
+                total_asignada=Sum('cantidad_asignada'),
+                total_retirada=Sum('cantidad_retirada')
+            ).filter(total_asignada__gt=0).order_by('unidad_organizacional__nombre')
+
+            oficinas_asignadas = []
+            for asig in asignaciones_qs:
+                saldo_disp = asig['total_asignada'] - asig['total_retirada']
+                if saldo_disp > 0:
+                    oficinas_asignadas.append({
+                        'nombre': asig['unidad_organizacional__nombre'],
+                        'cantidad_disponible': saldo_disp,
+                        'cantidad_asignada': asig['total_asignada']
+                    })
 
             partidas_agrupadas.append({
                 'partida': part,
                 'materiales_data': materiales_data,
                 'total_materiales': len(materiales_data),
-                'stock_fisico_partida': stock_partida_en_almacen, # <-- Variable corregida
-                'poas_habilitados': poas_partida
+                'stock_fisico_partida': stock_partida_en_almacen,
+                'oficinas_asignadas': oficinas_asignadas
             })
 
     return render(request, 'inventario/index.html', {
@@ -1093,6 +1107,11 @@ def reporte_inventario(request):
     return response
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+def reporte_inventario_oficial_pdf(request):
+    """Redirige al reporte oficial clasificado por partidas presupuestarias."""
+    return reporte_inventario(request)
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def movimientos(request):
     movimientos = MovimientoInventario.objects.all().order_by('-id')
     return render(request, 'inventario/movimientos.html', {'movimientos': movimientos})
@@ -1319,7 +1338,7 @@ def entrada_inventario(request):
     else:
         almacenes = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
 
-    proveedores = Proveedor.objects.all().order_by('razon_social')
+    proveedores = Proveedor.objects.filter(is_active=True).order_by('razon_social')
     materiales = Material.objects.filter(is_active=True).order_by('nombre')
     unidades_org = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
 
@@ -1906,71 +1925,97 @@ def lotes_list(request):
         'query_busqueda': query_busqueda,
     })
 
-
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def reporte_consumo_unidades(request):
     """
-    Tarjeta 6: Reporte Consolidado Institucional de Consumo por Dependencia (Formulario 005 / SABS).
-    Agrupa por Secretaría y Unidad, calculando insumos físicos retirados,
-    gasto valorado por PEPS y comparativa porcentual frente al techo POA.
+    TARJETA 1: Consolidado de Consumo por Dependencia.
+    Mide Asignación Física Recibida vs. Retirada y Valorado Real PEPS por Oficina (Sin POAs).
     """
     from organizacion.models import Secretaria, UnidadOrganizacional
-    from presupuestos.models import POA
+    from inventario.models import AsignacionEntradaUnidad, InventarioAlmacen
     from datetime import date
 
-    # 1. Filtros de Fechas y Secretaría
-    desde_str = request.GET.get('desde', '').strip()
-    hasta_str = request.GET.get('hasta', '').strip()
-    filtro_secretaria_id = request.GET.get('secretaria_id', '').strip()
+    # 1. Filtros
+    sec_id = request.GET.get('secretaria_id', '').strip()
+    uni_id = request.GET.get('unidad_id', '').strip()
+    gestion = int(request.GET.get('gestion', date.today().year))
+    
+    desde_str = request.GET.get('desde', f"{gestion}-01-01").strip()
+    hasta_str = request.GET.get('hasta', f"{gestion}-12-31").strip()
 
-    desde = parse_date(desde_str) if desde_str else date(2026, 1, 1)
-    hasta = parse_date(hasta_str) if hasta_str else date(2026, 12, 31)
+    desde = parse_date(desde_str) if desde_str else date(gestion, 1, 1)
+    hasta = parse_date(hasta_str) if hasta_str else date(gestion, 12, 31)
 
+    # 2. Catálogos
     secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
     secretarias_query = secretarias
-    if filtro_secretaria_id:
-        secretarias_query = secretarias_query.filter(id=filtro_secretaria_id)
+    if sec_id:
+        secretarias_query = secretarias_query.filter(id=sec_id)
 
-    # 2. Base de movimientos de salida en el periodo
+    unidades_query = UnidadOrganizacional.objects.filter(is_active=True)
+    if sec_id:
+        unidades_query = unidades_query.filter(secretaria_id=sec_id)
+    if uni_id:
+        unidades_query = unidades_query.filter(id=uni_id)
+    unidades_query = unidades_query.order_by('nombre')
+
+    # 3. Movimientos de salida física en el periodo
     salidas_periodo = MovimientoInventario.objects.filter(
         tipo='SALIDA',
         fecha__date__range=[desde, hasta]
     )
 
     datos_por_secretaria = []
-    total_general_fisico = 0
+    
+    # ACUMULADORES TOTALES GENERALES (INICIALIZADOS)
+    total_general_asignado = 0
+    total_general_retirado = 0
+    total_general_pendiente = 0
+    total_general_valorado_asig = Decimal('0.00')
     total_general_valorado = Decimal('0.00')
-    total_general_poa = Decimal('0.00')
 
     for sec in secretarias_query:
-        unidades_sec = sec.unidades_organizacionales.filter(is_active=True).order_by('nombre')
+        unidades_sec = unidades_query.filter(secretaria=sec)
         filas_unidades = []
 
-        total_sec_fisico = 0
+        # ACUMULADORES POR SECRETARÍA (INICIALIZADOS)
+        total_sec_asignado = 0
+        total_sec_retirado = 0
+        total_sec_pendiente = 0
+        total_sec_valorado_asig = Decimal('0.00')
         total_sec_valorado = Decimal('0.00')
-        total_sec_poa = Decimal('0.00')
 
         for u in unidades_sec:
-            # Salidas dirigidas a esta oficina
-            salidas_u = salidas_periodo.filter(unidad_destino=u)
+            # 1. Asignaciones directas por notas de ingreso con sus precios de compra
+            asig_u = AsignacionEntradaUnidad.objects.filter(
+                unidad_organizacional=u
+            ).select_related('nota_ingreso_detalle')
+
+            cant_asig = asig_u.aggregate(s=Sum('cantidad_asignada'))['s'] or 0
             
-            tot_cant = salidas_u.aggregate(s=Sum('cantidad'))['s'] or 0
-            tot_val = salidas_u.aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
+            # Valor en Bs. de lo asignado a la unidad (según precio unitario de la nota de ingreso)
+            val_asignado = sum(
+                (Decimal(str(a.cantidad_asignada)) * (a.nota_ingreso_detalle.precio_unitario or Decimal('0.00')))
+                for a in asig_u
+            ) or Decimal('0.00')
 
-            # Presupuesto POA total asignado a esta oficina en 2026
-            poas_u = POA.objects.filter(unidad=u, gestion=2026)
-            poa_inicial = poas_u.aggregate(s=Sum('monto_inicial'))['s'] or Decimal('0.00')
-            poa_disponible = poas_u.aggregate(s=Sum('monto_disponible'))['s'] or Decimal('0.00')
+            # 2. Salidas efectivas y valorado PEPS retirado por la unidad
+            salidas_u = salidas_periodo.filter(unidad_destino=u)
+            cant_retirada = salidas_u.aggregate(s=Sum('cantidad'))['s'] or 0
+            val_retirado = salidas_u.aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
 
-            # Porcentaje de consumo sobre el presupuesto de apertura
-            pct_consumo = round((float(tot_val) / float(poa_inicial) * 100), 1) if poa_inicial > 0 else 0.0
+            saldo_pendiente = max(0, cant_asig - cant_retirada)
+            saldo_valorado_pendiente = max(Decimal('0.00'), val_asignado - val_retirado)
 
-            total_sec_fisico += tot_cant
-            total_sec_valorado += tot_val
-            total_sec_poa += poa_inicial
+            # Acumuladores de secretaría
+            total_sec_asignado += cant_asig
+            total_sec_retirado += cant_retirada
+            total_sec_pendiente += saldo_pendiente
+            total_sec_valorado_asig += val_asignado
+            total_sec_valorado += val_retirado
 
-            # Listado de los 5 materiales más retirados por esta oficina (para detalle rápido)
+            # Top 4 materiales más retirados
             top_materiales = salidas_u.values(
                 'material__codigo', 'material__nombre', 'material__unidad_medida'
             ).annotate(
@@ -1980,45 +2025,59 @@ def reporte_consumo_unidades(request):
 
             filas_unidades.append({
                 'unidad': u,
-                'total_cant': tot_cant,
-                'total_val': tot_val,
-                'poa_inicial': poa_inicial,
-                'poa_disponible': poa_disponible,
-                'pct_consumo': pct_consumo,
+                'cant_asignada': cant_asig,
+                'val_asignado': val_asignado,
+                'cant_retirada': cant_retirada,
+                'val_retirado': val_retirado,
+                'saldo_pendiente': saldo_pendiente,
+                'saldo_valorado_pendiente': saldo_valorado_pendiente,
                 'top_materiales': top_materiales,
-                'tiene_consumo': (tot_cant > 0)
+                'tiene_movimiento': (cant_asig > 0 or cant_retirada > 0)
             })
 
-        total_general_fisico += total_sec_fisico
+        total_general_asignado += total_sec_asignado
+        total_general_retirado += total_sec_retirado
+        total_general_pendiente += total_sec_pendiente
+        total_general_valorado_asig += total_sec_valorado_asig
         total_general_valorado += total_sec_valorado
-        total_general_poa += total_sec_poa
 
-        pct_sec = round((float(total_sec_valorado) / float(total_sec_poa) * 100), 1) if total_sec_poa > 0 else 0.0
+        if filas_unidades:
+            datos_por_secretaria.append({
+                'secretaria': sec,
+                'unidades': filas_unidades,
+                'total_asignado': total_sec_asignado,
+                'total_retirado': total_sec_retirado,
+                'total_pendiente': total_sec_pendiente,
+                'total_valorado_asig': total_sec_valorado_asig,
+                'total_valorado': total_sec_valorado,
+                'tiene_movimiento': (total_sec_asignado > 0 or total_sec_retirado > 0)
+            })
 
-        datos_por_secretaria.append({
-            'secretaria': sec,
-            'unidades': filas_unidades,
-            'total_fisico': total_sec_fisico,
-            'total_valorado': total_sec_valorado,
-            'total_poa': total_sec_poa,
-            'pct_consumo': pct_sec,
-            'tiene_consumo': (total_sec_fisico > 0)
-        })
+    # Stock físico real existente en custodia de almacenes (estanterías)
+    saldo_custodia_almacen = InventarioAlmacen.objects.aggregate(s=Sum('stock_fisico'))['s'] or 0
 
-    pct_global = round((float(total_general_valorado) / float(total_general_poa) * 100), 1) if total_general_poa > 0 else 0.0
-
-    return render(request, 'inventario/consumo_unidades.html', {
+    context = {
         'secretarias': secretarias,
+        'unidades': unidades_query,
         'datos_por_secretaria': datos_por_secretaria,
-        'filtro_secretaria_id': filtro_secretaria_id,
+        'filtro_secretaria_id': sec_id,
+        'filtro_unidad_id': uni_id,
+        'gestion': gestion,
         'desde': desde.strftime('%Y-%m-%d'),
         'hasta': hasta.strftime('%Y-%m-%d'),
-        'total_general_fisico': total_general_fisico,
+        # KPIs
+        'total_general_asignado': total_general_asignado,
+        'total_general_retirado': total_general_retirado,
+        'total_general_pendiente': total_general_pendiente,
+        'saldo_custodia_almacen': saldo_custodia_almacen,
+        'total_general_valorado_asig': total_general_valorado_asig,
         'total_general_valorado': total_general_valorado,
-        'total_general_poa': total_general_poa,
-        'pct_global': pct_global,
-    })
+    }
 
+    if request.GET.get('exportar') == 'pdf':
+        return render(request, 'inventario/consumo_unidades_pdf.html', context)
+
+    return render(request, 'inventario/consumo_unidades.html', context)
 @login_required
 def obtener_items_compra_view(request):
     """
@@ -2733,115 +2792,6 @@ def reporte_dgcf_r106(request):
         'almacen_seleccionado': almacen_seleccionado,
     }
     return render(request, 'inventario/reporte_dgcf_r106.html', context)
-@login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
-def reporte_inventario_oficial_pdf(request):
-    desde_str = request.GET.get('desde')
-    hasta_str = request.GET.get('hasta')
-
-    desde = parse_date(desde_str) if desde_str else datetime.date(2026, 1, 1)
-    hasta = parse_date(hasta_str) if hasta_str else datetime.date(2026, 5, 31)
-
-    materiales = Material.objects.all().order_by('codigo')
-
-    headers_1 = ['ITEM', 'DESCRIPCION', 'UNIDAD DE\nMANEJO', f'SALDO AL {desde.strftime("%d/%m/%Y")}', '', 'ENTRADAS DEL PERIODO', '', 'SALIDAS DEL PERIODO', '', 'SALDO AL Cierre', '']
-    headers_2 = ['', '', '', 'CANT. SALDO', 'COSTO TOTAL', 'CANT. INGRES.', 'COSTO TOTAL', 'CANT. ENTREG.', 'COSTO TOTAL', 'CANTIDAD', 'COSTO TOTAL']
-    data = [headers_1, headers_2]
-
-    for mat in materiales:
-        mov_previos = MovimientoInventario.objects.filter(material=mat, fecha__date__lt=desde)
-        ini_cant = 0
-        ini_val = Decimal('0.00')
-        for m in mov_previos:
-            if m.tipo == 'ENTRADA':
-                ini_cant += m.cantidad
-                ini_val += m.costo_total
-            else:
-                ini_cant -= m.cantidad
-                ini_val -= m.costo_total
-
-        mov_periodo = MovimientoInventario.objects.filter(material=mat, fecha__date__range=[desde, hasta])
-        ent_cant, ent_val = 0, Decimal('0.00')
-        sal_cant, sal_val = 0, Decimal('0.00')
-        for m in mov_periodo:
-            if m.tipo == 'ENTRADA':
-                ent_cant += m.cantidad
-                ent_val += m.costo_total
-            else:
-                sal_cant += m.cantidad
-                sal_val += m.costo_total
-
-        fin_cant = ini_cant + ent_cant - sal_cant
-        fin_val = ini_val + ent_val - sal_val
-
-        data.append([
-            mat.codigo,
-            mat.nombre[:35],
-            mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida,
-            str(ini_cant),
-            f"{ini_val:.2f}",
-            str(ent_cant),
-            f"{ent_val:.2f}",
-            str(sal_cant),
-            f"{sal_val:.2f}",
-            str(fin_cant),
-            f"{fin_val:.2f}"
-        ])
-
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="inventario_oficial_potosi.pdf"'
-
-    pdf = canvas.Canvas(response, pagesize=landscape(letter))
-    pdf.setTitle(f"Inventario Valorado ({desde.strftime('%d/%m/%Y')} a {hasta.strftime('%d/%m/%Y')})")
-    pdf.setSubject("SGA - Gobierno Autónomo Departamental de Potosí")
-    pdf.setAuthor("Sistema de Gestión de Almacenes")
-
-    width, height = landscape(letter)
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(50, height - 40, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
-    pdf.drawString(50, height - 52, "SECRETARÍA DPTAL. ADMINISTRATIVA Y FINANCIERA")
-    pdf.drawString(50, height - 64, "UNIDAD DE CONTABILIDAD")
-
-    pdf.setFont("Helvetica-Bold", 12)
-    pdf.drawString(250, height - 90, "INVENTARIO FÍSICO VALORADO DE MATERIALES")
-    pdf.setFont("Helvetica", 9)
-    pdf.drawString(290, height - 105, f"PRACTICADO DEL {desde.strftime('%d/%m/%Y')} AL {hasta.strftime('%d/%m/%Y')}")
-
-    col_widths = [65, 142, 35, 45, 60, 45, 60, 45, 60, 45, 65]
-    t = Table(data, colWidths=col_widths)
-
-    t_style = TableStyle([
-        ('SPAN', (0, 0), (0, 1)),  
-        ('SPAN', (1, 0), (1, 1)),  
-        ('SPAN', (2, 0), (2, 1)),  
-        ('SPAN', (3, 0), (4, 0)),  
-        ('SPAN', (5, 0), (6, 0)),  
-        ('SPAN', (7, 0), (8, 0)),  
-        ('SPAN', (9, 0), (10, 0)), 
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('ALIGN', (1,2), (1,-1), 'LEFT'),
-        ('FONTNAME', (0,0), (-1,1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 7),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#9CA3AF')),
-        ('BACKGROUND', (0,0), (-1,1), colors.HexColor('#E5E7EB')),
-        ('FONTNAME', (0,2), (-1,-1), 'Helvetica'),
-    ])
-    t.setStyle(t_style)
-
-    w_act, h_act = t.wrapOn(pdf, width - 100, height - 200)
-    t.drawOn(pdf, 50, height - 125 - h_act)
-
-    pdf.save()
-
-    Bitacora.objects.create(
-        usuario=request.user,
-        modulo='Inventario',
-        accion='Exportar Inventario Oficial PDF',
-        descripcion=f'Se exportó en PDF el Inventario Físico Valorado desde {desde} hasta {hasta}.'
-    )
-    return response
-
 
 @login_required
 @rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -3153,139 +3103,6 @@ def reporte_dgcf_r106(request):
     }
     return render(request, 'inventario/reporte_dgcf_r106.html', context)
 
-
-@login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
-def reporte_consumo_unidades(request):
-    """
-    Consolidado Ejecutivo de Consumo Físico y Valorado por Secretaría y Unidad frente a su POA.
-    Soporta filtro por Secretaría, Unidad, Gestión, Fechas e Impresión PDF oficial.
-    """
-    from organizacion.models import Secretaria, UnidadOrganizacional
-    from presupuestos.models import POA
-
-    # 1. Filtros
-    sec_id = request.GET.get('secretaria_id', '').strip()
-    uni_id = request.GET.get('unidad_id', '').strip()
-    gestion = int(request.GET.get('gestion', 2026))
-    
-    desde_defecto = f"{gestion}-01-01"
-    hasta_defecto = f"{gestion}-12-31"
-    desde_str = request.GET.get('desde', desde_defecto).strip()
-    hasta_str = request.GET.get('hasta', hasta_defecto).strip()
-
-    desde = parse_date(desde_str) if desde_str else date(gestion, 1, 1)
-    hasta = parse_date(hasta_str) if hasta_str else date(gestion, 12, 31)
-
-    # 2. Catálogos para los selects
-    secretarias = Secretaria.objects.filter(is_active=True).order_by('nombre')
-    secretarias_query = secretarias
-    if sec_id:
-        secretarias_query = secretarias_query.filter(id=sec_id)
-
-    unidades_query = UnidadOrganizacional.objects.filter(is_active=True)
-    if sec_id:
-        unidades_query = unidades_query.filter(secretaria_id=sec_id)
-    if uni_id:
-        unidades_query = unidades_query.filter(id=uni_id)
-    unidades_query = unidades_query.order_by('nombre')
-
-    gestiones_disponibles = sorted(list(set(
-        list(POA.objects.values_list('gestion', flat=True).distinct()) + [date.today().year, 2026]
-    )), reverse=True)
-
-    # 3. Base de movimientos de salida en el periodo
-    salidas_periodo = MovimientoInventario.objects.filter(
-        tipo='SALIDA',
-        fecha__date__range=[desde, hasta]
-    )
-
-    datos_por_secretaria = []
-    total_general_fisico = 0
-    total_general_valorado = Decimal('0.00')
-    total_general_poa = Decimal('0.00')
-
-    for sec in secretarias_query:
-        unidades_sec = unidades_query.filter(secretaria=sec)
-        filas_unidades = []
-
-        total_sec_fisico = 0
-        total_sec_valorado = Decimal('0.00')
-        total_sec_poa = Decimal('0.00')
-
-        for u in unidades_sec:
-            salidas_u = salidas_periodo.filter(unidad_destino=u)
-            
-            tot_cant = salidas_u.aggregate(s=Sum('cantidad'))['s'] or 0
-            tot_val = salidas_u.aggregate(s=Sum('costo_total'))['s'] or Decimal('0.00')
-
-            poas_u = POA.objects.filter(unidad=u, gestion=gestion)
-            poa_inicial = poas_u.aggregate(s=Sum('monto_inicial'))['s'] or Decimal('0.00')
-            poa_disponible = poas_u.aggregate(s=Sum('monto_disponible'))['s'] or Decimal('0.00')
-
-            pct_consumo = round((float(tot_val) / float(poa_inicial) * 100), 1) if poa_inicial > 0 else 0.0
-
-            total_sec_fisico += tot_cant
-            total_sec_valorado += tot_val
-            total_sec_poa += poa_inicial
-
-            top_materiales = salidas_u.values(
-                'material__codigo', 'material__nombre', 'material__unidad_medida'
-            ).annotate(
-                cant_total=Sum('cantidad'),
-                val_total=Sum('costo_total')
-            ).order_by('-val_total')[:4]
-
-            filas_unidades.append({
-                'unidad': u,
-                'total_cant': tot_cant,
-                'total_val': tot_val,
-                'poa_inicial': poa_inicial,
-                'poa_disponible': poa_disponible,
-                'pct_consumo': pct_consumo,
-                'top_materiales': top_materiales,
-                'tiene_consumo': (tot_cant > 0)
-            })
-
-        total_general_fisico += total_sec_fisico
-        total_general_valorado += total_sec_valorado
-        total_general_poa += total_sec_poa
-
-        pct_sec = round((float(total_sec_valorado) / float(total_sec_poa) * 100), 1) if total_sec_poa > 0 else 0.0
-
-        if filas_unidades:
-            datos_por_secretaria.append({
-                'secretaria': sec,
-                'unidades': filas_unidades,
-                'total_fisico': total_sec_fisico,
-                'total_valorado': total_sec_valorado,
-                'total_poa': total_sec_poa,
-                'pct_consumo': pct_sec,
-                'tiene_consumo': (total_sec_fisico > 0)
-            })
-
-    pct_global = round((float(total_general_valorado) / float(total_general_poa) * 100), 1) if total_general_poa > 0 else 0.0
-
-    context = {
-        'secretarias': secretarias,
-        'unidades': unidades_query,
-        'datos_por_secretaria': datos_por_secretaria,
-        'filtro_secretaria_id': sec_id,
-        'filtro_unidad_id': uni_id,
-        'gestion': gestion,
-        'gestiones_disponibles': gestiones_disponibles,
-        'desde': desde.strftime('%Y-%m-%d'),
-        'hasta': hasta.strftime('%Y-%m-%d'),
-        'total_general_fisico': total_general_fisico,
-        'total_general_valorado': total_general_valorado,
-        'total_general_poa': total_general_poa,
-        'pct_global': pct_global,
-    }
-
-    if request.GET.get('exportar') == 'pdf':
-        return render(request, 'inventario/consumo_unidades_pdf.html', context)
-
-    return render(request, 'inventario/consumo_unidades.html', context)
 
 
 @login_required
@@ -3666,3 +3483,38 @@ def toggle_unidad_medida(request, id):
         messages.error(request, f"Error al modificar estado: {str(e)}")
 
     return redirect('unidad_medida_list')
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES', 'PRESUPUESTOS', 'BIENES_SERVICIOS', 'SECRETARIO_SAF', 'RPA'])
+def hub_reportes(request):
+    """
+    TARJETA 3: Centro de Mando Centralizado de Reportes y Auditoría.
+    Permite auditar cualquier gestión fiscal (2025, 2026, 2027, etc.) de forma dinámica.
+    """
+    from datetime import date
+    from .models import MovimientoInventario, Material, Almacen
+
+    # 1. Obtener gestiones que tienen movimientos registrados en el sistema
+    anios_db = list(MovimientoInventario.objects.dates('fecha', 'year').values_list('fecha__year', flat=True).distinct())
+    anio_actual = date.today().year
+    
+    # 2. Lista de gestiones ordenada descendente
+    gestiones_disponibles = sorted(list(set(anios_db + [anio_actual, 2026])), reverse=True)
+
+    # 3. Gestión seleccionada (por defecto la primera disponible o la actual)
+    gestion_sel = int(request.GET.get('gestion', gestiones_disponibles[0]))
+
+    almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
+    
+    # Materiales para el generador rápido de Kardex
+    materiales = Material.objects.filter(is_active=True).select_related('partida', 'unidad_medida_fk').order_by('codigo')
+
+    context = {
+        'gestion_sel': gestion_sel,
+        'gestiones_disponibles': gestiones_disponibles,
+        'almacenes': almacenes,
+        'materiales': materiales,
+        'desde_defecto': f"{gestion_sel}-01-01",
+        'hasta_defecto': f"{gestion_sel}-12-31",
+    }
+    return render(request, 'inventario/reportes_hub.html', context)

@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     # BANDEJA Y PROCESOS DE ADQUISICIÓN (FLUJO 2)
+    path('', views.adquisiciones_list, name='compras_list'),
     path('adquisiciones/', views.adquisiciones_list, name='adquisiciones_list'),
     path('adquisiciones/nueva/', views.crear_adquisicion, name='crear_adquisicion'),
     path('adquisiciones/<int:id>/', views.detalle_adquisicion, name='detalle_adquisicion'),
@@ -22,7 +23,7 @@ urlpatterns = [
     path('proveedores/', views.proveedores_list, name='proveedores_list'),
     path('proveedores/crear/', views.crear_proveedor, name='crear_proveedor'),
     path('proveedores/editar/<int:id>/', views.editar_proveedor, name='editar_proveedor'),
-
+    path('proveedores/toggle/<int:id>/', views.toggle_proveedor, name='toggle_proveedor'),
     # FASES DEL TRÁMITE SABS
     path('adquisiciones/<int:id>/emitir-saf/', views.emitir_nota_saf, name='emitir_nota_saf'),
     path('adquisiciones/<int:id>/certificar/', views.certificar_presupuesto_adquisicion, name='certificar_presupuesto_adquisicion'),

@@ -215,76 +215,30 @@ def detalle_compra(request, id):
 def proveedores_list(request):
     """Listado y búsqueda de proveedores del Estado."""
     query = request.GET.get('q', '').strip()
-    proveedores = Proveedor.objects.all()
+    proveedores_qs = Proveedor.objects.all()
 
     if query:
-        proveedores = proveedores.filter(
+        proveedores_qs = proveedores_qs.filter(
             Q(razon_social__icontains=query) |
             Q(nit__icontains=query) |
             Q(telefono__icontains=query)
         )
 
-    proveedores = proveedores.order_by('razon_social')
-    paginator = Paginator(proveedores, 10)
+    proveedores_qs = proveedores_qs.order_by('razon_social')
+    paginator = Paginator(proveedores_qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'compras/proveedores_list.html', {
+        'proveedores': page_obj,  # <-- COMPATIBILIDAD CON TU TEMPLATE
         'page_obj': page_obj,
         'query': query,
     })
-
-@login_required
-@rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
-def crear_proveedor(request):
-  """Registra un proveedor en el catálogo de adquisiciones."""
-  if request.method == 'POST':
-    nit = request.POST.get('nit', '').strip()
-    razon_social = request.POST.get('razon_social', '').strip()
-    telefono = request.POST.get('telefono', '').strip()
-    direccion = request.POST.get('direccion', '').strip()
-
-    if not nit or not razon_social:
-      messages.error(request, 'El NIT y la Razón Social son campos obligatorios.')
-      return redirect('crear_proveedor')
-
-    if Proveedor.objects.filter(nit=nit).exists():
-      messages.error(
-          request, 'Ya existe un proveedor registrado con este NIT.'
-      )
-      return redirect('crear_proveedor')
-
-    try:
-      with transaction.atomic():
-        Proveedor.objects.create(
-            nit=nit,
-            razon_social=razon_social,
-            telefono=telefono if telefono else None,
-            direccion=direccion if direccion else None,
-        )
-        Bitacora.objects.create(
-            usuario=request.user,
-            modulo='Compras',
-            accion='Registrar Proveedor',
-            descripcion=(
-                f'Bienes y Servicios registró al proveedor: {razon_social} (NIT:'
-                f' {nit})'
-            ),
-        )
-
-      messages.success(request, 'Proveedor registrado correctamente.')
-      return redirect('proveedores_list')
-
-    except Exception as e:
-      messages.error(request, f'Error al registrar el proveedor: {str(e)}')
-      return redirect('crear_proveedor')
-
-  return render(request, 'compras/crear_proveedor.html')
 
 
 @login_required
 @rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS'])
 def crear_proveedor(request):
-    """Crea un nuevo proveedor desde el formulario o vía AJAX modal."""
+    """Crea un nuevo proveedor desde la vista dedicada o vía AJAX modal."""
     if request.method == 'POST':
         nit = request.POST.get('nit', '').strip()
         razon_social = request.POST.get('razon_social', '').strip().upper()
@@ -295,13 +249,13 @@ def crear_proveedor(request):
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'ok': False, 'error': 'NIT y Razón Social son obligatorios.'}, status=400)
             messages.error(request, "NIT y Razón Social son campos requeridos.")
-            return redirect('proveedores_list')
+            return redirect('crear_proveedor')
 
         if Proveedor.objects.filter(nit=nit).exists():
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'ok': False, 'error': f'Ya existe un proveedor con el NIT {nit}.'}, status=400)
             messages.error(request, f"Ya existe un proveedor registrado con el NIT {nit}.")
-            return redirect('proveedores_list')
+            return redirect('crear_proveedor')
 
         proveedor = Proveedor.objects.create(
             nit=nit,
@@ -317,7 +271,6 @@ def crear_proveedor(request):
             descripcion=f'Se registró al proveedor {razon_social} (NIT: {nit}).'
         )
 
-        # Respuesta rápida si se llamó desde el modal en plena adjudicación
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({
                 'ok': True,
@@ -329,8 +282,8 @@ def crear_proveedor(request):
         messages.success(request, f"Proveedor '{razon_social}' registrado correctamente.")
         return redirect('proveedores_list')
 
-    return redirect('proveedores_list')
-
+    # GET: Mostrar el formulario de creación si el botón te lleva a otra página
+    return render(request, 'compras/crear_proveedor.html')
 
 @login_required
 @rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS'])
@@ -356,6 +309,27 @@ def editar_proveedor(request, id):
 
         messages.success(request, f"Proveedor '{razon_social}' actualizado exitosamente.")
 
+    return redirect('proveedores_list')
+
+@login_required
+@rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES', 'BIENES_SERVICIOS'])
+def toggle_proveedor(request, id):
+    """
+    Baja lógica o reactivación de un proveedor sin romper notas ni compras históricas.
+    """
+    proveedor = get_object_or_404(Proveedor, id=id)
+    proveedor.is_active = not proveedor.is_active
+    proveedor.save()
+
+    estado_txt = "habilitado" if proveedor.is_active else "dado de baja (inhabilitado)"
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Compras',
+        accion='Cambiar Estado Proveedor',
+        descripcion=f'El proveedor {proveedor.razon_social} (NIT: {proveedor.nit}) fue {estado_txt}.'
+    )
+
+    messages.success(request, f"Proveedor '{proveedor.razon_social}' {estado_txt} correctamente.")
     return redirect('proveedores_list')
 # ========================================================
 # 3. GENERADOR DE ÓRDENES PDF (COMPRA / SERVICIO)
@@ -849,7 +823,7 @@ def detalle_adquisicion(request, id):
 
     total_referencial = sum(i.subtotal_referencial for i in proceso.items.all())
     total_oficial = sum(i.subtotal_oficial for i in proceso.items.all())
-    proveedores_list = Proveedor.objects.all().order_by('razon_social')
+    proveedores_list = Proveedor.objects.filter(is_active=True).order_by('razon_social')
 
     return render(request, 'compras/detalle_adquisicion.html', {
         'proceso': proceso,
@@ -1272,3 +1246,36 @@ def doc_autorizacion_rpa_pdf(request, id):
         id=id
     )
     return render(request, 'compras/pdf_autorizacion_rpa.html', {'proceso': proceso})
+
+@login_required
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES', 'PRESUPUESTOS', 'BIENES_SERVICIOS', 'SECRETARIO_SAF', 'RPA'])
+def hub_reportes(request):
+    """
+    Centro de Mando Unificado de Reportes y Auditoría.
+    Permite auditar cualquier gestión fiscal (2025, 2026, 2027, etc.) con 1 clic.
+    """
+    from datetime import date
+    from .models import MovimientoInventario, Material, Almacen
+
+    # Años disponibles basados en movimientos reales de la base de datos
+    anios_db = list(MovimientoInventario.objects.dates('fecha', 'year').values_list('fecha__year', flat=True).distinct())
+    anio_actual = date.today().year
+    
+    # Lista única y ordenada descendente de gestiones
+    gestiones_disponibles = sorted(list(set(anios_db + [anio_actual, 2026])), reverse=True)
+
+    # Gestión activa seleccionada por el usuario (por defecto 2026 o el año corriente)
+    gestion_sel = int(request.GET.get('gestion', anio_actual if anio_actual in gestiones_disponibles else 2026))
+
+    almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
+    materiales_recientes = Material.objects.filter(is_active=True).select_related('partida', 'unidad_medida_fk')[:15]
+
+    context = {
+        'gestion_sel': gestion_sel,
+        'gestiones_disponibles': gestiones_disponibles,
+        'almacenes': almacenes,
+        'materiales_recientes': materiales_recientes,
+        'desde_defecto': f"{gestion_sel}-01-01",
+        'hasta_defecto': f"{gestion_sel}-12-31",
+    }
+    return render(request, 'inventario/reportes_hub.html', context)

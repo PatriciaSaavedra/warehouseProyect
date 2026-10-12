@@ -5,36 +5,62 @@
 {% block content %}
 <div class="max-w-7xl mx-auto space-y-6 font-['Outfit']">
 
-    <!-- CABECERA -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-            <a href="{% url 'inventario' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition mb-2">
-                <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Existencias
-            </a>
-            <!-- En la cabecera superior derecha de inventario/templates/inventario/kardex.html: -->
-            <div class="flex items-center gap-2">
-                <!-- Kardex Físico con Rango de Fechas -->
-                <a href="{% url 'kardex_fisico_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde|default:'' }}&hasta={{ hasta|default:'' }}" target="_blank" class="btn-secondary px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                    <span class="material-symbols-outlined text-[18px]">print</span> Kardex Físico
+    <!-- 1. CABECERA JERÁRQUICA RESPONSIVA -->
+    <div class="card p-5 sm:p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+            
+            <div class="space-y-2 min-w-0 flex-1">
+                <a href="{% url 'inventario' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-[#8b0000] dark:hover:text-red-400 transition">
+                    <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Existencias
                 </a>
 
-                <!-- Kardex Valorado PDF con Rango de Fechas -->
-                <a href="{% url 'kardex_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde|default:'' }}&hasta={{ hasta|default:'' }}" target="_blank" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Kardex Valorado (PDF)
+                <!-- BADGE PARTIDA PRESUPUESTARIA -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black font-mono bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <span class="material-symbols-outlined text-[15px]">account_tree</span>
+                        PARTIDA {{ material.partida.codigo|default:"S/P" }}
+                    </span>
+                    <span class="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wide truncate">
+                        {{ material.partida.nombre|default:"Sin Partida Asignada" }}
+                    </span>
+                </div>
+
+                <!-- TÍTULO SUBARTÍCULO -->
+                <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight break-words">
+                    {{ material.nombre }}
+                </h1>
+
+                <!-- METADATOS TÉCNICOS SABS -->
+                <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400 font-mono">
+                    <span>Código SABS: <strong class="text-[#8b0000] dark:text-red-400 font-bold">{{ material.codigo }}</strong></span>
+                    <span class="hidden sm:inline">•</span>
+                    <span>U. Manejo: <strong class="text-gray-800 dark:text-gray-200">{{ material.unidad_medida_fk.codigo|default:material.unidad_medida }}</strong></span>
+                    <span class="hidden sm:inline">•</span>
+                    <span>Depósito: <strong class="text-gray-800 dark:text-gray-200">{{ almacen_seleccionado.nombre }}</strong></span>
+                </div>
+            </div>
+
+            <!-- BOTONES DE EXPORTACIÓN (Adaptables en móvil y escritorio) -->
+            <div class="flex flex-row flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
+                <a href="{% url 'kardex_fisico_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde|default:'' }}&hasta={{ hasta|default:'' }}" target="_blank" class="flex-1 sm:flex-initial px-4 py-2.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">print</span>
+                    <span>Kardex Físico</span>
+                </a>
+
+                <a href="{% url 'kardex_pdf' material.id %}?almacen={{ almacen_seleccionado.id }}&gestion={{ filtro_gestion }}&desde={{ desde|default:'' }}&hasta={{ hasta|default:'' }}" target="_blank" class="flex-1 sm:flex-initial bg-[#8b0000] hover:bg-[#700000] text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                    <span>Kardex Valorado</span>
                 </a>
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Subartículo: <strong class="text-gray-900 dark:text-white">{{ material.nombre }}</strong> • Código: <span class="font-mono text-[#8b0000] dark:text-red-400 font-bold">{{ material.codigo }}</span> • Partida: <span class="font-mono font-bold">{{ material.partida.codigo }}</span>
-            </p>
-        </div>
 
+        </div>
     </div>
 
-    <!-- BARRA DE AISLAMIENTO POR ALMACÉN Y RANGO DE FECHAS -->
+    <!-- 2. BARRA DE FILTROS ADAPTABLE -->
     <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
-        <form method="GET" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end text-xs">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end text-xs">
             <!-- Selector de Almacén -->
-            <div class="sm:col-span-4">
+            <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Almacén a Auditar *</label>
                 <select name="almacen" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#8b0000]">
                     {% for alm in almacenes_disponibles %}
@@ -46,20 +72,20 @@
             </div>
 
             <!-- Desde -->
-            <div class="sm:col-span-3">
+            <div class="sm:col-span-1 lg:col-span-3">
                 <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Fecha Desde</label>
-                <input type="date" name="desde" value="{{ desde }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono">
+                <input type="date" name="desde" value="{{ desde }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono text-xs">
             </div>
 
             <!-- Hasta -->
-            <div class="sm:col-span-3">
+            <div class="sm:col-span-1 lg:col-span-3">
                 <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Fecha Hasta</label>
-                <input type="date" name="hasta" value="{{ hasta }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono">
+                <input type="date" name="hasta" value="{{ hasta }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-mono text-xs">
             </div>
 
-            <!-- Botón -->
-            <div class="sm:col-span-2">
-                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 shadow cursor-pointer h-[38px]">
+            <!-- Botón Filtrar -->
+            <div class="sm:col-span-2 lg:col-span-2">
+                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#700000] text-white p-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 shadow cursor-pointer h-[42px]">
                     <span class="material-symbols-outlined text-[18px]">filter_alt</span>
                     <span>Filtrar</span>
                 </button>
@@ -67,34 +93,37 @@
         </form>
     </div>
 
-    <!-- CUADRO DE COMPROBACIÓN CONTABLE DEL ALMACÉN AUDITADO -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+    <!-- 3. CUADRO DE COMPROBACIÓN CONTABLE -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 text-xs">
         <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
-            <span class="text-[10px] font-bold uppercase text-gray-400 block">Inv. Inicial en {{ almacen_seleccionado.nombre }}</span>
+            <span class="text-[10px] font-bold uppercase text-gray-400 block truncate">Inv. Inicial en {{ almacen_seleccionado.nombre }}</span>
             <span class="text-xl font-black text-gray-800 dark:text-gray-100 font-mono mt-1 block">Bs. {{ comprobacion.inv_inicial_val|floatformat:2 }}</span>
             <span class="text-[11px] text-gray-500 font-mono">{{ comprobacion.inv_inicial_cant }} unidades</span>
         </div>
+        
         <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
             <span class="text-[10px] font-bold uppercase text-green-600 block">(+) Entradas a este Almacén</span>
             <span class="text-xl font-black text-green-700 dark:text-green-400 font-mono mt-1 block">+Bs. {{ comprobacion.compras_val|floatformat:2 }}</span>
             <span class="text-[11px] text-gray-500 font-mono">{{ comprobacion.compras_cant }} ingresadas</span>
         </div>
+
         <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
             <span class="text-[10px] font-bold uppercase text-red-600 block">(-) Salidas de este Almacén</span>
             <span class="text-xl font-black text-red-700 dark:text-red-400 font-mono mt-1 block">-Bs. {{ comprobacion.salidas_val|floatformat:2 }}</span>
             <span class="text-[11px] text-gray-500 font-mono">{{ comprobacion.salidas_cant }} retiradas</span>
         </div>
+
         <div class="card p-4 bg-white dark:bg-slate-900 border-2 border-[#8b0000]/40 rounded-2xl shadow-sm bg-red-50/20">
-            <span class="text-[10px] font-bold uppercase text-[#8b0000] dark:text-red-400 block">(=) Stock Real en {{ almacen_seleccionado.nombre }}</span>
+            <span class="text-[10px] font-bold uppercase text-[#8b0000] dark:text-red-400 block truncate">(=) Stock Real en {{ almacen_seleccionado.nombre }}</span>
             <span class="text-xl font-black text-[#8b0000] dark:text-red-400 font-mono mt-1 block">Bs. {{ comprobacion.inv_final_val|floatformat:2 }}</span>
             <span class="text-[11px] text-gray-800 dark:text-gray-200 font-black font-mono">{{ comprobacion.inv_final_cant }} unidades en estantería</span>
         </div>
     </div>
 
-    <!-- TABLA DEL LIBRO DE ALMACÉN AUDITADO -->
+    <!-- 4. TABLA DEL LIBRO DE ALMACÉN CON SCROLL HORIZONTAL SEGURO (min-w-[950px]) -->
     <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
         <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left border-collapse">
+            <table class="w-full text-xs text-left border-collapse min-w-[950px]">
                 <thead class="bg-gray-100 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-gray-600 dark:text-gray-300 border-b border-gray-300 dark:border-gray-700">
                     <tr>
                         <th rowspan="2" class="p-3 w-28 text-center border-r border-gray-200 dark:border-gray-700">Fecha</th>
