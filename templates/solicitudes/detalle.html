@@ -26,7 +26,7 @@
                     {% elif solicitud.estado == 'VALIDADA_SAF' %}
                         <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">Validada por SAF</span>
                     {% elif solicitud.estado == 'VALIDADA_PRESUPUESTOS' %}
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900/30">Aprobada (POA)</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900/30">Aprobada (Presupuestos)</span>
                     {% elif solicitud.estado == 'VALIDADA_RPA' %}
                         <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30">Aprobada por RPA</span>
                     {% elif solicitud.estado == 'VALIDADA_JEFATURA' %}
@@ -49,23 +49,21 @@
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Fecha de Registro: {{ solicitud.fecha_registro|date:"d \d\e F, Y | H:i" }}</p>
             </div>
 
-            <!-- BOTONES DE ACCIÓN SEGÚN EL ROL Y CIRCUITO SABS -->
+<!-- BOTONES DE ACCIÓN SEGÚN EL ROL Y CIRCUITO SABS -->
             <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <!-- BOTÓN CONDICIONADO A LA VERIFICACIÓN Y APROBACIÓN DE ALMACENES -->
-            {% if solicitud.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
-                <a href="{% url 'solicitud_pdf' solicitud.id %}" target="_blank" class="...">
-                    <span class="material-symbols-outlined text-[18px]">print</span>
-                    <span>Imprimir Pedido Oficial (PDF)</span>
-                </a>
-            {% else %}
-                <button disabled 
-                        class="bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-gray-600 px-4 py-2 text-xs font-bold rounded-xl cursor-not-allowed inline-flex items-center gap-1.5 border border-gray-300 dark:border-gray-700" 
-                        title="El formulario solo puede imprimirse tras la verificación y aprobación física del Almacenero (Estado: Preparada o Entregada).">
-                    <span class="material-symbols-outlined text-[18px]">lock</span>
-                    <span>Imprimir (Pendiente Aprobación)</span>
-                </button>
-            {% endif %}
-                
+                {% if solicitud.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
+                    <a href="{% url 'solicitud_pdf' solicitud.id %}" target="_blank" class="px-4 py-2.5 bg-[#7c121e] hover:bg-[#610c16] text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-red-950/20">
+                        <span class="material-symbols-outlined text-[18px]">print</span>
+                        <span>Imprimir Pedido Oficial (PDF)</span>
+                    </a>
+                {% else %}
+                    <button disabled 
+                            class="bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 px-4 py-2.5 text-xs font-bold rounded-2xl cursor-not-allowed inline-flex items-center gap-1.5 border border-gray-200 dark:border-gray-700" 
+                            title="El formulario oficial se habilita tras la verificación física de Almacén (Estado: Preparada o Entregada).">
+                        <span class="material-symbols-outlined text-[18px]">lock</span>
+                        <span>Imprimir (Pendiente Aprobación)</span>
+                    </button>
+                {% endif %}
                 {% if solicitud.tiene_detalles %}
                     <!-- 1. REGISTRADA: AUTORIZACIÓN DEL JEFE DE UNIDAD -->
                     {% if solicitud.estado == 'REGISTRADA' %}
@@ -111,7 +109,8 @@
                             <form method="POST" action="{% url 'aprobar_solicitud' solicitud.id %}" class="inline">
                                 {% csrf_token %}
                                 <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer">
-                                    <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span> Validar POA
+                                    <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span> Certificar Presupuesto
+
                                 </button>
                             </form>
                             <a href="{% url 'rechazar_solicitud' solicitud.id %}" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2.5 rounded-2xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm">
@@ -274,7 +273,7 @@
                     <span class="w-8 h-8 rounded-full flex items-center justify-center border-2 {% if solicitud.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}border-[#580000] bg-[#580000] text-white{% elif solicitud.estado == 'VALIDADA_SAF' %}border-amber-500 bg-amber-50 text-amber-600 animate-spin{% else %}border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-400{% endif %} shadow">
                         <span class="material-symbols-outlined text-sm">{% if solicitud.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}done{% elif solicitud.estado == 'VALIDADA_SAF' %}sync{% else %}account_balance_wallet{% endif %}</span>
                     </span>
-                    <span class="{% if solicitud.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% elif solicitud.estado == 'VALIDADA_SAF' %}text-amber-700{% else %}text-gray-400{% endif %}">4. POA</span>
+                    <span class="{% if solicitud.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}text-[#580000] dark:text-red-400{% elif solicitud.estado == 'VALIDADA_SAF' %}text-amber-700{% else %}text-gray-400{% endif %}">4. Certificación Presupuestaria</span>
                 </div>
                 <!-- 5. RPA -->
                 <div class="flex flex-col items-center gap-1.5 z-10 w-20 text-center text-[11px] font-bold">
@@ -606,13 +605,13 @@
                             <span class="material-symbols-outlined text-lg">account_balance_wallet</span>
                         </div>
                         <div>
-                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">3. POA</span>
+                            <span class="font-bold text-gray-700 dark:text-gray-200 text-xs block">3. Presupuestos</span>
                             <span class="text-gray-500 text-[10px] block">{{ solicitud.presupuestado_por.first_name|default:solicitud.presupuestado_por.username }}</span>
                             <span class="text-gray-400 block text-[9px]">{{ solicitud.fecha_presupuesto|date:"d/m/Y" }}</span>
                         </div>
                     {% else %}
                         <div class="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400 flex items-center justify-center shadow"><span class="material-symbols-outlined text-lg">account_balance</span></div>
-                        <div><span class="font-bold text-gray-400 text-xs block">3. POA</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
+                        <div><span class="font-bold text-gray-400 text-xs block">3. Presupuestos</span><span class="text-gray-400 text-[10px] block">Pendiente</span></div>
                     {% endif %}
                 </div>
 

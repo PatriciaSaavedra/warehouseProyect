@@ -1,128 +1,207 @@
 from decimal import Decimal
+from datetime import date, timedelta
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db import models
-from django.db.models import F, Q
+from django.db.models import F, Q, Sum
+from django.utils import timezone
 
-from inventario.models import Material, MovimientoInventario, InventarioAlmacen, Almacen
+from inventario.models import Material, MovimientoInventario, InventarioAlmacen, Almacen, AsignacionEntradaUnidad
 from solicitudes.models import Solicitud
-from inventario.services import obtener_alertas_tempranas  # <-- IMPORT DEL MOTOR DE ALERTAS
+from compras.models import ProcesoAdquisicion
+from inventario.views import obtener_almacenes_usuario
 
 
 @login_required
 def dashboard_view(request):
     """
-    Panel de Control contextualizado con Centro de Alertas Tempranas SABS:
-    - Administrador / SAF: Métricas macro y alertas de toda la Gobernación.
-    - Almacenero Seccional (Pedro en UNASBA): Métricas y alertas aisladas de su depósito.
-    - Unidad Solicitante (Sebastián en Archivo): Resumen y alertas de su oficina.
+    TARJETA 5: Centro de Mando / Dashboard Contextualizado por Rol:
+    - UNIDAD_SOLICITANTE: Sus materiales asignados, saldo de cupos y seguimiento de trámites.
+    - ALMACENERO / KARDISTA: Existencias en su depósito, stock crítico, lotes por vencer y cola de ventanilla.
+    - AUTORIDADES (RPA, SAF, Presupuestos, BBSS): Trámites que esperan su acción inmediata.
+    - ADMINISTRADOR: Vista consolidada departamental.
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
+    hoy = timezone.now().date()
 
-    # 1. Determinar el alcance del usuario
-    es_admin_global = (
-        rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'SECRETARIO_SAF', 'PRESUPUESTOS'] or 
-        request.user.is_superuser
-    )
+    es_autoridad_sabs = rol in ['RPA', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'BIENES_SERVICIOS', 'JEFE_ADMINISTRATIVO']
+    es_almacen_o_admin = rol in ['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'] or request.user.is_superuser
 
-    # 2. Obtener las alertas del motor centralizado (Tarjeta 7)
-    alertas = obtener_alertas_tempranas(request.user)
+    context = {
+        'rol': rol,
+        'hoy': hoy,
+    }
 
-    if es_admin_global:
-        # ========================================================
-        # A. VISIÓN GLOBAL INSTITUCIONAL
-        # ========================================================
-        materiales_bajos = Material.objects.filter(
-            is_active=True,
-            stock_actual__lte=F('stock_minimo')
-        ).select_related('partida', 'unidad_medida_fk')[:5]
+    # =========================================================================
+    # CASO 1: UNIDAD SOLICITANTE (Oficinas de la Gobernación)
+    # =========================================================================
+    if rol == 'UNIDAD_SOLICITANTE':
+        unidad_user = perfil.unidad if perfil else None
 
-        total_materiales = Material.objects.filter(is_active=True).count()
-        total_solicitudes = Solicitud.objects.count()
-        solicitudes_pendientes = Solicitud.objects.filter(estado='REGISTRADA').count()
+        # 1. Materiales asignados físicamente a esta oficina en compras
+        asignaciones_oficina = []
+        if unidad_user:
+            asigs_qs = AsignacionEntradaUnidad.objects.filter(
+                unidad_organizacional=unidad_user,
+                nota_ingreso_detalle__material__is_active=True
+            ).select_related(
+                'nota_ingreso_detalle__material',
+                'nota_ingreso_detalle__material__unidad_medida_fk'
+            )
 
-        total_movimientos = MovimientoInventario.objects.count()
-        movimientos_recientes = MovimientoInventario.objects.select_related(
-            'material', 'almacen', 'usuario'
-        ).order_by('-id')[:5]
+            # Agrupar por material para sumar lotes
+            materiales_agrupados = {}
+            for a in asigs_qs:
+                mat = a.nota_ingreso_detalle.material
+                if mat.id not in materiales_agrupados:
+                    u_med = mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida
+                    materiales_agrupados[mat.id] = {
+                        'id': mat.id,
+                        'codigo': mat.codigo,
+                        'nombre': mat.nombre,
+                        'unidad_medida': u_med,
+                        'total_asignado': 0,
+                        'total_retirado': 0,
+                        'saldo_disponible': 0,
+                    }
+                materiales_agrupados[mat.id]['total_asignado'] += a.cantidad_asignada
+                materiales_agrupados[mat.id]['total_retirado'] += a.cantidad_retirada
+                materiales_agrupados[mat.id]['saldo_disponible'] += a.saldo_disponible
 
-    elif rol in ['ALMACENERO', 'KARDISTA']:
-        # ========================================================
-        # B. VISIÓN SECCIONAL AISLADA (Pedro en UNASBA)
-        # ========================================================
-        almacenes_user = Almacen.objects.filter(
-            Q(responsable=request.user) | 
-            Q(id__in=perfil.almacenes_autorizados.all()) |
-            Q(unidad_organizacional=perfil.unidad),
-            is_active=True
-        ).distinct()
+            asignaciones_oficina = [m for m in materiales_agrupados.values() if m['saldo_disponible'] > 0]
 
-        items_almacen = InventarioAlmacen.objects.filter(
-            almacen__in=almacenes_user
-        ).select_related('material', 'material__unidad_medida_fk')
+        # 2. Seguimiento de trámites propios
+        pedidos_propios = Solicitud.objects.filter(solicitante=request.user).order_by('-id')[:5]
+        adquisiciones_propias = ProcesoAdquisicion.objects.filter(solicitante=request.user).order_by('-id')[:5]
 
+        # 3. KPIs de la oficina
+        total_asignados = len(asignaciones_oficina)
+        tramites_activos = (
+            Solicitud.objects.filter(solicitante=request.user).exclude(estado__in=['ENTREGADA', 'CERRADA', 'RECHAZADA']).count() +
+            ProcesoAdquisicion.objects.filter(solicitante=request.user).exclude(estado__in=['CONCLUIDA', 'RECHAZADA']).count()
+        )
+        tramites_completados = (
+            Solicitud.objects.filter(solicitante=request.user, estado__in=['ENTREGADA', 'CERRADA']).count() +
+            ProcesoAdquisicion.objects.filter(solicitante=request.user, estado='CONCLUIDA').count()
+        )
+
+        context.update({
+            'unidad_user': unidad_user,
+            'asignaciones_oficina': asignaciones_oficina,
+            'pedidos_propios': pedidos_propios,
+            'adquisiciones_propias': adquisiciones_propias,
+            'total_asignados': total_asignados,
+            'tramites_activos': tramites_activos,
+            'tramites_completados': tramites_completados,
+        })
+
+    # =========================================================================
+    # CASO 2: ALMACENERO / KARDISTA / ADMINISTRADOR
+    # =========================================================================
+    elif es_almacen_o_admin:
+        almacenes_user = obtener_almacenes_usuario(request.user)
+        es_central_o_admin = almacenes_user.filter(tipo='CENTRAL').exists() or rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']
+        almacen_principal = almacenes_user.first()
+
+        # 1. Existencias e ítems en almacén
+        if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
+            inventario_items = InventarioAlmacen.objects.filter(stock_fisico__gt=0)
+            movimientos_base = MovimientoInventario.objects.all()
+            pedidos_almacen = Solicitud.objects.all()
+        else:
+            inventario_items = InventarioAlmacen.objects.filter(almacen__in=almacenes_user, stock_fisico__gt=0)
+            movimientos_base = MovimientoInventario.objects.filter(almacen__in=almacenes_user)
+            
+            # Subalmacén: solo pedidos de sus unidades atendidas
+            unidades_subalmacen = set(almacen_principal.unidades_atendidas.values_list('id', flat=True)) if almacen_principal else set()
+            if almacen_principal and almacen_principal.unidad_organizacional_id:
+                unidades_subalmacen.add(almacen_principal.unidad_organizacional_id)
+            pedidos_almacen = Solicitud.objects.filter(unidad_solicitante_id__in=unidades_subalmacen)
+
+        total_materiales = inventario_items.values('material_id').distinct().count()
+        total_stock_fisico = inventario_items.aggregate(t=Sum('stock_fisico'))['t'] or 0
+
+        # 2. Materiales bajo stock mínimo
         ids_bajos = [
-            inv.material_id for inv in items_almacen 
+            inv.material_id for inv in inventario_items.select_related('material')
             if inv.stock_fisico <= inv.material.stock_minimo
         ]
-        materiales_bajos = Material.objects.filter(id__in=ids_bajos)[:5]
+        materiales_bajos = Material.objects.filter(id__in=ids_bajos).select_related('partida', 'unidad_medida_fk')[:5]
 
-        total_materiales = items_almacen.filter(stock_fisico__gt=0).values('material_id').distinct().count()
+        # 3. Alertas de Lotes Perecederos (< 30 días o vencidos)
+        fecha_umbral = hoy + timedelta(days=30)
+        lotes_activos = movimientos_base.filter(
+            tipo='ENTRADA',
+            saldo_disponible_lote__gt=0,
+            fecha_vencimiento__isnull=False
+        ).select_related('material')
 
-        unidades_atendidas_ids = almacenes_user.values_list('unidades_atendidas', flat=True)
-        solicitudes_almacen = Solicitud.objects.filter(
-            Q(unidad_solicitante__in=unidades_atendidas_ids) |
-            Q(unidad_solicitante__in=almacenes_user.values_list('unidad_organizacional', flat=True))
-        )
-        total_solicitudes = solicitudes_almacen.count()
-        solicitudes_pendientes = solicitudes_almacen.filter(estado='REGISTRADA').count()
+        lotes_vencidos = lotes_activos.filter(fecha_vencimiento__lt=hoy)[:5]
+        lotes_por_vencer = lotes_activos.filter(fecha_vencimiento__gte=hoy, fecha_vencimiento__lte=fecha_umbral)[:5]
 
-        total_movimientos = MovimientoInventario.objects.filter(almacen__in=almacenes_user).count()
-        movimientos_recientes = MovimientoInventario.objects.filter(
-            almacen__in=almacenes_user
-        ).select_related('material', 'almacen', 'usuario').order_by('-id')[:5]
+        # 4. Cola de Ventanilla: Pedidos listos para despacho físico
+        pedidos_por_entregar = pedidos_almacen.filter(
+            estado='PREPARADA'
+        ).select_related('solicitante', 'unidad_solicitante').order_by('-fecha_preparado')[:6]
 
-        # Contextualizar alertas de almacén: solo mostrar agotados que afecten sus depósitos
-        ids_almacen = list(almacenes_user.values_list('id', flat=True))
-        alertas['materiales_agotados'] = alertas['materiales_agotados'].filter(
-            inventarios_almacen__almacen_id__in=ids_almacen
-        ).distinct()
+        pedidos_pendientes_preparar = pedidos_almacen.filter(
+            estado='REVISADA'
+        ).count()
 
-    else:
-        # ========================================================
-        # C. VISIÓN DE UNIDAD SOLICITANTE (Oficinas)
-        # ========================================================
-        materiales_bajos = Material.objects.none()
-        total_materiales = Material.objects.filter(is_active=True).count()
+        # 5. Gráfica de Entradas vs Salidas del período
+        total_entradas = movimientos_base.filter(tipo='ENTRADA', fecha__year=hoy.year).aggregate(t=Sum('cantidad'))['t'] or 0
+        total_salidas = movimientos_base.filter(tipo='SALIDA', fecha__year=hoy.year).aggregate(t=Sum('cantidad'))['t'] or 0
 
-        solicitudes_propias = Solicitud.objects.filter(solicitante=request.user)
-        total_solicitudes = solicitudes_propias.count()
-        solicitudes_pendientes = solicitudes_propias.filter(estado='REGISTRADA').count()
+        movimientos_recientes = movimientos_base.select_related('material', 'almacen', 'usuario').order_by('-id')[:6]
 
-        total_movimientos = 0
-        movimientos_recientes = []
-
-        # Contextualizar alertas para el solicitante: solo las alertas de su propia oficina
-        if perfil and perfil.unidad:
-            alertas['poas_criticos'] = [p for p in alertas['poas_criticos'] if p['poa'].unidad == perfil.unidad]
-            alertas['cuotas_criticas'] = [c for c in alertas['cuotas_criticas'] if c['unidad'] == perfil.unidad]
-            alertas['materiales_vencidos'] = Material.objects.none()
-            alertas['materiales_por_vencer'] = Material.objects.none()
-            alertas['total_criticas'] = len([p for p in alertas['poas_criticos'] if p['es_cero']]) + len([c for c in alertas['cuotas_criticas'] if c['agotado']])
-            alertas['total_advertencias'] = len([p for p in alertas['poas_criticos'] if not p['es_cero']]) + len([c for c in alertas['cuotas_criticas'] if not c['agotado']])
-
-    return render(
-        request,
-        'dashboard/index.html',
-        {
-            'materiales_bajos': materiales_bajos,
+        context.update({
+            'almacen_principal': almacen_principal,
+            'es_central_o_admin': es_central_o_admin,
             'total_materiales': total_materiales,
-            'total_solicitudes': total_solicitudes,
-            'solicitudes_pendientes': solicitudes_pendientes,
-            'total_movimientos': total_movimientos,
+            'total_stock_fisico': total_stock_fisico,
+            'materiales_bajos': materiales_bajos,
+            'lotes_vencidos': lotes_vencidos,
+            'lotes_por_vencer': lotes_por_vencer,
+            'pedidos_por_entregar': pedidos_por_entregar,
+            'pedidos_pendientes_preparar': pedidos_pendientes_preparar,
+            'total_entradas': total_entradas,
+            'total_salidas': total_salidas,
             'movimientos_recientes': movimientos_recientes,
-            'alertas': alertas,  # <-- Inyectado en el context para el bloque de semáforos
-            'rol': rol,
-        }
-    )
+        })
+
+    # =========================================================================
+    # CASO 3: AUTORIDADES SABS (RPA, SAF, Presupuestos, Bienes y Servicios)
+    # =========================================================================
+    if es_autoridad_sabs:
+        # Trámites urgentes según la fase de competencia del rol
+        if rol == 'RPA':
+            tramites_urgentes = ProcesoAdquisicion.objects.filter(estado='CERTIFICADA').order_by('-id')[:8]
+            accion_requerida = "Aprobación de Inicio RPA (Resolución)"
+        elif rol == 'PRESUPUESTOS':
+            tramites_urgentes = ProcesoAdquisicion.objects.filter(estado='NOTA_SAF_EMITIDA').order_by('-id')[:8]
+            accion_requerida = "Certificación Presupuestaria de Partida"
+        elif rol == 'SECRETARIO_SAF':
+            tramites_urgentes = ProcesoAdquisicion.objects.filter(estado='CHECKLIST_VERIFICADO').order_by('-id')[:8]
+            accion_requerida = "Autorización y Emisión de Nota a Presupuestos"
+        elif rol == 'BIENES_SERVICIOS':
+            tramites_urgentes = ProcesoAdquisicion.objects.filter(estado='APROBADA_RPA').order_by('-id')[:8]
+            accion_requerida = "Emisión de Orden de Compra / Servicio"
+        else:
+            tramites_urgentes = ProcesoAdquisicion.objects.filter(estado__in=['CHECKLIST_VERIFICADO', 'CERTIFICADA', 'APROBADA_RPA']).order_by('-id')[:8]
+            accion_requerida = "Revisión Administrativa"
+
+        # KPIs globales de contrataciones del año
+        adquisiciones_año = ProcesoAdquisicion.objects.filter(fecha_solicitud__year=hoy.year)
+        total_adquisiciones = adquisiciones_año.count()
+        en_curso = adquisiciones_año.exclude(estado__in=['CONCLUIDA', 'RECHAZADA']).count()
+        concluidas = adquisiciones_año.filter(estado='CONCLUIDA').count()
+
+        context.update({
+            'tramites_urgentes': tramites_urgentes,
+            'accion_requerida': accion_requerida,
+            'total_adquisiciones': total_adquisiciones,
+            'en_curso': en_curso,
+            'concluidas': concluidas,
+        })
+
+    return render(request, 'dashboard/index.html', context)

@@ -251,7 +251,7 @@ def inventario_view(request):
     })
 
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR'])
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def kardex(request, id):
     """
     Libro de Almacén o Kardex Valorado oficial (D.S. 0181 / SABS).
@@ -263,9 +263,9 @@ def kardex(request, id):
     rol = perfil.rol
 
     # 1. Almacenes autorizados
-    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre') if rol == 'ADMINISTRADOR' else perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
+    almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre') if rol == 'ADMINISTRADOR' or rol == 'ADMIN_ALMACENES' else perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
 
-    if not almacenes_disponibles.exists() and rol != 'ADMINISTRADOR':
+    if not almacenes_disponibles.exists() and rol != 'ADMINISTRADOR' and rol != 'ADMIN_ALMACENES':
         messages.error(request, "No tiene ningún almacén asignado bajo su responsabilidad.")
         return redirect('inventario')
 
@@ -277,7 +277,7 @@ def kardex(request, id):
     # ========================================================
     if not filtro_almacen_id:
         almacen_central = Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
-        if almacen_central and (rol == 'ADMINISTRADOR' or perfil.tiene_acceso_almacen(almacen_central)):
+        if almacen_central and (rol == 'ADMINISTRADOR' or rol == 'ADMIN_ALMACENES' or perfil.tiene_acceso_almacen(almacen_central)):
             almacen_seleccionado = almacen_central
             filtro_almacen_id = str(almacen_central.id)
         else:

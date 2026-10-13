@@ -3,365 +3,137 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Solicitud de Bienes y Servicios - {{ proceso.codigo|default:"ADQ-2026-0004" }}</title>
+    <title>Solicitud de Bienes y Servicios - {{ proceso.codigo }}</title>
     <style>
-        @page {
-            size: letter landscape;
-            margin: 0.8cm 1cm 0.8cm 1cm;
-        }
-
-        *, *:before, *:after {
-            box-sizing: border-box;
-        }
+        @page { size: letter landscape; margin: 0.8cm 1cm 0.8cm 1cm; }
+        *, *:before, *:after { box-sizing: border-box; }
 
         body {
+            background-color: #eaedf1;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 9.5px;
             color: #000;
-            background-color: #f1f5f9;
             margin: 0;
-            padding: 16px;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
 
-        /* BARRA SUPERIOR DE ACCIONES (MODO EDICIÓN) */
         .top-action-bar {
-            max-width: 1060px;
-            margin: 0 auto 16px auto;
+            width: 100%;
+            max-width: 1050px;
             background: #ffffff;
-            border: 1px solid #d1d5db;
+            border: 1px solid #d5d9df;
             border-radius: 14px;
-            padding: 10px 18px;
+            padding: 10px 20px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
-        .action-text {
-            color: #0284c7;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-        }
+        .action-text { color: #063b2f; font-size: 11px; font-weight: bold; }
         .btn-save {
-            background-color: #0284c7;
-            color: white;
-            border: none;
-            padding: 7px 16px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            background-color: #063b2f; color: #fff; border: none; padding: 7px 16px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer;
         }
+        .btn-save:hover { background-color: #04271f; }
         .btn-print {
-            background-color: #8b0000;
-            color: white;
-            border: none;
-            padding: 7px 16px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            background-color: #7c121e; color: #fff; border: none; padding: 7px 18px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer;
         }
+        .btn-print:hover { background-color: #610c16; }
 
-        /* HOJA PRINCIPAL DEL DOCUMENTO */
         .document-page {
-            max-width: 1060px;
+            width: 100%;
+            max-width: 1050px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            padding: 26px 32px 30px 32px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
             margin: 0 auto;
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            padding: 24px 28px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
         }
 
-        /* CABECERA (LOGO, TITULO, DOC NRO) */
-        .header-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 12px;
-        }
-        .header-table td {
-            vertical-align: middle;
-        }
-        .escudo-img {
-            max-height: 58px;
-            width: auto;
-        }
-        .header-title {
-            text-align: center;
-        }
-        .header-title h2 {
-            margin: 0;
-            font-size: 11px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .header-title h1 {
-            margin: 2px 0 0 0;
-            font-size: 14px;
-            font-weight: 800;
-        }
-        .nro-doc-box {
-            border: 1px solid #000;
-            text-align: center;
-            padding: 6px 12px;
-            width: 140px;
-            margin-left: auto;
-        }
-        .nro-doc-box .label {
-            font-size: 8px;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 2px;
-        }
-        .nro-doc-box .code {
-            font-size: 9.5px;
-            font-weight: bold;
-            font-family: monospace;
-        }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .escudo-img { max-height: 52px; width: auto; display: block; }
+        .header-title { text-align: center; }
+        .header-title h2 { margin: 0; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .header-title h1 { margin: 3px 0 0 0; font-size: 14px; font-weight: 800; }
+        .nro-doc-box { border: 1px solid #000; text-align: center; padding: 6px 10px; width: 140px; margin-left: auto; }
+        .nro-doc-box .label { font-size: 8px; font-weight: bold; display: block; }
+        .nro-doc-box .code { font-size: 9.5px; font-weight: bold; font-family: monospace; }
 
-        /* DATOS GENERALES */
-        .info-grid {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 8px;
-            font-size: 8.5px;
-        }
-        .info-grid td {
-            padding: 2px 0;
-            vertical-align: top;
-        }
-        .info-grid .label-col {
-            font-weight: bold;
-            width: 110px;
-        }
-        .info-grid .val-col {
-            padding-right: 20px;
-        }
+        .info-grid { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 8.5px; }
+        .info-grid td { padding: 2px 0; vertical-align: top; }
+        .info-grid .label-col { font-weight: bold; width: 110px; }
 
-        /* RECUADRO DE CATEGORÍA PROGRAMÁTICA */
-        .cat-prog-box {
-            border: 1px solid #000;
-            margin-bottom: 8px;
-            padding: 4px 8px 6px 8px;
-        }
-        .cat-prog-title {
-            font-size: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-        .cat-prog-inner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 8.5px;
-        }
-        .prog-fields {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .prog-row {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        .field-group {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .cat-prog-box { border: 1px solid #000; margin-bottom: 8px; padding: 5px 8px; }
+        .cat-prog-title { font-size: 8px; font-weight: bold; text-transform: uppercase; margin-bottom: 3px; }
+        .cat-prog-inner { display: flex; justify-content: space-between; align-items: center; font-size: 8.5px; }
         .input-dashed {
-            border: 1px dashed #6b7280;
-            border-radius: 9999px;
-            padding: 1px 12px;
-            font-family: monospace;
-            font-weight: bold;
-            font-size: 8.5px;
-            background: #ffffff;
-            outline: none;
-            text-align: center;
-            min-width: 50px;
-        }
-        .right-options {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 6px;
-        }
-        .radio-options {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-        .radio-options label {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
+            border: 1px dashed #6b7280; border-radius: 9999px; padding: 1px 10px; font-family: monospace; font-weight: bold; font-size: 8.5px; text-align: center; min-width: 48px;
         }
 
-        /* TABLA DE ÍTEMS */
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #000;
-            margin-bottom: 8px;
-            font-size: 8px;
-        }
-        .items-table th, .items-table td {
-            border: 1px solid #000;
-            padding: 3.5px 4px;
-        }
-        .items-table th {
-            text-align: center;
-            font-weight: bold;
-            background-color: #ffffff;
-            line-height: 1.2;
-        }
-        .items-table td.text-center { text-align: center; }
-        .items-table td.text-right { text-align: right; }
-        .items-table td.desc-col {
-            font-weight: 500;
-            text-align: left;
-        }
-        .total-row td {
-            font-weight: bold;
-            padding: 3px 4px;
-        }
+        .items-table { width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 8px; font-size: 8px; }
+        .items-table th, .items-table td { border: 1px solid #000; padding: 3px 4px; }
+        .items-table th { text-align: center; font-weight: bold; background-color: #f8fafc; }
+        .total-row td { font-weight: bold; background-color: #f1f5f9; }
 
-        /* RECUADROS DE FIRMAS */
-        .signatures-table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #000;
-            table-layout: fixed;
-        }
-        .signatures-table td {
-            border: 1px solid #000;
-            vertical-align: top;
-            padding: 6px 8px;
-            height: 110px;
-            position: relative;
-        }
-        .sig-header {
-            font-size: 8px;
-            font-weight: bold;
-            margin-bottom: 30px;
-        }
-        .sig-footer-center {
-            position: absolute;
-            bottom: 6px;
-            left: 6px;
-            right: 6px;
-            text-align: center;
-        }
-        .sig-line {
-            border-top: 1px dashed #000;
-            margin: 0 auto 3px auto;
-            width: 90%;
-        }
-        .sig-name {
-            font-weight: bold;
-            font-size: 8px;
-            display: block;
-        }
-        .sig-role {
-            font-size: 7px;
-            display: block;
-            text-transform: uppercase;
-        }
+        .signatures-table { width: 100%; border-collapse: collapse; border: 1px solid #000; table-layout: fixed; }
+        .signatures-table td { border: 1px solid #000; vertical-align: top; padding: 6px 8px; height: 105px; position: relative; }
+        .sig-header { font-size: 8px; font-weight: bold; margin-bottom: 25px; }
+        .sig-footer-center { position: absolute; bottom: 6px; left: 6px; right: 6px; text-align: center; }
+        .sig-line { border-top: 1px dashed #000; margin: 0 auto 3px auto; width: 90%; }
+        .sello-box { border: 1px dashed #000; padding: 6px; text-align: center; height: 92px; display: flex; flex-direction: column; justify-content: center; }
 
-        /* SELLO DE NO EXISTENCIA ALMACENES */
-        .sello-almacenes-box {
-            border: 1px dashed #000;
-            padding: 8px 6px;
-            text-align: center;
-            height: 96px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .sello-almacenes-title {
-            font-weight: bold;
-            font-size: 7.5px;
-            text-transform: uppercase;
-            line-height: 1.25;
-            margin-bottom: 6px;
-        }
-        .sello-almacenes-text {
-            font-style: italic;
-            font-size: 7px;
-            line-height: 1.2;
-        }
-
-        /* REGLAS PARA IMPRESIÓN */
         @media print {
-            body {
-                background: #ffffff;
-                padding: 0;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .document-page {
-                border: none;
-                box-shadow: none;
-                padding: 0;
-                width: 100%;
-                max-width: 100%;
-            }
-            .input-dashed {
-                border: 1px dashed #000 !important;
-            }
+            body { background: #fff !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .document-page { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+            .input-dashed { border: none !important; font-family: inherit !important; }
         }
     </style>
 </head>
 <body>
 
-    <!-- BARRA SUPERIOR DE ACCIONES (SE OCULTA AL IMPRIMIR) -->
+    <!-- BARRA SUPERIOR DE HERRAMIENTAS -->
     <div class="top-action-bar no-print">
         <div class="action-text">
-            Modo Edición Activado: Puedes modificar la Categoría Programática directamente en los campos punteados.
+            {% if puede_editar %}
+                <span>Modo Edición Activado:</span> Puedes actualizar la Categoría Programática antes de imprimir.
+            {% else %}
+                <span>Documento Oficial Sellado:</span> Vista previa oficial para impresión o auditoría (Solo Lectura).
+            {% endif %}
         </div>
-        <div class="action-buttons">
-            <button type="button" class="btn-save" onclick="alert('Cambios guardados con éxito')">
+        <div style="display: flex; gap: 8px;">
+            {% if puede_editar %}
+            <button type="button" class="btn-save" onclick="document.getElementById('form-cat-prog').submit()">
                 💾 Guardar Cambios
             </button>
+            {% endif %}
             <button type="button" class="btn-print" onclick="window.print()">
                 🖨️ Imprimir Formulario Oficial
             </button>
         </div>
     </div>
 
-    <!-- PÁGINA DEL FORMULARIO -->
+    <!-- HOJA BLANCA -->
     <div class="document-page">
 
-        <!-- CABECERA PRINCIPAL -->
+        <!-- CABECERA -->
         <table class="header-table">
             <tr>
                 <td style="width: 15%;">
-                    <img src="{% static 'img/escudo_bolivia.png' %}" alt="Escudo de Bolivia" class="escudo-img" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Escudo_de_Bolivia.svg/240px-Escudo_de_Bolivia.svg.png'">
+                    <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Escudo de Potosí" class="escudo-img">
                 </td>
                 <td style="width: 70%;" class="header-title">
-                    <h2>GOBIERNO AUTONOMO DEPARTAMENTAL DE POTOSI</h2>
+                    <h2>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h2>
                     <h1>Solicitud de Bienes y Servicios</h1>
                 </td>
                 <td style="width: 15%;">
                     <div class="nro-doc-box">
                         <span class="label">DOCUMENTO NRO.:</span>
-                        <span class="code">{{ proceso.codigo|default:"ADQ-2026-0004" }}</span>
+                        <span class="code">{{ proceso.codigo }}</span>
                     </div>
                 </td>
             </tr>
@@ -371,77 +143,81 @@
         <table class="info-grid">
             <tr>
                 <td class="label-col">Dirigido a:</td>
-                <td class="val-col">{{ proceso.autoridad_rpa.nombre_completo|default:"Ing. Carlos Mendoza Ramos" }} - Responsable del R.P.A.</td>
-                <td class="label-col" style="width: 80px;">Lugar y Fecha:</td>
-                <td class="val-col">Potosí, {{ proceso.fecha_solicitud|date:"d \d\e F \d\e Y"|default:"07 de octubre de 2026" }}</td>
+                <td style="padding-right: 15px;">{{ proceso.autoridad_rpa.nombre_completo|default:"Responsable del R.P.A." }}</td>
+                <td class="label-col" style="width: 90px;">Lugar y Fecha:</td>
+                <td>Potosí, {{ proceso.fecha_solicitud|date:"d \d\e F \d\e Y" }}</td>
             </tr>
             <tr>
                 <td class="label-col">Entidad:</td>
-                <td class="val-col">Gobierno Autónomo Deptal. de Potosí</td>
+                <td>Gobierno Autónomo Departamental de Potosí</td>
                 <td class="label-col">Secretaría:</td>
-                <td class="val-col">{{ proceso.secretaria_solicitante|default:"SECRETARIA DEPARTAMENTAL ADMINISTRATIVA FINANCIERA"|upper }}</td>
+                <td>{{ proceso.unidad_solicitante.secretaria.nombre|default:proceso.unidad_solicitante.nombre|upper }}</td>
             </tr>
             <tr>
                 <td class="label-col">Unidad Ejecutora:</td>
-                <td class="val-col" colspan="3">[ X ] Unidad Administrativa</td>
+                <td colspan="3">[ X ] {{ proceso.unidad_solicitante.nombre }}</td>
             </tr>
         </table>
 
-        <!-- CATEGORIA PROGRAMÁTICA -->
-        <div class="cat-prog-box">
-            <div class="cat-prog-title">CATEGORIA PROGRAMATICA</div>
-            <div class="cat-prog-inner">
-                <div class="prog-fields">
-                    <div class="prog-row">
-                        <div class="field-group">
+        <!-- CATEGORÍA PROGRAMÁTICA -->
+        <form method="POST" id="form-cat-prog" action="{% url 'actualizar_datos_solicitud_bbss' proceso.id %}">
+            {% csrf_token %}
+            <div class="cat-prog-box">
+                <div class="cat-prog-title">CATEGORIA PROGRAMATICA</div>
+                <div class="cat-prog-inner">
+                    <div style="display: flex; gap: 20px;">
+                        <div>
                             <span>Programa:</span>
-                            <input type="text" class="input-dashed" value="{{ proceso.cat_programa|default:'000' }}">
+                            {% if puede_editar %}
+                                <input type="text" name="programa" class="input-dashed" value="{{ proceso.programa|default:'000' }}">
+                            {% else %}
+                                <strong>{{ proceso.programa|default:'000' }}</strong>
+                            {% endif %}
                         </div>
-                        <div class="field-group">
+                        <div>
                             <span>Proy. O Acti.:</span>
-                            <input type="text" class="input-dashed" value="{{ proceso.cat_actividad|default:'001' }}">
+                            {% if puede_editar %}
+                                <input type="text" name="proyecto_actividad" class="input-dashed" value="{{ proceso.proyecto_actividad|default:'001' }}">
+                            {% else %}
+                                <strong>{{ proceso.proyecto_actividad|default:'001' }}</strong>
+                            {% endif %}
                         </div>
-                    </div>
-                    <div class="prog-row">
-                        <div class="field-group">
+                        <div>
                             <span>Fuente:</span>
-                            <input type="text" class="input-dashed" value="{{ proceso.cat_fuente|default:'20' }}">
+                            {% if puede_editar %}
+                                <input type="text" name="fuente_financiamiento" class="input-dashed" value="{{ proceso.fuente_financiamiento|default:'20' }}">
+                            {% else %}
+                                <strong>{{ proceso.fuente_financiamiento|default:'20' }}</strong>
+                            {% endif %}
                         </div>
-                        <div class="field-group">
+                        <div>
                             <span>Org. Fin.:</span>
-                            <input type="text" class="input-dashed" value="{{ proceso.cat_org_fin|default:'220' }}">
+                            {% if puede_editar %}
+                                <input type="text" name="organismo_financiador" class="input-dashed" value="{{ proceso.organismo_financiador|default:'220' }}">
+                            {% else %}
+                                <strong>{{ proceso.organismo_financiador|default:'220' }}</strong>
+                            {% endif %}
                         </div>
                     </div>
-                </div>
 
-                <div class="right-options">
-                    <div class="radio-options">
-                        <span>Clase de Gasto:</span>
-                        <label>
-                            <input type="radio" name="clase_gasto" value="bienes" checked> Bienes
-                        </label>
-                        <label>
-                            <input type="radio" name="clase_gasto" value="servicios"> Servicios
-                        </label>
-                    </div>
-                    <div>
-                        <span>CITE Solicitud:</span>
-                        <strong>{{ proceso.cite_solicitud|default:"cite sis 100" }}</strong>
+                    <div style="text-align: right;">
+                        <span>Clase: <strong>{{ proceso.get_tipo_display }}</strong></span> • 
+                        <span>CITE: <strong>{{ proceso.cite_solicitud|default:"S/C" }}</strong></span>
                     </div>
                 </div>
             </div>
-        </div>
+        </form>
 
-        <!-- TABLA DE ÍTEMS REQUERIDOS -->
+        <!-- TABLA DE ÍTEMS -->
         <table class="items-table">
             <thead>
                 <tr>
-                    <th rowspan="2" style="width: 28px;">Nro</th>
-                    <th rowspan="2" style="width: 290px;">Descripción</th>
+                    <th rowspan="2" style="width: 25px;">Nro</th>
+                    <th rowspan="2" style="width: 310px;">Descripción Técnica / Requerimiento</th>
                     <th colspan="3">UNIDAD SOLICITANTE</th>
                     <th colspan="2">Precio Referencial</th>
                     <th colspan="2">SAF (Aprobado)</th>
-                    <th rowspan="2" style="width: 140px;">Partida / Observaciones</th>
+                    <th rowspan="2" style="width: 120px;">Partida</th>
                 </tr>
                 <tr>
                     <th style="width: 45px;">Cant. Sol.</th>
@@ -456,103 +232,63 @@
             <tbody>
                 {% for it in proceso.items.all %}
                 <tr>
-                    <td class="text-center">{{ forloop.counter }}</td>
-                    <td class="desc-col">{{ it.descripcion }}</td>
-                    <td class="text-center">{{ it.cantidad }}</td>
-                    <td class="text-center">{{ it.cantidad }}</td>
-                    <td class="text-center">{{ it.unidad_medida|upper }}</td>
-                    <td class="text-right">{{ it.precio_unitario|floatformat:2 }}</td>
-                    <td class="text-right">{{ it.subtotal_referencial|floatformat:2 }}</td>
-                    <td class="text-center">{{ it.cantidad }}</td>
-                    <td class="text-right">{{ it.subtotal_referencial|floatformat:2 }}</td>
-                    <td class="text-center">{{ it.partida.codigo|default:"39100" }}</td>
-                </tr>
-                {% empty %}
-                <!-- FILAS POR DEFECTO IDÉNTICAS A LA IMAGEN 1 -->
-                <tr>
-                    <td class="text-center">1</td>
-                    <td class="desc-col">39100-003 - BASURERO TIPO CANASTILLO CIRCULAR DE PLASTICO</td>
-                    <td class="text-center">1</td>
-                    <td class="text-center">1</td>
-                    <td class="text-center">PIEZA</td>
-                    <td class="text-right">40,00</td>
-                    <td class="text-right">40,00</td>
-                    <td class="text-center">1</td>
-                    <td class="text-right">40,00</td>
-                    <td class="text-center">39100</td>
-                </tr>
-                <tr>
-                    <td class="text-center">2</td>
-                    <td class="desc-col">39100-015 - LEVANTADOR DE BASURA PLASTICO CON MANGO (TAMAÑO MEDIANO)</td>
-                    <td class="text-center">1</td>
-                    <td class="text-center">1</td>
-                    <td class="text-center">PIEZA</td>
-                    <td class="text-right">50,00</td>
-                    <td class="text-right">50,00</td>
-                    <td class="text-center">1</td>
-                    <td class="text-right">50,00</td>
-                    <td class="text-center">39100</td>
+                    <td style="text-align: center;">{{ forloop.counter }}</td>
+                    <td style="font-weight: 500;">{{ it.descripcion }}</td>
+                    <td style="text-align: center;">{{ it.cantidad }}</td>
+                    <td style="text-align: center;">{{ it.cantidad }}</td>
+                    <td style="text-align: center;">{{ it.unidad_medida|upper }}</td>
+                    <td style="text-align: right;">{{ it.precio_referencial_estimado|floatformat:2 }}</td>
+                    <td style="text-align: right; font-weight: bold;">{{ it.subtotal_referencial|floatformat:2 }}</td>
+                    <td style="text-align: center;">{{ it.cantidad }}</td>
+                    <td style="text-align: right; font-weight: bold;">{{ it.subtotal_referencial|floatformat:2 }}</td>
+                    <td style="text-align: center; font-family: monospace; font-weight: bold;">{{ it.partida.codigo|default:"39100" }}</td>
                 </tr>
                 {% endfor %}
-
-                <!-- FILA DE TOTALES -->
                 <tr class="total-row">
-                    <td colspan="6" class="text-right">TOTAL:</td>
-                    <td class="text-right">Bs. {{ total_referencial|default:"90,00"|floatformat:2 }}</td>
-                    <td class="text-right">TOTAL:</td>
-                    <td class="text-right">Bs. {{ total_referencial|default:"90,00"|floatformat:2 }}</td>
+                    <td colspan="6" style="text-align: right;">TOTAL:</td>
+                    <td style="text-align: right;">Bs. {{ proceso.total_referencial|floatformat:2 }}</td>
+                    <td style="text-align: right;">TOTAL:</td>
+                    <td style="text-align: right;">Bs. {{ proceso.total_referencial|floatformat:2 }}</td>
                     <td></td>
                 </tr>
             </tbody>
         </table>
 
-        <!-- BLOQUE DE FIRMAS (4 RECUADROS) -->
+        <!-- 4 FIRMAS REGLAMENTARIAS -->
         <table class="signatures-table">
             <tr>
-                <!-- FIRMA 1: SOLICITADO POR -->
                 <td>
                     <div class="sig-header">Solicitado por:</div>
                     <div class="sig-footer-center">
                         <div class="sig-line"></div>
-                        <span class="sig-name">{{ proceso.usuario_solicitante.get_full_name|default:"Emilia Saavedra" }}</span>
-                        <span class="sig-role">RESPONSABLE / SOLICITANTE<br>Unidad Administrativa</span>
+                        <span style="font-weight: bold; font-size: 8px;">{{ proceso.solicitante.get_full_name|default:proceso.solicitante.username }}</span><br>
+                        <span style="font-size: 7px;">{{ proceso.unidad_solicitante.nombre|upper }}</span>
                     </div>
                 </td>
-
-                <!-- FIRMA 2: AUTORIZADO POR SECRETARIO -->
                 <td>
-                    <div class="sig-header">Autorizado por (Secretario):</div>
+                    <div class="sig-header">Autorizado por (Secretario/Jefe):</div>
                     <div class="sig-footer-center">
                         <div class="sig-line"></div>
-                        <span class="sig-name">{{ proceso.autoridad_saf.nombre_completo|default:"Lic. Flora Colque Calizaya" }}</span>
-                        <span class="sig-role">FIRMA Y SELLO</span>
+                        <span style="font-weight: bold; font-size: 8px;">{{ proceso.autoridad_saf.nombre_completo|default:"FIRMA Y SELLO" }}</span><br>
+                        <span style="font-size: 7px;">SECRETARÍA DPTAL. ADMINISTRATIVA FINANCIERA</span>
                     </div>
                 </td>
-
-                <!-- FIRMA 3: SELLO DE ALMACENES O ACTIVOS FIJOS -->
                 <td style="padding: 5px;">
-                    <div class="sello-almacenes-box">
-                        <span class="sello-almacenes-title">
-                            SELLO DE ALMACENES O ACTIVOS FIJOS DE NO EXISTENCIA
-                        </span>
-                        <span class="sello-almacenes-text">
-                            Certifico que no se cuenta con stock disponible en almacén para atender este requerimiento.
-                        </span>
+                    <div class="sello-box">
+                        <strong style="font-size: 7.5px; text-transform: uppercase;">SELLO DE NO EXISTENCIA EN ALMACENES</strong>
+                        <span style="font-size: 7px; font-style: italic; margin-top: 4px;">Certifico que no se cuenta con stock disponible en estantería para este pedido.</span>
                     </div>
                 </td>
-
-                <!-- FIRMA 4: AUTORIZACION DEL RPA -->
                 <td>
-                    <div class="sig-header">AUTORIZACION DEL RPA:</div>
+                    <div class="sig-header">Autorización del RPA:</div>
                     <div class="sig-footer-center">
                         <div class="sig-line"></div>
-                        <span class="sig-name">{{ proceso.autoridad_rpa.nombre_completo|default:"Ing. Carlos Mendoza Ramos" }}</span>
-                        <span class="sig-role">RESP. DE PROCESOS DE CONTRATACIÓN RPA<br><strong>Se autoriza el inicio del Proceso</strong></span>
+                        <span style="font-weight: bold; font-size: 8px;">{{ proceso.autoridad_rpa.nombre_completo|default:"RPA CONTRATACIÓN MENOR" }}</span><br>
+                        <span style="font-size: 7px; font-weight: bold;">SE AUTORIZA EL INICIO DEL PROCESO</span>
                     </div>
                 </td>
             </tr>
         </table>
-
     </div>
 
 </body>
