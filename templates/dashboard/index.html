@@ -1,435 +1,450 @@
 {% extends 'base.html' %}
 
-{% block title %}
-Dashboard
-{% endblock %}
+{% block title %} Panel de Control - SGA Potosí {% endblock %}
 
 {% block content %}
+<div class="max-w-7xl mx-auto space-y-7 font-['Outfit'] pb-12">
 
-<div class="max-w-7xl mx-auto">
-
-    <!-- CABECERA (Textos adaptables) -->
-    <div class="mb-8">
-        <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
-            Dashboard General
-        </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Resumen estadístico, alertas de stock e historial de transacciones de almacén
-        </p>
-    </div>
-
-    <!-- TARJETAS DE INDICADORES (KPI CARDS) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-
-        <!-- MATERIALES -->
-        <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
-            <div>
-                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    Materiales
-                </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
-                    {{ total_materiales|default:0 }}
-                </h2>
-            </div>
-            <div class="w-14 h-14 rounded-2xl badge-info flex items-center justify-center shadow-inner">
-                <span class="material-symbols-outlined text-[28px]">
-                    inventory_2
-                </span>
-            </div>
-        </div>
-
-        <!-- SOLICITUDES (Badge verde adaptable) -->
-        <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
-            <div>
-                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    Solicitudes
-                </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
-                    {{ total_solicitudes|default:0 }}
-                </h2>
-            </div>
-            <div class="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 flex items-center justify-center shadow-inner">
-                <span class="material-symbols-outlined text-[28px]">
-                    description
-                </span>
-            </div>
-        </div>
-
-        <!-- PENDIENTES -->
-        <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
-            <div>
-                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    Pendientes
-                </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
-                    {{ solicitudes_pendientes|default:0 }}
-                </h2>
-            </div>
-            <div class="w-14 h-14 rounded-2xl badge-gold flex items-center justify-center shadow-inner">
-                <span class="material-symbols-outlined text-[28px]">
-                    pending_actions
-                </span>
-            </div>
-        </div>
-
-        <!-- MOVIMIENTOS -->
-        <div class="card p-6 flex items-center justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-200">
-            <div>
-                <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    Movimientos
-                </p>
-                <h2 class="text-4xl font-extrabold mt-1.5 text-gray-800 dark:text-gray-100 font-['Outfit']">
-                    {{ total_movimientos|default:0 }}
-                </h2>
-            </div>
-            <div class="w-14 h-14 rounded-2xl badge-primary flex items-center justify-center shadow-inner">
-                <span class="material-symbols-outlined text-[28px]">
-                    sync_alt
-                </span>
-            </div>
-        </div>
-
-    </div>
-    <!-- CENTRO DE ALERTAS TEMPRANAS SABS (TARJETA 7) -->
-    <div class="space-y-4 font-['Outfit'] mb-8">
-        <div class="flex items-center justify-between">
-            <h2 class="text-lg font-extrabold text-gray-850 dark:text-gray-100 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[#8b0000] dark:text-red-400 text-2xl">notification_important</span>
-                Centro de Alertas Tempranas Institucionales
-            </h2>
-            <div class="flex items-center gap-2">
-                {% if alertas.total_criticas > 0 %}
-                    <span class="px-2.5 py-1 bg-red-100 text-red-800 text-xs font-black rounded-full animate-pulse border border-red-300">
-                        🚨 {{ alertas.total_criticas }} Críticas
+    <!-- 1. CABECERA CONTEXTUAL DEL USUARIO -->
+    <div class="card p-6 sm:p-7 bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-gray-800 rounded-3xl shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-[#063b2f]/10 text-[#063b2f] dark:bg-emerald-950/60 dark:text-emerald-400 border border-[#063b2f]/20">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                        {{ request.user.perfilusuario.get_rol_display|default:"Usuario Activo" }}
                     </span>
-                {% endif %}
-                {% if alertas.total_advertencias > 0 %}
-                    <span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-full border border-amber-300">
-                        ⚠️ {{ alertas.total_advertencias }} Advertencias
-                    </span>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- REJILLA DE 4 PANELES DE ALERTA -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            
-            <!-- 1. VENCIMIENTOS -->
-            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.materiales_vencidos.exists %}border-red-300 bg-red-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase text-gray-400">Caducidad / Perecederos</span>
-                    <span class="material-symbols-outlined text-red-600 text-xl">event_busy</span>
-                </div>
-                <div>
-                    <span class="text-2xl font-black text-gray-900 dark:text-gray-100 font-mono">
-                        {{ alertas.materiales_vencidos.count|add:alertas.materiales_por_vencer.count }}
-                    </span>
-                    <span class="text-[10px] text-gray-400 block mt-0.5">insumos con alerta</span>
+                    <span class="text-xs text-gray-400 font-mono">{{ hoy|date:"l, d \d\e F \d\e Y" }}</span>
                 </div>
                 
-                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
-                    {% for m in alertas.materiales_vencidos %}
-                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-red-50 dark:bg-red-950/30 rounded-lg text-red-700 dark:text-red-400">
-                            <span class="truncate font-semibold max-w-[130px]" title="{{ m.nombre }}">{{ m.nombre }}</span>
-                            <span class="font-bold font-mono">VENCIDO</span>
-                        </div>
-                    {% empty %}
-                        {% for m in alertas.materiales_por_vencer %}
-                            <div class="flex justify-between items-center text-[11px] p-1.5 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-amber-800 dark:text-amber-400">
-                                <span class="truncate font-semibold max-w-[130px]" title="{{ m.nombre }}">{{ m.nombre }}</span>
-                                <span class="font-bold font-mono">{{ m.dias_para_vencer }}d</span>
-                            </div>
-                        {% empty %}
-                            <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Sin productos por vencer</span>
-                        {% endfor %}
-                    {% endfor %}
-                </div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                    Bienvenido, {{ request.user.first_name|default:request.user.username }}
+                </h1>
+                
+                <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                    {% if rol == 'UNIDAD_SOLICITANTE' %}
+                        Gestión de insumos de oficina y seguimiento de adquisiciones de <strong>{{ unidad_user.nombre|default:"tu unidad" }}</strong>.
+                    {% elif rol in 'ALMACENERO,KARDISTA' %}
+                        Control físico, despacho de materiales y libro de almacén de <strong>{{ almacen_principal.nombre|default:"tu depósito" }}</strong>.
+                    {% elif rol in 'RPA,SECRETARIO_SAF,PRESUPUESTOS,BIENES_SERVICIOS' %}
+                        Bandeja de decisiones institucionales y contrataciones del Estado (SABS).
+                    {% else %}
+                        Panel general de administración y control patrimonial del GAD Potosí.
+                    {% endif %}
+                </p>
             </div>
 
-            <!-- 2. DESABASTECIMIENTO (STOCK AGOTADO) -->
-            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.materiales_agotados.exists %}border-red-300 bg-red-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase text-gray-400">Almacén (Stock Cero)</span>
-                    <span class="material-symbols-outlined text-red-600 text-xl">production_quantity_limits</span>
-                </div>
-                <div>
-                    <span class="text-2xl font-black text-gray-900 dark:text-gray-100 font-mono">
-                        {{ alertas.materiales_agotados.count }}
-                    </span>
-                    <span class="text-[10px] text-gray-400 block mt-0.5">materiales agotados</span>
-                </div>
-
-                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
-                    {% for m in alertas.materiales_agotados|slice:":4" %}
-                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-gray-50 dark:bg-slate-800 rounded-lg">
-                            <span class="truncate font-semibold max-w-[140px]" title="{{ m.nombre }}">{{ m.nombre }}</span>
-                            <a href="{% url 'nueva_solicitud_compra' %}" class="text-[10px] font-bold text-[#8b0000] hover:underline" title="Iniciar compra">Comprar</a>
-                        </div>
-                    {% empty %}
-                        <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Existencias normales</span>
-                    {% endfor %}
-                </div>
+            <!-- Accesos Rápidos para Unidad Solicitante -->
+            {% if rol == 'UNIDAD_SOLICITANTE' %}
+            <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                <a href="{% url 'nuevo_pedido_almacen' %}" class="px-4 py-2.5 bg-[#7c121e] hover:bg-[#610c16] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-red-950/20">
+                    <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+                    <span>Pedir de Almacén</span>
+                </a>
+                <a href="{% url 'nueva_solicitud_compra' %}" class="px-4 py-2.5 bg-gray-900 hover:bg-slate-800 dark:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">shopping_cart</span>
+                    <span>Nueva Adquisición</span>
+                </a>
             </div>
-
-            <!-- 3. PRESUPUESTO CRÍTICO POA (< 15%) -->
-            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.poas_criticos %}border-amber-300 bg-amber-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase text-gray-400">Presupuesto POA (&lt; 15%)</span>
-                    <span class="material-symbols-outlined text-amber-600 text-xl">account_balance_wallet</span>
-                </div>
-                <div>
-                    <span class="text-2xl font-black text-amber-700 dark:text-amber-400 font-mono">
-                        {{ alertas.poas_criticos|length }}
-                    </span>
-                    <span class="text-[10px] text-gray-400 block mt-0.5">partidas en riesgo</span>
-                </div>
-
-                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
-                    {% for p in alertas.poas_criticos|slice:":4" %}
-                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-amber-900 dark:text-amber-300">
-                            <div class="truncate max-w-[120px]" title="{{ p.poa.unidad.nombre }} - Partida {{ p.poa.partida.codigo }}">
-                                <strong>{{ p.poa.partida.codigo }}</strong> • {{ p.poa.unidad.nombre|truncatechars:12 }}
-                            </div>
-                            <a href="{% url 'traspaso_entre_partidas' %}" class="text-[10px] font-bold text-[#8b0000] font-mono hover:underline">
-                                Bs. {{ p.saldo_disponible|floatformat:0 }}
-                            </a>
-                        </div>
-                    {% empty %}
-                        <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Presupuestos estables</span>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- 4. CUOTAS FÍSICAS FORM. 005 (> 85%) -->
-            <div class="card p-5 bg-white dark:bg-slate-900 border {% if alertas.cuotas_criticas %}border-purple-300 bg-purple-50/10{% else %}border-gray-200 dark:border-gray-800{% endif %} rounded-2xl shadow-sm space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase text-gray-400">Cuotas Form. 005 (&gt; 85%)</span>
-                    <span class="material-symbols-outlined text-purple-600 text-xl">assignment_late</span>
-                </div>
-                <div>
-                    <span class="text-2xl font-black text-purple-700 dark:text-purple-400 font-mono">
-                        {{ alertas.cuotas_criticas|length }}
-                    </span>
-                    <span class="text-[10px] text-gray-400 block mt-0.5">insumos al límite</span>
-                </div>
-
-                <div class="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
-                    {% for c in alertas.cuotas_criticas|slice:":4" %}
-                        <div class="flex justify-between items-center text-[11px] p-1.5 bg-purple-50 dark:bg-purple-950/30 rounded-lg text-purple-900 dark:text-purple-300">
-                            <div class="truncate max-w-[130px]" title="{{ c.material.nombre }} - {{ c.unidad.nombre }}">
-                                {{ c.material.nombre|truncatechars:15 }} ({{ c.unidad.nombre|truncatechars:10 }})
-                            </div>
-                            <span class="font-bold font-mono text-[10px]">{{ c.pct_consumido }}%</span>
-                        </div>
-                    {% empty %}
-                        <span class="text-gray-400 text-[11px] italic block py-2 text-center">✓ Cuotas bajo control</span>
-                    {% endfor %}
-                </div>
-            </div>
-
+            {% endif %}
         </div>
     </div>
-    <!-- ALERTAS DE STOCK (Indicadores y advertencias adaptadas) -->
-    <div class="card p-6 mb-8 shadow-sm">
-        
-        <div class="flex items-center gap-3 mb-6">
-            <span class="material-symbols-outlined text-[#8b0000] dark:text-red-500 text-3xl">
-                warning
-            </span>
-            <h2 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
-                Alertas de Stock Mínimo
-            </h2>
+
+    <!-- =========================================================================
+         DASHBOARD 1: UNIDAD SOLICITANTE
+         ========================================================================= -->
+    {% if rol == 'UNIDAD_SOLICITANTE' %}
+    
+    <!-- 3 KPIS DE LA OFICINA -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-[#d97706] flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">assignment_turned_in</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Artículos Asignados a tu Oficina</span>
+                <span class="text-2xl font-black text-gray-900 dark:text-gray-100 font-mono">{{ total_asignados }} materiales</span>
+            </div>
         </div>
 
-        {% if materiales_bajos %}
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {% for material in materiales_bajos %}
-                <div class="border border-red-200 dark:border-red-900/30 rounded-2xl p-4 flex justify-between items-center bg-red-50/50 dark:bg-red-950/20">
-                    <div>
-                        <h3 class="font-bold text-gray-800 dark:text-gray-100 text-base">
-                            {{ material.nombre }}
-                        </h3>
-                        <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                            Stock actual: <span class="font-bold text-red-700 dark:text-red-400">{{ material.stock_actual }}</span>
-                        </p>
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                            Stock mínimo: {{ material.stock_minimo }}
-                        </p>
-                    </div>
-                    <span class="bg-red-100 dark:bg-red-950/30 text-[#8b0000] dark:text-red-400 border border-red-200 dark:border-red-900/30 px-3 py-1.5 rounded-full text-xs font-bold">
-                        Bajo Stock
-                    </span>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">pending_actions</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Tus Trámites en Curso</span>
+                <span class="text-2xl font-black text-blue-600 font-mono">{{ tramites_activos }} en proceso</span>
+            </div>
+        </div>
+
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">verified</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Trámites Concluidos / Entregados</span>
+                <span class="text-2xl font-black text-emerald-700 font-mono">{{ tramites_completados }} finalizados</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- WIDGET PRINCIPAL: MATERIALES ASIGNADOS A LA OFICINA CON BOTÓN PEDIR -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-amber-100/70 text-[#d97706] flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[18px]">inventory</span>
+                </span>
+                <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                        Materiales con Saldo Asignado para tu Oficina
+                    </h2>
+                    <span class="text-[11px] text-gray-400">Compras recepcionadas listas para ser retiradas de almacén</span>
                 </div>
+            </div>
+            <a href="{% url 'nuevo_pedido_almacen' %}" class="text-xs font-bold text-[#7c121e] hover:underline flex items-center gap-1">
+                Pedir Material <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+            </a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-gray-50 dark:bg-slate-800/60 text-[10px] font-bold uppercase text-gray-500 border-b border-gray-100 dark:border-gray-800">
+                    <tr>
+                        <th class="p-3">Código</th>
+                        <th class="p-3">Descripción del Material</th>
+                        <th class="p-3 text-center">U. Manejo</th>
+                        <th class="p-3 text-center">Total Asignado</th>
+                        <th class="p-3 text-center">Ya Retirado</th>
+                        <th class="p-3 text-center font-bold text-emerald-700">Saldo Disponible</th>
+                        <th class="p-3 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    {% for mat in asignaciones_oficina %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                        <td class="p-3 font-mono font-bold text-[#7c121e]">{{ mat.codigo }}</td>
+                        <td class="p-3 font-semibold text-gray-800 dark:text-gray-200">{{ mat.nombre }}</td>
+                        <td class="p-3 text-center text-gray-500">{{ mat.unidad_medida }}</td>
+                        <td class="p-3 text-center font-mono">{{ mat.total_asignado }} u.</td>
+                        <td class="p-3 text-center font-mono text-purple-600">{{ mat.total_retirado }} u.</td>
+                        <td class="p-3 text-center font-mono font-black text-sm text-emerald-700 dark:text-emerald-400">
+                            {{ mat.saldo_disponible }} u.
+                        </td>
+                        <td class="p-3 text-right">
+                            <a href="{% url 'nuevo_pedido_almacen' %}" class="px-3 py-1 bg-[#7c121e] hover:bg-[#610c16] text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1 shadow-sm">
+                                <span class="material-symbols-outlined text-[14px]">add</span> Pedir
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-gray-400">
+                            <span class="material-symbols-outlined text-4xl text-amber-500 block mb-1">sentiment_dissatisfied</span>
+                            Tu oficina no tiene cupos de materiales asignados pendientes de retiro en este momento.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SEGUIMIENTO DE TRÁMITES RECIENTES -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Pedidos de Almacén -->
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                <span>Últimos Pedidos de Almacén (Flujo 1)</span>
+                <a href="{% url 'solicitudes' %}" class="text-[11px] font-bold text-[#7c121e] hover:underline">Ver todos</a>
+            </h3>
+            <div class="space-y-2">
+                {% for p in pedidos_propios %}
+                <a href="{% url 'detalle_solicitud' p.id %}" class="block p-3 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-mono font-bold text-[#7c121e]">{{ p.codigo }}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300">
+                            {{ p.get_estado_display }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate">{{ p.justificacion }}</p>
+                    <span class="text-[10px] text-gray-400 font-mono">{{ p.fecha|date:"d/m/Y" }}</span>
+                </a>
+                {% empty %}
+                <p class="text-xs text-gray-400 text-center py-6">Sin pedidos registrados</p>
                 {% endfor %}
             </div>
-        {% else %}
-            <div class="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30 rounded-2xl p-4 flex items-center gap-3 text-green-700 dark:text-green-400">
-                <span class="material-symbols-outlined">
-                    check_circle
-                </span>
-                <p class="font-semibold text-sm">
-                    No existen alertas de stock. Todos los materiales se encuentran en niveles óptimos.
-                </p>
-            </div>
-        {% endif %}
+        </div>
 
+        <!-- Adquisiciones SABS -->
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                <span>Requerimientos de Adquisición (Flujo 2)</span>
+                <a href="{% url 'solicitudes' %}?tab=adquisiciones" class="text-[11px] font-bold text-[#7c121e] hover:underline">Ver todos</a>
+            </h3>
+            <div class="space-y-2">
+                {% for a in adquisiciones_propias %}
+                <a href="{% url 'detalle_adquisicion' a.id %}" class="block p-3 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-mono font-bold text-[#063b2f] dark:text-emerald-400">{{ a.codigo }}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                            {{ a.get_estado_display }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate">{{ a.objeto_contratacion }}</p>
+                    <span class="text-[10px] text-gray-400 font-mono">{{ a.fecha_solicitud|date:"d/m/Y" }}</span>
+                </a>
+                {% empty %}
+                <p class="text-xs text-gray-400 text-center py-6">Sin requerimientos de compra registrados</p>
+                {% endfor %}
+            </div>
+        </div>
     </div>
-    
 
-    <!-- GRÁFICO DE BARRAS Y ACTIVIDAD RECIENTE -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- =========================================================================
+         DASHBOARD 2: ALMACENERO / KARDISTA / ADMIN
+         ========================================================================= -->
+    {% elif rol in 'ALMACENERO,KARDISTA,ADMINISTRADOR,ADMIN_ALMACENES' %}
 
-        <!-- PANEL DEL GRÁFICO -->
-        <div class="card p-6 shadow-sm flex flex-col">
-            <div class="mb-6">
-                <h2 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
-                    Movimientos de Inventario
-                </h2>
-                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    Relación de flujo entre entradas y salidas registradas
-                </p>
+    <!-- 4 KPIS OPERATIVOS DEL DEPÓSITO -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">category</span>
             </div>
-            <!-- Contenedor con altura fija para asegurar el responsive de Chart.js -->
-            <div class="relative flex-1 min-h-[300px]">
-                <canvas id="movimientosChart"></canvas>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Artículos en Depósito</span>
+                <span class="text-2xl font-black text-gray-900 dark:text-gray-100 font-mono">{{ total_materiales }}</span>
             </div>
         </div>
 
-        <!-- PANEL DE ACTIVIDAD RECIENTE (Flujos con bordes y hovers sutiles) -->
-        <div class="card p-6 shadow-sm flex flex-col">
-            <div class="mb-6">
-                <h2 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100 font-['Outfit']">
-                    Actividad Reciente
-                </h2>
-                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    Últimas operaciones realizadas en el inventario
-                </p>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">inventory</span>
             </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Existencias Físicas Totales</span>
+                <span class="text-2xl font-black text-emerald-700 font-mono">{{ total_stock_fisico }} u.</span>
+            </div>
+        </div>
 
-            <div class="space-y-1 overflow-y-auto max-h-[320px] pr-2">
-                {% for movimiento in movimientos_recientes %}
-                <div class="flex justify-between items-center py-3.5 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition px-2 rounded-xl">
-                    <div class="flex items-center gap-3">
-                        
-                        <!-- Icono e indicador de dirección del flujo de material -->
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner
-                            {% if movimiento.tipo == 'Entrada' %}
-                                bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400
-                            {% else %}
-                                bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400
-                            {% endif %}">
-                            <span class="material-symbols-outlined text-[20px] font-bold">
-                                {% if movimiento.tipo == 'Entrada' %}
-                                    arrow_downward
-                                {% else %}
-                                    arrow_upward
-                                {% endif %}
-                            </span>
-                        </div>
-                        
-                        <div>
-                            <h3 class="font-bold text-gray-800 dark:text-gray-100 text-sm">
-                                {{ movimiento.material.nombre }}
-                            </h3>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {{ movimiento.tipo }} — <span class="font-bold text-gray-700 dark:text-gray-300">{{ movimiento.cantidad }}</span> unidades
-                            </p>
-                        </div>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-50 text-[#7c121e] flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">shopping_cart_checkout</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Listos para Despacho Físico</span>
+                <span class="text-2xl font-black text-[#7c121e] font-mono">{{ pedidos_por_entregar.count }} en cola</span>
+            </div>
+        </div>
+
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-[#d97706] flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">warning</span>
+            </div>
+            <div>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Stock Mínimo / Crítico</span>
+                <span class="text-2xl font-black text-[#d97706] font-mono">{{ materiales_bajos.count }} ítems</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- COLA DE DESPACHOS DE VENTANILLA -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-xl bg-red-100 text-[#7c121e] flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[18px]">output</span>
+                </span>
+                <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                        Cola de Despacho en Ventanilla (Pedidos Preparados)
+                    </h2>
+                    <span class="text-[11px] text-gray-400">Entregas autorizadas esperando retiro del funcionario</span>
+                </div>
+            </div>
+            <a href="{% url 'solicitudes_general' %}" class="text-xs font-bold text-[#7c121e] hover:underline">Ver Bandeja</a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for p in pedidos_por_entregar %}
+            <div class="p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-slate-800/40 flex flex-col justify-between space-y-3">
+                <div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-mono font-bold text-[#7c121e]">{{ p.codigo }}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                            LISTO PARA ENTREGA
+                        </span>
                     </div>
+                    <h4 class="text-sm font-bold text-gray-800 dark:text-gray-100 mt-1">{{ p.unidad_solicitante.nombre }}</h4>
+                    <p class="text-xs text-gray-500 mt-0.5 truncate">{{ p.justificacion }}</p>
+                </div>
+                <div class="pt-2 border-t border-gray-200/60 dark:border-gray-700/60 flex items-center justify-between">
+                    <span class="text-[10px] text-gray-400 font-mono">{{ p.fecha_preparado|date:"d/m H:i" }}</span>
+                    <a href="{% url 'entregar_solicitud' p.id %}" class="px-3 py-1.5 bg-[#7c121e] hover:bg-[#610c16] text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                        <span class="material-symbols-outlined text-[14px]">check_circle</span> Despachar
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-3 text-center py-8 text-gray-400">
+                <span class="material-symbols-outlined text-4xl text-emerald-600 block mb-1">task_alt</span>
+                No hay pedidos pendientes de entrega física en ventanilla.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 
-                    <span class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase">
-                        {{ movimiento.fecha|date:"d/m H:i"|default:movimiento.fecha }}
+    <!-- SEMÁFORO DE ALERTAS Y GRÁFICO REAL -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- ALERTAS: LOTES CADUCIDAD Y STOCK BAJO -->
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-600">notification_important</span>
+                Alertas de Stock y Caducidad en este Depósito
+            </h3>
+
+            <div class="space-y-2">
+                {% for m in materiales_bajos %}
+                <div class="flex justify-between items-center p-3 rounded-xl bg-red-50/60 dark:bg-red-950/30 border border-red-200 text-xs">
+                    <div>
+                        <span class="font-bold text-gray-800 dark:text-gray-200">{{ m.nombre }}</span>
+                        <span class="text-[10px] text-gray-400 block font-mono">Partida {{ m.partida.codigo }}</span>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800">
+                        Stock Mínimo ({{ m.stock_actual }} u.)
                     </span>
                 </div>
                 {% empty %}
-                <div class="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">
-                    <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 block mb-2">
-                        history
+                <p class="text-xs text-gray-400 text-center py-3">✓ Existencias de materiales en niveles óptimos</p>
+                {% endfor %}
+
+                {% for l in lotes_por_vencer %}
+                <div class="flex justify-between items-center p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 text-xs">
+                    <div>
+                        <span class="font-bold text-gray-800 dark:text-gray-200">{{ l.material.nombre }}</span>
+                        <span class="text-[10px] text-gray-400 block font-mono">Vence: {{ l.fecha_vencimiento|date:"d/m/Y" }}</span>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 font-mono">
+                        {{ l.dias_para_vencer }} días
                     </span>
-                    No se han registrado movimientos recientemente.
                 </div>
                 {% endfor %}
             </div>
         </div>
 
+        <!-- GRÁFICA REAL DE ENTRADAS VS SALIDAS -->
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm flex flex-col justify-between">
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    Flujo Anual de Movimientos Físicos ({{ hoy.year }})
+                </h3>
+                <p class="text-[11px] text-gray-400 mt-0.5">Relación de entradas y salidas registradas en este depósito</p>
+            </div>
+            
+            <div class="relative min-h-[220px] my-2">
+                <canvas id="movimientosChart" data-entradas="{{ total_entradas|default:0 }}" data-salidas="{{ total_salidas|default:0 }}"></canvas>
+            </div>
+
+            <div class="flex justify-around border-t border-gray-100 dark:border-gray-800 pt-3 text-xs font-mono">
+                <div>Ingresos: <strong class="text-emerald-700">{{ total_entradas }} u.</strong></div>
+                <div>Egresos: <strong class="text-[#7c121e]">{{ total_salidas }} u.</strong></div>
+            </div>
+        </div>
+
     </div>
+
+    <!-- =========================================================================
+         DASHBOARD 3: AUTORIDADES SABS (RPA, SAF, Presupuestos, Bienes y Servicios)
+         ========================================================================= -->
+    {% elif es_autoridad_sabs %}
+
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-xl bg-amber-100 text-[#d97706] flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[18px]">gavel</span>
+                </span>
+                <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                        Bandeja de Acción Inmediata: {{ accion_requerida }}
+                    </h2>
+                    <span class="text-[11px] text-gray-400">Trámites de contratación esperando tu firma o validación oficial</span>
+                </div>
+            </div>
+            <a href="{% url 'solicitudes_general' %}?tab=adquisiciones" class="text-xs font-bold text-[#7c121e] hover:underline">
+                Ver todos ({{ tramites_urgentes.count }})
+            </a>
+        </div>
+
+        <div class="divide-y divide-gray-100 dark:divide-gray-800">
+            {% for t in tramites_urgentes %}
+            <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono font-bold text-[#063b2f] dark:text-emerald-400">{{ t.codigo }}</span>
+                        <span class="font-semibold text-gray-800 dark:text-gray-200">{{ t.unidad_solicitante.nombre }}</span>
+                    </div>
+                    <p class="text-gray-500 truncate max-w-xl">{{ t.objeto_contratacion }}</p>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                    <span class="font-mono text-gray-400">{{ t.fecha_solicitud|date:"d/m/Y" }}</span>
+                    <a href="{% url 'detalle_adquisicion' t.id %}" class="px-3.5 py-1.5 bg-[#7c121e] hover:bg-[#610c16] text-white rounded-xl font-bold transition flex items-center gap-1 shadow-sm">
+                        <span>Revisar y Firmar</span>
+                        <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="py-10 text-center text-gray-400">
+                <span class="material-symbols-outlined text-4xl text-emerald-600 block mb-1">done_all</span>
+                No tienes trámites pendientes de validación o firma en este momento.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% endif %}
 
 </div>
 
-<!-- CONFIGURACIÓN GRÁFICA INTELIGENTE DE CHART.JS -->
+<!-- CHART.JS CON DATOS REALES DEL DEPÓSITO -->
+<!-- CHART.JS CON DATOS LEÍDOS DESDE EL CANVAS (0 ERRORES EN VS CODE) -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const ctx = document.getElementById('movimientosChart');
-    if (ctx) {
-        // Detectar si el modo oscuro está activo para optimizar los colores del gráfico
-        const isDark = document.documentElement.classList.contains('dark');
-        const gridColor = isDark ? '#241919' : '#f3f4f6';
-        const labelColor = isDark ? '#dec396' : '#4b5563'; 
-        const tickColor = isDark ? '#8c7e7a' : '#9ca3af'; 
+    const canvas = document.getElementById('movimientosChart');
+    if (canvas) {
+        const totalEntradas = Number(canvas.getAttribute('data-entradas')) || 0;
+        const totalSalidas = Number(canvas.getAttribute('data-salidas')) || 0;
 
-        new Chart(ctx, {
+        new Chart(canvas, {
             type: 'bar',
             data: {
-                labels: ['Entradas', 'Salidas'],
+                labels: ['Ingresos Físicos', 'Egresos / Despachos'],
                 datasets: [{
-                    label: 'Cantidad de Movimientos',
-                    data: [12, 7], // Django context data (ej: [{{ total_entradas }}, {{ total_salidas }}])
-                    backgroundColor: isDark ? [
-                        'rgba(139, 0, 0, 0.65)',   // Rojo institucional translúcido
-                        'rgba(217, 119, 6, 0.65)'   // Ámbar institucional translúcido
-                    ] : [
-                        'rgba(139, 0, 0, 0.85)',
-                        'rgba(217, 119, 6, 0.85)'
+                    label: 'Unidades',
+                    data: [totalEntradas, totalSalidas],
+                    backgroundColor: [
+                        'rgba(6, 59, 47, 0.85)',   // Verde Petróleo GAD Potosí
+                        'rgba(124, 18, 30, 0.85)'   // Guindo Imperial GAD Potosí
                     ],
-                    borderColor: [
-                        '#8b0000',
-                        '#d97706'
-                    ],
-                    borderWidth: 1,
-                    borderRadius: 12, // Esquinas curvas modernas en las barras
-                    borderSkipped: false
+                    borderColor: ['#063b2f', '#7c121e'],
+                    borderWidth: 1.5,
+                    borderRadius: 12,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false 
-                    }
-                },
+                plugins: { legend: { display: false } },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: gridColor // Línea de grilla adaptada
-                        },
-                        ticks: {
-                            color: tickColor,
-                            font: {
-                                family: 'Inter',
-                                size: 11
-                            }
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false 
-                        },
-                        ticks: {
-                            color: labelColor,
-                            font: {
-                                family: 'Outfit',
-                                weight: 'bold',
-                                size: 13
-                            }
-                        }
-                    }
+                    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } },
+                    x: { grid: { display: false } }
                 }
             }
         });
     }
 });
 </script>
-
 {% endblock %}

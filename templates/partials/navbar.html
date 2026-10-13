@@ -1,133 +1,194 @@
-<!-- HEADER: Se agregó la clase 'navbar-custom' al final para anular el fondo blanco y bordes en modo oscuro -->
-<!-- HEADER FIJO SIN SUPERPOSICIONES -->
-<header class="fixed top-0 right-0 w-full lg:w-[calc(100%-260px)] h-16 sm:h-[68px] bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm transition-all duration-300 navbar-custom">
-    <!-- LADO IZQUIERDO: ACCESOS Y TÍTULO -->
-    <div class="flex items-center gap-2 min-w-0">
+<!-- HEADER INSTITUCIONAL SIGAL (HOVER Y MICRO-INTERACCIONES MEJORADAS) -->
+<header class="fixed top-0 right-0 left-0 lg:left-72 h-16 z-40 px-4 sm:px-6 flex items-center justify-between transition-colors duration-300 shadow-md
+               bg-[#008548] text-white border-b border-[#006938]
+               dark:bg-[#0c1511]/90 dark:backdrop-blur-xl dark:border-b dark:border-[#232c27]">
+
+    <!-- LADO IZQUIERDO: ACCESOS Y BUSCADOR -->
+    <div class="flex items-center gap-3 sm:gap-5 flex-1 max-w-3xl min-w-0">
         
-        <!-- Botón Hamburguesa de Menú para pantallas táctiles/móviles -->
-        <!-- Botón Hamburguesa de Menú para pantallas táctiles/móviles -->
+        <!-- Botón Hamburguesa de Menú para móviles -->
         <button 
             type="button"
             id="btn-sidebar-toggle"
             onclick="toggleSidebarMobile()"
-            class="lg:hidden p-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-900 flex items-center justify-center transition duration-150 cursor-pointer"
+            class="lg:hidden p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer
+                   dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-[#71dc95]/30"
             aria-label="Abrir menú"
         >
-            <span class="material-symbols-outlined text-[24px]">
+            <span class="material-symbols-outlined text-[22px] transition-transform duration-200 hover:rotate-90">
                 menu
             </span>
         </button>
         
-        <!-- Título SGA -->
-        <h2 class="text-lg sm:text-xl font-extrabold text-[#8b0000] dark:text-red-500 font-['Outfit'] tracking-wide truncate">
-            SGA <span class="text-gray-300 dark:text-gray-700 font-light mx-1">|</span> <span class="text-gray-500 dark:text-gray-450 text-xs sm:text-sm font-medium">Sistema de Almacén</span>
-        </h2>
+        <!-- Título Institucional SIGAL / SGA -->
+        <div class="flex items-center gap-2 shrink-0 select-none group cursor-default">
+            <h2 class="text-base sm:text-lg font-black font-['Outfit'] tracking-tight truncate text-white dark:text-[#dbe5de] transition-colors duration-200 group-hover:text-emerald-100 dark:group-hover:text-[#71dc95]">
+                SIGAL
+            </h2>
+            <span class="hidden sm:inline-block text-xs font-medium text-[#8df9af] dark:text-[#889488] transition-colors duration-200 group-hover:text-white dark:group-hover:text-[#dbe5de]">
+                | Sistema de Almacén
+            </span>
+        </div>
 
-    </div>
-
-    <!-- LADO DERECHO: ACCIONES Y PERFIL -->
-    <div class="flex items-center gap-3 sm:gap-5">
-
-        <!-- BUSCADOR CON FORMULARIO ACTIVO (Oculto en móviles) -->
-        <form method="GET" action="." class="relative hidden md:block">
-            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[20px] pointer-events-none">
+        <!-- BUSCADOR INSTITUCIONAL CON FORMULARIO ACTIVO -->
+        <form method="GET" action="." class="relative w-full max-w-md hidden md:block group">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/70 dark:text-[#889488] text-[18px] pointer-events-none transition-colors duration-200 group-hover:text-white dark:group-hover:text-[#71dc95]">
                 search
             </span>
             <input
                 type="text"
                 name="q"
                 value="{{ query|default:'' }}"
-                placeholder="Buscar..."
-                class="w-60 lg:w-72 pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-2xl text-sm bg-gray-50/50 dark:bg-slate-900/40 text-gray-800 dark:text-gray-200 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
+                placeholder="Buscar por código SKU, Nro. Solicitud o Lote..."
+                class="w-full h-9 pl-9 pr-4 text-xs rounded-xl transition-all duration-200
+                       bg-white/15 placeholder-white/70 text-white border border-white/20 
+                       hover:bg-white/20 hover:border-white/35
+                       focus:outline-none focus:bg-white/25 focus:ring-2 focus:ring-white/40 focus:border-transparent
+                       dark:bg-[#18221d] dark:placeholder-[#889488] dark:text-[#dbe5de] dark:border-[#232c27]
+                       dark:hover:bg-[#1c2721] dark:hover:border-[#3e4a40]
+                       dark:focus:ring-2 dark:focus:ring-[#71dc95]/40 dark:focus:border-[#71dc95]"
             >
         </form>
 
-        <!-- NOTIFICACIONES -->
+        <!-- BADGE DE ESTADO DEL NODO -->
+        <div class="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shrink-0 select-none transition-all duration-200 hover:scale-[1.02]
+                    bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20
+                    dark:bg-[#18221d] dark:border-[#232c27] dark:hover:border-[#71dc95]/40">
+            <span class="w-2 h-2 rounded-full bg-[#8df9af] dark:bg-[#eec14b] animate-pulse"></span>
+            <span class="text-[11px] text-white dark:text-[#bdcabd] font-medium">Almacén Central Potosí - Conectado</span>
+        </div>
+
+    </div>
+
+    <!-- LADO DERECHO: ACCIONES Y PERFIL -->
+    <div class="flex items-center gap-2 sm:gap-4 shrink-0">
+
+        <!-- BOTÓN CAMBIAR TEMA -->
         <button 
             type="button"
-            title="Notificaciones"
-            class="relative w-10 h-10 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-600 dark:text-gray-400 flex items-center justify-center transition duration-150 cursor-pointer"
+            id="theme-toggle" 
+            onclick="toggleThemeGlobal()"
+            class="p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer
+                   dark:text-[#bdcabd] dark:hover:text-[#71dc95] dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-[#71dc95]/30" 
+            title="Alternar entre Modo Claro y Oscuro Esmeralda"
         >
-            <span class="material-symbols-outlined text-[24px]">
-                notifications
+            <span class="material-symbols-outlined text-[22px] transition-transform duration-300 hover:rotate-45 theme-toggle-icon">
+                {% if theme == 'light' %}dark_mode{% else %}light_mode{% endif %}
             </span>
-            <!-- Indicador activo utilizando tu color secundario #d97706 -->
-            <span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#d97706] dark:bg-amber-500 border-2 border-white dark:border-slate-950"></span>
         </button>
 
-        <!-- Dentro de templates/partials/navbar.html -->
-        <button id="theme-toggle" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors duration-150 flex items-center justify-center text-gray-600 dark:text-gray-400 cursor-pointer" title="Cambiar tema">
-            <span class="material-symbols-outlined text-[24px]">
-                {% if theme == 'dark' %}
-                    light_mode
-                {% else %}
-                    dark_mode
-                {% endif %}
+        <!-- BOTÓN NOTIFICACIONES -->
+        <button 
+            type="button"
+            title="Notificaciones del Sistema"
+            class="relative p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer group
+                   dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-white/10"
+        >
+            <span class="material-symbols-outlined text-[22px] transition-transform duration-300 group-hover:rotate-12">
+                notifications
             </span>
+            <!-- Indicador activo de notificación -->
+            <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#ff7577] ring-2 ring-[#008548] dark:ring-[#0c1511] transition-transform duration-200 group-hover:scale-125"></span>
         </button>
 
         <!-- SEPARADOR -->
-        <div class="h-8 w-px bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
+        <div class="h-6 w-px bg-white/20 dark:bg-[#232c27] hidden sm:block"></div>
 
-        <!-- PERFIL CON MENÚ DESPLEGABLE (Menú Hover integrado de forma nativa) -->
-        <div class="relative flex items-center gap-3 group py-3 cursor-pointer">
+        <!-- PERFIL CON MENÚ DESPLEGABLE MEJORADO (CON PUENTE ANTI-PARPADEO) -->
+        <div class="relative group py-1.5">
 
-            <!-- Datos de Usuario -->
-            <div class="text-right hidden sm:block select-none">
-                <p class="font-bold text-gray-800 dark:text-gray-200 text-sm font-['Outfit'] truncate max-w-[150px]">
-                    {% if request.user.first_name or request.user.last_name %}
-                        {{ request.user.first_name }} {{ request.user.last_name }}
-                    {% else %}
-                        {{ request.user.username }}
-                    {% endif %}
-                </p>
-                <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-wider mt-0.5">
-                    {% if request.user.perfilusuario %}
-                        {{ request.user.perfilusuario.get_rol_display }}
-                    {% else %}
-                        Usuario
-                    {% endif %}
-                </p>
-            </div>
-
-            <!-- Avatar del Usuario (Diseño squircle moderno) -->
-            <div class="w-10 h-10 rounded-2xl bg-[#8b0000] dark:bg-red-700 text-white flex items-center justify-center font-bold text-xs tracking-wider shadow-sm select-none transition duration-150 group-hover:scale-105">
-                {% if request.user.first_name or request.user.last_name %}
-                    {{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
-                {% else %}
-                    {{ request.user.username|slice:":2"|upper }}
-                {% endif %}
-            </div>
-
-            <!-- MENÚ DESPLEGABLE (Se activa automáticamente al posicionar el cursor sobre el Perfil) -->
-            <div class="absolute right-0 top-14 w-48 bg-white dark:bg-[#151010] border border-gray-100 dark:border-gray-800 rounded-2xl shadow-lg py-2 hidden group-hover:block hover:block transition duration-150 z-50">
+            <!-- Cápsula Trigger con Hover Suave -->
+            <div class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl cursor-pointer transition-all duration-200 select-none
+                        hover:bg-white/15 active:scale-[0.98]
+                        dark:hover:bg-white/5 dark:hover:border dark:hover:border-white/10">
                 
-                <a 
-                    href="{% url 'perfil' %}"
-                    class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
-                >
-                    <span class="material-symbols-outlined text-[18px] text-gray-400 dark:text-gray-500">
-                        person
-                    </span> 
-                    Mi Perfil
-                </a>
+                <!-- Datos de Usuario -->
+                <div class="text-right hidden sm:block leading-tight">
+                    <p class="font-bold text-xs font-['Outfit'] truncate max-w-[150px] text-white dark:text-[#dbe5de] transition-colors duration-200 group-hover:text-emerald-100 dark:group-hover:text-white">
+                        {% if request.user.first_name or request.user.last_name %}
+                            {{ request.user.first_name }} {{ request.user.last_name }}
+                        {% else %}
+                            {{ request.user.username }}
+                        {% endif %}
+                    </p>
+                    <p class="text-[10px] font-semibold tracking-wider uppercase mt-0.5 text-[#8df9af] dark:text-[#eec14b]">
+                        {% if request.user.perfilusuario %}
+                            {{ request.user.perfilusuario.get_rol_display }}
+                        {% else %}
+                            Usuario
+                        {% endif %}
+                    </p>
+                </div>
 
-                <hr class="border-gray-100 dark:border-gray-800 my-1">
+                <!-- Avatar con Anillo de Enfoque en Hover -->
+                <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm select-none transition-all duration-200
+                            bg-white text-[#006938] group-hover:shadow-[0_0_12px_rgba(255,255,255,0.45)] group-hover:scale-105
+                            dark:bg-[#008548] dark:text-white dark:border dark:border-[#71dc95]/40 dark:group-hover:border-[#71dc95] dark:group-hover:shadow-[0_0_12px_rgba(113,220,149,0.35)]">
+                    {% if request.user.first_name or request.user.last_name %}
+                        {{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
+                    {% else %}
+                        {{ request.user.username|slice:":2"|upper }}
+                    {% endif %}
+                </div>
 
-                <!-- Botón Cerrar Sesión seguro -->
-                <form method="POST" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button 
-                        type="submit" 
-                        class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold transition cursor-pointer"
+                <!-- Flechita indicadora micro-animada -->
+                <span class="material-symbols-outlined text-[16px] text-white/60 dark:text-[#889488] transition-transform duration-200 group-hover:rotate-180 group-hover:text-white dark:group-hover:text-[#71dc95] hidden sm:inline-block">
+                    expand_more
+                </span>
+            </div>
+
+            <!-- MENÚ DESPLEGABLE CON PUENTE INVISIBLE ANTI-CIERRE -->
+            <div class="absolute right-0 top-full pt-2 w-56 z-50 transition-all duration-200 transform origin-top-right
+                        opacity-0 invisible pointer-events-none translate-y-1
+                        group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0
+                        before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-4">
+                
+                <div class="rounded-2xl shadow-2xl py-2 overflow-hidden border backdrop-blur-xl transition-colors duration-200
+                            bg-white/95 border-gray-100 text-gray-800 shadow-emerald-950/10
+                            dark:bg-[#141d19]/95 dark:border-[#232c27] dark:text-[#dbe5de] dark:shadow-black/60">
+                    
+                    <!-- Encabezado de Usuario para Móviles -->
+                    <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#232c27] sm:hidden bg-gray-50/50 dark:bg-[#18221d]/50">
+                        <p class="font-bold text-xs font-['Outfit'] truncate text-gray-900 dark:text-white">
+                            {{ request.user.get_full_name|default:request.user.username }}
+                        </p>
+                        <p class="text-[10px] text-emerald-600 dark:text-[#71dc95] font-semibold uppercase mt-0.5">
+                            {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
+                        </p>
+                    </div>
+
+                    <!-- Enlace Perfil con Desplazamiento Suave -->
+                    <a 
+                        href="{% url 'perfil' %}"
+                        class="group/item flex items-center gap-3 px-4 py-2.5 text-xs font-medium transition-all duration-150
+                               text-gray-700 hover:text-emerald-700 hover:bg-emerald-50/80 hover:translate-x-1
+                               dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:translate-x-1"
                     >
-                        <span class="material-symbols-outlined text-[18px]">
-                            logout
+                        <span class="material-symbols-outlined text-[19px] text-gray-400 dark:text-[#889488] transition-colors duration-150 group-hover/item:text-[#008548] dark:group-hover/item:text-[#71dc95]">
+                            person
                         </span> 
-                        Cerrar Sesión
-                    </button>
-                </form>
+                        <span>Mi Perfil Institucional</span>
+                    </a>
 
+                    <hr class="border-gray-100 dark:border-[#232c27] my-1.5">
+
+                    <!-- Botón Cerrar Sesión con Hover de Alerta Roja -->
+                    <form method="POST" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button 
+                            type="submit" 
+                            class="group/logout w-full text-left flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-all duration-150 cursor-pointer
+                                   text-red-600 hover:text-red-700 hover:bg-red-50 hover:translate-x-1
+                                   dark:text-[#ff7577] dark:hover:text-white dark:hover:bg-[#8c1f28]/35 dark:hover:translate-x-1"
+                        >
+                            <span class="material-symbols-outlined text-[19px] transition-transform duration-150 group-hover/logout:translate-x-0.5">
+                                logout
+                            </span> 
+                            <span>Cerrar Sesión</span>
+                        </button>
+                    </form>
+
+                </div>
             </div>
 
         </div>

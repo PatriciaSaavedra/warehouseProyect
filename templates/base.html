@@ -1,41 +1,37 @@
 {% load static %}
-
 <!DOCTYPE html>
-<html lang="es" class="scroll-smooth {{ theme }}">
+<html lang="es" class="scroll-smooth {{ theme|default:'dark' }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SIGAL{% endblock %} | Sistema de Gestión de Almacenes</title>
+    <link rel="icon" type="image/jpeg" href="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}">
 
-    <title>{% block title %}SGA{% endblock %} | GAD Potosí</title>
-    <link rel="icon" type="image/jpeg" href="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}">    
-    
-    <!-- TAILWIND CSS CDN -->
+    <!-- TAILWIND CSS CDN CON EXTENSIÓN BITEMÁTICA -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-
-    <!-- CONFIGURACIÓN GLOBAL DE TAILWIND -->
     <script>
         tailwind.config = {
-            darkMode: 'class', 
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        guindo: {
-                            DEFAULT: '#7c121e',
-                            hover: '#610c16',
-                            dark: '#9e1c2b',
+                        sigal: {
+                            emerald: '#008548',
+                            emeraldDark: '#004d26',
+                            emeraldDeep: '#003d1e',
+                            neon: '#71dc95',
+                            neonLight: '#8df9af',
+                            gold: '#eec14b',
+                            goldDark: '#906e00',
+                            crimson: '#ff7577',
+                            crimsonDark: '#8c1f28',
                         },
-                        verde: {
-                            DEFAULT: '#063b2f',
-                            light: '#0a4f3f',
-                            hover: '#04271f',
-                            dark: '#0f5948',
-                        },
-                        dorado: {
-                            DEFAULT: '#c59b27',
-                            light: '#dfb26c',
-                            hover: '#a8811b',
-                        },
+                        // Paleta Dark Obsidian Esmeralda
+                        darkbg: '#0c1511',
+                        darkcard: '#141d19',
+                        darksurface: '#18221d',
+                        darkborder: '#232c27',
                     },
                     fontFamily: {
                         outfit: ['Outfit', 'sans-serif'],
@@ -46,269 +42,106 @@
         }
     </script>
 
-    <!-- FUENTES DE GOOGLE -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <!-- FUENTES OFICIALES E ÍCONOS MATERIAL SYMBOLS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
     <style>
-        /* ========================================================
-           SISTEMA DE PROFUNDIDAD, SOMBRAS Y GRADIENTES GAD POTOSÍ
-           ======================================================== */
+        /* Modo Claro: Fondo Menta Institucional */
         :root {
-            --primary: #7c121e;           /* Guindo Imperial */
-            --secondary: #063b2f;         /* Verde Petróleo */
-            --gold: #c59b27;              /* Dorado */
-            --gold-light: #dfb26c;
-
-            /* FONDO CLARO AMBIENTAL (Gradiente Radial Multicapa) */
-            --bg-body: radial-gradient(at 0% 0%, rgba(6, 59, 47, 0.06) 0px, transparent 55%),
-                       radial-gradient(at 100% 100%, rgba(197, 155, 39, 0.07) 0px, transparent 50%),
-                       radial-gradient(at 100% 0%, rgba(124, 18, 30, 0.04) 0px, transparent 40%),
-                       #f8faf9;
-
-            --card-bg: rgba(255, 255, 255, 0.95);
-            --card-border: rgba(6, 59, 47, 0.1);
-            --sidebar-bg: rgba(255, 255, 255, 0.92);
-            --navbar-bg: rgba(255, 255, 255, 0.85);
-
-            --text-main: #1e293b;
-            --text-heading: #063b2f;
-            --text-muted: #64748b;
-
-            /* SOMBRAS MULTICAPA CON RELIEVE */
-            --shadow-card: 0 1px 3px rgba(6, 59, 47, 0.04), 
-                           0 6px 16px -2px rgba(6, 59, 47, 0.06), 
-                           0 16px 32px -4px rgba(6, 59, 47, 0.04),
-                           inset 0 1px 0 rgba(255, 255, 255, 0.9);
-
-            --shadow-hover: 0 2px 6px rgba(6, 59, 47, 0.06), 
-                            0 12px 28px -4px rgba(6, 59, 47, 0.12), 
-                            0 24px 48px -6px rgba(6, 59, 47, 0.06),
-                            inset 0 1px 0 rgba(255, 255, 255, 1);
+            --bg-main: #eef8f2;
+            --card-main: #ffffff;
+            --border-main: rgba(0, 77, 38, 0.1);
+            --text-title: #0e1f16;
+            --text-body: #3e4a40;
+            --text-muted: #6e7a6f;
         }
 
-        /* ========================================================
-           MODO OSCURO ULTRA-PROFUNDO (Dark Emerald & Warm Gold)
-           ======================================================== */
+        /* Modo Oscuro: Obsidiana Esmeralda */
         .dark {
-            --primary: #9e1c2b;
-            --secondary: #0f5948;
-            --gold: #dfb26c;
-            --gold-light: #f5d491;
-
-            /* FONDO OSCURO AMBIENTAL */
-            --bg-body: radial-gradient(at 0% 0%, rgba(15, 89, 72, 0.25) 0px, transparent 55%),
-                       radial-gradient(at 100% 100%, rgba(197, 155, 39, 0.12) 0px, transparent 50%),
-                       radial-gradient(at 50% 50%, rgba(124, 18, 30, 0.08) 0px, transparent 60%),
-                       #040a08;
-
-            --card-bg: rgba(10, 24, 20, 0.88);
-            --card-border: rgba(223, 178, 108, 0.16);
-            --sidebar-bg: rgba(7, 18, 15, 0.92);
-            --navbar-bg: rgba(7, 18, 15, 0.85);
-
-            --text-main: #e2e8f0;
-            --text-heading: #dfb26c;
-            --text-muted: #8fa69c;
-
-            /* SOMBRAS MODO OSCURO CON BRILLO DE BORDE */
-            --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 
-                           0 12px 36px -4px rgba(0, 0, 0, 0.6),
-                           inset 0 1px 0 rgba(223, 178, 108, 0.12);
-
-            --shadow-hover: 0 8px 24px -2px rgba(0, 0, 0, 0.6), 
-                            0 20px 48px -4px rgba(15, 89, 72, 0.35),
-                            inset 0 1px 0 rgba(223, 178, 108, 0.25);
+            --bg-main: #0c1511;
+            --card-main: #141d19;
+            --border-main: #232c27;
+            --text-title: #dbe5de;
+            --text-body: #bdcabd;
+            --text-muted: #889488;
         }
 
-        /* 1. Fondo Global */
         body {
-            background: var(--bg-body) !important;
-            background-attachment: fixed !important;
-            color: var(--text-main) !important;
+            background-color: var(--bg-main) !important;
+            color: var(--text-body);
             font-family: 'Inter', sans-serif;
             min-height: 100vh;
         }
 
-        /* 2. Tarjetas con Profundidad 3D y Borde Iluminado */
-        .card {
-            background: var(--card-bg) !important;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--card-border) !important;
-            border-radius: 24px;
-            box-shadow: var(--shadow-card) !important;
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        .card-sigal {
+            background-color: var(--card-main);
+            border: 1px solid var(--border-main);
+            border-radius: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            transition: all 0.2s ease-in-out;
+        }
+        .dark .card-sigal {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
 
-        .card:hover {
-            box-shadow: var(--shadow-hover) !important;
-        }
-
-        /* 3. Vidrio Esmerilado para Navbar y Sidebar */
-        .navbar-custom {
-            background: var(--navbar-bg) !important;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--card-border) !important;
-            box-shadow: 0 4px 20px -2px rgba(6, 59, 47, 0.05);
-        }
-
-        .sidebar-custom {
-            background: var(--sidebar-bg) !important;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-right: 1px solid var(--card-border) !important;
-            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.03);
-        }
-
-        /* 4. Enlaces Activos en Sidebar con Relieve */
-        .sidebar-active {
-            background: linear-gradient(135deg, rgba(6, 59, 47, 0.14) 0%, rgba(6, 59, 47, 0.04) 100%) !important;
-            color: var(--secondary) !important;
-            border-left: 4px solid var(--gold) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(6, 59, 47, 0.06);
-            font-weight: 700;
-        }
-        .dark .sidebar-active {
-            background: linear-gradient(135deg, rgba(15, 89, 72, 0.35) 0%, rgba(15, 89, 72, 0.08) 100%) !important;
-            color: var(--gold) !important;
-            border-left: 4px solid var(--gold) !important;
-            box-shadow: inset 0 1px 0 rgba(223, 178, 108, 0.2);
-        }
-
-        /* 5. Botones con Brillo Cenital y Sombras Proyectadas */
-        .btn-guindo {
-            background: linear-gradient(180deg, #8f1725 0%, #7c121e 100%) !important;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 
-                        0 4px 12px rgba(124, 18, 30, 0.35), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
-            color: #ffffff !important;
-            transition: all 0.15s ease-out;
-        }
-        .btn-guindo:hover {
-            background: linear-gradient(180deg, #9c1a29 0%, #6d101a 100%) !important;
-            box-shadow: 0 6px 16px rgba(124, 18, 30, 0.45), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-            transform: translateY(-1px);
-        }
-        .btn-guindo:active {
-            transform: translateY(1px);
-            box-shadow: 0 2px 6px rgba(124, 18, 30, 0.3) !important;
-        }
-
-        .btn-verde {
-            background: linear-gradient(180deg, #0a4f3f 0%, #063b2f 100%) !important;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 
-                        0 4px 12px rgba(6, 59, 47, 0.3), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
-            color: #ffffff !important;
-            transition: all 0.15s ease-out;
-        }
-        .btn-verde:hover {
-            background: linear-gradient(180deg, #0d5e4b 0%, #04271f 100%) !important;
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(6, 59, 47, 0.4) !important;
-        }
-
-        .btn-dorado {
-            background: linear-gradient(180deg, #e5c05d 0%, #c59b27 100%) !important;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 
-                        0 4px 14px rgba(197, 155, 39, 0.35), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
-            color: #04271f !important;
-            font-weight: 800;
-            transition: all 0.15s ease-out;
-        }
-        .btn-dorado:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(197, 155, 39, 0.5) !important;
-        }
-
-        /* 6. Inputs con Sombra Interior Suave */
-        input[type="text"], 
-        input[type="number"], 
-        input[type="password"], 
-        input[type="email"], 
-        input[type="date"],
-        select, 
-        textarea {
-            background-color: var(--input-bg) !important;
-            border: 1px solid var(--card-border) !important;
-            border-radius: 0.875rem !important;
-            color: var(--input-text) !important;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04) !important;
-            transition: all 0.15s ease !important;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none !important;
-            border-color: var(--secondary) !important;
-            box-shadow: 0 0 0 3px rgba(6, 59, 47, 0.15), inset 0 1px 1px rgba(0,0,0,0.02) !important;
-        }
-
-        /* 7. Scrollbar refinado */
-        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        /* Scrollbar discreto */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(6, 59, 47, 0.2); border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--secondary); }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 133, 72, 0.3); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 133, 72, 0.7); }
     </style>
 </head>
 
-<body class="antialiased transition-colors duration-200 overflow-x-hidden">
+<body class="antialiased transition-colors duration-300">
 
-    <!-- BARRA LATERAL -->
+    <!-- SIDEBAR -->
     {% include 'partials/sidebar.html' %}
 
-    <!-- BARRA SUPERIOR -->
+    <!-- NAVBAR -->
     {% include 'partials/navbar.html' %}
 
-    <!-- CONTENEDOR PRINCIPAL: pt-[80px] calibra 16px exactos de aire cenital con el navbar -->
-    <main class="ml-0 lg:ml-[260px] pt-[80px] px-4 sm:px-6 lg:px-8 pb-14 min-h-screen transition-all duration-200">
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="ml-0 lg:ml-72 pt-16 px-4 sm:px-6 lg:px-8 py-6 min-h-screen transition-all duration-300">
         
-        <!-- ALERTAS GLOBALES FLOTANTES -->
+        <!-- ALERTAS FLOTANTES -->
         {% if messages %}
         <div class="max-w-7xl mx-auto mb-6" id="global-alerts-container">
             {% for message in messages %}
-                <div class="p-4 rounded-2xl text-xs sm:text-sm border font-['Outfit'] flex justify-between items-center gap-3 mb-2 shadow-md backdrop-blur-md transition-all
+                <div class="p-3.5 rounded-xl text-xs sm:text-sm border font-outfit flex justify-between items-center gap-3 mb-2 shadow-lg backdrop-blur-md transition-all
                     {% if message.tags == 'error' %}
-                        bg-red-50/90 text-[#7c121e] border-red-200/80 dark:bg-red-950/60 dark:text-red-300 dark:border-red-900/60
+                        bg-sigal-crimson/15 text-sigal-crimson border-sigal-crimson/30
                     {% elif message.tags == 'warning' %}
-                        bg-amber-50/90 text-[#c59b27] border-amber-200/80 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900/60
+                        bg-sigal-gold/15 text-sigal-gold border-sigal-gold/30
                     {% else %}
-                        bg-emerald-50/90 text-[#063b2f] border-emerald-200/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-900/60
+                        bg-sigal-emerald/15 text-sigal-emerald dark:text-sigal-neon border-sigal-emerald/30
                     {% endif %}">
-                    
-                    <span class="flex items-center gap-2.5 font-medium">
-                        <span class="material-symbols-outlined text-[19px]">
-                            {% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}check_circle{% endif %}
+                    <span class="flex items-center gap-2 font-medium">
+                        <span class="material-symbols-outlined text-[18px]">
+                            {% if message.tags == 'error' %}warning{% elif message.tags == 'warning' %}priority_high{% else %}verified{% endif %}
                         </span>
                         {{ message }}
                     </span>
-                    
-                    <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition cursor-pointer" onclick="this.parentElement.remove()">
+                    <button type="button" class="opacity-60 hover:opacity-100 transition" onclick="this.parentElement.remove()">
                         <span class="material-symbols-outlined text-[16px]">close</span>
                     </button>
                 </div>
             {% endfor %}
         </div>
         {% endif %}
-        
-        <!-- CONTENIDO ESPECÍFICO DE CADA VISTA -->
+
         {% block content %}
         {% endblock %}
-
     </main>
 
-    <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <script>
         function toggleSidebarMobile() {
             const sidebar = document.getElementById('main-sidebar');
             const backdrop = document.getElementById('sidebar-backdrop');
             if (!sidebar || !backdrop) return;
-
             const isClosed = sidebar.classList.contains('-translate-x-full');
             if (isClosed) {
                 sidebar.classList.remove('-translate-x-full');
@@ -321,41 +154,26 @@
             }
         }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const sidebar = document.getElementById('main-sidebar');
-                if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
-                    toggleSidebarMobile();
-                }
+        function toggleThemeGlobal() {
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+
+            if (newTheme === 'dark') {
+                html.classList.add('dark');
+                html.classList.remove('light');
+            } else {
+                html.classList.remove('dark');
+                html.classList.add('light');
             }
-        });
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            if (themeToggleBtn) {
-                themeToggleBtn.addEventListener('click', () => {
-                    const htmlElement = document.documentElement;
-                    const isDark = htmlElement.classList.contains('dark');
-                    const newTheme = isDark ? 'light' : 'dark';
-
-                    if (newTheme === 'dark') {
-                        htmlElement.classList.add('dark');
-                        htmlElement.classList.remove('light');
-                    } else {
-                        htmlElement.classList.remove('dark');
-                        htmlElement.classList.add('light');
-                    }
-
-                    document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
-                    
-                    const icon = themeToggleBtn.querySelector('.material-symbols-outlined');
-                    if (icon) {
-                        icon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
-                    }
-                });
-            }
-        });
+            document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+            
+            // Actualizar posibles iconos y textos
+            const icons = document.querySelectorAll('.theme-toggle-icon');
+            icons.forEach(icon => {
+                icon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+            });
+        }
     </script>
 </body>
-
 </html>

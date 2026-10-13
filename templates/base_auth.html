@@ -1,28 +1,59 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="{{ theme|default:'dark' }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>{% block title %}Login{% endblock %}</title>
+    <title>{% block title %}Iniciar Sesión{% endblock %} | GAD Potosí</title>
+    <link rel="icon" type="image/jpeg" href="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}">
 
+    <!-- TAILWIND CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet"
-    />
-    <style>
+    <!-- CONFIGURACIÓN DE COLORES INSTITUCIONALES GAD POTOSÍ -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Habilitado por clases para alternar en vivo
+            theme: {
+                extend: {
+                    colors: {
+                        verde: {
+                            DEFAULT: '#063b2f',
+                            dark: '#031c16',
+                            light: '#008548',
+                        },
+                        guindo: {
+                            DEFAULT: '#7c121e',
+                            dark: '#5c0b15',
+                            hover: '#610c16',
+                        },
+                        dorado: {
+                            DEFAULT: '#c59b27',
+                            light: '#dfb26c',
+                        },
+                    },
+                    fontFamily: {
+                        outfit: ['Outfit', 'sans-serif'],
+                        inter: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
 
+    <!-- FUENTES OFICIALES (OUTFIT & INTER) -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+    <style>
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(16px);
             }
-
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -30,18 +61,93 @@
         }
 
         .animate-fade {
-            animation: fadeIn 0.5s ease;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        h1, h2, h3, h4, .font-heading {
+            font-family: 'Outfit', sans-serif;
+        }
     </style>
 </head>
 
-<body class="min-h-screen bg-gradient-to-br from-red-950 via-red-900 to-black flex items-center justify-center overflow-hidden relative">
+<body class="min-h-screen bg-gradient-to-br from-[#eaf2ed] via-[#f3f7f4] to-[#fbf9f2] dark:from-[#063b2f] dark:via-[#031c16] dark:to-[#020b08] flex items-center justify-center p-4 overflow-hidden relative selection:bg-[#c59b27] selection:text-[#031c16] transition-colors duration-300">
     
-    {% block content %}
-    {% endblock %}
-    <div class="absolute top-0 left-0 w-72 h-72 bg-red-700 rounded-full blur-3xl opacity-20"></div>
+    <!-- BOTÓN FLOTANTE SUPERIOR: CONMUTADOR DE TEMA CLARO / OSCURO -->
+    <div class="fixed top-5 right-5 sm:top-7 sm:right-7 z-50">
+        <button 
+            id="theme-toggle" 
+            type="button"
+            class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/70 dark:bg-black/30 backdrop-blur-xl border border-black/10 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg cursor-pointer text-xs font-semibold select-none font-['Outfit']"
+            title="Cambiar entre modo claro y oscuro"
+        >
+            <span class="material-symbols-outlined text-[19px] text-[#c59b27] dark:text-[#dfb26c]">
+                {% if theme == 'light' %}
+                    dark_mode
+                {% else %}
+                    light_mode
+                {% endif %}
+            </span>
+            <span id="theme-text" class="hidden sm:inline">
+                {% if theme == 'light' %}Modo Oscuro{% else %}Modo Claro{% endif %}
+            </span>
+        </button>
+    </div>
 
-    <div class="absolute bottom-0 right-0 w-72 h-72 bg-red-500 rounded-full blur-3xl opacity-20"></div>
+    <!-- CONTENIDO DEL LOGIN (FORMULARIO) -->
+    <div class="relative z-10 w-full max-w-md animate-fade">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <!-- ORBES DE LUZ AMBIENTAL (SE ADAPTAN CON SUAVIDAD AL TEMA) -->
+    
+    <!-- Orbe 1: Verde Esmeralda (Superior Izquierda) -->
+    <div class="absolute -top-24 -left-24 w-96 h-96 bg-[#063b2f]/20 dark:bg-[#0f5948]/40 rounded-full blur-[110px] pointer-events-none transition-opacity duration-300"></div>
+
+    <!-- Orbe 2: Oro Virreinal (Inferior Derecha) -->
+    <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-[#c59b27]/20 dark:bg-[#c59b27]/25 rounded-full blur-[130px] pointer-events-none transition-opacity duration-300"></div>
+
+    <!-- Orbe 3: Guindo Imperial (Centro Suave) -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[34rem] h-[34rem] bg-[#7c121e]/10 dark:bg-[#7c121e]/15 rounded-full blur-[160px] pointer-events-none transition-opacity duration-300"></div>
+
+    <!-- SCRIPT DE CONMUTACIÓN DE TEMA -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeBtn = document.getElementById('theme-toggle');
+            if (!themeBtn) return;
+
+            themeBtn.addEventListener('click', () => {
+                const htmlEl = document.documentElement;
+                const isDark = htmlEl.classList.contains('dark');
+                const newTheme = isDark ? 'light' : 'dark';
+
+                if (newTheme === 'dark') {
+                    htmlEl.classList.add('dark');
+                    htmlEl.classList.remove('light');
+                } else {
+                    htmlEl.classList.remove('dark');
+                    htmlEl.classList.add('light');
+                }
+
+                // Guardar preferencia en cookie por 1 año para que al entrar ya lo tenga
+                document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+
+                // Actualizar icono y texto
+                const icon = themeBtn.querySelector('.material-symbols-outlined');
+                const text = document.getElementById('theme-text');
+                if (icon) {
+                    icon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+                }
+                if (text) {
+                    text.textContent = newTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
