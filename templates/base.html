@@ -1,38 +1,37 @@
 {% load static %}
-
 <!DOCTYPE html>
-<!-- El servidor Django inyectará aquí 'dark' o 'light' previniendo el parpadeo en blanco -->
-<html lang="es" class="scroll-smooth {{ theme }}">
+<html lang="es" class="scroll-smooth {{ theme|default:'dark' }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SIGAL{% endblock %} | Sistema de Gestión de Almacenes</title>
+    <link rel="icon" type="image/jpeg" href="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}">
 
-    <title>{% block title %}SGA{% endblock %} | Gobierno Autónomo</title>
-    <link rel="icon" type="image/jpeg" href="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}">    
-    <!-- TAILWIND CSS CDN CON PLUGINS -->
+    <!-- TAILWIND CSS CDN CON EXTENSIÓN BITEMÁTICA -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-
-    <!-- CONFIGURACIÓN GLOBAL DE TAILWIND -->
     <script>
         tailwind.config = {
-            // Activamos el modo oscuro basado en clases para Tailwind
-            darkMode: 'class', 
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        primary: {
-                            DEFAULT: '#8b0000',
-                            dark: '#700000',
+                        sigal: {
+                            emerald: '#008548',
+                            emeraldDark: '#004d26',
+                            emeraldDeep: '#003d1e',
+                            neon: '#71dc95',
+                            neonLight: '#8df9af',
+                            gold: '#eec14b',
+                            goldDark: '#906e00',
+                            crimson: '#ff7577',
+                            crimsonDark: '#8c1f28',
                         },
-                        secondary: {
-                            DEFAULT: '#d97706',
-                            dark: '#c06705',
-                        },
-                        gold: '#dfb26c',
-                        dark: '#111111',
-                        info: '#007aff',
-                        grayBorder: '#d1d5db',
+                        // Paleta Dark Obsidian Esmeralda
+                        darkbg: '#0c1511',
+                        darkcard: '#141d19',
+                        darksurface: '#18221d',
+                        darkborder: '#232c27',
                     },
                     fontFamily: {
                         outfit: ['Outfit', 'sans-serif'],
@@ -43,336 +42,140 @@
         }
     </script>
 
-    <!-- FUENTES DE GOOGLE -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-
-    <!-- MATERIAL SYMBOLS -->
+    <!-- FUENTES OFICIALES E ÍCONOS MATERIAL SYMBOLS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
     <style>
-        /* ==========================================
-           VARIABLES CSS GLOBALES (Tema Claro)
-           ========================================== */
+        /* Modo Claro: Fondo Menta Institucional */
         :root {
-            --primary: #8b0000;
-            --secondary: #d97706;
-            --gold: #c5a059;
-            --info: #007aff;
-
-            /* Colores de Fondo y Texto */
-            --bg-body: #f7f9fd;
-            --card-bg: #ffffff;
-            --sidebar-bg: #ffffff;
-            --text-main: #1f2937;       /* text-gray-800 */
-            --text-heading: #111111;    /* Títulos oscuros */
-            --text-muted: #6b7280;      /* text-gray-500 */
-            --border-color: #d1d5db;    /* Gris de borde */
-
-            /* Componentes */
-            --input-bg: #ffffff;
-            --input-text: #1f2937;
-            --table-header-bg: #f9fafb;
-
-            /* Desplazamiento */
-            --scrollbar-track: #f1f1f1;
-            --scrollbar-thumb: #cbcbcb;
-            --scrollbar-thumb-hover: #a8a8a8;
+            --bg-main: #eef8f2;
+            --card-main: #ffffff;
+            --border-main: rgba(0, 77, 38, 0.1);
+            --text-title: #0e1f16;
+            --text-body: #3e4a40;
+            --text-muted: #6e7a6f;
         }
 
-        /* ==========================================
-           VARIABLES PARA EL MODO OSCURO PREMIUM (Warm Dark)
-           ========================================== */
+        /* Modo Oscuro: Obsidiana Esmeralda */
         .dark {
-            --primary: #8b0000;         /* Conservamos tu rojo institucional */
-            --secondary: #d97706;       /* Ámbar institucional */
-            --gold: #dfb26c;            /* Oro suave (de tu imagen de referencia) */
-            --info: #60a5fa;
-
-            /* Fondos cálidos ultra oscuros */
-            --bg-body: #0d0909;         /* Fondo general chocolate/carbón */
-            --card-bg: #151010;         /* Tarjetas, navbar y dropdowns */
-            --sidebar-bg: #120d0d;      /* Sidebar ligeramente más oscuro */
-            
-            /* Textos refinados */
-            --text-main: #dfd8d0;       /* Texto común en crema suave */
-            --text-heading: #dec396;    /* Títulos e indicadores en oro suave */
-            --text-muted: #8c7e7a;      /* Subtítulos y secundarios */
-            --border-color: #241919;    /* Bordes discretos con matiz rojizo */
-
-            /* Componentes */
-            --input-bg: #1a1212;
-            --input-text: #dfd8d0;
-            --table-header-bg: #181212;
-            
-            /* Desplazamiento */
-            --scrollbar-track: #0d0909;
-            --scrollbar-thumb: #2c1d1d;
-            --scrollbar-thumb-hover: #3d2b2b;
+            --bg-main: #0c1511;
+            --card-main: #141d19;
+            --border-main: #232c27;
+            --text-title: #dbe5de;
+            --text-body: #bdcabd;
+            --text-muted: #889488;
         }
 
-        /* ==========================================
-           APLICACIÓN AUTOMÁTICA EN TODO EL SISTEMA 
-           ========================================== */
-
-        /* 1. Fondo y Textos del Cuerpo */
         body {
-            background-color: var(--bg-body) !important;
-            color: var(--text-main) !important;
+            background-color: var(--bg-main) !important;
+            color: var(--text-body);
             font-family: 'Inter', sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            transition: background-color 0.2s ease, color 0.2s ease;
+            min-height: 100vh;
         }
 
-        /* 2. Cabeceras */
-        h1, h2, h3, h4, h5, h6, .font-heading {
-            font-family: 'Outfit', sans-serif;
-            color: var(--text-heading) !important;
-            transition: color 0.2s ease;
+        .card-sigal {
+            background-color: var(--card-main);
+            border: 1px solid var(--border-main);
+            border-radius: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            transition: all 0.2s ease-in-out;
+        }
+        .dark .card-sigal {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
 
-        /* 3. Textos secundarios */
-        p, .text-muted, .text-secondary {
-            color: var(--text-muted);
-        }
-
-        /* 4. Tablas Globales (Sin bordes blancos) */
-        table {
-            background-color: var(--card-bg) !important;
-            color: var(--text-main) !important;
-            border-color: var(--border-color) !important;
-            transition: background-color 0.2s, color 0.2s;
-        }
-
-        thead, tr.table-header {
-            background-color: var(--table-header-bg) !important;
-        }
-
-        th {
-            color: var(--text-heading) !important;
-            border-bottom: 1px solid var(--border-color) !important;
-            background-color: var(--table-header-bg) !important;
-            text-transform: uppercase;
-            font-size: 0.75rem !important; /* text-xs */
-            letter-spacing: 0.05em;
-            font-weight: 700 !important;
-        }
-
-        td {
-            color: var(--text-main) !important;
-            border-bottom: 1px solid var(--border-color) !important;
-        }
-
-        /* 5. Tarjetas (Cards) */
-        .card {
-            background: var(--card-bg) !important;
-            border: 1px solid var(--border-color) !important;
-            border-radius: 24px;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        /* 6. Layouts principales (Sidebar y Navbar) */
-        .sidebar-custom {
-            background-color: var(--sidebar-bg, var(--card-bg)) !important;
-            border-right: 1px solid var(--border-color) !important;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        .navbar-custom {
-            background-color: var(--card-bg) !important;
-            border-bottom: 1px solid var(--border-color) !important;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        /* 7. Botón dorado premium ("New Asset") */
-        .btn-gold {
-            background-color: var(--gold) !important;
-            color: #0d0909 !important;
-            font-weight: 700 !important;
-            border-radius: 12px !important;
-            transition: background-color 0.15s ease;
-        }
-
-        .btn-gold:hover {
-            background-color: #c9a05e !important;
-        }
-
-        /* 8. Componentes del Sidebar */
-        .sidebar-active {
-            background-color: var(--primary) !important;
-            color: white !important;
-            border-left: 4px solid var(--secondary);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-            transition: all 0.15s ease-in-out;
-        }
-
-        .btn-primary:hover {
-            background: #700000;
-        }
-
-        .btn-secondary {
-            background: var(--secondary);
-            color: white;
-            transition: all 0.15s ease-in-out;
-        }
-
-        .btn-secondary:hover {
-            background: #c06705;
-        }
-
-        /* Badges de estado */
-        .badge-primary {
-            background: rgba(139, 0, 0, 0.08);
-            color: var(--primary);
-        }
-
-        .badge-gold {
-            background: rgba(197, 160, 89, 0.15);
-            color: var(--primary);
-        }
-
-        .badge-info {
-            background: rgba(0, 122, 255, 0.08);
-            color: var(--info);
-        }
-
-        /* 9. Estilizado de Formularios */
-        input[type="text"], 
-        input[type="number"], 
-        input[type="password"], 
-        input[type="email"], 
-        select, 
-        textarea {
-            background-color: var(--input-bg) !important;
-            border-color: var(--border-color) !important;
-            border-radius: 1rem !important; 
-            font-size: 0.875rem !important; 
-            color: var(--input-text) !important; 
-            transition: all 0.15s ease-in-out !important;
-        }
-
-        input[type="text"]:focus, 
-        input[type="number"]:focus, 
-        input[type="password"]:focus, 
-        input[type="email"]:focus, 
-        select:focus, 
-        textarea:focus {
-            outline: none !important;
-            border-color: transparent !important;
-            box-shadow: 0 0 0 2px var(--primary) !important; 
-        }
-
-        /* 10. Barra de desplazamiento */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--scrollbar-track);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
-            border-radius: 9999px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
+        /* Scrollbar discreto */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 133, 72, 0.3); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 133, 72, 0.7); }
     </style>
-
 </head>
 
-<body class="antialiased transition-colors duration-200">
+<body class="antialiased transition-colors duration-300">
 
-    <!-- BARRA LATERAL (SIDEBAR) -->
+    <!-- SIDEBAR -->
     {% include 'partials/sidebar.html' %}
 
-    <!-- BARRA SUPERIOR (NAVBAR) -->
+    <!-- NAVBAR -->
     {% include 'partials/navbar.html' %}
 
     <!-- CONTENEDOR PRINCIPAL -->
-    <main class="ml-[260px] pt-20 p-8 min-h-screen transition-colors duration-200">
+    <main class="ml-0 lg:ml-72 pt-16 px-4 sm:px-6 lg:px-8 py-6 min-h-screen transition-all duration-300">
         
+        <!-- ALERTAS FLOTANTES -->
         {% if messages %}
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4" id="global-alerts-container">
+        <div class="max-w-7xl mx-auto mb-6" id="global-alerts-container">
             {% for message in messages %}
-                <div class="p-4 rounded-2xl text-sm border font-['Outfit'] flex justify-between items-center gap-3 mb-2 shadow-sm 
+                <div class="p-3.5 rounded-xl text-xs sm:text-sm border font-outfit flex justify-between items-center gap-3 mb-2 shadow-lg backdrop-blur-md transition-all
                     {% if message.tags == 'error' %}
-                        bg-red-50 text-red-700 border-red-200
+                        bg-sigal-crimson/15 text-sigal-crimson border-sigal-crimson/30
                     {% elif message.tags == 'warning' %}
-                        bg-yellow-50 text-yellow-700 border-yellow-200
+                        bg-sigal-gold/15 text-sigal-gold border-sigal-gold/30
                     {% else %}
-                        bg-green-50 text-green-700 border-green-200
+                        bg-sigal-emerald/15 text-sigal-emerald dark:text-sigal-neon border-sigal-emerald/30
                     {% endif %}">
-                    
-                    <span class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-base">
-                            {% if message.tags == 'error' %}
-                                error
-                            {% elif message.tags == 'warning' %}
-                                warning
-                            {% else %}
-                                check_circle
-                            {% endif %}
+                    <span class="flex items-center gap-2 font-medium">
+                        <span class="material-symbols-outlined text-[18px]">
+                            {% if message.tags == 'error' %}warning{% elif message.tags == 'warning' %}priority_high{% else %}verified{% endif %}
                         </span>
                         {{ message }}
                     </span>
-                    
-                    <!-- Botón dinámico 'X' para cerrar la alerta en el acto sin recargar -->
-                    <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition cursor-pointer" onclick="this.parentElement.remove()">
-                        <span class="material-symbols-outlined text-base">close</span>
+                    <button type="button" class="opacity-60 hover:opacity-100 transition" onclick="this.parentElement.remove()">
+                        <span class="material-symbols-outlined text-[16px]">close</span>
                     </button>
                 </div>
             {% endfor %}
         </div>
         {% endif %}
-        
+
         {% block content %}
         {% endblock %}
-
     </main>
 
-    <!-- CHART.JS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- SCRIPT DE ACTUALIZACIÓN DEL TEMA -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            
-            if (themeToggleBtn) {
-                themeToggleBtn.addEventListener('click', () => {
-                    const htmlElement = document.documentElement;
-                    const isDark = htmlElement.classList.contains('dark');
-                    const newTheme = isDark ? 'light' : 'dark';
-
-                    // Alternamos las clases correspondientes en la raíz
-                    if (newTheme === 'dark') {
-                        htmlElement.classList.add('dark');
-                        htmlElement.classList.remove('light');
-                    } else {
-                        htmlElement.classList.remove('dark');
-                        htmlElement.classList.add('light');
-                    }
-
-                    // Escribimos la cookie de preferencia con duración de 1 año
-                    document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
-                    
-                    // Actualizamos el icono del botón en tiempo real (Material Symbols)
-                    const icon = themeToggleBtn.querySelector('.material-symbols-outlined');
-                    if (icon) {
-                        icon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
-                    }
-                });
+        function toggleSidebarMobile() {
+            const sidebar = document.getElementById('main-sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if (!sidebar || !backdrop) return;
+            const isClosed = sidebar.classList.contains('-translate-x-full');
+            if (isClosed) {
+                sidebar.classList.remove('-translate-x-full');
+                backdrop.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
             }
-        });
+        }
+
+        function toggleThemeGlobal() {
+            const htmlEl = document.documentElement;
+            const isDark = htmlEl.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+
+            // 1. Alternar la clase 'dark' en la raíz <html>
+            if (newTheme === 'dark') {
+                htmlEl.classList.add('dark');
+                htmlEl.classList.remove('light');
+            } else {
+                htmlEl.classList.remove('dark');
+                htmlEl.classList.add('light');
+            }
+
+            // 2. Guardar preferencia en la cookie por 1 año para Django
+            document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+
+            // 3. Actualizar los iconos de sol/luna en tiempo real
+            document.querySelectorAll('.theme-toggle-icon, #theme-toggle .material-symbols-outlined').forEach(icon => {
+                icon.textContent = (newTheme === 'dark') ? 'light_mode' : 'dark_mode';
+            });
+        }
     </script>
 </body>
-
 </html>

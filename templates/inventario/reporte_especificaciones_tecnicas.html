@@ -1,0 +1,284 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Especificaciones Técnicas - Consolidación de Demanda</title>
+    <style>
+        /* Formato Oficio/Legal Horizontal para abarcar muchas secretarías */
+        @page {
+            size: legal landscape; 
+            margin: 0.8cm;
+        }
+
+        *, *:before, *:after { box-sizing: border-box; }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 8px;
+            color: #000;
+            margin: 0;
+            padding: 20px 14px;
+            background-color: #eaedf1; /* Fondo gris institucional */
+        }
+
+        /* BARRA SUPERIOR (NO SE IMPRIME) */
+        .toolbar-top {
+            max-width: 1400px; /* Más ancho para la matriz */
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .filter-form { display: flex; align-items: center; gap: 12px; }
+        .filter-group { display: flex; flex-direction: column; gap: 2px; }
+        .filter-group label { font-size: 9px; font-weight: bold; color: #475569; text-transform: uppercase; }
+        .filter-group select, .filter-group input {
+            padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; font-weight: bold; color: #1e293b; background: #f8fafc;
+        }
+        .btn-filter {
+            background: #063b2f; color: white; border: none; padding: 7px 16px;
+            border-radius: 6px; font-weight: bold; cursor: pointer; height: 30px; margin-top: 14px;
+        }
+        .btn-filter:hover { background: #04271f; }
+        .btn-print {
+            background: #0284c7; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; font-weight: bold; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-print:hover { background: #0369a1; }
+
+        /* HOJA BLANCA FLOTANTE (CANVAS) */
+        .sheet-container {
+            width: 100%;
+            max-width: 1400px; /* Más ancho para la matriz */
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px 40px;
+            border-radius: 4px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            border: 1px solid #cbd5e1;
+        }
+
+        /* CABECERA INSTITUCIONAL */
+        .header-table { width: 100%; margin-bottom: 20px; border-collapse: collapse; }
+        .header-table td { vertical-align: middle; }
+        .logo-box { width: 20%; text-align: left; }
+        .logo-box img { max-height: 55px; }
+        .title-box { width: 60%; text-align: center; }
+        .title-box h3 { margin: 0; font-size: 11px; font-weight: bold; }
+        .title-box h2 { margin: 3px 0; font-size: 12.5px; font-weight: bold; text-transform: uppercase; color: #7c121e; }
+        .title-box p { margin: 2px 0; font-size: 9.5px; }
+        .code-box { width: 20%; text-align: right; font-size: 10px; font-weight: bold; font-family: monospace; }
+
+        /* CONTENEDOR DE LA MATRIZ CON SCROLL HORIZONTAL (Para que no rompa la hoja) */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        /* TABLA MATRICIAL ESTILO HOJA FÍSICA */
+        table.matriz-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7px;
+        }
+        table.matriz-table th, table.matriz-table td {
+            border: 0.5px solid #000;
+            padding: 3px 4px;
+        }
+        table.matriz-table th {
+            background-color: #f1f5f9;
+            color: #000;
+            text-align: center;
+            font-weight: bold;
+            line-height: 1.1;
+        }
+        .th-secretaria {
+            font-size: 6.5px;
+            padding: 3px 2px;
+            background-color: #e2e8f0;
+            white-space: normal;
+            min-width: 65px;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .row-total {
+            background-color: #e2e8f0;
+            font-weight: bold;
+            font-size: 7.5px;
+        }
+
+        /* FIRMAS */
+        .firmas-container {
+            margin-top: 45px;
+            width: 100%;
+            page-break-inside: avoid;
+        }
+        .firmas-table { width: 100%; border-collapse: collapse; }
+        .firmas-table td { width: 33.33%; text-align: center; vertical-align: top; padding: 0 25px; }
+        .linea { border-top: 1px solid #000; padding-top: 3px; font-weight: bold; font-size: 8px; }
+
+        /* MODO IMPRESIÓN */
+        @media print {
+            body { background: white !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .sheet-container { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+            .table-responsive { overflow: visible !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA DE CONTROL (NO SE IMPRIME) -->
+    <div class="toolbar-top no-print">
+        <form method="GET" class="filter-form">
+            <div class="filter-group">
+                <label>Partida Presupuestaria</label>
+                <select name="partida" onchange="this.form.submit()" style="width: 300px;">
+                    {% for p in partidas_disponibles %}
+                        <option value="{{ p.id }}" {% if partida.id == p.id %}selected{% endif %}>
+                            {{ p.codigo }} - {{ p.nombre|truncatechars:40 }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Gestión Fiscal</label>
+                <input type="number" name="gestion" value="{{ gestion }}" style="width: 80px;">
+            </div>
+            <button type="submit" class="btn-filter">Generar Matriz</button>
+        </form>
+
+        <button onclick="window.print()" class="btn-print">
+            🖨️ Imprimir Formulario Matriz (PDF)
+        </button>
+    </div>
+
+    <!-- HOJA BLANCA FLOTANTE (CANVAS) -->
+    <div class="sheet-container">
+        
+        <!-- CABECERA INSTITUCIONAL OFICIAL -->
+        <table class="header-table">
+            <tr>
+                <td class="logo-box">
+                    <img 
+                        src="{% static 'img/LOGO_GOBERNACION_VERTICAL_NEGRO.png' %}" 
+                        data-fallback="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                        alt="Logo Gobernación" 
+                        onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}"
+                    >
+                </td>
+                <td class="title-box">
+                    <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
+                    <h2>ESPECIFICACIONES TÉCNICAS Y CONSOLIDACIÓN DE DEMANDA</h2>
+                    <p>PARTIDA: <strong>{{ partida.codigo }} - {{ partida.nombre|upper }}</strong></p>
+                    <p>GESTIÓN FISCAL: <strong>{{ gestion }}</strong></p>
+                </td>
+                <td class="code-box">
+                    DBC / PROCESO<br>
+                    <span style="font-size: 8px; font-weight: normal; color: #555;">SGA - GADP</span>
+                </td>
+            </tr>
+        </table>
+
+        <!-- MATRIZ CON SCROLL INTERNO HORIZONTAL (Para no romper la hoja) -->
+        <div class="table-responsive">
+            <table class="matriz-table">
+                <thead>
+                    <!-- Nivel 1: Columnas fijas + Nombres de TODAS las Secretarías + Totales -->
+                    <tr>
+                        <th rowspan="2" style="width: 2%;">N°</th>
+                        <th rowspan="2" style="width: 22%;">DESCRIPCIÓN TÉCNICA DETALLADA</th>
+                        <th rowspan="2" style="width: 3.5%;">U. MED.</th>
+                        <th rowspan="2" style="width: 3.5%;">P. UNIT. (Bs.)</th>
+                        {% for sec in secretarias %}
+                            <th colspan="2" class="th-secretaria">
+                                {{ sec.nombre_corto }}
+                            </th>
+                        {% endfor %}
+                        <th rowspan="2" style="width: 4.5%;">TOTAL Bs.</th>
+                        <th rowspan="2" style="width: 4%;">TOTAL CANTIDAD</th>
+                    </tr>
+                    <!-- Nivel 2: Subcolumnas Cant. y Total Bs. por cada Secretaría -->
+                    <tr>
+                        {% for sec in secretarias %}
+                            <th style="width: 22px;">Cant.</th>
+                            <th style="width: 30px;">Total Bs.</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in matriz_filas %}
+                    <tr>
+                        <td class="text-center font-bold">{{ f.nro }}</td>
+                        <td class="text-left" style="font-size: 6.5px; line-height: 1.1;">
+                            {{ f.desc_tecnica }}
+                        </td>
+                        <td class="text-center">{{ f.unidad_medida }}</td>
+                        <td class="text-right">{{ f.precio_unitario|floatformat:2 }}</td>
+
+                        <!-- Valores de cada Secretaría -->
+                        {% for v in f.valores_secretarias %}
+                            <td class="text-center">
+                                {% if v.cantidad > 0 %}<strong>{{ v.cantidad }}</strong>{% else %}—{% endif %}
+                            </td>
+                            <td class="text-right">
+                                {% if v.total_bs > 0 %}{{ v.total_bs|floatformat:2 }}{% else %}—{% endif %}
+                            </td>
+                        {% endfor %}
+
+                        <!-- Totales del Ítem -->
+                        <td class="text-right font-bold">{{ f.total_fila_bs|floatformat:2 }}</td>
+                        <td class="text-center font-bold">{{ f.total_fila_cant }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{{ secretarias|length|add:6 }}" class="text-center" style="padding: 20px; font-size: 10px; color: #64748b;">
+                            No existen requerimientos registrados para esta partida en la gestión {{ gestion }}.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    <!-- FILA DE TOTALES GENERALES -->
+                    <tr class="row-total">
+                        <td colspan="4" class="text-center">TOTALES CONSOLIDADOS (Bs.)</td>
+                        {% for tot in resumen_columnas_totales %}
+                            <td class="text-center">{{ tot.cant }}</td>
+                            <td class="text-right">{{ tot.total_bs|floatformat:2 }}</td>
+                        {% endfor %}
+                        <td class="text-right">{{ gran_total_bs|floatformat:2 }}</td>
+                        <td class="text-center">{{ gran_total_cant }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- FIRMAS OFICIALES AL PIE -->
+        <div class="firmas-container">
+            <table class="firmas-table">
+                <tr>
+                    <td>
+                        <div class="linea">Responsable Almacén Central<br>(Consolidación de Demanda)</div>
+                    </td>
+                    <td>
+                        <div class="linea">Responsable Bienes y Servicios<br>(Especificaciones Técnicas)</div>
+                    </td>
+                    <td>
+                        <div class="linea">Responsable del Proceso de Contratación (RPA)<br>Secretaría Dptal. Administrativa y Financiera</div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>

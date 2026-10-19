@@ -1,0 +1,295 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Autorización de Inicio RPA - {{ proceso.codigo }}</title>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 1.8cm 2cm 2cm 2.2cm;
+        }
+
+        /* LIENZO GRIS DE FONDO EN PANTALLA */
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 9.5px;
+            line-height: 1.6;
+            color: #000;
+            margin: 0;
+            padding: 20px;
+            background-color: #f1f5f9; /* Fondo gris canvas */
+        }
+
+        /* BARRA SUPERIOR DE ACCIONES (NO SE IMPRIME) */
+        .toolbar-top {
+            max-width: 820px;
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn-action-save {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-action-save:hover { background-color: #0369a1; }
+        .btn-action-print {
+            background-color: #8b0000;
+            color: white;
+            border: none;
+            padding: 7px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-action-print:hover { background-color: #6b0000; }
+
+        /* HOJA BLANCA DEL DOCUMENTO (CANVAS / SHEET) */
+        .sheet-container {
+            max-width: 820px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            padding: 35px 45px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            border-radius: 4px;
+        }
+
+        .header { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+        .header td { vertical-align: middle; }
+        .logo img { max-height: 52px; width: auto; }
+
+        .sello-recibido {
+            border: 1.5px solid #0284c7;
+            color: #0284c7;
+            text-align: center;
+            padding: 6px 10px;
+            font-size: 7.5px;
+            font-weight: bold;
+            border-radius: 8px;
+            width: 115px;
+            float: right;
+            line-height: 1.25;
+        }
+
+        .titulo { text-align: center; margin-bottom: 22px; }
+        .titulo h3 { margin: 0; font-size: 11px; font-weight: bold; }
+        .titulo h2 { margin: 3px 0; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        p.parrafo-legal {
+            text-align: justify;
+            margin: 10px 0;
+            text-indent: 20px;
+            font-size: 9.5px;
+            line-height: 1.6;
+        }
+
+        .se-autoriza {
+            margin: 18px 0 10px 0;
+            font-weight: bold;
+            font-size: 10.5px;
+            letter-spacing: 0.5px;
+        }
+
+        .disposicion {
+            text-indent: 0 !important;
+            padding-left: 15px;
+            margin: 8px 0;
+            text-align: justify;
+        }
+
+        .lugar-fecha {
+            text-align: right;
+            margin-top: 25px;
+            font-size: 9.5px;
+        }
+
+        /* INPUTS EDITABLES DISCRETOS EN PANTALLA */
+        .input-live {
+            border: 1px dashed #94a3b8;
+            background: #f8fafc;
+            padding: 2px 5px;
+            font-size: 9px;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        .input-live:focus {
+            outline: none;
+            border-color: #0284c7;
+            background: #fff;
+        }
+
+        .firmas { width: 100%; margin-top: 70px; text-align: center; page-break-inside: avoid; }
+        .linea-rpa {
+            width: 45%;
+            margin: 0 auto;
+            border-top: 1px solid #000;
+            padding-top: 4px;
+            font-weight: bold;
+            font-size: 8.5px;
+            line-height: 1.35;
+        }
+
+        .footer-lema {
+            margin-top: 60px;
+            border-top: 0.5px solid #ccc;
+            padding-top: 6px;
+            font-size: 8px;
+            color: #444;
+            text-align: center;
+            font-style: italic;
+        }
+        .footer-info {
+            font-size: 7.5px;
+            color: #666;
+            text-align: center;
+            margin-top: 2px;
+        }
+
+        /* COMPORTAMIENTO AL IMPRIMIR */
+        @media print {
+            body { background: white !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .sheet-container {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                background: white !important;
+            }
+            .input-live {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <form method="POST" action="{% url 'aprobar_rpa_adquisicion' proceso.id %}">
+        {% csrf_token %}
+
+        <!-- BARRA SUPERIOR DE ACCIONES -->
+        <div class="toolbar-top no-print">
+            <div style="font-size: 11px; color: #475569;">
+                <strong style="color: #8b0000;">Autorización Oficial RPA:</strong> Formulario oficial bajo el D.S. 0181 (Contratación Menor).
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="btn-action-save">
+                    💾 Guardar CITE / Datos
+                </button>
+                <button type="button" onclick="window.print()" class="btn-action-print">
+                    🖨️ Imprimir Autorización RPA
+                </button>
+            </div>
+        </div>
+
+        <!-- HOJA BLANCA OFICIAL (CANVAS / SHEET) -->
+        <div class="sheet-container">
+
+            <!-- ENCABEZADO CON LOGO Y SELLO DE RECIBIDO -->
+            <table class="header">
+                <tr>
+                    <td style="width: 35%;" class="logo">
+                        <img src="{% static 'img/logo_gober_horizontal.png' %}" alt="GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ">
+                    </td>
+                    <td style="width: 35%;"></td>
+                    <td style="width: 30%;">
+                        <div class="sello-recibido">
+                            RECIBIDO<br>
+                            UNIDAD ADMINISTRATIVA G.A.D.P.<br>
+                            {{ proceso.fecha_solicitud|date:"d M Y" }}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- TÍTULO OFICIAL (FOTO 2) -->
+            <div class="titulo">
+                <h3>
+                    NOTA Nº 
+                    <input type="text" name="cite_aprobacion_rpa" 
+                           value="{{ proceso.cite_aprobacion_rpa|default:'0199/2026' }}" 
+                           class="input-live" style="width: 90px; text-align: center;">
+                </h3>
+                <h2>AUTORIZACIÓN DE INICIO DE PROCESO DE CONTRATACIÓN<br>MODALIDAD: CONTRATACIÓN MENOR</h2>
+            </div>
+
+            <!-- CUERPO LEGAL EXACTO DEL GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ -->
+            <p class="parrafo-legal">
+                En cumplimiento de la <strong>Resolución Administrativa {{ proceso.autoridad_rpa.resolucion_designacion|default:"252/2026, de fecha 18 de junio de 2026" }}</strong>, mediante la cual se me designa como responsable de los Procesos de Contratación (RPA) en la modalidad de Contratación Menor y Contratación Directa, para procesos comprendidos entre Bs. 1,00 y Bs. 50.000,00, en el Gobierno Autónomo Departamental de Potosí.
+            </p>
+
+            <p class="parrafo-legal">
+                Que, de acuerdo a la Hoja de Ruta / CITE Nº <strong>{{ proceso.cite_solicitud|default:"03523/2026" }}</strong> solicitada por <strong>{{ proceso.unidad_solicitante.nombre|upper }}</strong>, Formulario de Bienes y Servicios Documento Nº <strong>{{ proceso.codigo }}</strong>, certificación presupuestaria Nº <strong>{{ proceso.certificacion_nro|default:"1156/2026" }}</strong>, donde se evidencia el cumplimiento de los requisitos administrativos y presupuestarios establecidos en la normativa vigente.
+            </p>
+
+            <p class="parrafo-legal">
+                Que, conforme a lo dispuesto en el <strong>Decreto Supremo Nº 0181 – Normas Básicas del Sistema de Administración de Bienes y Servicios (NB-SABS)</strong>, y en ejercicio de las atribuciones conferidas como responsable del Proceso de Contratación (RPA).
+            </p>
+
+            <div class="se-autoriza">
+                SE AUTORIZA:
+            </div>
+
+            <p class="parrafo-legal disposicion">
+                El inicio del Proceso de Contratación bajo la modalidad de Contratación Menor para el proceso <strong>"{{ proceso.objeto_contratacion|upper }}"</strong> dependiente de {{ proceso.unidad_solicitante.nombre }}.
+            </p>
+
+            <p class="parrafo-legal disposicion">
+                Es cuanto se dispone para fines consiguientes.
+            </p>
+
+            <div class="lugar-fecha">
+                Potosí, {{ proceso.fecha_solicitud|date:"d \d\e F \d\e Y" }}
+            </div>
+
+            <!-- FIRMA OFICIAL DEL RPA (IDÉNTICA A LA FOTO 2) -->
+            <table class="firmas">
+                <tr>
+                    <td>
+                        <div class="linea-rpa">
+                            {{ proceso.autoridad_rpa.nombre_completo|default:"Arq. Edwin M. Flores Leyton" }}<br>
+                            RESP. DE PROCESOS DE CONTRATACIÓN RPA<br>
+                            <span style="font-size: 7.5px; font-weight: normal;">
+                                MODALIDAD CONTRATACIÓN MENOR<br>
+                                GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ
+                            </span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- LEMA OFICIAL Y CONTACTOS -->
+            <div class="footer-lema">
+                "Construyendo el futuro de Potosí"
+            </div>
+            <div class="footer-info">
+                Teléfonos: (591-2) 6229292 / 6229295 • Correo: gabinetegobernacion@potosi.gob.bo
+            </div>
+
+        </div>
+    </form>
+
+</body>
+</html>

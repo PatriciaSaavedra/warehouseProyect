@@ -1,664 +1,257 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %} Bandeja de Gestión {% endblock %}
+{% block title %} Bandeja de Gestión Institucional {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+<div class="max-w-7xl mx-auto space-y-6 font-['Outfit']">
 
     <!-- CABECERA -->
-    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
-        <div class="min-w-0">
-            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100 font-['Outfit'] tracking-tight">Bandeja de Gestión Institucional</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xl">Audite, valide partidas del POA y procese la preparación física y despachos del almacén.</p>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">
+                Bandeja de Gestión Institucional
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Audite y gestione los trámites de Almacén (Flujo 1) y Adquisiciones SABS (Flujo 2) según sus atribuciones oficiales.
+            </p>
         </div>
+
     </div>
 
-    <!-- PESTAÑAS DE NAVEGACIÓN (Tabs SABS) -->
-    <div class="border-b border-gray-200 dark:border-gray-800 flex gap-6">
-        <a href="{% url 'solicitudes' %}" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 pb-3 text-sm font-bold flex items-center gap-2 font-['Outfit'] transition-all">
-            <span class="material-symbols-outlined text-[18px]">person</span> Mis Solicitudes
-        </a>
-        <a href="{% url 'solicitudes_general' %}" class="border-b-2 border-[#580000] dark:border-red-500 text-[#580000] dark:text-red-400 pb-3 text-sm font-bold flex items-center gap-2 font-['Outfit'] transition-all">
-            <span class="material-symbols-outlined text-[18px]">warehouse</span> Bandeja de Gestión
-        </a>
-    </div>
-
-    <!-- TARJETAS DE INDICADORES (KPIs) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Pendientes -->
-        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-amber-500 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
-            <div>
-                <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Pendientes de Revisión</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_pendientes }}</span>
-                <span class="text-[10px] text-amber-655 dark:text-amber-405 font-bold block mt-2 flex items-center gap-1 font-['Outfit']">
-                    <span class="material-symbols-outlined text-[12px]">warning</span> Requiere Acción
-                </span>
+    <!-- TARJETAS KPIS CONTEXTUALES -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-3xl shadow-sm flex items-center gap-4 bg-amber-50/20">
+            <div class="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">priority_high</span>
             </div>
-            <div class="p-3 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-105 transition-transform duration-300">
-                <span class="material-symbols-outlined text-2xl">rate_review</span>
+            <div>
+                <span class="text-2xl font-black text-amber-900 dark:text-amber-300 font-mono">{{ kpi_pendientes }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-500 block leading-tight mt-0.5">{{ accion_label }}</span>
             </div>
         </div>
 
-        <!-- En Preparación -->
-        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-indigo-500 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
-            <div>
-                <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">En Preparación</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_preparacion }}</span>
-                <span class="text-[10px] text-gray-400 dark:text-gray-500 block mt-2 font-['Outfit']">Procesando en Almacén</span>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">sync</span>
             </div>
-            <div class="p-3 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-105 transition-transform duration-300">
-                <span class="material-symbols-outlined text-2xl">inventory_2</span>
+            <div>
+                <span class="text-2xl font-black text-blue-700 font-mono">{{ kpi_en_curso }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block leading-tight mt-0.5">En Proceso / Trámite</span>
             </div>
         </div>
 
-        <!-- Entregas de Hoy -->
-        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-green-600 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
-            <div>
-                <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Entregas de Hoy</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_entregas_hoy }}</span>
-                <span class="text-[10px] text-green-655 dark:text-green-455 font-bold block mt-2 font-['Outfit']">Despachados con Éxito</span>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">task_alt</span>
             </div>
-            <div class="p-3 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 rounded-2xl group-hover:scale-105 transition-transform duration-300">
-                <span class="material-symbols-outlined text-2xl">local_shipping</span>
+            <div>
+                <span class="text-2xl font-black text-emerald-700 font-mono">{{ kpi_concluidos }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block leading-tight mt-0.5">Concluidos este Mes</span>
             </div>
         </div>
 
-        <!-- Total Folios -->
-        <div class="group p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800/80 border-t-4 border-t-gray-700 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-all duration-300">
-            <div>
-                <span class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-['Outfit']">Total Folios (Mes)</span>
-                <span class="text-3xl font-black text-gray-800 dark:text-gray-100 block mt-1 tracking-tight">{{ kpi_total_folios }}</span>
-                <span class="text-[10px] text-gray-400 dark:text-gray-500 block mt-2 font-['Outfit']">Acumulado Mensual</span>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">folder</span>
             </div>
-            <div class="p-3 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl group-hover:scale-105 transition-transform duration-300">
-                <span class="material-symbols-outlined text-2xl">receipt_long</span>
+            <div>
+                <span class="text-2xl font-black text-gray-800 dark:text-gray-100 font-mono">{{ kpi_total }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block leading-tight mt-0.5">Total Trámites</span>
             </div>
         </div>
     </div>
 
-    <!-- PANEL DE FILTRADO Y BÚSQUEDA AVANZADA -->
-    <div class="bg-white dark:bg-slate-900 border border-gray-150 dark:border-gray-800 rounded-2xl shadow-sm p-6">
-        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-355 font-['Outfit'] mb-4 flex items-center gap-2">
-            <span class="material-symbols-outlined text-gray-400">filter_alt</span>
-            Buscador y Filtros de Búsqueda
-        </h3>
+<!-- PESTAÑAS SELECTORAS DE FLUJO SEGÚN EL ROL -->
+    <div class="flex border-b border-gray-200 dark:border-gray-800 text-xs font-bold gap-6">
         
-        <form method="GET" action="{% url 'solicitudes_general' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-            <!-- Buscar -->
-            <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Buscar por Folio / Solicitante</label>
-                <div class="relative">
-                    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Ej. REQ-ADQ- o Recursos..." class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 pl-9 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all">
-                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base pointer-events-none">search</span>
-                </div>
-            </div>
-
-            <!-- Filtrar por Estado -->
-            <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Filtrar por Estado</label>
-                <div class="relative">
-                    <select name="estado" class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all appearance-none pr-10">
-                        <option value="">-- Todos los Estados --</option>
-                        {% for valor, etiqueta in estados %}
-                            <option value="{{ valor }}" {% if filtro_estado == valor %}selected{% endif %}>{{ etiqueta }}</option>
-                        {% endfor %}
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
-                </div>
-            </div>
-
-            <!-- Filtrar por Flujo -->
-            <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Filtrar por Flujo</label>
-                <div class="relative">
-                    <select name="flujo" class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all appearance-none pr-10">
-                        <option value="">-- Todos los Flujos --</option>
-                        {% for fl_code, fl_name in flujos %}
-                            <option value="{{ fl_code }}" {% if filtro_flujo == fl_code %}selected{% endif %}>{{ fl_name }}</option>
-                        {% endfor %}
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">keyboard_arrow_down</span>
-                </div>
-            </div>
-
-            <!-- Fecha Desde -->
-            <div>
-                <label class="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-2 font-['Outfit'] uppercase">Fecha Desde</label>
-                <input type="date" name="desde" value="{{ desde|default:'' }}" class="w-full border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-550 focus:border-transparent transition-all">
-            </div>
-
-            <!-- Botones de Acción -->
-            <div class="flex gap-2">
-                <button type="submit" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 flex-1 h-[44px] cursor-pointer shadow-sm active:scale-95">
-                    <span class="material-symbols-outlined text-[18px]">search</span> Buscar
-                </button>
-                <a href="{% url 'solicitudes_general' %}" class="border border-gray-355 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all h-[44px] shadow-sm" title="Limpiar filtros">
-                    <span class="material-symbols-outlined text-[18px]">restart_alt</span>
-                </a>
-            </div>
-        </form>
-    </div>
-
-    <!-- LISTADO DE SOLICITUDES ACTIVAS (Bandeja SABS) -->
-    <div class="bg-white dark:bg-slate-900 border border-gray-150 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-        <div class="p-6 border-b border-gray-150 dark:border-gray-800">
-            <h2 class="text-xl font-bold text-gray-850 dark:text-gray-100 font-['Outfit']">Bandeja de Trámites del SABS</h2>
-        </div>
-        
-        <div class="divide-y divide-gray-100 dark:divide-gray-850">
-            {% for sol in solicitudes %}
-            <!-- Tarjeta de Trámite con Borde de Color Acorde al Flujo -->
-            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between p-6 hover:bg-gray-50/60 dark:hover:bg-slate-855/40 transition-all duration-200 gap-6 border-l-4 
-                {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
-                    border-l-green-500
-                {% elif sol.flujo_atencion == 'CONTRATACION_SERVICIO' %}
-                    border-l-purple-500
-                {% else %}
-                    border-l-blue-500
-                {% endif %}">
-                
-                <!-- Datos básicos -->
-                <div class="min-w-[260px] space-y-2.5">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-wider font-['Outfit']">
-                            {{ sol.codigo }}
-                        </span>
-                        
-                        <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border font-['Outfit']
-                            {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
-                                bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30
-                            {% elif sol.flujo_atencion == 'CONTRATACION_SERVICIO' %}
-                                bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/30
-                            {% else %}
-                                bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30
-                            {% endif %}">
-                            {{ sol.get_flujo_atencion_display|default:"Salida de Almacén" }}
-                        </span>
-                    </div>
-
-                    <div>
-                        <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 font-['Outfit']">{{ sol.unidad_solicitante.nombre }}</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 font-['Outfit'] mt-0.5">Solicitante: {{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</p>
-                    </div>
-                    
-                    <div class="flex flex-col gap-1 text-xs font-['Outfit']">
-                        <p class="text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
-                            <span class="material-symbols-outlined text-[15px]">calendar_month</span> {{ sol.fecha|date:"d M Y" }}
-                        </p>
-                        <p class="font-bold text-[#8b0000] dark:text-red-400 flex items-center gap-1.5 font-mono">
-                            <span class="material-symbols-outlined text-[15px]">payments</span> Total Ref: Bs. {{ sol.total_referencial|floatformat:2 }}
-                        </p>
-                    </div>
-                </div>
-
-                <!-- LÍNEA DE TIEMPO VISUAL (Stepper SABS - Desktop) -->
-                <div class="flex-1 max-w-lg hidden xl:flex flex-col justify-center py-4 px-4 mx-auto">
-                    <!-- Indicador de Fase Actual Superior -->
-                    <div class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1 font-['Outfit']">
-                        <span>Fase actual:</span>
-                        <span class="text-[#8b0000] dark:text-red-405 font-bold">
-                            {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
-                                {% if sol.estado == 'REGISTRADA' %}Registrada{% elif sol.estado == 'REVISADA' %}Revisada{% elif sol.estado == 'PREPARADA' %}Preparada en Almacén{% elif sol.estado == 'ENTREGADA' %}Entregada{% else %}Cerrada{% endif %}
-                            {% else %}
-                                {% if sol.estado == 'REGISTRADA' %}Registrada{% elif sol.estado == 'REVISADA' %}Revisada{% elif sol.estado == 'VALIDADA_SAF' %}Validada por SAF{% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}Aprobada (POA){% elif sol.estado == 'VALIDADA_RPA' %}Aprobada por RPA{% elif sol.estado == 'VALIDADA_JEFATURA' %}Aprobada Jefatura{% elif sol.estado == 'PREPARADA' %}Preparada{% else %}Entregada{% endif %}
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    <!-- Contenedor Geométrico de Doble Capa (Evita cualquier desvío de píxeles) -->
-                    <div class="relative w-full py-3">
-                        {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
-                            <!-- CASO A: STEPPER DE 5 PASOS -->
-                            <!-- Capa 1: Pista de progreso encapsulada matemáticamente centrada en el eje Y -->
-                            <div class="absolute h-0.5 left-3 right-3 top-1/2 -translate-y-1/2 z-0 overflow-hidden rounded-full pointer-events-none">
-                                <div class="absolute inset-0 bg-gray-200 dark:bg-gray-800"></div>
-                                <div class="absolute left-0 top-0 h-full bg-[#8b0000] dark:bg-red-550 transition-all duration-350 progress-bar-line" data-width="{{ sol.progreso_porcentaje }}"></div>
-                            </div>
-
-                            <!-- Capa 2: Fila de círculos con estructura y flexbox uniforme -->
-                            <div class="relative z-10 flex items-center justify-between w-full">
-                                <!-- 1. Registrada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="1. Registrada (Completado)">
-                                    <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                        <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                    </div>
-                                </div>
-
-                                <!-- 2. Revisada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="2. Revisada">
-                                    {% if sol.estado != 'REGISTRADA' and sol.estado != 'RECHAZADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'REGISTRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 3. Preparada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="3. Preparada">
-                                    {% if sol.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'REVISADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 4. Entregada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="4. Entregada">
-                                    {% if sol.estado in 'ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'PREPARADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 5. Cerrada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="5. Cerrada">
-                                    {% if sol.estado == 'CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'ENTREGADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                        {% else %}
-                            <!-- CASO B: STEPPER DE 8 PASOS SABS -->
-                            <!-- Capa 1: Pista de progreso encapsulada matemáticamente centrada en el eje Y -->
-                            <div class="absolute h-0.5 left-3 right-3 top-1/2 -translate-y-1/2 z-0 overflow-hidden rounded-full pointer-events-none">
-                                <div class="absolute inset-0 bg-gray-200 dark:bg-gray-800"></div>
-                                <div class="absolute left-0 top-0 h-full bg-[#8b0000] dark:bg-red-550 transition-all duration-350 progress-bar-line" data-width="{{ sol.progreso_porcentaje_sabs }}"></div>
-                            </div>
-
-                            <!-- Capa 2: Fila de círculos con estructura y flexbox uniforme -->
-                            <div class="relative z-10 flex items-center justify-between w-full">
-                                <!-- 1. Registrada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="1. Registrada (Completado)">
-                                    <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                        <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                    </div>
-                                </div>
-
-                                <!-- 2. Revisada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="2. Revisada">
-                                    {% if sol.estado != 'REGISTRADA' and sol.estado != 'RECHAZADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'REGISTRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 3. Val. SAF -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="3. Validación SAF">
-                                    {% if sol.estado in 'VALIDADA_SAF,VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'REVISADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 4. Aprob. POA -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="4. Aprobación POA">
-                                    {% if sol.estado in 'VALIDADA_PRESUPUESTOS,VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'VALIDADA_SAF' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-650 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 5. Val. RPA -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="5. Validación RPA">
-                                    {% if sol.estado in 'VALIDADA_RPA,VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 6. Val. Jefat. -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="6. Validación Jefatura">
-                                    {% if sol.estado in 'VALIDADA_JEFATURA,PREPARADA,ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'VALIDADA_RPA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 7. Preparada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="7. Preparada">
-                                    {% if sol.estado in 'PREPARADA,ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'VALIDADA_JEFATURA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 8. Entregada -->
-                                <div class="w-6 h-6 flex items-center justify-center shrink-0" title="8. Entregada">
-                                    {% if sol.estado in 'ENTREGADA,CERRADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-[#8b0000] text-white shadow-sm border-2 border-white dark:border-slate-900">
-                                            <span class="material-symbols-outlined text-[12px] font-black leading-none">done</span>
-                                        </div>
-                                    {% elif sol.estado == 'PREPARADA' %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white shadow-sm border-2 border-white dark:border-slate-900 animate-pulse">
-                                            <span class="material-symbols-outlined text-[12px] animate-spin leading-none">sync</span>
-                                        </div>
-                                    {% else %}
-                                        <div class="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border-2 border-gray-200 dark:border-gray-700 text-gray-400">
-                                            <div class="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-655 rounded-full"></div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- LÍNEA DE TIEMPO / ESTADO SIMPLIFICADO (Mobile y Tablet - xl:hidden) -->
-                <div class="xl:hidden w-full pt-4 border-t border-gray-100 dark:border-gray-800/80 mt-2">
-                    <div class="flex items-center justify-between text-xs font-['Outfit']">
-                        <span class="text-gray-455 font-medium">Progreso del Trámite</span>
-                        <span class="font-bold text-[#8b0000] dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded-lg border border-red-100 dark:border-red-900/30 uppercase tracking-wide text-[10px]">
-                            {{ sol.estado }}
-                        </span>
-                    </div>
-                    <div class="w-full bg-gray-150 dark:bg-slate-800 h-1.5 mt-2 overflow-hidden rounded-full">
-                        <div class="bg-[#8b0000] dark:bg-red-550 h-full transition-all duration-500 progress-bar-line" 
-                             data-width="{% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}{{ sol.progreso_porcentaje }}{% else %}{{ sol.progreso_porcentaje_sabs }}{% endif %}"></div>
-                    </div>
-                </div>
-
-                <!-- Botones contextuales de acción -->
-                <div class="flex flex-col gap-2 min-w-[170px] w-full lg:w-[170px] justify-center">
-
-                    <!-- 1. FASE REGISTRADA -->
-                    {% if sol.estado == 'REGISTRADA' %}
-                        {% if request.user.perfilusuario.rol == 'JEFE_INMEDIATO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
-                            <a href="{% url 'revisar_solicitud' sol.id %}" class="w-full bg-[#d97706] hover:bg-[#b45309] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] active:scale-95">
-                                <span class="material-symbols-outlined text-[16px]">rate_review</span>
-                                <span>Autorizar (Jefe)</span>
-                            </a>
-                        {% else %}
-                            <span class="w-full text-center py-2 px-2 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                Pendiente Autorización
-                            </span>
-                        {% endif %}
-
-                    <!-- 2. FASE REVISADA -->
-                    {% elif sol.estado == 'REVISADA' %}
-                        {% if sol.flujo_atencion == 'SALIDA_ALMACEN' %}
-                            {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
-                                <form method="POST" action="{% url 'preparar_solicitud' sol.id %}" class="w-full">
-                                    {% csrf_token %}
-                                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
-                                        <span class="material-symbols-outlined text-[16px]">inventory_2</span>
-                                        <span>Preparar Pedido</span>
-                                    </button>
-                                </form>
-                            {% else %}
-                                <span class="w-full text-center py-2 px-2 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                    En Espera de Almacén
-                                </span>
-                            {% endif %}
-                        {% else %}
-                            {% if request.user.perfilusuario.rol == 'SECRETARIO_SAF' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                                <form method="POST" action="{% url 'validar_saf' sol.id %}" class="w-full">
-                                    {% csrf_token %}
-                                    <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
-                                        <span class="material-symbols-outlined text-[16px]">assignment_turned_in</span>
-                                        <span>Validar (SAF)</span>
-                                    </button>
-                                </form>
-                            {% else %}
-                                <span class="w-full text-center py-2 px-2 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                    En Revisión SAF
-                                </span>
-                            {% endif %}
-                        {% endif %}
-
-                    <!-- 3. FASE VALIDADA SAF -->
-                    {% elif sol.estado == 'VALIDADA_SAF' %}
-                        {% if request.user.perfilusuario.rol == 'PRESUPUESTOS' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'aprobar_solicitud' sol.id %}" class="w-full">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
-                                    <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span>
-                                    <span>Validar (POA)</span>
-                                </button>
-                            </form>
-                        {% else %}
-                            <span class="w-full text-center py-2 px-2 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                Pendiente Control POA
-                            </span>
-                        {% endif %}
-
-                    <!-- 4. FASE VALIDADA PRESUPUESTOS -->
-                    {% elif sol.estado == 'VALIDADA_PRESUPUESTOS' %}
-                        {% if request.user.perfilusuario.rol == 'RPA' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'validar_rpa' sol.id %}" class="w-full">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
-                                    <span class="material-symbols-outlined text-[16px]">how_to_reg</span>
-                                    <span>Validar (RPA)</span>
-                                </button>
-                            </form>
-                        {% else %}
-                            <span class="w-full text-center py-2 px-2 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                En Firma RPA
-                            </span>
-                        {% endif %}
-
-                    <!-- 5. FASE VALIDADA RPA -->
-                    {% elif sol.estado == 'VALIDADA_RPA' %}
-                        {% if request.user.perfilusuario.rol == 'JEFE_ADMINISTRATIVO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' %}
-                            <form method="POST" action="{% url 'validar_jefatura' sol.id %}" class="w-full">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
-                                    <span class="material-symbols-outlined text-[16px]">gavel</span>
-                                    <span>Validar (Jefatura)</span>
-                                </button>
-                            </form>
-                        {% else %}
-                            <span class="w-full text-center py-2 px-2 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                En Jefatura Adm.
-                            </span>
-                        {% endif %}
-
-                    <!-- 6. FASE VALIDADA JEFATURA -->
-                    {% elif sol.estado == 'VALIDADA_JEFATURA' %}
-                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
-                            <form method="POST" action="{% url 'preparar_solicitud' sol.id %}" class="w-full">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
-                                    <span class="material-symbols-outlined text-[16px]">inventory_2</span>
-                                    <span>Preparar Pedido</span>
-                                </button>
-                            </form>
-                        {% endif %}
-
-                    <!-- 7. FASE PREPARADA: Despacho Físico Oficial -->
-                    {% elif sol.estado == 'PREPARADA' %}
-                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
-                            <a href="{% url 'entregar_solicitud' sol.id %}" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] active:scale-95">
-                                <span class="material-symbols-outlined text-[16px]">local_shipping</span>
-                                <span>Entrega Final</span>
-                            </a>
-                        {% else %}
-                            <span class="w-full text-center py-2 px-2 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                Listo p/ Entrega
-                            </span>
-                        {% endif %}
-
-                    <!-- 8. FASE ENTREGADA -->
-                    {% elif sol.estado == 'ENTREGADA' %}
-                        {% if request.user.perfilusuario.rol == 'ALMACENERO' or request.user.perfilusuario.rol == 'ADMINISTRADOR' or request.user.perfilusuario.rol == 'ADMIN_ALMACENES' %}
-                            <form method="POST" action="{% url 'cerrar_solicitud' sol.id %}" class="w-full">
-                                {% csrf_token %}
-                                <button type="submit" class="w-full bg-gray-700 hover:bg-gray-800 text-white text-center py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 font-['Outfit'] cursor-pointer active:scale-95">
-                                    <span class="material-symbols-outlined text-[16px]">task</span>
-                                    <span>Cerrar Trámite</span>
-                                </button>
-                            </form>
-                        {% else %}
-                            <span class="w-full text-center py-2 px-2 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                                ✓ Entregado
-                            </span>
-                        {% endif %}
-
-                    <!-- 9. FASE CERRADA O RECHAZADA -->
-                    {% elif sol.estado == 'CERRADA' %}
-                        <span class="w-full text-center py-2 px-2 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                            Archivado
-                        </span>
-                    {% elif sol.estado == 'RECHAZADA' %}
-                        <span class="w-full text-center py-2 px-2 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/40 rounded-xl text-[11px] font-bold font-['Outfit'] block">
-                            Rechazado
-                        </span>
-                    {% endif %}
-
-                    <!-- BOTÓN DE VER DETALLES (Fijo, con borde limpio y contraste garantizado) -->
-                    <a href="{% url 'detalle_solicitud' sol.id %}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900/60 hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-200 text-center py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all font-['Outfit'] shadow-sm">
-                        <span class="material-symbols-outlined text-[16px]">visibility</span>
-                        <span>Detalles</span>
-                    </a>
-
-                </div>
-
-            </div>
-            {% empty %}
-            <div class="p-12 text-center text-gray-400 dark:text-gray-500 font-['Outfit'] flex flex-col items-center justify-center gap-3">
-                <span class="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-700">inbox</span>
-                <span>No se registran trámites pendientes en esta bandeja de gestión.</span>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- PAGINACIÓN -->
-        {% if solicitudes.has_other_pages %}
-        <div class="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/40 border-t border-gray-150 dark:border-gray-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 font-['Outfit']">
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-                Mostrando del <strong class="text-gray-700 dark:text-gray-200">{{ solicitudes.start_index }}</strong> al <strong class="text-gray-700 dark:text-gray-200">{{ solicitudes.end_index }}</strong> de <strong class="text-gray-700 dark:text-gray-200">{{ solicitudes.paginator.count }}</strong> solicitudes totales.
-            </div>
-            
-            <div class="flex items-center gap-1 text-xs">
-                {% if solicitudes.has_previous %}
-                    <a href="?page={{ solicitudes.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-650 dark:text-gray-400 transition-all shadow-sm">
-                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
-                    </a>
-                {% else %}
-                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900/60 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
-                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
-                    </span>
-                {% endif %}
-                
-                {% for num in solicitudes.paginator.page_range %}
-                    {% if solicitudes.number == num %}
-                        <span class="w-8 h-8 rounded-xl bg-[#580000] text-white flex items-center justify-center font-bold shadow-sm select-none">
-                            {{ num }}
-                        </span>
-                    {% elif num > solicitudes.number|add:'-3' and num < solicitudes.number|add:'3' %}
-                        <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-650 dark:text-gray-400 font-semibold transition-all shadow-sm">
-                            {{ num }}
-                        </a>
-                    {% endif %}
-                {% endfor %}
-                
-                {% if solicitudes.has_next %}
-                    <a href="?page={{ solicitudes.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}{% if filtro_flujo %}&flujo={{ filtro_flujo }}{% endif %}{% if desde %}&desde={{ desde }}{% endif %}{% if hasta %}&hasta={{ hasta }}{% endif %}" class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-gray-650 dark:text-gray-400 transition-all shadow-sm">
-                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-                    </a>
-                {% else %}
-                    <span class="w-8 h-8 rounded-xl border border-gray-100 dark:border-gray-900/60 flex items-center justify-center text-gray-300 dark:text-gray-700 cursor-not-allowed select-none">
-                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-                    </span>
-                {% endif %}
-            </div>
-        </div>
+        <!-- Pestaña Flujo 1 (Se oculta para RPA, SAF, Presupuestos y Bienes/Servicios) -->
+        {% if mostrar_tab_pedidos %}
+        <a href="?tab=pedidos" 
+           class="pb-3 border-b-2 flex items-center gap-2 transition {% if tab_activa == 'pedidos' %}border-[#8b0000] text-[#8b0000] dark:text-red-400{% else %}border-transparent text-gray-400 hover:text-gray-600{% endif %}">
+            <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+            <span>Pedidos de Almacén (Flujo 1 - Stock Físico)</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-gray-100 dark:bg-slate-800 text-gray-600">{{ total_pedidos }}</span>
+        </a>
         {% endif %}
 
-    </div> 
-</div>
+        <!-- Pestaña Flujo 2 (Visible para Compras, RPA, SAF, Presupuestos, Almacén y Administrador) -->
+        {% if mostrar_tab_adquisiciones %}
+        <a href="?tab=adquisiciones" 
+           class="pb-3 border-b-2 flex items-center gap-2 transition {% if tab_activa == 'adquisiciones' %}border-[#8b0000] text-[#8b0000] dark:text-red-400{% else %}border-transparent text-gray-400 hover:text-gray-600{% endif %}">
+            <span class="material-symbols-outlined text-[18px]">shopping_bag</span>
+            <span>Nuevas Adquisiciones SABS (Flujo 2 - Sin Stock)</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 font-mono font-bold">{{ total_adquisiciones }}</span>
+        </a>
+        {% endif %}
+    </div>
 
-<script>
-    document.querySelectorAll('.progress-bar-line').forEach(el => el.style.width = el.getAttribute('data-width') + '%');
-</script>
+    <!-- ======================================================== -->
+    <!-- TABLA 1: PEDIDOS DE ALMACÉN (FLUJO 1) -->
+    <!-- ======================================================== -->
+    {% if tab_activa == 'pedidos' %}
+    <div class="space-y-4">
+        {% for s in page_pedidos %}
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md transition">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                
+                <!-- Datos del Folio -->
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold font-mono bg-red-50 text-[#8b0000] border border-red-200">
+                            {{ s.codigo }}
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-800">
+                            Salida de Almacén (Con Cupo)
+                        </span>
+                    </div>
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">{{ s.unidad_solicitante.nombre }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ s.justificacion|truncatechars:80 }}</p>
+                    <div class="flex items-center gap-4 text-[10px] text-gray-400 mt-2 font-mono">
+                        <span>Fecha: {{ s.fecha|date:"d/m/Y" }}</span>
+                        <span>Solicitante: {{ s.solicitante.get_full_name|default:s.solicitante.username }}</span>
+                    </div>
+                </div>
+
+                <!-- Stepper Visual de 4 Pasos -->
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-bold text-gray-400 mb-1">Fase: <strong class="text-gray-700 dark:text-gray-200">{{ s.get_estado_display }}</strong></span>
+                    <div class="flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold {% if s.estado in 'REGISTRADA,REVISADA,PREPARADA,ENTREGADA' %}bg-red-800 text-white{% else %}bg-gray-200 text-gray-400{% endif %}">1</span>
+                        <span class="w-6 h-0.5 bg-gray-200"></span>
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold {% if s.estado in 'REVISADA,PREPARADA,ENTREGADA' %}bg-red-800 text-white{% else %}bg-gray-200 text-gray-400{% endif %}">2</span>
+                        <span class="w-6 h-0.5 bg-gray-200"></span>
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold {% if s.estado in 'PREPARADA,ENTREGADA' %}bg-red-800 text-white{% else %}bg-gray-200 text-gray-400{% endif %}">3</span>
+                        <span class="w-6 h-0.5 bg-gray-200"></span>
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold {% if s.estado == 'ENTREGADA' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-400{% endif %}">4</span>
+                    </div>
+                </div>
+
+                <!-- Botón de Acción Directo -->
+                <div class="flex items-center gap-2 justify-end">
+                    {% if s.estado == 'REGISTRADA' and rol in 'JEFE_INMEDIATO,ADMINISTRADOR' %}
+                        <a href="{% url 'revisar_solicitud' s.id %}" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow">
+                            Autorizar (Jefe)
+                        </a>
+                    {% elif s.estado == 'PREPARADA' and rol in 'ALMACENERO,ADMINISTRADOR' %}
+                        <a href="{% url 'entregar_solicitud' s.id %}" class="px-4 py-2 bg-[#8b0000] hover:bg-[#6b0000] text-white rounded-xl text-xs font-bold shadow">
+                            Despacho Físico
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'detalle_solicitud' s.id %}" class="px-3 py-2 border rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100">
+                        Detalles
+                    </a>
+                </div>
+
+            </div>
+        </div>
+        {% empty %}
+        <div class="card p-12 text-center text-gray-400">
+            No se registran pedidos de almacén pendientes.
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TABLA 2: NUEVAS ADQUISICIONES SABS (FLUJO 2 - CERO STOCK) -->
+    <!-- ======================================================== -->
+    {% else %}
+    <div class="space-y-4">
+        {% for a in page_adq %}
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md transition">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                
+                <!-- Datos del Folio ADQ -->
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold font-mono bg-amber-50 text-amber-900 border border-amber-300">
+                            {{ a.codigo }}
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-md font-bold {% if a.tipo == 'BIEN' %}bg-blue-50 text-blue-700{% else %}bg-purple-50 text-purple-700{% endif %}">
+                            {{ a.get_tipo_display }}
+                        </span>
+                        {% if a.cite_solicitud %}
+                            <span class="text-[10px] text-gray-400 font-mono">CITE: {{ a.cite_solicitud }}</span>
+                        {% endif %}
+                    </div>
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">{{ a.objeto_contratacion }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Solicitante: <strong>{{ a.unidad_solicitante.nombre }}</strong> • {{ a.items.count }} ítem(s) solicitado(s)</p>
+                    <div class="flex items-center gap-4 text-[10px] text-gray-400 mt-2 font-mono">
+                        <span>Fecha: {{ a.fecha_solicitud|date:"d/m/Y" }}</span>
+                        <span>Monto Ref: <strong>Bs. {{ a.total_referencial|floatformat:2 }}</strong></span>
+                        {% if a.certificacion_nro %}
+                            <span class="text-blue-700 font-bold">CP: {{ a.certificacion_nro }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Stepper Visual del Flujo 2 (6 Fases SABS) -->
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-bold text-gray-400 mb-1">Fase: <strong class="text-amber-800 dark:text-amber-400">{{ a.get_estado_display }}</strong></span>
+                    <div class="flex items-center gap-1.5 font-mono text-[9px] font-bold">
+                        <!-- 1. Checklist -->
+                        <span class="w-4 h-4 rounded-full flex items-center justify-center {% if a.estado != 'INICIADA' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-400{% endif %}" title="1. Checklist OK">✓</span>
+                        <span class="w-3 h-0.5 bg-gray-200"></span>
+                        <!-- 2. Nota SAF -->
+                        <span class="w-4 h-4 rounded-full flex items-center justify-center {% if a.estado in 'NOTA_SAF_EMITIDA,CERTIFICADA,APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-400{% endif %}" title="2. Nota SAF">2</span>
+                        <span class="w-3 h-0.5 bg-gray-200"></span>
+                        <!-- 3. Certificación -->
+                        <span class="w-4 h-4 rounded-full flex items-center justify-center {% if a.estado in 'CERTIFICADA,APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-400{% endif %}" title="3. Certificación Presupuestaria">3</span>
+                        <span class="w-3 h-0.5 bg-gray-200"></span>
+                        <!-- 4. Aprobado RPA -->
+                        <span class="w-4 h-4 rounded-full flex items-center justify-center {% if a.estado in 'APROBADA_RPA,ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}bg-purple-700 text-white{% else %}bg-gray-200 text-gray-400{% endif %}" title="4. Aprobado RPA">4</span>
+                        <span class="w-3 h-0.5 bg-gray-200"></span>
+                        <!-- 5. Orden -->
+                        <span class="w-4 h-4 rounded-full flex items-center justify-center {% if a.estado in 'ORDEN_EMITIDA,RECEPCIONADA,CONCLUIDA' %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-400{% endif %}" title="5. Orden Emitida">5</span>
+                        <span class="w-3 h-0.5 bg-gray-200"></span>
+                        <!-- 6. Concluida -->
+                        <span class="w-4 h-4 rounded-full flex items-center justify-center {% if a.estado == 'CONCLUIDA' %}bg-emerald-700 text-white{% else %}bg-gray-200 text-gray-400{% endif %}" title="6. Concluida">6</span>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción Contextual por Rol -->
+                <div class="flex items-center gap-2 justify-end">
+                    <!-- ACCIÓN DIRECTA PARA EL RPA (Si está certificada) -->
+                    {% if a.estado == 'CERTIFICADA' and rol in 'RPA,ADMINISTRADOR' %}
+                        <a href="{% url 'detalle_adquisicion' a.id %}" class="px-4 py-2 bg-purple-800 hover:bg-purple-900 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 animate-pulse">
+                            <span class="material-symbols-outlined text-[16px]">gavel</span>
+                            <span>Aprobar (RPA)</span>
+                        </a>
+                    <!-- ACCIÓN DIRECTA PARA PRESUPUESTOS (Si se remitió nota SAF) -->
+                    {% elif a.estado == 'NOTA_SAF_EMITIDA' and rol in 'PRESUPUESTOS,ADMINISTRADOR' %}
+                        <a href="{% url 'detalle_adquisicion' a.id %}" class="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 animate-pulse">
+                            <span class="material-symbols-outlined text-[16px]">verified</span>
+                            <span>Certificar</span>
+                        </a>
+                    <!-- ACCIÓN DIRECTA PARA BIENES Y SERVICIOS (Si RPA aprobó) -->
+                    {% elif a.estado == 'APROBADA_RPA' and rol in 'BIENES_SERVICIOS,ADMINISTRADOR' %}
+                        <a href="{% url 'detalle_adquisicion' a.id %}" class="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 animate-pulse">
+                            <span class="material-symbols-outlined text-[16px]">shopping_bag</span>
+                            <span>Emitir Orden</span>
+                        </a>
+                    <!-- ACCIÓN DIRECTA PARA ALMACENES (Recepción Documental) -->
+                    {% elif a.estado == 'ORDEN_EMITIDA' and rol in 'ALMACENERO,ADMINISTRADOR' %}
+                        <a href="{% url 'detalle_adquisicion' a.id %}" class="px-4 py-2 bg-[#8b0000] hover:bg-[#6b0000] text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 animate-pulse">
+                            <span class="material-symbols-outlined text-[16px]">receipt</span>
+                            <span>Recepción Doc.</span>
+                        </a>
+                    {% endif %}
+
+                    <a href="{% url 'detalle_adquisicion' a.id %}" class="px-3 py-2 border rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 flex items-center gap-1">
+                        <span>Ver Trámite</span>
+                        <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+                    </a>
+                </div>
+
+            </div>
+        </div>
+        {% empty %}
+        <div class="card p-12 text-center text-gray-400">
+            No se registran trámites de nueva adquisición para auditar.
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
 {% endblock %}

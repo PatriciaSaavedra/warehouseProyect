@@ -1,153 +1,163 @@
 {% extends 'base_auth.html' %}
 {% load static %}
 
+{% block title %}Iniciar Sesión - SGA Potosí{% endblock %}
+
 {% block content %}
 
-<div class="animate-fade w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-10">
+<!-- TARJETA CON PROFUNDIDAD ADAPTABLE AL TEMA -->
+<div class="animate-fade w-full max-w-md bg-white/90 dark:bg-[#071713]/90 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-950/10 dark:shadow-black/40 border border-black/5 dark:border-amber-500/15 p-8 sm:p-10 font-['Outfit'] transition-colors duration-300">
 
-    <!-- LOGO -->
-    <div class="flex justify-center mb-8">
+<!-- ESCUDO OFICIAL ADAPTABLE AL TEMA (CLARO / OSCURO) -->
+    <div class="flex justify-center mb-6">
+        <div class="relative group">
+            <!-- Resplandor ambiental de fondo -->
+            <div class="absolute -inset-1 rounded-3xl bg-gradient-to-r from-amber-500/20 via-[#7c121e]/20 to-emerald-600/20 blur-xl opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
 
-        <div class="bg-white/10 backdrop-blur-md p-4 rounded-3xl shadow-2xl border border-white/20">
+            <!-- Contenedor del Escudo -->
+            <div class="relative w-24 h-24 rounded-3xl bg-gradient-to-b from-white via-stone-50 to-amber-50/40 dark:from-slate-900 dark:via-[#09221a] dark:to-[#051611] shadow-lg shadow-black/5 dark:shadow-black/40 border border-amber-300/50 dark:border-amber-400/30 transition-all duration-300 group-hover:scale-105 flex items-center justify-center p-3 overflow-hidden">
+                
+                <!-- LOGO MODO CLARO -->
+                <img
+                    src="{% static 'img/LOGO_GOBERNACION_VERTICAL_NEGRO.png' %}"
+                    data-fallback="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                    alt="Escudo GAD Potosí (Claro)"
+                    class="w-full h-full object-contain drop-shadow-sm dark:hidden"
+                    onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}"
+                />
 
-            <img
-                src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
-                alt="Logo"
-                class="w-24 h-24 object-contain"
-            />
+                <!-- LOGO MODO OSCURO -->
+                <img
+                    src="{% static 'img/LOGO_GOBERNACION_BLANCO_VERTICAL.png' %}"
+                    data-fallback="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                    alt="Escudo GAD Potosí (Oscuro)"
+                    class="w-full h-full object-contain drop-shadow-sm hidden dark:block"
+                    onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}"
+                />
 
+            </div>
         </div>
-
     </div>
 
-    <!-- TITULO -->
-    <h1 class="text-3xl font-extrabold text-center text-gray-800">
-        Almacén Central
-    </h1>
-
-    <p class="text-center text-gray-500 mt-2 mb-8">
-        Sistema de Gestión Gubernamental
-    </p>
+    <!-- TÍTULOS -->
+    <div class="text-center space-y-1 mb-7">
+        <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold font-mono tracking-wider bg-[#063b2f]/10 text-[#063b2f] dark:bg-emerald-950/60 dark:text-emerald-300 border border-[#063b2f]/20 uppercase">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+            Sistema de Almacenes SGA
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-black text-[#063b2f] dark:text-[#dfb26c] tracking-tight">
+            Almacén Central
+        </h1>
+        <p class="text-xs text-gray-500 dark:text-gray-400 font-sans">
+            Gobierno Autónomo Departamental de Potosí
+        </p>
+    </div>
 
     <!-- ERROR -->
     {% if error %}
-        <div class="mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl flex items-center gap-2 text-sm">
-
-            <span class="material-symbols-outlined">
+        <div class="mb-5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-[#7c121e] dark:text-red-300 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold shadow-sm animate-fade font-sans">
+            <span class="material-symbols-outlined text-[18px] text-[#7c121e] dark:text-red-400 shrink-0">
                 error
             </span>
-
-            <span>
-                {{ error }}
-            </span>
-
+            <span>{{ error }}</span>
         </div>
     {% endif %}
 
-    <!-- FORM -->
-    <form method="POST" class="space-y-5">
-
+    <!-- FORMULARIO -->
+    <form method="POST" class="space-y-4 font-sans">
         {% csrf_token %}
 
-        <!-- USERNAME -->
+        <!-- USUARIO -->
         <div>
-
-            <label class="block mb-2 text-sm font-semibold text-gray-700">
-                Usuario
+            <label class="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 font-['Outfit']">
+                Usuario Institucional
             </label>
-
-            <input
-                type="text"
-                name="username"
-                class="w-full rounded-2xl border border-gray-300 bg-white/80 px-4 py-3
-                focus:outline-none focus:ring-2 focus:ring-red-800
-                focus:border-transparent transition-all duration-200"
-                placeholder="Ingrese usuario"
-                required
-            >
-
+            <div class="relative">
+                <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[20px] pointer-events-none">
+                    person
+                </span>
+                <input
+                    type="text"
+                    name="username"
+                    class="w-full rounded-2xl border border-gray-300/80 dark:border-emerald-900/40 bg-white/80 dark:bg-slate-900/60 pl-11 pr-4 py-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#063b2f] dark:focus:ring-[#dfb26c] transition-all shadow-inner"
+                    placeholder="Ingrese su usuario"
+                    autocomplete="username"
+                    required
+                >
+            </div>
         </div>
 
-        <!-- PASSWORD -->
+        <!-- CONTRASEÑA -->
         <div>
-
-            <label class="block mb-2 text-sm font-semibold text-gray-700">
+            <label class="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 font-['Outfit']">
                 Contraseña
             </label>
-
             <div class="relative">
-
+                <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[20px] pointer-events-none">
+                    lock
+                </span>
                 <input
                     id="password"
                     type="password"
                     name="password"
-                    class="w-full rounded-2xl border border-gray-300 bg-white/80 px-4 py-3
-                    focus:outline-none focus:ring-2 focus:ring-red-800
-                    focus:border-transparent transition-all duration-200"
-                    placeholder="Ingrese contraseña"
+                    class="w-full rounded-2xl border border-gray-300/80 dark:border-emerald-900/40 bg-white/80 dark:bg-slate-900/60 pl-11 pr-11 py-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#063b2f] dark:focus:ring-[#dfb26c] transition-all shadow-inner"
+                    placeholder="••••••••••••"
+                    autocomplete="current-password"
                     required
                 >
-
                 <button
                     type="button"
                     onclick="togglePassword()"
-                    class="absolute right-4 top-3 text-gray-500 hover:text-red-900 transition"
+                    class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#7c121e] dark:hover:text-[#dfb26c] transition p-1 cursor-pointer"
+                    aria-label="Mostrar u ocultar contraseña"
                 >
-
-                    <span
-                        id="eyeIcon"
-                        class="material-symbols-outlined text-[22px]"
-                    >
+                    <span id="eyeIcon" class="material-symbols-outlined text-[20px] block">
                         visibility
                     </span>
-
                 </button>
-
             </div>
-
         </div>
 
-        <!-- BUTTON -->
-        <button
-            type="submit"
-            class="w-full bg-red-900 hover:bg-red-800 text-white py-3 rounded-2xl
-            font-semibold shadow-lg hover:shadow-2xl
-            active:scale-[0.98] transition-all duration-200"
-        >
-            Iniciar Sesión
-        </button>
+        <!-- BOTÓN INICIAR SESIÓN -->
+        <div class="pt-2">
+            <button
+                type="submit"
+                class="w-full py-3.5 px-4 rounded-2xl text-white font-['Outfit'] font-bold text-sm tracking-wide bg-gradient-to-r from-[#8f1725] to-[#7c121e] hover:from-[#7c121e] hover:to-[#610c16] active:scale-[0.99] transition-all duration-200 shadow-lg shadow-red-950/25 border-t border-white/20 cursor-pointer flex items-center justify-center gap-2"
+            >
+                <span class="material-symbols-outlined text-[19px]">login</span>
+                <span>Ingresar al Sistema</span>
+            </button>
+        </div>
 
     </form>
 
-    <!-- FOOTER -->
-    <p class="text-center text-sm text-gray-400 mt-8">
-        © 2026 Gobierno Autónomo
-    </p>
+    <!-- PIE -->
+    <div class="text-center mt-7 pt-5 border-t border-gray-100 dark:border-emerald-950/40 space-y-1 font-sans">
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+            SGA • Gestión Departamental 2026
+        </p>
+        <p class="text-[10px] text-gray-400/80 dark:text-gray-600 font-medium">
+            Acceso seguro y auditado bajo normativa SABS
+        </p>
+    </div>
 
 </div>
 
-<!-- SCRIPT -->
+<!-- SCRIPT DE VISIBILIDAD -->
 <script>
+    function togglePassword() {
+        const password = document.getElementById('password');
+        const eyeIcon = document.getElementById('eyeIcon');
+        if (!password || !eyeIcon) return;
 
-function togglePassword() {
-
-    const password = document.getElementById('password');
-    const eyeIcon = document.getElementById('eyeIcon');
-
-    if (password.type === 'password') {
-
-        password.type = 'text';
-        eyeIcon.innerText = 'visibility_off';
-
-    } else {
-
-        password.type = 'password';
-        eyeIcon.innerText = 'visibility';
-
+        if (password.type === 'password') {
+            password.type = 'text';
+            eyeIcon.innerText = 'visibility_off';
+        } else {
+            password.type = 'password';
+            eyeIcon.innerText = 'visibility';
+        }
     }
-
-}
-
 </script>
 
 {% endblock %}

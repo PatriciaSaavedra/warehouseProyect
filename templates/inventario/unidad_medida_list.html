@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %} Unidades de Medida - Almacén {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6 font-['Outfit']">
+
+    <!-- 1. CABECERA PRINCIPAL -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+                <span class="p-2 rounded-2xl bg-red-50 text-[#8b0000] dark:bg-red-950/40 dark:text-red-400 inline-flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[26px]">straighten</span>
+                </span>
+                Unidades de Medida
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Catálogo normalizado de unidades de manejo, empaque y despacho físico de almacenes.
+            </p>
+        </div>
+
+        <button onclick="abrirModalCrear()" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-red-900/20 active:scale-95 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">add_circle</span>
+            <span>Nueva Unidad</span>
+        </button>
+    </div>
+
+    <!-- 2. BARRA DE BÚSQUEDA Y FILTRO RÁPIDO -->
+    <div class="card p-3.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-3">
+        <form method="GET" class="flex-1 flex gap-2">
+            <div class="relative flex-1">
+                <input type="text" name="q" value="{{ query|default:'' }}" 
+                       placeholder="Buscar por código (ej. PAQ, CAJA) o descripción (ej. Paquete de 500)..." 
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-950 rounded-xl pl-9 pr-4 py-2 text-xs text-gray-800 dark:text-gray-200 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition">
+                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">search</span>
+            </div>
+            <button type="submit" class="bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                <span>Buscar</span>
+            </button>
+            {% if query %}
+                <a href="{% url 'unidad_medida_list' %}" class="border border-gray-300 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800 px-3 py-2 rounded-xl flex items-center transition" title="Limpiar filtro">
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- 3. TABLA PRINCIPAL DE UNIDADES -->
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-gray-50 dark:bg-slate-800/60 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
+                    <tr>
+                        <th class="px-6 py-3.5 w-36">Sigla / Código</th>
+                        <th class="px-6 py-3.5">Descripción de Manejo</th>
+                        <th class="px-6 py-3.5 text-center w-36">Estado Lógico</th>
+                        <th class="px-6 py-3.5 text-right w-44 pr-8">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    {% for u in page_obj %}
+                    <tr class="hover:bg-gray-50/60 dark:hover:bg-slate-800/30 transition group">
+                        <!-- Código -->
+                        <td class="px-6 py-4 font-mono font-black text-sm">
+                            <span class="px-2.5 py-1 rounded-lg bg-red-50 text-[#8b0000] border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900">
+                                {{ u.codigo }}
+                            </span>
+                        </td>
+                        
+                        <!-- Descripción -->
+                        <td class="px-6 py-4">
+                            <span class="font-bold text-gray-900 dark:text-white text-sm block">{{ u.nombre }}</span>
+                            <span class="text-[10px] text-gray-400 font-mono">U.M. ID: #{{ u.id }}</span>
+                        </td>
+
+                        <!-- Estado con Pastilla -->
+                        <td class="px-6 py-4 text-center">
+                            {% if u.is_active %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Habilitada
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                    Dada de Baja
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="px-6 py-4 text-right pr-8 whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-2">
+                                <!-- Botón Editar -->
+                                <button onclick="abrirModalEditar('{{ u.id }}', '{{ u.codigo }}', '{{ u.nombre }}')" 
+                                        class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-amber-50 hover:border-amber-300 text-amber-600 inline-flex items-center justify-center transition shadow-sm cursor-pointer" 
+                                        title="Editar unidad de medida">
+                                    <span class="material-symbols-outlined text-[16px]">edit</span>
+                                </button>
+
+                                <!-- Botón Emergente Baja/Reactivación -->
+                                <!-- Botón Emergente Baja/Reactivación Limpio -->
+                                <button type="button"
+                                        onclick="confirmarBajaModal(this)"
+                                        data-id="{{ u.id }}"
+                                        data-codigo="{{ u.codigo }}"
+                                        data-nombre="{{ u.nombre }}"
+                                        data-activo="{% if u.is_active %}1{% else %}0{% endif %}"
+                                        class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-700 inline-flex items-center justify-center transition shadow-sm cursor-pointer {% if u.is_active %}hover:bg-rose-50 hover:border-rose-300 text-rose-600{% else %}hover:bg-emerald-50 hover:border-emerald-300 text-emerald-600{% endif %}"
+                                        title="{% if u.is_active %}Dar de baja del catálogo{% else %}Reactivar unidad{% endif %}">
+                                    <span class="material-symbols-outlined text-[16px]">
+                                        {% if u.is_active %}power_settings_new{% else %}check_circle{% endif %}
+                                    </span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="p-12 text-center text-gray-400">
+                            <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">straighten</span>
+                            No se encontraron unidades de medida registradas.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if page_obj.has_other_pages %}
+        <div class="p-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center text-xs">
+            <span class="text-gray-500">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            <div class="flex gap-1">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-100 transition">Anterior</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-100 transition">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 1: CREAR UNIDAD DE MEDIDA (CON CHIPS Y PREVIEW) -->
+<!-- ======================================================== -->
+<div id="modalCrear" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        
+        <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div class="flex items-center gap-2.5">
+                <span class="p-2 rounded-xl bg-red-50 text-[#8b0000] dark:bg-red-950/40">
+                    <span class="material-symbols-outlined text-[20px]">add_circle</span>
+                </span>
+                <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Registrar Unidad de Medida</h3>
+            </div>
+            <button onclick="cerrarModalCrear()" class="text-gray-400 hover:text-gray-600 transition">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Chips de atajo rápido -->
+        <div>
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Atajos habituales de almacén:</span>
+            <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="cargarChip('PAQ', 'Paquete')" class="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-[11px] font-semibold hover:border-[#8b0000] hover:text-[#8b0000] transition">PAQ (Paquete)</button>
+                <button type="button" onclick="cargarChip('PZA', 'Pieza')" class="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-[11px] font-semibold hover:border-[#8b0000] hover:text-[#8b0000] transition">PZA (Pieza)</button>
+                <button type="button" onclick="cargarChip('CAJA', 'Caja')" class="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-[11px] font-semibold hover:border-[#8b0000] hover:text-[#8b0000] transition">CAJA</button>
+                <button type="button" onclick="cargarChip('ROLLO', 'Rollo')" class="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-[11px] font-semibold hover:border-[#8b0000] hover:text-[#8b0000] transition">ROLLO</button>
+                <button type="button" onclick="cargarChip('LITRO', 'Litro')" class="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-[11px] font-semibold hover:border-[#8b0000] hover:text-[#8b0000] transition">LITRO</button>
+                <button type="button" onclick="cargarChip('BOTE', 'Bote')" class="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-[11px] font-semibold hover:border-[#8b0000] hover:text-[#8b0000] transition">BOTE</button>
+            </div>
+        </div>
+
+        <form method="POST" action="{% url 'crear_unidad_medida' %}" class="space-y-4 text-xs">
+            {% csrf_token %}
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Sigla / Código Oficial *</label>
+                <input type="text" id="crearCodigo" name="codigo" placeholder="Ej. PAQ, CAJA, PZA" required maxlength="10" 
+                       oninput="this.value = this.value.toUpperCase(); actualizarPreviewCrear();"
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-950 rounded-xl p-2.5 font-mono uppercase focus:ring-2 focus:ring-[#8b0000]">
+                <span class="text-[10px] text-gray-400 mt-1 block">Máximo 10 caracteres. Se guardará automáticamente en mayúsculas.</span>
+            </div>
+
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre o Descripción Completa *</label>
+                <input type="text" id="crearNombre" name="nombre" placeholder="Ej. Paquete de 500 hojas, Pieza, Bidón" required maxlength="100" 
+                       oninput="actualizarPreviewCrear()"
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-950 rounded-xl p-2.5 focus:ring-2 focus:ring-[#8b0000]">
+            </div>
+
+            <!-- Preview Card -->
+            <div class="p-3 bg-gray-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <span class="text-[9px] font-bold uppercase text-gray-400 block">Vista Previa de Visualización:</span>
+                    <span id="previewNombre" class="font-bold text-gray-700 dark:text-gray-200 text-xs">Nombre de Unidad</span>
+                </div>
+                <span id="previewBadge" class="px-2.5 py-1 rounded-lg bg-red-50 text-[#8b0000] border border-red-200 dark:bg-red-950/40 dark:text-red-300 font-mono font-bold text-xs">
+                    SIGLA
+                </span>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <button type="button" onclick="cerrarModalCrear()" class="px-4 py-2 border rounded-xl text-gray-600 hover:bg-gray-100 transition cursor-pointer font-semibold">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-[#8b0000] hover:bg-[#6b0000] text-white font-bold rounded-xl shadow cursor-pointer transition">Guardar Unidad</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 2: EDITAR UNIDAD DE MEDIDA -->
+<!-- ======================================================== -->
+<div id="modalEditar" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div class="flex items-center gap-2">
+                <span class="p-2 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40">
+                    <span class="material-symbols-outlined text-[18px]">edit</span>
+                </span>
+                <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Editar Unidad de Medida</h3>
+            </div>
+            <button onclick="cerrarModalEditar()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <form id="formEditar" method="POST" action="" class="space-y-4 text-xs">
+            {% csrf_token %}
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Código / Sigla *</label>
+                <input type="text" id="editCodigo" name="codigo" required maxlength="10" 
+                       oninput="this.value = this.value.toUpperCase()"
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-950 rounded-xl p-2.5 font-mono uppercase focus:ring-2 focus:ring-[#8b0000]">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre Descriptivo *</label>
+                <input type="text" id="editNombre" name="nombre" required maxlength="100" 
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-950 rounded-xl p-2.5 focus:ring-2 focus:ring-[#8b0000]">
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <button type="button" onclick="cerrarModalEditar()" class="px-4 py-2 border rounded-xl text-gray-600 hover:bg-gray-100 transition cursor-pointer">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow cursor-pointer transition">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 3: CONFIRMACIÓN DE BAJA LÓGICA / REACTIVACIÓN -->
+<!-- ======================================================== -->
+<div id="modalConfirmarBaja" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        
+        <div id="bajaIconoContainer" class="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center">
+            <span id="bajaIcono" class="material-symbols-outlined text-3xl"></span>
+        </div>
+
+        <div>
+            <h3 id="bajaTitulo" class="text-lg font-extrabold text-gray-900 dark:text-white"></h3>
+            <p id="bajaMensaje" class="text-xs text-gray-500 dark:text-gray-400 mt-2 px-2"></p>
+        </div>
+
+        <div class="p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-gray-700 text-xs text-left">
+            <p class="text-[10px] uppercase font-bold text-gray-400">Elemento Seleccionado:</p>
+            <p class="font-bold text-gray-900 dark:text-white mt-0.5">
+                <span id="bajaCodigoBadge" class="font-mono text-[#8b0000] font-black"></span> - <span id="bajaNombreSpan"></span>
+            </p>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+            <button type="button" onclick="cerrarModalBaja()" class="flex-1 py-2.5 border border-gray-300 dark:border-gray-700 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 transition cursor-pointer">
+                Cancelar
+            </button>
+            <a id="bajaEnlaceAccion" href="#" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow transition flex items-center justify-center cursor-pointer">
+                Confirmar
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- SCRIPTS DE INTERACCIÓN -->
+<!-- ======================================================== -->
+<script>
+    // 1. Modales de Crear / Editar
+    function abrirModalCrear() {
+        document.getElementById('modalCrear').classList.remove('hidden');
+        document.getElementById('crearCodigo').focus();
+    }
+    function cerrarModalCrear() {
+        document.getElementById('modalCrear').classList.add('hidden');
+    }
+    function abrirModalEditar(id, codigo, nombre) {
+        document.getElementById('formEditar').action = `/inventario/unidades-medida/editar/${id}/`;
+        document.getElementById('editCodigo').value = codigo;
+        document.getElementById('editNombre').value = nombre;
+        document.getElementById('modalEditar').classList.remove('hidden');
+    }
+    function cerrarModalEditar() {
+        document.getElementById('modalEditar').classList.add('hidden');
+    }
+
+    // 2. Cargar chips rápidos
+    function cargarChip(cod, nom) {
+        document.getElementById('crearCodigo').value = cod;
+        document.getElementById('crearNombre').value = nom;
+        actualizarPreviewCrear();
+    }
+
+    // 3. Live Preview
+    function actualizarPreviewCrear() {
+        const cod = document.getElementById('crearCodigo').value || 'SIGLA';
+        const nom = document.getElementById('crearNombre').value || 'Nombre de Unidad';
+        document.getElementById('previewBadge').textContent = cod;
+        document.getElementById('previewNombre').textContent = nom;
+    }
+
+    // 4. Modal Emergente de Confirmación de Baja / Reactivación
+    function confirmarBajaModal(boton) {
+        const id = boton.dataset.id;
+        const codigo = boton.dataset.codigo;
+        const nombre = boton.dataset.nombre;
+        const estaActivo = boton.dataset.activo === "1";
+
+        const modal = document.getElementById('modalConfirmarBaja');
+        const iconoContainer = document.getElementById('bajaIconoContainer');
+        const icono = document.getElementById('bajaIcono');
+        const titulo = document.getElementById('bajaTitulo');
+        const mensaje = document.getElementById('bajaMensaje');
+        const badge = document.getElementById('bajaCodigoBadge');
+        const nombreSpan = document.getElementById('bajaNombreSpan');
+        const enlace = document.getElementById('bajaEnlaceAccion');
+
+        badge.textContent = codigo;
+        nombreSpan.textContent = nombre;
+        enlace.href = `/inventario/unidades-medida/toggle/${id}/`;
+
+        if (estaActivo) {
+            iconoContainer.className = "w-14 h-14 rounded-2xl mx-auto flex items-center justify-center bg-rose-50 text-rose-600 dark:bg-rose-950/40";
+            icono.textContent = "warning";
+            titulo.textContent = "¿Dar de Baja esta Unidad?";
+            mensaje.textContent = "Al dar de baja, esta unidad ya no aparecerá disponible para nuevos materiales. Los registros y movimientos históricos no se verán afectados.";
+            enlace.className = "flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow bg-rose-600 hover:bg-rose-700 transition flex items-center justify-center";
+            enlace.textContent = "Sí, Dar de Baja";
+        } else {
+            iconoContainer.className = "w-14 h-14 rounded-2xl mx-auto flex items-center justify-center bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40";
+            icono.textContent = "check_circle";
+            titulo.textContent = "¿Reactivar Unidad de Medida?";
+            mensaje.textContent = "Esta unidad volverá a estar disponible inmediatamente en el formulario de catalogación de materiales.";
+            enlace.className = "flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow bg-emerald-600 hover:bg-emerald-700 transition flex items-center justify-center";
+            enlace.textContent = "Sí, Reactivar";
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function cerrarModalBaja() {
+        document.getElementById('modalConfirmarBaja').classList.add('hidden');
+    }
+
+    // Cerrar modales con tecla ESC
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape") {
+            cerrarModalCrear();
+            cerrarModalEditar();
+            cerrarModalBaja();
+        }
+    });
+</script>
+{% endblock %}

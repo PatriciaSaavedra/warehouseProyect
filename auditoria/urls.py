@@ -1,10 +1,8 @@
 from django.urls import path
-from .views import auditoria_view
+from . import views
 
 urlpatterns = [
-    path(
-        '',
-        auditoria_view,
-        name='auditoria'
-    ),
+    path('', views.auditoria_list, name='auditoria_list'),
+    path('exportar-excel/', views.exportar_logs_excel, name='exportar_logs_excel'),
+    path('purgar/', views.purgar_logs_antiguos, name='purgar_logs_antiguos'),
 ]

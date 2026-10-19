@@ -1,0 +1,313 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Consumo por Dependencias</title>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 1cm 1.2cm 1.2cm 1.2cm;
+        }
+        @page landscape-page {
+            size: letter landscape;
+            margin: 1cm 1.2cm 1.2cm 1.2cm;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            color: #111;
+            margin: 0;
+            padding: 15px;
+            background: #f8fafc;
+        }
+
+        /* Configuración según modo horizontal o vertical */
+        body.modo-valorado {
+            page: landscape-page;
+        }
+        body.modo-valorado .toolbar-container,
+        body.modo-valorado .sheet-container {
+            max-width: 1150px;
+        }
+
+        body.modo-fisico .toolbar-container,
+        body.modo-fisico .sheet-container {
+            max-width: 900px;
+        }
+
+        /* BARRA SUPERIOR DE FILTROS EN PANTALLA (NO SE IMPRIME) */
+        .toolbar-container {
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .filter-group label {
+            font-size: 9px;
+            font-weight: bold;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        .filter-group select, 
+        .filter-group input {
+            padding: 5px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #1e293b;
+            background: #fff;
+        }
+        .btn-filter {
+            background-color: #8b0000;
+            color: white;
+            border: none;
+            padding: 7px 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            margin-top: 12px;
+            height: 30px;
+        }
+        .btn-filter:hover { background-color: #6b0000; }
+        .btn-print {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            margin-top: 12px;
+            height: 30px;
+        }
+        .btn-print:hover { background-color: #0369a1; }
+
+        /* HOJA DEL DOCUMENTO */
+        .sheet-container {
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            padding: 30px 40px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .header-table { width: 100%; margin-bottom: 15px; border-collapse: collapse; }
+        .header-table td { vertical-align: middle; }
+        .logo-box { width: 20%; text-align: left; }
+        .logo-box img { max-height: 55px; }
+        .title-box { width: 60%; text-align: center; }
+        .title-box h3 { margin: 0; font-size: 12px; font-weight: bold; }
+        .title-box h2 { margin: 3px 0; font-size: 13px; font-weight: bold; text-transform: uppercase; }
+        .title-box p { margin: 1px 0; font-size: 10px; }
+        .code-box { width: 20%; text-align: right; font-size: 10px; font-weight: bold; }
+
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; }
+        table.data-table th, table.data-table td { border: 1px solid #444; padding: 4px 6px; }
+        table.data-table th { background: #555; color: #fff; text-align: center; font-size: 8.5px; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .row-total { background: #eee; font-weight: bold; }
+        .unidad-header { background: #e2e8f0; font-weight: bold; padding: 6px; font-size: 9.5px; border: 1px solid #444; border-bottom: none; }
+
+        .firmas-table { width: 100%; border-collapse: collapse; margin-top: 60px; page-break-inside: avoid; }
+        .firmas-table td { width: 33.33%; text-align: center; vertical-align: bottom; padding: 0 20px; }
+        .linea { border-top: 1px solid #000; padding-top: 4px; font-weight: bold; font-size: 9px; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .no-print { display: none !important; }
+            .sheet-container { border: none; box-shadow: none; padding: 0; max-width: 100% !important; }
+        }
+    </style>
+</head>
+<body class="{% if tipo_reporte == 'VALORADO' %}modo-valorado{% else %}modo-fisico{% endif %}">
+
+    <!-- BARRA INTERACTIVA DE FILTROS SUPERIOR (NO SE IMPRIME) -->
+    <div class="toolbar-container no-print">
+        <form method="GET" class="filter-form">
+            <!-- 1. Secretaría -->
+            <div class="filter-group">
+                <label>Secretaría</label>
+                <select name="secretaria" onchange="this.form.submit()" style="max-width: 200px;">
+                    <option value="">🏢 Todas las Secretarías</option>
+                    {% for s in secretarias %}
+                        <option value="{{ s.id }}" {% if sec_id == s.id|stringformat:"s" %}selected{% endif %}>
+                            {{ s.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 2. Unidad -->
+            <div class="filter-group">
+                <label>Unidad Organizacional</label>
+                <select name="unidad" onchange="this.form.submit()" style="max-width: 200px;">
+                    <option value="">🏛️ Todas las Unidades</option>
+                    {% for u in unidades %}
+                        <option value="{{ u.id }}" {% if uni_id == u.id|stringformat:"s" %}selected{% endif %}>
+                            {{ u.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 3. Tipo de Reporte (Almacenero vs Kardista) -->
+            <div class="filter-group">
+                <label style="color: #8b0000;">Tipo de Reporte</label>
+                <select name="tipo" onchange="this.form.submit()" style="border: 2px solid #8b0000; color: #8b0000; font-weight: bold;">
+                    <option value="VALORADO" {% if tipo_reporte == 'VALORADO' %}selected{% endif %}>📄 Valorado en Bs. (Kardista)</option>
+                    <option value="FISICO" {% if tipo_reporte == 'FISICO' %}selected{% endif %}>🖨️ Físico / Unidades (Almacenero)</option>
+                </select>
+            </div>
+
+            <!-- 4. Fechas Desde / Hasta -->
+            <div class="filter-group">
+                <label>Desde</label>
+                <input type="date" name="desde" value="{{ desde }}">
+            </div>
+            <div class="filter-group">
+                <label>Hasta</label>
+                <input type="date" name="hasta" value="{{ hasta }}">
+            </div>
+
+            <button type="submit" class="btn-filter">🔍 Filtrar</button>
+        </form>
+
+        <button onclick="window.print()" class="btn-print">
+            🖨️ Imprimir / Guardar en PDF
+        </button>
+    </div>
+
+    <!-- CONTENEDOR DE LA HOJA OFICIAL -->
+    <div class="sheet-container">
+        <table class="header-table">
+            <tr>
+                <td class="logo-box">
+                    <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo Gobernación">
+                </td>
+                <td class="title-box">
+                    <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
+                    <h2>
+                        {% if tipo_reporte == 'FISICO' %}
+                            REPORTE DE DESPACHOS FÍSICOS POR DEPENDENCIA (ALMACÉN)
+                        {% else %}
+                            REPORTE DE CONSUMO VALORADO POR DEPENDENCIA (KARDEX / POA)
+                        {% endif %}
+                    </h2>
+                    <p>Período de Despacho: Del {{ desde }} al {{ hasta }}</p>
+                    {% if tipo_reporte == 'VALORADO' %}
+                        <p><em>(Valuado al costo PEPS - Expresado en Bolivianos)</em></p>
+                    {% endif %}
+                </td>
+                <td class="code-box">
+                    SGA - GADP<br>
+                    Control Interno
+                </td>
+            </tr>
+        </table>
+
+        <!-- LISTADO DE OFICINAS -->
+        {% for grupo in estructura_datos %}
+            <div class="unidad-header">
+                DEPENDENCIA: {{ grupo.secretaria.nombre|upper }} &gt; {{ grupo.unidad.nombre|upper }}
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 12%;">Código SABS</th>
+                        <th style="width: 45%;">Descripción del Material</th>
+                        <th style="width: 10%;">Partida</th>
+                        <th style="width: 10%;">U. Manejo</th>
+                        <th style="width: 13%;">Cantidad Entregada</th>
+                        {% if tipo_reporte == 'VALORADO' %}
+                            <th style="width: 15%;">Costo Total (Bs.)</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in grupo.materiales %}
+                    <tr>
+                        <td class="text-center font-bold">{{ m.material__codigo }}</td>
+                        <td class="text-left">{{ m.material__nombre }}</td>
+                        <td class="text-center">{{ m.material__partida__codigo }}</td>
+                        <td class="text-center">{{ m.material__unidad_medida_fk__codigo|default:m.material__unidad_medida }}</td>
+                        <td class="text-center font-bold">{{ m.cant_total }}</td>
+                        {% if tipo_reporte == 'VALORADO' %}
+                            <td class="text-right font-bold">{{ m.costo_total_bs|floatformat:2 }}</td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">Sin despachos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="row-total">
+                        <td colspan="4" class="text-right">SUBTOTAL OFICINA:</td>
+                        <td class="text-center">{{ grupo.total_cant }}</td>
+                        {% if tipo_reporte == 'VALORADO' %}
+                            <td class="text-right">{{ grupo.total_bs|floatformat:2 }}</td>
+                        {% endif %}
+                    </tr>
+                </tbody>
+            </table>
+        {% empty %}
+            <div style="text-align: center; padding: 40px; color: #64748b;">
+                No se registraron despachos de almacén para las dependencias y filtros seleccionados.
+            </div>
+        {% endfor %}
+
+        <!-- TOTAL GENERAL -->
+        <table class="data-table" style="margin-top: 15px;">
+            <tr class="row-total" style="background: #cbd5e1; font-size: 11px;">
+                <td style="width: 77%;" class="text-right">TOTAL GENERAL CONSOLIDADO:</td>
+                <td style="width: 10%;" class="text-center">{{ total_general_cant }} unidades</td>
+                {% if tipo_reporte == 'VALORADO' %}
+                    <td style="width: 13%;" class="text-right">Bs. {{ total_general_bs|floatformat:2 }}</td>
+                {% endif %}
+            </tr>
+        </table>
+
+        <!-- FIRMAS -->
+        <table class="firmas-table">
+            <tr>
+                <td><div class="linea">Responsable Almacén Central</div></td>
+                <td>
+                    <div class="linea">
+                        {% if tipo_reporte == 'FISICO' %}Encargado de Despacho{% else %}Responsable Kardex Valorado{% endif %}
+                    </div>
+                </td>
+                <td>
+                    <div class="linea">
+                        {% if tipo_reporte == 'FISICO' %}V.B. Jefatura Administrativa{% else %}Responsable Contabilidad{% endif %}
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+</body>
+</html>

@@ -3,65 +3,72 @@
 {% block title %} Stock y Cuotas por Estructura Organizacional {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-6 font-['Outfit']">
+<div class="max-w-7xl mx-auto space-y-6 font-['Outfit'] pb-12">
 
     <!-- CABECERA -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-850 dark:text-gray-100">
-                Stock y Cuotas por Estructura Organizacional
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
+                Stock y Asignaciones por Unidad
             </h1>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Existencias aisladas por Almacén, agrupadas por Partidas Presupuestarias y cruzadas con el Formulario 005.
+                Existencias físicas en Almacén cruzadas contra las asignaciones de compras directas por oficina.
             </p>
         </div>
-        <a href="{% url 'inventario' %}" class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+        <a href="{% url 'inventario' %}" class="border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
             <span class="material-symbols-outlined text-[16px]">arrow_back</span> Volver a Existencias
         </a>
     </div>
 
-    <!-- TARJETAS KPIS SUPERIORES -->
+    <!-- TARJETAS KPIS ADAPTABLES -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-red-50 text-[#8b0000] flex items-center justify-center">
+            <div class="w-12 h-12 rounded-xl bg-red-50 text-[#7c121e] flex items-center justify-center">
                 <span class="material-symbols-outlined text-2xl">category</span>
             </div>
             <div>
-                <span class="text-[10px] uppercase font-bold text-gray-400 block">Materiales en este Almacén</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">
+                    {% if unidad_seleccionada %}Materiales Asignados a la Unidad{% else %}Materiales en este Almacén{% endif %}
+                </span>
                 <span class="text-2xl font-black text-gray-800 dark:text-gray-100">{{ total_materiales }}</span>
             </div>
         </div>
 
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-green-50 text-green-700 flex items-center justify-center">
+            <div class="w-12 h-12 rounded-xl bg-green-50 text-emerald-700 flex items-center justify-center">
                 <span class="material-symbols-outlined text-2xl">inventory</span>
             </div>
             <div>
-                <span class="text-[10px] uppercase font-bold text-gray-400 block">Stock Físico en {{ almacen_seleccionado.nombre }}</span>
-                <span class="text-2xl font-black text-green-700 font-mono">{{ total_stock_fisico }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">
+                    {% if unidad_seleccionada %}Saldo Total Disponible a Retirar{% else %}Stock Físico en {{ almacen_seleccionado.nombre }}{% endif %}
+                </span>
+                <span class="text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">{{ total_stock_fisico }} u.</span>
             </div>
         </div>
 
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
-                <span class="material-symbols-outlined text-2xl">warehouse</span>
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-[#d97706] flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">corporate_fare</span>
             </div>
             <div>
-                <span class="text-[10px] uppercase font-bold text-gray-400 block">Depósito Consultado</span>
-                <span class="text-base font-extrabold text-blue-700 block truncate max-w-[180px]">{{ almacen_seleccionado.nombre }}</span>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">
+                    {% if unidad_seleccionada %}Unidad Consultada{% else %}Depósito Consultado{% endif %}
+                </span>
+                <span class="text-base font-extrabold text-[#063b2f] dark:text-[#dfb26c] block truncate max-w-[200px]" title="{% if unidad_seleccionada %}{{ unidad_seleccionada.nombre }}{% else %}{{ almacen_seleccionado.nombre }}{% endif %}">
+                    {% if unidad_seleccionada %}{{ unidad_seleccionada.nombre }}{% else %}{{ almacen_seleccionado.nombre }}{% endif %}
+                </span>
             </div>
         </div>
     </div>
 
-    <!-- FILTROS (ALMACÉN + SECRETARÍA + UNIDAD) -->
-    <!-- FILTROS EN CASCADA (ALMACÉN -> SECRETARÍA -> UNIDAD) -->
-    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+    <!-- FILTROS EN CASCADA CON TODAS LAS SECRETARÍAS Y UNIDADES -->
+    <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
         <form method="GET" id="form-filtros-cascada" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end text-xs">
             
-            <!-- 1. Almacén a Consultar -->
+            <!-- 1. Almacén -->
             <div class="sm:col-span-4">
                 <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Almacén a Consultar *</label>
-                <select name="almacen_id" id="select_almacen" onchange="cambiarAlmacenCascada()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#8b0000]">
+                <select name="almacen_id" id="select_almacen" onchange="cambiarAlmacenCascada()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#7c121e]">
                     {% for alm in almacenes_disponibles %}
                         <option value="{{ alm.id }}" {% if almacen_seleccionado.id == alm.id %}selected{% endif %}>
                             📍 {{ alm.nombre }} {% if alm.tipo == 'CENTRAL' %}(Central){% endif %}
@@ -70,7 +77,7 @@
                 </select>
             </div>
 
-            <!-- 2. Secretaría Departamental -->
+            <!-- 2. Secretaría Departamental (TODAS) -->
             <div class="sm:col-span-3">
                 <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Filtrar Secretaría</label>
                 <select name="secretaria_id" id="select_secretaria" onchange="cambiarSecretariaCascada()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-gray-700 dark:text-gray-300">
@@ -83,7 +90,7 @@
                 </select>
             </div>
 
-            <!-- 3. Unidad Organizacional -->
+            <!-- 3. Unidad Organizacional (TODAS) -->
             <div class="sm:col-span-3">
                 <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Unidad Organizacional</label>
                 <select name="unidad_id" id="select_unidad" onchange="this.form.submit()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-gray-700 dark:text-gray-300">
@@ -96,9 +103,9 @@
                 </select>
             </div>
 
-            <!-- Botón -->
+            <!-- Botón Aplicar -->
             <div class="sm:col-span-2">
-                <button type="submit" class="w-full bg-[#8b0000] hover:bg-[#6b0000] text-white p-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 shadow cursor-pointer h-[38px]">
+                <button type="submit" class="w-full bg-[#7c121e] hover:bg-[#610c16] text-white p-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 shadow cursor-pointer h-[40px]">
                     <span class="material-symbols-outlined text-[18px]">filter_alt</span> Aplicar Filtro
                 </button>
             </div>
@@ -106,116 +113,110 @@
     </div>
 
     <script>
-    // Al cambiar de almacén, se resetean secretaría y unidad para cargar las opciones que corresponden
     function cambiarAlmacenCascada() {
-        const secSelect = document.getElementById('select_secretaria');
-        const uniSelect = document.getElementById('select_unidad');
-        if (secSelect) secSelect.value = '';
-        if (uniSelect) uniSelect.value = '';
         document.getElementById('form-filtros-cascada').submit();
     }
-
-    // Al cambiar de secretaría, se resetea la unidad para listar únicamente las oficinas de esa secretaría
     function cambiarSecretariaCascada() {
         const uniSelect = document.getElementById('select_unidad');
         if (uniSelect) uniSelect.value = '';
         document.getElementById('form-filtros-cascada').submit();
     }
     </script>
-    <!-- SECCIÓN ORGANIZADA JERÁRQUICAMENTE POR PARTIDAS -->
+
+    <!-- LISTADO POR PARTIDAS -->
     <div class="space-y-6">
         {% for grupo in grupos_por_partida %}
-        <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+        <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm">
             
-            <!-- ENCABEZADO DE LA PARTIDA PRESUPUESTARIA -->
-            <div class="p-4 bg-gray-50/90 dark:bg-slate-800/60 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <!-- ENCABEZADO PARTIDA -->
+            <div class="p-4 bg-stone-50/80 dark:bg-slate-800/60 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div class="flex items-center gap-3">
                     <span class="px-3 py-1 rounded-xl text-xs font-black font-mono bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
                         PARTIDA {{ grupo.partida.codigo }}
                     </span>
                     <div>
                         <h2 class="text-sm font-bold text-gray-900 dark:text-white uppercase">{{ grupo.partida.nombre }}</h2>
-                        <span class="text-[11px] text-gray-400">{{ grupo.total_items }} materiales en {{ almacen_seleccionado.nombre }}</span>
+                        <span class="text-[11px] text-gray-400">{{ grupo.total_items }} materiales asignados</span>
                     </div>
                 </div>
                 <div class="text-right">
-                    <span class="text-[10px] text-gray-400 uppercase font-bold block">Stock Disponible en este Almacén</span>
-                    <span class="text-base font-black text-[#8b0000] dark:text-red-400 font-mono">{{ grupo.stock_total_partida }} unidades</span>
+                    <span class="text-[10px] text-gray-400 uppercase font-bold block">
+                        {% if unidad_seleccionada %}Cupo Disponible para esta Unidad{% else %}Stock en Almacén{% endif %}
+                    </span>
+                    <span class="text-base font-black text-[#7c121e] dark:text-red-400 font-mono">{{ grupo.stock_total_partida }} unidades</span>
                 </div>
             </div>
 
-            <!-- TABLA DE MATERIALES DE ESTA PARTIDA -->
+            <!-- TABLA -->
             <div class="overflow-x-auto">
                 <table class="w-full text-xs text-left">
                     <thead class="bg-gray-100/60 dark:bg-slate-900 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
                         <tr>
-                            <th class="p-3">Código SABS / Material</th>
-                            <th class="p-3 w-40">Almacén Despachador</th>
-                            <th class="p-3 text-center w-28">Stock Almacén (Disp.)</th>
+                            <th class="p-3.5">Código SABS / Material</th>
+                            <th class="p-3.5 w-40">Almacén Custodio</th>
+                            <th class="p-3.5 text-center w-28">Stock Almacén</th>
                             {% if unidad_seleccionada %}
-                                <th class="p-3 text-center w-48">Cuota Form. 005 [Prog / Cons / Saldo]</th>
-                                <th class="p-3 text-center w-28">Tope Permitido</th>
+                                <th class="p-3.5 text-center w-48">Asignación [Asig / Ret / Saldo]</th>
+                                <th class="p-3.5 text-center w-28">Tope a Pedir</th>
                             {% endif %}
-                            <th class="p-3 text-right w-28 pr-6">Costo Ref. (Bs.)</th>
+                            <th class="p-3.5 text-right w-28 pr-6">Costo Ref. (Bs.)</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 font-['Outfit']">
                         {% for item in grupo.items %}
                         <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
                             <!-- Material -->
-                            <td class="p-3 font-semibold text-gray-800 dark:text-gray-200">
+                            <td class="p-3.5 font-semibold text-gray-800 dark:text-gray-200">
                                 <div>{{ item.material.nombre }}</div>
-                                <span class="text-[10px] text-[#8b0000] dark:text-red-400 font-mono font-bold">{{ item.material.codigo }}</span>
+                                <span class="text-[10px] text-[#7c121e] dark:text-red-400 font-mono font-bold">{{ item.material.codigo }}</span>
                                 <span class="text-[10px] text-gray-400 font-normal">({{ item.material.unidad_medida_fk.codigo|default:item.material.unidad_medida }})</span>
                             </td>
 
                             <!-- Almacén -->
-                            <td class="p-3 text-gray-600 dark:text-gray-300">
+                            <td class="p-3.5 text-gray-600 dark:text-gray-300">
                                 <span class="font-medium flex items-center gap-1">
-                                    <span class="material-symbols-outlined text-[14px] text-[#8b0000]">location_on</span>
+                                    <span class="material-symbols-outlined text-[14px] text-[#7c121e]">location_on</span>
                                     {{ item.almacen.nombre }}
                                 </span>
                             </td>
 
-                            <!-- Stock en Almacén -->
-                            <td class="p-3 text-center">
-                                <span class="font-mono font-black text-sm {% if item.stock_disponible <= 0 %}text-red-600{% else %}text-gray-900 dark:text-gray-100{% endif %}">
-                                    {{ item.stock_disponible }}
+                            <!-- Stock Físico en Almacén -->
+                            <td class="p-3.5 text-center">
+                                <span class="font-mono font-bold text-xs text-gray-700 dark:text-gray-300">
+                                    {{ item.stock_disponible }} u.
                                 </span>
-                                <span class="text-[10px] text-gray-400 block font-normal">(Físico: {{ item.stock_fisico }})</span>
                             </td>
 
-                            <!-- Cuota Formulario 005 (Si hay unidad seleccionada) -->
+                            <!-- Asignación Directa de la Unidad -->
                             {% if unidad_seleccionada %}
-                            <td class="p-3 text-center">
-                                {% if item.tiene_cuota %}
-                                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-gray-700 font-mono text-xs">
-                                        <span class="text-gray-700 dark:text-gray-300 font-bold" title="Programado Anual">{{ item.cuota_programada }}</span>
+                            <td class="p-3.5 text-center">
+                                {% if item.tiene_asignacion %}
+                                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 font-mono text-xs">
+                                        <span class="text-gray-700 dark:text-gray-300 font-bold" title="Asignado en compras">{{ item.cant_asignada }}</span>
                                         <span class="text-gray-300">/</span>
-                                        <span class="text-purple-600 dark:text-purple-400 font-bold" title="Retirado a la fecha">{{ item.cuota_consumida }}</span>
+                                        <span class="text-purple-600 dark:text-purple-400 font-bold" title="Retirado físicamente">{{ item.cant_retirada }}</span>
                                         <span class="text-gray-300">/</span>
-                                        <span class="font-black {% if item.saldo_cuota <= 0 %}text-red-600{% else %}text-green-600{% endif %}" title="Saldo de Cuota Remanente">
-                                            {{ item.saldo_cuota }}
+                                        <span class="font-black text-emerald-700 dark:text-emerald-400" title="Saldo disponible para esta oficina">
+                                            {{ item.saldo_disp_unidad }}
                                         </span>
                                     </div>
-                                    <span class="text-[9px] text-gray-400 block mt-0.5 font-mono">Actividad: {{ item.item_005.codigo_actividad_poa }}</span>
                                 {% else %}
-                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">
-                                        Bolsa Común (Sin Cuota)
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-500">
+                                        Sin Asignación (0 u.)
                                     </span>
                                 {% endif %}
                             </td>
 
-                            <!-- Tope Permitido -->
-                            <td class="p-3 text-center">
-                                <span class="px-2.5 py-1 rounded-xl text-xs font-black font-mono inline-block {% if item.tope_permitido <= 0 %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
-                                    {{ item.tope_permitido }}
+                            <!-- Tope a Pedir -->
+                            <td class="p-3.5 text-center">
+                                <span class="px-3 py-1 rounded-xl text-xs font-black font-mono inline-block {% if item.tope_permitido <= 0 %}bg-red-50 text-red-700 border border-red-200{% else %}bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300{% endif %}">
+                                    {{ item.tope_permitido }} u.
                                 </span>
                             </td>
                             {% endif %}
 
                             <!-- Costo Referencial -->
-                            <td class="p-3 text-right pr-6 font-mono text-gray-500 dark:text-gray-400">
+                            <td class="p-3.5 text-right pr-6 font-mono text-gray-500 dark:text-gray-400">
                                 Bs. {{ item.costo_referencial|floatformat:2 }}
                             </td>
                         </tr>
@@ -225,9 +226,23 @@
             </div>
         </div>
         {% empty %}
-        <div class="card p-12 text-center text-gray-400">
-            <span class="material-symbols-outlined text-4xl mb-2 block">inventory_2</span>
-            No existen materiales registrados para los filtros seleccionados en {{ almacen_seleccionado.nombre }}.
+        <!-- MENSAJE OFICIAL CUANDO LA OFICINA NO TIENE MATERIALES ASIGNADOS -->
+        <div class="card p-12 text-center text-gray-400 space-y-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl">
+            <span class="material-symbols-outlined text-5xl text-[#d97706] block mx-auto">inventory_2</span>
+            <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">
+                {% if unidad_seleccionada %}
+                    La unidad "{{ unidad_seleccionada.nombre }}" no cuenta con materiales asignados en este almacén.
+                {% else %}
+                    No existen materiales registrados para los filtros seleccionados.
+                {% endif %}
+            </h3>
+            <p class="text-xs text-gray-500 max-w-lg mx-auto leading-relaxed">
+                {% if unidad_seleccionada %}
+                    Los materiales existentes en las estanterías de este almacén fueron adquiridos bajo asignación directa para otras dependencias institucionales.
+                {% else %}
+                    Selecciona una secretaría u oficina diferente para consultar sus saldos asignados.
+                {% endif %}
+            </p>
         </div>
         {% endfor %}
     </div>

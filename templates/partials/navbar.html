@@ -1,134 +1,302 @@
-<!-- HEADER: Se agregó la clase 'navbar-custom' al final para anular el fondo blanco y bordes en modo oscuro -->
-<header class="fixed top-0 right-0 w-full lg:w-[calc(100%-260px)] h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm transition-all duration-300 navbar-custom">
+<!-- HEADER INSTITUCIONAL SIGAL (HOVER Y MICRO-INTERACCIONES MEJORADAS) -->
+<header class="fixed top-0 right-0 left-0 lg:left-72 h-16 z-40 px-4 sm:px-6 flex items-center justify-between transition-colors duration-300 shadow-md
+               bg-[#008548] text-white border-b border-[#006938]
+               dark:bg-[#0c1511]/90 dark:backdrop-blur-xl dark:border-b dark:border-[#232c27]">
 
-    <!-- LADO IZQUIERDO: ACCESOS Y TÍTULO -->
-    <div class="flex items-center gap-2 min-w-0">
+    <!-- LADO IZQUIERDO: ACCESOS Y BUSCADOR -->
+    <div class="flex items-center gap-3 sm:gap-5 flex-1 max-w-3xl min-w-0">
         
-        <!-- Botón Hamburguesa de Menú para pantallas táctiles/móviles -->
+        <!-- Botón Hamburguesa de Menú para móviles -->
         <button 
             type="button"
-            class="lg:hidden p-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-900 flex items-center justify-center transition duration-150 cursor-pointer"
+            id="btn-sidebar-toggle"
+            onclick="toggleSidebarMobile()"
+            class="lg:hidden p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer
+                   dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-[#71dc95]/30"
             aria-label="Abrir menú"
         >
-            <span class="material-symbols-outlined text-[24px]">
+            <span class="material-symbols-outlined text-[22px] transition-transform duration-200 hover:rotate-90">
                 menu
             </span>
         </button>
         
-        <!-- Título SGA -->
-        <h2 class="text-lg sm:text-xl font-extrabold text-[#8b0000] dark:text-red-500 font-['Outfit'] tracking-wide truncate">
-            SGA <span class="text-gray-300 dark:text-gray-700 font-light mx-1">|</span> <span class="text-gray-500 dark:text-gray-450 text-xs sm:text-sm font-medium">Sistema de Almacén</span>
-        </h2>
+        <!-- Título Institucional SIGAL / SGA -->
+        <div class="flex items-center gap-2 shrink-0 select-none group cursor-default">
+            <h2 class="text-base sm:text-lg font-black font-['Outfit'] tracking-tight truncate text-white dark:text-[#dbe5de] transition-colors duration-200 group-hover:text-emerald-100 dark:group-hover:text-[#71dc95]">
+                SIGAL
+            </h2>
+            <span class="hidden sm:inline-block text-xs font-medium text-[#8df9af] dark:text-[#889488] transition-colors duration-200 group-hover:text-white dark:group-hover:text-[#dbe5de]">
+                | Sistema de Almacén
+            </span>
+        </div>
 
-    </div>
-
-    <!-- LADO DERECHO: ACCIONES Y PERFIL -->
-    <div class="flex items-center gap-3 sm:gap-5">
-
-        <!-- BUSCADOR CON FORMULARIO ACTIVO (Oculto en móviles) -->
-        <form method="GET" action="." class="relative hidden md:block">
-            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[20px] pointer-events-none">
+        <!-- BUSCADOR INSTITUCIONAL CON FORMULARIO ACTIVO -->
+        <form method="GET" action="." class="relative w-full max-w-md hidden md:block group">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/70 dark:text-[#889488] text-[18px] pointer-events-none transition-colors duration-200 group-hover:text-white dark:group-hover:text-[#71dc95]">
                 search
             </span>
             <input
                 type="text"
                 name="q"
                 value="{{ query|default:'' }}"
-                placeholder="Buscar..."
-                class="w-60 lg:w-72 pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-2xl text-sm bg-gray-50/50 dark:bg-slate-900/40 text-gray-800 dark:text-gray-200 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#8b0000] dark:focus:ring-red-500 focus:border-transparent transition duration-150"
+                placeholder="Buscar por código SABS, Nro. Solicitud o Lote..."
+                class="w-full h-9 pl-9 pr-4 text-xs rounded-xl transition-all duration-200
+                       bg-white/15 placeholder-white/70 text-white border border-white/20 
+                       hover:bg-white/20 hover:border-white/35
+                       focus:outline-none focus:bg-white/25 focus:ring-2 focus:ring-white/40 focus:border-transparent
+                       dark:bg-[#18221d] dark:placeholder-[#889488] dark:text-[#dbe5de] dark:border-[#232c27]
+                       dark:hover:bg-[#1c2721] dark:hover:border-[#3e4a40]
+                       dark:focus:ring-2 dark:focus:ring-[#71dc95]/40 dark:focus:border-[#71dc95]"
             >
         </form>
 
-        <!-- NOTIFICACIONES -->
+        <!-- BADGE DE ESTADO DEL NODO -->
+        <div class="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shrink-0 select-none transition-all duration-200 hover:scale-[1.02]
+                    bg-black/20 border border-white/10 hover:bg-black/30 hover:border-white/20
+                    dark:bg-[#18221d] dark:border-[#232c27] dark:hover:border-[#71dc95]/40">
+            <span class="w-2 h-2 rounded-full bg-[#8df9af] dark:bg-[#eec14b] animate-pulse"></span>
+            <span class="text-[11px] text-white dark:text-[#bdcabd] font-medium">Almacén Central Potosí - Conectado</span>
+        </div>
+
+    </div>
+
+    <!-- LADO DERECHO: ACCIONES Y PERFIL -->
+    <div class="flex items-center gap-2 sm:gap-4 shrink-0">
+
+        <!-- BOTÓN CAMBIAR TEMA (SIN ONCLICK CONFLICTIVO) -->
         <button 
             type="button"
-            title="Notificaciones"
-            class="relative w-10 h-10 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-600 dark:text-gray-400 flex items-center justify-center transition duration-150 cursor-pointer"
+            id="theme-toggle" 
+            class="p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer select-none
+                   dark:text-[#bdcabd] dark:hover:text-[#71dc95] dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-[#71dc95]/30" 
+            title="Alternar entre Modo Claro y Oscuro"
         >
-            <span class="material-symbols-outlined text-[24px]">
-                notifications
+            <span class="material-symbols-outlined text-[22px] transition-transform duration-300 hover:rotate-45 theme-toggle-icon">
+                {% if theme == 'dark' %}light_mode{% else %}dark_mode{% endif %}
             </span>
-            <!-- Indicador activo utilizando tu color secundario #d97706 -->
-            <span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#d97706] dark:bg-amber-500 border-2 border-white dark:border-slate-950"></span>
         </button>
 
-        <!-- Dentro de templates/partials/navbar.html -->
-        <button id="theme-toggle" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors duration-150 flex items-center justify-center text-gray-600 dark:text-gray-400 cursor-pointer" title="Cambiar tema">
-            <span class="material-symbols-outlined text-[24px]">
-                {% if theme == 'dark' %}
-                    light_mode
-                {% else %}
-                    dark_mode
+        <!-- BOTÓN NOTIFICACIONES INTERACTIVO (TARJETA 6) -->
+        <div class="relative" id="container-notificaciones">
+            <button 
+                type="button"
+                id="btn-notificaciones"
+                onclick="toggleMenuNotificaciones(event)"
+                title="Notificaciones del Sistema"
+                class="relative p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer group
+                       dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-white/10"
+                aria-label="Ver alertas"
+            >
+                <span class="material-symbols-outlined text-[22px] transition-transform duration-300 group-hover:rotate-12">
+                    notifications
+                </span>
+
+                {% if conteo_notificaciones > 0 %}
+                    <span class="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-[#ff7577] text-[#0c1511] font-black text-[9px] font-mono shadow-md ring-2 ring-[#008548] dark:ring-[#0c1511] animate-pulse">
+                        {{ conteo_notificaciones }}
+                    </span>
                 {% endif %}
-            </span>
-        </button>
+            </button>
+
+            <!-- MENÚ DESPLEGABLE DE NOTIFICACIONES -->
+            <div 
+                id="menu-notificaciones" 
+                class="hidden absolute right-[-70px] sm:right-0 top-full mt-2 w-[310px] sm:w-[370px] z-50 transition-all duration-200 transform origin-top-right font-['Outfit']"
+            >
+                <div class="rounded-2xl shadow-2xl overflow-hidden border backdrop-blur-xl transition-colors duration-200
+                            bg-white/95 border-gray-200 text-gray-800 shadow-emerald-950/20
+                            dark:bg-[#141d19]/95 dark:border-[#232c27] dark:text-[#dbe5de] dark:shadow-black/70">
+                    
+                    <div class="px-4 py-3 border-b border-gray-100 dark:border-[#232c27] flex items-center justify-between bg-gray-50/70 dark:bg-[#18221d]/60">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px] text-[#008548] dark:text-[#71dc95]">
+                                notifications_active
+                            </span>
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-gray-900 dark:text-white">
+                                Avisos del Sistema
+                            </h3>
+                        </div>
+                        {% if conteo_notificaciones > 0 %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-[#71dc95]/20 dark:text-[#71dc95]">
+                                {{ conteo_notificaciones }} pendiente{{ conteo_notificaciones|pluralize:"s" }}
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-[#232c27]/60">
+                        {% for noti in notificaciones_usuario %}
+                        <a 
+                            href="{{ noti.url }}" 
+                            class="p-3.5 flex items-start gap-3 transition-colors duration-150 group block
+                                   hover:bg-emerald-50/70 dark:hover:bg-[#18221d]"
+                        >
+                            <div class="w-8 h-8 rounded-xl {{ noti.color_bg }} border flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                <span class="material-symbols-outlined text-[17px]">{{ noti.icono }}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1 mb-0.5">
+                                    <h4 class="text-xs font-bold truncate text-gray-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-[#71dc95] transition-colors">
+                                        {{ noti.titulo }}
+                                    </h4>
+                                    <span class="text-[9px] font-mono text-gray-400 shrink-0">{{ noti.tiempo }}</span>
+                                </div>
+                                <p class="text-[11px] text-gray-500 dark:text-[#889488] line-clamp-2 leading-relaxed">
+                                    {{ noti.mensaje }}
+                                </p>
+                            </div>
+                        </a>
+                        {% empty %}
+                        <div class="p-8 text-center text-gray-400 dark:text-[#889488] space-y-1">
+                            <span class="material-symbols-outlined text-3xl text-emerald-600 dark:text-[#71dc95] block mb-1">
+                                check_circle
+                            </span>
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-200">Todo al día</p>
+                            <p class="text-[11px] text-gray-400 dark:text-[#889488]">No tienes trámites urgentes ni alertas de stock en este momento.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="px-4 py-2.5 bg-gray-50/70 dark:bg-[#18221d]/80 border-t border-gray-100 dark:border-[#232c27] text-center">
+                        <a href="{% url 'solicitudes_general' %}" class="text-[11px] font-bold text-[#008548] dark:text-[#71dc95] hover:underline flex items-center justify-center gap-1">
+                            <span>Abrir Bandeja de Gestión</span>
+                            <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- SEPARADOR -->
-        <div class="h-8 w-px bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
+        <div class="h-6 w-px bg-white/20 dark:bg-[#232c27] hidden sm:block"></div>
 
-        <!-- PERFIL CON MENÚ DESPLEGABLE (Menú Hover integrado de forma nativa) -->
-        <div class="relative flex items-center gap-3 group py-3 cursor-pointer">
+        <!-- PERFIL CON MENÚ DESPLEGABLE -->
+        <div class="relative group py-1.5">
+            <div class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl cursor-pointer transition-all duration-200 select-none
+                        hover:bg-white/15 active:scale-[0.98]
+                        dark:hover:bg-white/5 dark:hover:border dark:hover:border-white/10">
+                <div class="text-right hidden sm:block leading-tight">
+                    <p class="font-bold text-xs font-['Outfit'] truncate max-w-[150px] text-white dark:text-[#dbe5de] transition-colors duration-200 group-hover:text-emerald-100 dark:group-hover:text-white">
+                        {% if request.user.first_name or request.user.last_name %}
+                            {{ request.user.first_name }} {{ request.user.last_name }}
+                        {% else %}
+                            {{ request.user.username }}
+                        {% endif %}
+                    </p>
+                    <p class="text-[10px] font-semibold tracking-wider uppercase mt-0.5 text-[#8df9af] dark:text-[#eec14b]">
+                        {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
+                    </p>
+                </div>
 
-            <!-- Datos de Usuario -->
-            <div class="text-right hidden sm:block select-none">
-                <p class="font-bold text-gray-800 dark:text-gray-200 text-sm font-['Outfit'] truncate max-w-[150px]">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm select-none transition-all duration-200
+                            bg-white text-[#006938] group-hover:shadow-[0_0_12px_rgba(255,255,255,0.45)] group-hover:scale-105
+                            dark:bg-[#008548] dark:text-white dark:border dark:border-[#71dc95]/40 dark:group-hover:border-[#71dc95] dark:group-hover:shadow-[0_0_12px_rgba(113,220,149,0.35)]">
                     {% if request.user.first_name or request.user.last_name %}
-                        {{ request.user.first_name }} {{ request.user.last_name }}
+                        {{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
                     {% else %}
-                        {{ request.user.username }}
+                        {{ request.user.username|slice:":2"|upper }}
                     {% endif %}
-                </p>
-                <p class="text-[11px] font-bold text-[#d97706] dark:text-amber-500 uppercase tracking-wider mt-0.5">
-                    {% if request.user.perfilusuario %}
-                        {{ request.user.perfilusuario.get_rol_display }}
-                    {% else %}
-                        Usuario
-                    {% endif %}
-                </p>
+                </div>
+
+                <span class="material-symbols-outlined text-[16px] text-white/60 dark:text-[#889488] transition-transform duration-200 group-hover:rotate-180 group-hover:text-white dark:group-hover:text-[#71dc95] hidden sm:inline-block">
+                    expand_more
+                </span>
             </div>
 
-            <!-- Avatar del Usuario (Diseño squircle moderno) -->
-            <div class="w-10 h-10 rounded-2xl bg-[#8b0000] dark:bg-red-700 text-white flex items-center justify-center font-bold text-xs tracking-wider shadow-sm select-none transition duration-150 group-hover:scale-105">
-                {% if request.user.first_name or request.user.last_name %}
-                    {{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
-                {% else %}
-                    {{ request.user.username|slice:":2"|upper }}
-                {% endif %}
-            </div>
-
-            <!-- MENÚ DESPLEGABLE (Se activa automáticamente al posicionar el cursor sobre el Perfil) -->
-            <div class="absolute right-0 top-14 w-48 bg-white dark:bg-[#151010] border border-gray-100 dark:border-gray-800 rounded-2xl shadow-lg py-2 hidden group-hover:block hover:block transition duration-150 z-50">
-                
-                <a 
-                    href="{% url 'perfil' %}"
-                    class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
-                >
-                    <span class="material-symbols-outlined text-[18px] text-gray-400 dark:text-gray-500">
-                        person
-                    </span> 
-                    Mi Perfil
-                </a>
-
-                <hr class="border-gray-100 dark:border-gray-800 my-1">
-
-                <!-- Botón Cerrar Sesión seguro -->
-                <form method="POST" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button 
-                        type="submit" 
-                        class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold transition cursor-pointer"
+            <!-- DROPDOWN PERFIL -->
+            <div class="absolute right-0 top-full pt-2 w-56 z-50 transition-all duration-200 transform origin-top-right
+                        opacity-0 invisible pointer-events-none translate-y-1
+                        group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0
+                        before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-4">
+                <div class="rounded-2xl shadow-2xl py-2 overflow-hidden border backdrop-blur-xl transition-colors duration-200
+                            bg-white/95 border-gray-100 text-gray-800 shadow-emerald-950/10
+                            dark:bg-[#141d19]/95 dark:border-[#232c27] dark:text-[#dbe5de] dark:shadow-black/60">
+                    <a 
+                        href="{% url 'perfil' %}"
+                        class="group/item flex items-center gap-3 px-4 py-2.5 text-xs font-medium transition-all duration-150
+                               text-gray-700 hover:text-emerald-700 hover:bg-emerald-50/80 hover:translate-x-1
+                               dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:translate-x-1"
                     >
-                        <span class="material-symbols-outlined text-[18px]">
-                            logout
+                        <span class="material-symbols-outlined text-[19px] text-gray-400 dark:text-[#889488] transition-colors duration-150 group-hover/item:text-[#008548] dark:group-hover/item:text-[#71dc95]">
+                            person
                         </span> 
-                        Cerrar Sesión
-                    </button>
-                </form>
-
+                        <span>Mi Perfil Institucional</span>
+                    </a>
+                    <hr class="border-gray-100 dark:border-[#232c27] my-1.5">
+                    <form method="POST" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button 
+                            type="submit" 
+                            class="group/logout w-full text-left flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-all duration-150 cursor-pointer
+                                   text-red-600 hover:text-red-700 hover:bg-red-50 hover:translate-x-1
+                                   dark:text-[#ff7577] dark:hover:text-white dark:hover:bg-[#8c1f28]/35 dark:hover:translate-x-1"
+                        >
+                            <span class="material-symbols-outlined text-[19px] transition-transform duration-150 group-hover/logout:translate-x-0.5">
+                                logout
+                            </span> 
+                            <span>Cerrar Sesión</span>
+                        </button>
+                    </form>
+                </div>
             </div>
-
         </div>
 
     </div>
 
 </header>
+
+<!-- SCRIPT AUTÓNOMO BLINDADO: NOTIFICACIONES + CAMBIO DE TEMA 100% GARANTIZADO -->
+<script>
+    // 1. Control del Menú de Notificaciones
+    function toggleMenuNotificaciones(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('menu-notificaciones');
+        if (menu) {
+            menu.classList.toggle('hidden');
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('container-notificaciones');
+        const menu = document.getElementById('menu-notificaciones');
+        if (menu && container && !container.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+
+    // 2. Control del Tema: Se ejecuta de forma única sin duplicar eventos
+    (function initThemeControl() {
+        const btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+
+        // Clonamos el botón para eliminar cualquier event listener duplicado anterior
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+
+            // Alternar clase en la raíz <html>
+            if (newTheme === 'dark') {
+                html.classList.add('dark');
+                html.classList.remove('light');
+            } else {
+                html.classList.remove('dark');
+                html.classList.add('light');
+            }
+
+            // Guardar cookie por 1 año
+            document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+
+            // Actualizar icono inmediatamente
+            const icon = newBtn.querySelector('.material-symbols-outlined, .theme-toggle-icon');
+            if (icon) {
+                icon.textContent = (newTheme === 'dark') ? 'light_mode' : 'dark_mode';
+            }
+        });
+    })();
+</script>

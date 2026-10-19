@@ -2,6 +2,11 @@ from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
 
+import hashlib
+from django.db import models
+from django.contrib.auth.models import User
+from decimal import Decimal
+
 # ========================================================
 # 1. MODELOS DE CONFIGURACIÓN Y CATÁLOGOS BASE
 # ========================================================
@@ -18,10 +23,15 @@ class PartidaPresupuestaria(models.Model):
 class UnidadMedida(models.Model):
     codigo = models.CharField(max_length=10, unique=True)
     nombre = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True, help_text="Baja lógica de la unidad de medida")
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
-
+        
+    class Meta:
+        verbose_name = "Unidad de Medida"
+        verbose_name_plural = "Unidades de Medida"
+        ordering = ['codigo']
 
 class Almacen(models.Model):
     """
@@ -81,46 +91,32 @@ class Almacen(models.Model):
         verbose_name = "Almacén"
         verbose_name_plural = "Almacenes"
         
+
 class Material(models.Model):
-    partida = models.ForeignKey(
-        PartidaPresupuestaria,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
+    partida = models.ForeignKey(PartidaPresupuestaria, on_delete=models.PROTECT, null=True, blank=True)
     codigo = models.CharField(max_length=50, unique=True)
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True, null=True)
-    stock_actual = models.IntegerField(default=0)  # Iniciará en 0 al crearse
-    stock_minimo = models.IntegerField(default=5)
+    stock_actual = models.IntegerField(default=0)
+    stock_minimo = models.IntegerField(default=5, verbose_name="Stock Mínimo (Alerta Crítica)")
+    stock_medio = models.IntegerField(default=15, verbose_name="Stock Medio (Punto de Reorden)")
+    stock_maximo = models.IntegerField(default=50, verbose_name="Stock Máximo / Techo")
     unidad_medida = models.CharField(max_length=50)
-    unidad_medida_fk = models.ForeignKey(
-        UnidadMedida,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
+    unidad_medida_fk = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, null=True, blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
+
     def __str__(self):
         return self.nombre
-    
+
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=['partida', 'nombre'],
-                name='material_unico_por_partida'
-            )
+            models.UniqueConstraint(fields=['partida', 'nombre'], name='material_unico_por_partida')
         ]
 
     @property
     def tiene_movimientos(self):
-        """
-        Retorna True si el material ya cuenta con movimientos en el Kardex.
-        """
         return self.movimientoinventario_set.exists()
-
-
 class InventarioAlmacen(models.Model):
     """
     Tarjeta 5: Controlar y aislar la existencia física (stock) de cada material por Almacén.
@@ -182,17 +178,7 @@ TIPOS_MOVIMIENTO = [
 
 class MovimientoInventario(models.Model):
     material = models.ForeignKey(Material, on_delete=models.CASCADE)
-    
-    # Tarjeta 6: Asociar el movimiento y lote PEPS a un almacén específico
-    almacen = models.ForeignKey(
-        Almacen,
-        on_delete=models.PROTECT,
-        related_name='movimientos',
-        null=True,  
-        blank=True,
-        help_text="Almacén o subalmacén donde ocurre físicamente el movimiento"
-    )
-    
+    almacen = models.ForeignKey(Almacen, on_delete=models.PROTECT, related_name='movimientos', null=True, blank=True)
     tipo = models.CharField(max_length=20, choices=TIPOS_MOVIMIENTO)
     cantidad = models.IntegerField()
     costo_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -201,39 +187,24 @@ class MovimientoInventario(models.Model):
     stock_resultante = models.IntegerField(default=0)
     referencia = models.CharField(max_length=100)
     fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    saldo_disponible_lote = models.IntegerField(default=0)
+    unidad_destino = models.ForeignKey('organizacion.UnidadOrganizacional', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumos')
+
+    # ========================================================
+    # VENCIMIENTO POR LOTE DE ENTRADA (AQUÍ ES DONDE CORRESPONDE)
+    # ========================================================
     fecha_vencimiento = models.DateField(
         null=True, 
         blank=True, 
-        help_text="Fecha de caducidad/vencimiento para insumos perecederos (químicos, tintas, reactivos, etc.)"
-    )
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    saldo_disponible_lote = models.IntegerField(
-        default=0, 
-        help_text="Solo para ENTRADAS: Cantidad remanente de este lote para el costeo PEPS"
-    )
-    unidad_destino = models.ForeignKey(
-        'organizacion.UnidadOrganizacional',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='consumos',
-        help_text="Unidad organizacional de la Gobernación que consumió el material"
+        help_text="Fecha de vencimiento del lote recibido"
     )
 
-    def __str__(self):
-        return f"{self.tipo} - {self.material.nombre} ({self.cantidad}) en {self.almacen.nombre if self.almacen else 'Global'}"
-    @property
-    def valor_disponible_lote(self):
-        """
-        Calcula el valor monetario del saldo remanente de este lote específico.
-        """
-        return self.saldo_disponible_lote * self.costo_unitario
     @property
     def dias_para_vencer(self):
         if self.fecha_vencimiento:
             from django.utils import timezone
-            hoy = timezone.now().date()
-            return (self.fecha_vencimiento - hoy).days
+            return (self.fecha_vencimiento - timezone.now().date()).days
         return None
 
     @property
@@ -248,15 +219,16 @@ class MovimientoInventario(models.Model):
         elif dias <= 60:
             return 'POR_VENCER_ALERTA'
         return 'VIGENTE'
-# ========================================================
+    
+        # ========================================================
 # 4. COMPRAS (ENTRADAS DE ALMACÉN)
 # ========================================================
-
 class Proveedor(models.Model):
     nit = models.CharField(max_length=20, unique=True, help_text="NIT o documento de identificación")
     razon_social = models.CharField(max_length=200)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     direccion = models.CharField(max_length=300, blank=True, null=True)
+    is_active = models.BooleanField(default=True, help_text="Indica si el proveedor está habilitado para contrataciones")
 
     def __str__(self):
         return self.razon_social
@@ -269,8 +241,6 @@ class Proveedor(models.Model):
 class NotaIngreso(models.Model):
     nro_nota = models.CharField(max_length=50, unique=True, help_text="Número correlativo de nota de ingreso")
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='notas_ingreso')
-    
-    # Tarjeta 7: Almacén destino de la recepción física de los bienes
     almacen_destino = models.ForeignKey(
         Almacen,
         on_delete=models.PROTECT,
@@ -283,6 +253,15 @@ class NotaIngreso(models.Model):
     c31 = models.CharField(max_length=50, blank=True, null=True, help_text="Documento de gasto SIGEP C-31")
     nota_entrega = models.CharField(max_length=50, blank=True, null=True, help_text="Número de Nota de Entrega o Remisión")
     factura = models.CharField(max_length=50, blank=True, null=True, help_text="Número de Factura de Compra")
+    
+    # NUEVO CAMPO: Número de Orden de Compra manual o vinculado
+    nro_orden_compra = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True, 
+        help_text="Ej: COMPRA 168/2026 o BB.SS. N° 081/2026"
+    )
+    
     reingreso = models.BooleanField(default=False, help_text="Indica si la entrada es por devolución/reingreso de oficina")
     fecha = models.DateField(help_text="Fecha de recepción física de los bienes")
     usuario = models.ForeignKey(User, on_delete=models.PROTECT, help_text="Almacenero que registra el ingreso")
@@ -295,14 +274,14 @@ class NotaIngreso(models.Model):
         related_name='notas_ingreso_asociadas',
         help_text="Orden de Compra origen emitida por Bienes y Servicios"
     )
+    observaciones = models.CharField(max_length=500, blank=True, null=True)
 
     def __str__(self):
-        return f"Nota de Ingreso Nro: {self.nro_nota} - {self.proveedor.razon_social} -> {self.almacen_destino.nombre if self.almacen_destino else 'Central'}"
+        return f"Nota de Ingreso Nro: {self.nro_nota} - {self.proveedor.razon_social}"
 
     class Meta:
         verbose_name = "Nota de Ingreso"
         verbose_name_plural = "Notas de Ingreso"
-
 
 class NotaIngresoDetalle(models.Model):
     nota_ingreso = models.ForeignKey(NotaIngreso, on_delete=models.CASCADE, related_name='detalles')
@@ -540,3 +519,68 @@ class AsignacionMaterialUnidad(models.Model):
         verbose_name = "Asignación de Material por Unidad"
         verbose_name_plural = "Asignaciones de Material por Unidad"
         unique_together = ('unidad', 'material', 'gestion')
+
+
+class ReporteCierreAuditado(models.Model):
+    TIPO_REPORTE = [
+        ('DGCF_R105', 'Resumen de Almacenes por Partida (DGCF - R1.05)'),
+        ('DGCF_R106', 'Detalle Físico-Valorado por Ítem (DGCF - R1.06)'),
+        ('CIERRE_ANUAL', 'Acta de Cierre de Gestión Anual'),
+    ]
+
+    codigo_documento = models.CharField(max_length=50, unique=True, help_text="Ej: CIERRE-2025-R105-001")
+    tipo = models.CharField(max_length=20, choices=TIPO_REPORTE)
+    gestion = models.IntegerField(default=2026)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    total_items = models.IntegerField(default=0)
+    valor_total_bs = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    archivo_pdf = models.FileField(upload_to='reportes_cierres/%Y/', blank=True, null=True)
+    hash_seguridad = models.CharField(max_length=64, blank=True, null=True, help_text="Firma SHA-256 del archivo")
+    generado_por = models.ForeignKey(User, on_delete=models.PROTECT)
+    fecha_generacion = models.DateTimeField(auto_now_add=True)
+    observaciones = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Reporte de Cierre Auditado"
+        verbose_name_plural = "Reportes de Cierre Auditados"
+        ordering = ['-fecha_generacion']
+
+    def __str__(self):
+        return f"{self.codigo_documento} - {self.get_tipo_display()} ({self.fecha_fin})"
+
+class AsignacionEntradaUnidad(models.Model):
+    """
+    Desglosa la asignación física de una compra/entrada hacia Unidades Organizacionales específicas.
+    Sustituye la dependencia del POA: cada unidad solo puede pedir hasta el saldo que le fue asignado.
+    """
+    nota_ingreso_detalle = models.ForeignKey(
+        'NotaIngresoDetalle',
+        on_delete=models.CASCADE,
+        related_name='asignaciones_unidades'
+    )
+    unidad_organizacional = models.ForeignKey(
+        'organizacion.UnidadOrganizacional',
+        on_delete=models.PROTECT,
+        related_name='asignaciones_compras'
+    )
+    cantidad_asignada = models.IntegerField(
+        help_text="Cupo físico total asignado a esta oficina en esta compra"
+    )
+    cantidad_retirada = models.IntegerField(
+        default=0,
+        help_text="Cantidad física ya despachada mediante Solicitudes autorizadas"
+    )
+
+    @property
+    def saldo_disponible(self):
+        """Cantidad remanente que la oficina aún tiene derecho a solicitar."""
+        return max(0, self.cantidad_asignada - self.cantidad_retirada)
+
+    def __str__(self):
+        return f"{self.unidad_organizacional.nombre} - {self.nota_ingreso_detalle.material.nombre}: {self.saldo_disponible}/{self.cantidad_asignada}"
+
+    class Meta:
+        verbose_name = "Asignación de Entrada a Unidad"
+        verbose_name_plural = "Asignaciones de Entrada a Unidades"
+        unique_together = ('nota_ingreso_detalle', 'unidad_organizacional')

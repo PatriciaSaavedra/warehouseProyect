@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+
+{% block title %} Centro de Mando de Reportes y Auditoría {% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-7 font-['Outfit'] pb-12">
+
+    <!-- 1. HERO BANNER PRINCIPAL (CABECERA ADAPTABLE AL TIPO DE ALMACÉN) -->
+    <div class="relative overflow-hidden rounded-3xl border border-gray-200/80 dark:border-gray-800 bg-gradient-to-r from-white via-stone-50/60 to-red-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-red-950/20 p-6 sm:p-7 shadow-sm">
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            
+            <div class="space-y-1.5 max-w-2xl">
+                <div class="flex flex-wrap items-center gap-2">
+                    {% if not es_central_o_admin and almacen_fijado %}
+                        <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/60">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                            SUBALMACÉN: {{ almacen_fijado.nombre|upper }}
+                        </span>
+                        <span class="text-xs text-gray-400 font-mono">Jurisdicción Seccional</span>
+                    {% else %}
+                        <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-[#8b0000]/10 text-[#8b0000] dark:bg-red-950/60 dark:text-red-400 border border-[#8b0000]/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#8b0000] dark:bg-red-400"></span>
+                            Sede Central (Consolidado Institucional)
+                        </span>
+                        <span class="text-xs text-gray-400 font-mono">D.S. 0181 • SABS</span>
+                    {% endif %}
+                </div>
+
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                    Centro de Mando de Reportes y Cierres
+                </h1>
+                
+                <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {% if not es_central_o_admin and almacen_fijado %}
+                        Auditoría y libros de almacén aislados exclusivamente para las existencias y movimientos de <strong>{{ almacen_fijado.nombre }}</strong>.
+                    {% else %}
+                        Emisión de estados financieros consolidados de almacenes, kárdex y estados valorados departamentales.
+                    {% endif %}
+                </p>
+            </div>
+
+            <!-- SELECTOR DE GESTIÓN FISCAL -->
+            <div class="flex items-center gap-3 p-1.5 bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
+                <div class="flex items-center gap-2 pl-3">
+                    <span class="material-symbols-outlined text-[20px] text-[#d97706]">calendar_month</span>
+                    <span class="text-xs font-bold text-gray-600 dark:text-gray-300">Gestión:</span>
+                </div>
+                <select 
+                    id="selector-gestion"
+                    onchange="cambiarGestion(this.value)"
+                    class="border-0 bg-gray-50 dark:bg-slate-900 font-extrabold text-sm text-[#7c121e] dark:text-red-400 rounded-xl px-4 py-2 focus:ring-2 focus:ring-[#7c121e] cursor-pointer transition shadow-inner"
+                >
+                    {% for g in gestiones_disponibles %}
+                        <option value="{{ g }}" {% if g == gestion_sel %}selected{% endif %}>
+                            Gestión Fiscal {{ g }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <span class="material-symbols-outlined absolute -right-6 -bottom-8 text-[160px] text-gray-900/5 dark:text-white/5 pointer-events-none select-none">
+            assessment
+        </span>
+    </div>
+
+    <!-- 2. SECCIÓN: CIERRES FISCALES Y REPORTES DGCF -->
+    <section class="space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-red-100/70 dark:bg-red-950/60 text-[#7c121e] dark:text-red-400 flex items-center justify-center shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">account_balance</span>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                        Cierres Fiscales y Estados de Almacén (Gestión {{ gestion_sel }})
+                    </h2>
+                    <span class="text-[11px] text-gray-400">
+                        {% if not es_central_o_admin and almacen_fijado %}
+                            Cálculo aislado al inventario de {{ almacen_fijado.nombre }}
+                        {% else %}
+                            Consolidado Institucional GAD Potosí
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            
+            <!-- TARJETA R1.05 -->
+            <div class="group card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md hover:border-[#7c121e]/40 transition-all duration-200 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="w-11 h-11 rounded-2xl bg-stone-100 dark:bg-slate-800 text-[#7c121e] dark:text-red-400 flex items-center justify-center group-hover:bg-[#7c121e] group-hover:text-white transition-all">
+                            <span class="material-symbols-outlined text-[24px]">receipt_long</span>
+                        </span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-red-50 text-[#7c121e] dark:bg-red-950/50 dark:text-red-300 border border-red-200/60">
+                            DGCF - R1.05
+                        </span>
+                    </div>
+
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white group-hover:text-[#7c121e] transition">
+                        Resumen por Partidas
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                        Saldos iniciales, entradas, egresos y saldos finales clasificados por clasificador presupuestario.
+                    </p>
+                </div>
+
+                <div class="pt-5 mt-5 border-t border-gray-100 dark:border-gray-800/80">
+                    <a href="{% url 'reporte_dgcf_r105' %}?gestion={{ gestion_sel }}{% if not es_central_o_admin and almacen_fijado %}&almacen={{ almacen_fijado.id }}{% endif %}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-[#7c121e] hover:text-white dark:bg-slate-800 dark:hover:bg-[#7c121e] transition flex items-center justify-center gap-2 group-hover:bg-[#7c121e] group-hover:text-white shadow-sm">
+                        <span>Generar Formulario R1.05</span>
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- TARJETA R1.06 -->
+            <div class="group card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md hover:border-[#7c121e]/40 transition-all duration-200 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="w-11 h-11 rounded-2xl bg-stone-100 dark:bg-slate-800 text-[#d97706] dark:text-amber-400 flex items-center justify-center group-hover:bg-[#d97706] group-hover:text-white transition-all">
+                            <span class="material-symbols-outlined text-[24px]">table_view</span>
+                        </span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-50 text-[#d97706] dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60">
+                            DGCF - R1.06
+                        </span>
+                    </div>
+
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white group-hover:text-[#d97706] transition">
+                        Detalle de Almacenes por Ítem
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                        Inventario pormenorizado subartículo por subartículo con costos ponderados y existencias finales de custodia.
+                    </p>
+                </div>
+
+                <div class="pt-5 mt-5 border-t border-gray-100 dark:border-gray-800/80">
+                    <a href="{% url 'reporte_dgcf_r106' %}?gestion={{ gestion_sel }}{% if not es_central_o_admin and almacen_fijado %}&almacen={{ almacen_fijado.id }}{% endif %}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-[#d97706] hover:text-white dark:bg-slate-800 dark:hover:bg-[#d97706] transition flex items-center justify-center gap-2 group-hover:bg-[#d97706] group-hover:text-white shadow-sm">
+                        <span>Generar Formulario R1.06</span>
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- TARJETA INVENTARIO VALORADO (PDF OFICIAL) -->
+            <div class="group card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm hover:shadow-md hover:border-[#7c121e]/40 transition-all duration-200 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-950/50 text-[#7c121e] dark:text-red-400 flex items-center justify-center group-hover:bg-[#7c121e] group-hover:text-white transition-all">
+                            <span class="material-symbols-outlined text-[24px]">picture_as_pdf</span>
+                        </span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-red-100/70 text-[#7c121e] dark:bg-red-950/60 dark:text-red-300 border border-red-300/60">
+                            PDF OFICIAL
+                        </span>
+                    </div>
+
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white group-hover:text-[#7c121e] transition">
+                        Inventario Físico Valorado
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                        {% if not es_central_o_admin and almacen_fijado %}
+                            Reporte impreso oficial para el cierre de inventarios de <strong>{{ almacen_fijado.nombre }}</strong>.
+                        {% else %}
+                            Documento oficial con membrete y escudo, agrupado por partidas con subtotales y consolidado.
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="pt-5 mt-5 border-t border-gray-100 dark:border-gray-800/80">
+                    <a href="{% url 'reporte_inventario' %}?desde={{ desde_defecto }}&hasta={{ hasta_defecto }}{% if not es_central_o_admin and almacen_fijado %}&almacen={{ almacen_fijado.id }}{% endif %}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#7c121e] hover:bg-[#610c16] transition flex items-center justify-center gap-2 shadow-sm">
+                        <span class="material-symbols-outlined text-[16px]">download</span>
+                        <span>Descargar PDF {{ gestion_sel }}</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- 3. SECCIÓN: CONSUMO POR DEPENDENCIAS (Y MATRIZ DBC SOLO SI ES CENTRAL/ADMIN) -->
+    <section class="grid grid-cols-1 {% if es_central_o_admin %}lg:grid-cols-2{% endif %} gap-6">
+
+        <!-- CONSUMO POR DEPENDENCIAS -->
+        <div class="card p-6 sm:p-7 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm flex flex-col justify-between">
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-[#d97706] dark:text-amber-400 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[22px]">corporate_fare</span>
+                    </span>
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-50 text-[#d97706] dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60">
+                        CONTROL PEPS
+                    </span>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                        Consumo por Dependencias
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                        {% if not es_central_o_admin and almacen_fijado %}
+                            Mide las asignaciones y consumos retirados de las oficinas autorizadas para ser atendidas por <strong>{{ almacen_fijado.nombre }}</strong>.
+                        {% else %}
+                            Informe comparativo institucional de unidades asignadas, despachos en ventanilla y costo valorado por oficina.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-6 mt-6 border-t border-gray-100 dark:border-gray-800/80 flex items-center gap-3">
+                <a href="{% url 'reporte_consumo_unidades' %}?gestion={{ gestion_sel }}" class="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gray-900 dark:bg-slate-800 hover:bg-[#7c121e] transition flex items-center justify-center gap-2 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">visibility</span>
+                    <span>Ver Consolidado Web</span>
+                </a>
+                
+                <a href="{% url 'reporte_consumo_unidades' %}?gestion={{ gestion_sel }}&exportar=pdf" target="_blank" class="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-[#7c121e] hover:border-[#7c121e] transition flex items-center justify-center" title="Descargar versión PDF oficial">
+                    <span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- MATRIZ DBC: SOLO VISIBLE PARA CENTRAL, ADMIN O BIENES Y SERVICIOS -->
+        {% if es_central_o_admin or request.user.perfilusuario.rol in 'ADMINISTRADOR,ADMIN_ALMACENES,BIENES_SERVICIOS,RPA' %}
+        <div class="card p-6 sm:p-7 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm flex flex-col justify-between">
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="w-10 h-10 rounded-2xl bg-stone-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[22px]">view_column</span>
+                    </span>
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-stone-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        CONTRATACIONES
+                    </span>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                        Matriz de Especificaciones Técnicas (DBC)
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                        Cuadro comparativo que cruza la demanda consolidada de todas las Secretarías departamentales por partida presupuestaria para compras masivas.
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-6 mt-6 border-t border-gray-100 dark:border-gray-800/80">
+                <a href="{% url 'reporte_especificaciones_tecnicas' %}?gestion={{ gestion_sel }}" target="_blank" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gray-900 dark:bg-slate-800 hover:bg-[#7c121e] transition flex items-center justify-center gap-2 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                    <span>Abrir Matriz Oficial DBC {{ gestion_sel }}</span>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+    </section>
+
+    <!-- 4. SECCIÓN: AUDITORÍA RÁPIDA DE KÁRDEX POR MATERIAL -->
+    <section class="card p-6 sm:p-7 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
+        <div class="flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-xl bg-amber-100/70 dark:bg-amber-950/60 text-[#d97706] dark:text-amber-400 flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">menu_book</span>
+            </span>
+            <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                    Consulta Exprés de Kárdex por Material (Gestión {{ gestion_sel }})
+                </h2>
+                <span class="text-[11px] text-gray-400">
+                    {% if not es_central_o_admin and almacen_fijado %}
+                        Auditoría directa en el depósito {{ almacen_fijado.nombre }}
+                    {% else %}
+                        Auditoría de libro de almacén individual
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="p-3 bg-gray-50/70 dark:bg-slate-800/50 rounded-2xl border border-gray-200/70 dark:border-gray-700/60">
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <div class="sm:col-span-8">
+                    <select 
+                        id="select-material-kardex" 
+                        class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-900 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 dark:text-gray-200 font-semibold focus:ring-2 focus:ring-[#7c121e] cursor-pointer"
+                    >
+                        <option value="">-- Buscar por código SABS o nombre de subartículo --</option>
+                        {% for mat in materiales %}
+                            <option value="{{ mat.id }}">
+                                {{ mat.codigo }} — {{ mat.nombre }} [Partida {{ mat.partida.codigo|default:'S/P' }}]
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <button 
+                        type="button" 
+                        onclick="abrirKardex('web')" 
+                        class="w-full py-2.5 bg-gray-900 hover:bg-gray-800 dark:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 h-[40px] cursor-pointer shadow-sm active:scale-95"
+                    >
+                        <span class="material-symbols-outlined text-[16px]">visibility</span>
+                        <span>Ver Kárdex</span>
+                    </button>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <button 
+                        type="button" 
+                        onclick="abrirKardex('pdf')" 
+                        class="w-full py-2.5 bg-[#7c121e] hover:bg-[#610c16] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 h-[40px] cursor-pointer shadow-sm active:scale-95"
+                    >
+                        <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                        <span>PDF Valorado</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- SCRIPT DE NAVEGACIÓN AISLADA -->
+<script>
+    function cambiarGestion(gestion) {
+        window.location.href = "?gestion=" + gestion;
+    }
+
+    function abrirKardex(tipo) {
+        const matId = document.getElementById('select-material-kardex').value;
+        const gestion = '{{ gestion_sel }}';
+        // Inyecta el almacén del subalmacén si no es administrador general
+        const almacenParam = '{% if not es_central_o_admin and almacen_fijado %}&almacen={{ almacen_fijado.id }}{% endif %}';
+
+        if (!matId) {
+            alert('Por favor, selecciona primero un material de la lista.');
+            return;
+        }
+
+        if (tipo === 'web') {
+            window.location.href = `/inventario/kardex/${matId}/?gestion=${gestion}` + almacenParam;
+        } else {
+            window.open(`/inventario/kardex/pdf/${matId}/?gestion=${gestion}` + almacenParam, '_blank');
+        }
+    }
+</script>
+{% endblock %}

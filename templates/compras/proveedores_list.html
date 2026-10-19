@@ -1,68 +1,331 @@
 {% extends 'base.html' %}
 
-{% block title %} Proveedores {% endblock %}
+{% block title %} Catálogo de Proveedores {% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+<div class="max-w-6xl mx-auto space-y-6 font-['Outfit']">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Proveedores</h1>
-            <p class="text-sm text-gray-500 mt-1">Directorio y catálogo de empresas proveedoras registradas en el sistema.</p>
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
+                <span class="p-2 rounded-2xl bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 inline-flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[26px]">storefront</span>
+                </span>
+                Proveedores
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Directorio y catálogo de empresas proveedoras registradas en el sistema.
+            </p>
         </div>
-        <div class="flex gap-2 w-full sm:w-auto">
-            <a href="{% url 'crear_proveedor' %}" class="btn-primary px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-md hover:shadow transition flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
-                <span class="material-symbols-outlined text-[18px]">add</span> Registrar Proveedor
-            </a>
-            <a href="{% url 'compras_list' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
-                <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+
+        <div class="flex items-center gap-2">
+            <button onclick="abrirModalCrear()" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                <span>Registrar Proveedor</span>
+            </button>
+            <a href="{% url 'adquisiciones_list' %}" class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-xs font-semibold transition">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                <span>Volver</span>
             </a>
         </div>
     </div>
 
-    {% if messages %}
-        <div class="mb-6">
-            {% for message in messages %}
-                <div class="p-4 rounded-2xl text-sm border bg-green-50 text-green-700 border-green-200 mb-2">{{ message }}</div>
-            {% endfor %}
-        </div>
-    {% endif %}
+    <!-- BUSCADOR -->
+    <div class="card p-3.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+        <form method="GET" class="flex gap-2">
+            <div class="relative flex-1">
+                <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Buscar por NIT, Razón Social, teléfono o dirección..." 
+                       class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-950 rounded-xl pl-9 pr-4 py-2 text-xs">
+                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">search</span>
+            </div>
+            <button type="submit" class="bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer">
+                Buscar
+            </button>
+            {% if query %}
+                <a href="{% url 'proveedores_list' %}" class="border border-gray-300 dark:border-gray-700 text-gray-500 hover:bg-gray-100 px-3 py-2 rounded-xl flex items-center" title="Limpiar">
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                </a>
+            {% endif %}
+        </form>
+    </div>
 
-    <div class="card overflow-hidden shadow-sm">
+    <!-- TABLA DE PROVEEDORES CON ESTADO Y BAJA LÓGICA -->
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[800px]">
-                <thead class="bg-gray-50 border-b border-gray-100">
-                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                        <th class="px-6 py-4 font-semibold w-40">NIT</th>
-                        <th class="px-6 py-4 font-semibold">Razón Social</th>
-                        <th class="px-6 py-4 font-semibold w-48">Teléfono</th>
-                        <th class="px-6 py-4 font-semibold w-64">Dirección</th>
-                        <th class="px-6 py-4 font-semibold text-right pr-8 w-24">Acciones</th>
+            <table class="w-full text-xs text-left">
+                <thead class="bg-gray-50 dark:bg-slate-800/60 text-[10px] uppercase font-bold text-gray-500 border-b">
+                    <tr>
+                        <th class="px-6 py-3.5 w-36">NIT</th>
+                        <th class="px-6 py-3.5">Razón Social</th>
+                        <th class="px-6 py-3.5 w-32">Teléfono</th>
+                        <th class="px-6 py-3.5">Dirección</th>
+                        <th class="px-6 py-3.5 text-center w-32">Estado</th>
+                        <th class="px-6 py-3.5 text-right w-28 pr-8">Acciones</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    {% for prov in proveedores %}
-                    <tr class="hover:bg-gray-50/50 transition duration-150">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{{ prov.nit }}</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-700">{{ prov.razon_social }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">{{ prov.telefono|default:"—" }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500 truncate max-w-[200px]" title="{{ prov.direccion }}">{{ prov.direccion|default:"—" }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right pr-8">
-                            <a href="{% url 'editar_proveedor' prov.id %}" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-amber-50 hover:border-amber-200 inline-flex items-center justify-center transition">
-                                <span class="material-symbols-outlined text-[#d97706] text-[20px]">edit</span>
-                            </a>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    {% for p in proveedores %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                        <td class="px-6 py-4 font-mono font-bold text-[#8b0000] dark:text-red-400">
+                            {{ p.nit }}
+                        </td>
+                        <td class="px-6 py-4 font-bold text-gray-900 dark:text-white text-sm">
+                            {{ p.razon_social }}
+                        </td>
+                        <td class="px-6 py-4 font-mono text-gray-700 dark:text-gray-300">
+                            {{ p.telefono|default:'—' }}
+                        </td>
+                        <td class="px-6 py-4 text-gray-600 dark:text-gray-400">
+                            {{ p.direccion|default:'—' }}
+                        </td>
+                        
+                        <!-- ESTADO CON PASTILLA DE COLOR -->
+                        <td class="px-6 py-4 text-center">
+                            {% if p.is_active %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Habilitado
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                    Dado de Baja
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- ACCIONES (EDITAR + BAJA/REACTIVAR) -->
+                        <td class="px-6 py-4 text-right pr-8 whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-1.5">
+                                <!-- Botón Editar -->
+                                <button type="button"
+                                        onclick="abrirModalEditar(this)"
+                                        data-id="{{ p.id }}"
+                                        data-nit="{{ p.nit }}"
+                                        data-razon="{{ p.razon_social|escapejs }}"
+                                        data-telefono="{{ p.telefono|default:''|escapejs }}"
+                                        data-direccion="{{ p.direccion|default:''|escapejs }}"
+                                        class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-amber-50 text-amber-600 inline-flex items-center justify-center transition shadow-sm cursor-pointer" title="Editar datos">
+                                    <span class="material-symbols-outlined text-[16px]">edit</span>
+                                </button>
+
+                                <!-- Botón Baja / Reactivación con Modal de Confirmación -->
+                                <button type="button" 
+                                        onclick="confirmarBajaModal(this)"
+                                        data-id="{{ p.id }}"
+                                        data-nit="{{ p.nit }}"
+                                        data-razon="{{ p.razon_social }}"
+                                        data-activo="{% if p.is_active %}1{% else %}0{% endif %}"
+                                        class="w-8 h-8 rounded-xl border border-gray-200 dark:border-gray-700 inline-flex items-center justify-center transition shadow-sm cursor-pointer {% if p.is_active %}hover:bg-rose-50 hover:border-rose-300 text-rose-600{% else %}hover:bg-emerald-50 hover:border-emerald-300 text-emerald-600{% endif %}"
+                                        title="{% if p.is_active %}Dar de baja (Inhabilitar){% else %}Reactivar proveedor{% endif %}">
+                                    <span class="material-symbols-outlined text-[16px]">
+                                        {% if p.is_active %}power_settings_new{% else %}check_circle{% endif %}
+                                    </span>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
-                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">local_shipping</span>
-                            No existen proveedores registrados.
+                        <td colspan="6" class="p-12 text-center text-gray-400">
+                            <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">storefront</span>
+                            No se encontraron proveedores registrados.
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        {% if page_obj.has_other_pages %}
+        <div class="p-4 border-t flex justify-between items-center text-xs text-gray-500">
+            <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            <div class="flex gap-1">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-lg border">Anterior</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-3 py-1.5 rounded-lg border">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: REGISTRAR PROVEEDOR -->
+<!-- ======================================================== -->
+<div id="modalCrear" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Registrar Proveedor</h3>
+            <button onclick="cerrarModalCrear()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form method="POST" action="{% url 'crear_proveedor' %}" class="space-y-3 text-xs">
+            {% csrf_token %}
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">NIT / C.I. *</label>
+                <input type="text" name="nit" required placeholder="Ej: 1024589023" class="w-full border rounded-xl p-2.5 font-mono font-bold">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Razón Social / Nombre Comercial *</label>
+                <input type="text" name="razon_social" required placeholder="Ej: DISTRIBUIDORA Y LIBRERÍA POTOSÍ S.R.L." class="w-full border rounded-xl p-2.5 font-bold uppercase">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Teléfono / Celular</label>
+                <input type="text" name="telefono" placeholder="Ej: 62-24589 / 72412345" class="w-full border rounded-xl p-2.5">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Dirección Legal</label>
+                <input type="text" name="direccion" placeholder="Ej: Calle Bolívar N° 142, Potosí" class="w-full border rounded-xl p-2.5">
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t">
+                <button type="button" onclick="cerrarModalCrear()" class="px-4 py-2 border rounded-xl text-gray-600">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-[#8b0000] text-white font-bold rounded-xl shadow cursor-pointer">Guardar</button>
+            </div>
+        </form>
     </div>
 </div>
+
+<!-- ======================================================== -->
+<!-- MODAL: EDITAR PROVEEDOR -->
+<!-- ======================================================== -->
+<div id="modalEditar" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Editar Proveedor</h3>
+            <button onclick="cerrarModalEditar()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form id="formEditar" method="POST" action="" class="space-y-3 text-xs">
+            {% csrf_token %}
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">NIT / C.I. *</label>
+                <input type="text" id="editNit" name="nit" required class="w-full border rounded-xl p-2.5 font-mono font-bold">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Razón Social *</label>
+                <input type="text" id="editRazon" name="razon_social" required class="w-full border rounded-xl p-2.5 font-bold uppercase">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
+                <input type="text" id="editTel" name="telefono" class="w-full border rounded-xl p-2.5">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Dirección</label>
+                <input type="text" id="editDir" name="direccion" class="w-full border rounded-xl p-2.5">
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t">
+                <button type="button" onclick="cerrarModalEditar()" class="px-4 py-2 border rounded-xl text-gray-600">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-amber-600 text-white font-bold rounded-xl shadow cursor-pointer">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: CONFIRMACIÓN DE BAJA LÓGICA / REACTIVACIÓN -->
+<!-- ======================================================== -->
+<div id="modalConfirmarBaja" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+        
+        <div id="bajaIconoContainer" class="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center">
+            <span id="bajaIcono" class="material-symbols-outlined text-3xl"></span>
+        </div>
+
+        <div>
+            <h3 id="bajaTitulo" class="text-lg font-extrabold text-gray-900 dark:text-white"></h3>
+            <p id="bajaMensaje" class="text-xs text-gray-500 dark:text-gray-400 mt-2 px-2"></p>
+        </div>
+
+        <div class="p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-gray-700 text-xs text-left">
+            <p class="text-[10px] uppercase font-bold text-gray-400">Proveedor:</p>
+            <p class="font-bold text-gray-900 dark:text-white mt-0.5">
+                <span id="bajaRazonSpan"></span>
+                <span id="bajaNitSpan" class="block font-mono text-gray-500 text-[10px]"></span>
+            </p>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+            <button type="button" onclick="cerrarModalBaja()" class="flex-1 py-2.5 border border-gray-300 dark:border-gray-700 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 transition cursor-pointer">
+                Cancelar
+            </button>
+            <a id="bajaEnlaceAccion" href="#" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow transition flex items-center justify-center cursor-pointer">
+                Confirmar
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    function abrirModalCrear() { document.getElementById('modalCrear').classList.remove('hidden'); }
+    function cerrarModalCrear() { document.getElementById('modalCrear').classList.add('hidden'); }
+
+    function abrirModalEditar(id, nit, razon, tel, dir) {
+        document.getElementById('formEditar').action = `/compras/proveedores/editar/${id}/`;
+        document.getElementById('editNit').value = nit;
+        document.getElementById('editRazon').value = razon;
+        document.getElementById('editTel').value = tel;
+        document.getElementById('editDir').value = dir;
+        document.getElementById('modalEditar').classList.remove('hidden');
+    }
+    function cerrarModalEditar() { document.getElementById('modalEditar').classList.add('hidden'); }
+
+    // Modal de confirmación para Baja / Reactivación
+    function confirmarBajaModal(boton) {
+        const id = boton.dataset.id;
+        const nit = boton.dataset.nit;
+        const razon = boton.dataset.razon;
+        const estaActivo = boton.dataset.activo === "1";
+
+        const modal = document.getElementById('modalConfirmarBaja');
+        const iconoContainer = document.getElementById('bajaIconoContainer');
+        const icono = document.getElementById('bajaIcono');
+        const titulo = document.getElementById('bajaTitulo');
+        const mensaje = document.getElementById('bajaMensaje');
+        const razonSpan = document.getElementById('bajaRazonSpan');
+        const nitSpan = document.getElementById('bajaNitSpan');
+        const enlace = document.getElementById('bajaEnlaceAccion');
+
+        razonSpan.textContent = razon;
+        nitSpan.textContent = `NIT: ${nit}`;
+        enlace.href = `/compras/proveedores/toggle/${id}/`;
+
+        if (estaActivo) {
+            iconoContainer.className = "w-14 h-14 rounded-2xl mx-auto flex items-center justify-center bg-rose-50 text-rose-600 dark:bg-rose-950/40";
+            icono.textContent = "warning";
+            titulo.textContent = "¿Inhabilitar Proveedor?";
+            mensaje.textContent = "Al dar de baja, este proveedor ya no aparecerá disponible para nuevas órdenes de compra ni notas de entrada. Sus contratos pasados no se verán afectados.";
+            enlace.className = "flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow bg-rose-600 hover:bg-rose-700 transition flex items-center justify-center";
+            enlace.textContent = "Sí, Inhabilitar";
+        } else {
+            iconoContainer.className = "w-14 h-14 rounded-2xl mx-auto flex items-center justify-center bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40";
+            icono.textContent = "check_circle";
+            titulo.textContent = "¿Reactivar Proveedor?";
+            mensaje.textContent = "Este proveedor volverá a estar habilitado para adjudicaciones y compras inmediatamente.";
+            enlace.className = "flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow bg-emerald-600 hover:bg-emerald-700 transition flex items-center justify-center";
+            enlace.textContent = "Sí, Reactivar";
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function cerrarModalBaja() {
+        document.getElementById('modalConfirmarBaja').classList.add('hidden');
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === "Escape") {
+            cerrarModalCrear();
+            cerrarModalEditar();
+            cerrarModalBaja();
+        }
+    });
+</script>
 {% endblock %}

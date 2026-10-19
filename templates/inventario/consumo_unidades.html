@@ -1,52 +1,180 @@
 {% extends 'base.html' %}
 
-{% block title %} Consumo por Unidades {% endblock %}
+{% block title %} Consolidado de Consumo por Dependencia {% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto">
-    <div class="flex justify-between items-center mb-8">
+<div class="max-w-7xl mx-auto space-y-6 font-['Outfit']">
+
+    <!-- CABECERA -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">Consumo por Unidad Organizacional</h1>
-            <p class="text-sm text-gray-500 mt-1">Informe histórico de materiales retirados y presupuesto ejecutado por unidad [28].</p>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"></span> Control Físico / Valorado
+                </span>
+                <span class="text-xs text-gray-400">Gestión {{ gestion }}</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                Consolidado de Consumo por Dependencia
+            </h1>
+            <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                Seguimiento de Asignación Física Recibida vs. Retirada y Valorado Real PEPS por Oficina.
+            </p>
         </div>
-        <a href="{% url 'inventario' %}" class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
-            <span class="material-symbols-outlined text-[18px]">arrow_back</span> Volver
+
+        <a href="?exportar=pdf&secretaria_id={{ filtro_secretaria_id }}&unidad_id={{ filtro_unidad_id }}&desde={{ desde }}&hasta={{ hasta }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#8b0000] hover:bg-red-800 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+            <span>Exportar Informe PDF</span>
         </a>
     </div>
 
-    <div class="card overflow-hidden shadow-sm">
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-[800px]">
-                <thead class="bg-gray-50 border-b border-gray-100">
-                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                        <th class="px-6 py-4 font-semibold">Unidad Organizacional Destinataria</th>
-                        <th class="px-6 py-4 font-semibold text-center w-48">Cantidad de Materiales Solicitados</th>
-                        <th class="px-6 py-4 font-semibold text-right pr-12 w-64">Presupuesto Ejecutado (Bs.)</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    {% for item in datos_consumo %}
-                    <tr class="hover:bg-gray-50/50 transition duration-150">
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-700">
-                            {{ item.unidad.nombre }}
-                            {% if item.unidad.codigo_sigep %}
-                                <span class="text-xs text-gray-400 font-normal ml-2">({{ item.unidad.codigo_sigep }})</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 text-center text-sm font-bold text-gray-800">{{ item.total_items }} u.</td>
-                        <td class="px-6 py-4 text-right pr-12 text-sm font-black text-gray-800">{{ item.total_monto|floatformat:2 }} Bs.</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="3" class="px-6 py-12 text-center text-gray-500">
-                            <span class="material-symbols-outlined text-4xl text-gray-300 mb-2 block">bar_chart</span>
-                            No se han registrado despachos ni consumos de materiales a las unidades organizacionales aún.
-                        </td>
-                    </tr>
+    <!-- FILTROS -->
+    <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end text-xs">
+            <div class="sm:col-span-4">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Secretaría</label>
+                <select name="secretaria_id" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2.5 text-xs text-gray-800 dark:text-gray-200">
+                    <option value="">-- Todas las Secretarías --</option>
+                    {% for sec in secretarias %}
+                        <option value="{{ sec.id }}" {% if filtro_secretaria_id == sec.id|stringformat:"s" %}selected{% endif %}>{{ sec.nombre }}</option>
                     {% endfor %}
-                </tbody>
-            </table>
+                </select>
+            </div>
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Desde</label>
+                <input type="date" name="desde" value="{{ desde }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2 text-xs">
+            </div>
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-bold uppercase text-gray-500 mb-1">Hasta</label>
+                <input type="date" name="hasta" value="{{ hasta }}" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl p-2 text-xs">
+            </div>
+            <div class="sm:col-span-2">
+                <button type="submit" class="w-full bg-[#1e293b] hover:bg-[#0f172a] text-white p-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1 shadow cursor-pointer h-[38px]">
+                    <span class="material-symbols-outlined text-[16px]">filter_alt</span> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 4 TARJETAS KPIS SOLICITADAS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- KPI 1 -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">assignment_add</span>
+            </div>
+            <div>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">Total Asignado a Oficinas</span>
+                <span class="text-xl font-black text-gray-900 dark:text-gray-100 font-mono">{{ total_general_asignado }} u.</span>
+            </div>
         </div>
+
+        <!-- KPI 2 -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-green-50 dark:bg-green-950/40 text-green-600 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">output</span>
+            </div>
+            <div>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">Total Retirado</span>
+                <span class="text-xl font-black text-green-700 font-mono">{{ total_general_retirado }} u.</span>
+            </div>
+        </div>
+
+        <!-- KPI 3 -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">warehouse</span>
+            </div>
+            <div>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">Saldo Custodia Almacén</span>
+                <span class="text-xl font-black text-amber-700 font-mono">{{ saldo_custodia_almacen }} u.</span>
+            </div>
+        </div>
+
+        <!-- KPI 4 -->
+        <div class="card p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">payments</span>
+            </div>
+            <div>
+                <span class="text-[10px] uppercase font-bold text-gray-400 block">Total Valorado Asignado</span>
+                <span class="text-xl font-black text-purple-700 font-mono">Bs. {{ total_general_valorado_asig|floatformat:2 }}</span>
+                <span class="text-[10px] text-gray-400 block mt-0.5">Retirado: Bs. {{ total_general_valorado|floatformat:2 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLAS AGRUPADAS POR SECRETARÍA -->
+    <div class="space-y-6">
+        {% for grupo in datos_por_secretaria %}
+        <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
+            <div class="px-5 py-3.5 bg-gray-50/90 dark:bg-slate-800/60 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-gray-400 text-[20px]">corporate_fare</span>
+                    <h2 class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">{{ grupo.secretaria.nombre }}</h2>
+                </div>
+                <div class="text-xs text-gray-500 font-medium">
+                    Retirado Secretaría: <strong class="text-green-700 font-mono">{{ grupo.total_retirado }} u.</strong> | <strong class="text-[#8b0000] dark:text-red-400 font-mono">Bs. {{ grupo.total_valorado|floatformat:2 }}</strong>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-100/60 dark:bg-slate-900 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                            <th class="px-5 py-3">Unidad / Área Organizacional</th>
+                            <th class="px-4 py-3 text-center">Asignación Física</th>
+                            <th class="px-4 py-3 text-right">Valor Asignado (Bs.)</th>
+                            <th class="px-4 py-3 text-center">Cant. Retirada</th>
+                            <th class="px-4 py-3 text-right">Valor Retirado (Bs.)</th>
+                            <th class="px-4 py-3 text-center">Saldo Pendiente</th>
+                            <th class="px-5 py-3">Materiales Más Retirados</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        {% for u in grupo.unidades %}
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                            <td class="px-5 py-3.5 font-bold text-gray-800 dark:text-gray-200">
+                                {{ u.unidad.nombre }}
+                            </td>
+                            <td class="px-4 py-3.5 text-center font-mono font-semibold text-blue-700">
+                                {{ u.cant_asignada }} u.
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-mono font-bold text-purple-700">
+                                Bs. {{ u.val_asignado|floatformat:2 }}
+                            </td>
+                            <td class="px-4 py-3.5 text-center font-mono font-bold text-green-700">
+                                {{ u.cant_retirada }} u.
+                            </td>
+                            <td class="px-4 py-3.5 text-right font-mono font-bold text-gray-900 dark:text-white">
+                                Bs. {{ u.val_retirado|floatformat:2 }}
+                            </td>
+                            <td class="px-4 py-3.5 text-center font-mono font-bold text-amber-700">
+                                {{ u.saldo_pendiente }} u.
+                            </td>
+                            <td class="px-5 py-3.5">
+                                <div class="flex flex-wrap gap-1">
+                                    {% for mat in u.top_materiales %}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 font-mono">
+                                            {{ mat.material__nombre|truncatechars:18 }} ({{ mat.cant_total }})
+                                        </span>
+                                    {% empty %}
+                                        <span class="text-gray-400 text-[10px] italic">Sin retiros</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% empty %}
+        <div class="card p-12 text-center text-gray-400">
+            <span class="material-symbols-outlined text-4xl mb-2 block">folder_off</span>
+            No existen registros de consumo ni asignaciones directas en el período seleccionado.
+        </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}

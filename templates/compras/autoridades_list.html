@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %} Autoridades Institucionales (RPA / SAF) {% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6 font-['Outfit']">
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
+                <span class="p-2 rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 inline-flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[26px]">badge</span>
+                </span>
+                Autoridades Institucionales
+            </h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Designación oficial y vigencia del RPA, Secretario(a) SAF y autoridades que firman las compras menores.
+            </p>
+        </div>
+
+        <button onclick="abrirModalCrear()" class="bg-[#8b0000] hover:bg-[#6b0000] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">person_add</span>
+            <span>Nueva Designación</span>
+        </button>
+    </div>
+
+    <!-- TARJETAS DE AUTORIDADES ACTIVAS EN FUNCIONES -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for a in autoridades %}
+            {% if a.is_active %}
+            <div class="card p-5 bg-white dark:bg-slate-900 border-2 border-emerald-500/40 rounded-3xl shadow-sm space-y-3 relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <span class="px-3 py-1 rounded-xl text-[10px] font-black tracking-wider uppercase bg-emerald-100 text-emerald-800">
+                        {{ a.get_cargo_display }} • EN FUNCIONES VIGENTE
+                    </span>
+                    <button type="button"
+                            onclick="abrirModalEditar(this)"
+                            data-id="{{ a.id }}"
+                            data-nombre="{{ a.nombre_completo }}"
+                            data-resolucion="{{ a.resolucion_designacion }}"
+                            data-designacion="{{ a.fecha_designacion|date:'Y-m-d' }}"
+                            data-vencimiento="{{ a.fecha_vencimiento|date:'Y-m-d'|default:'' }}"
+                            class="text-gray-400 hover:text-amber-600 p-1 cursor-pointer"
+                            title="Editar autoridad">
+                        <span class="material-symbols-outlined text-[18px]">edit</span>
+                    </button>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-black text-gray-900 dark:text-white">{{ a.nombre_completo }}</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400 font-semibold mt-0.5">{{ a.resolucion_designacion }}</p>
+                </div>
+
+                <div class="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center text-xs font-mono text-gray-500">
+                    <span>Designado: <strong>{{ a.fecha_designacion|date:"d/m/Y" }}</strong></span>
+                    <span>Vigencia: <strong>{{ a.fecha_vencimiento|date:"d/m/Y"|default:"Indefinida" }}</strong></span>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- HISTORIAL COMPLETO DE DESIGNACIONES -->
+    <div class="card overflow-hidden bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-sm">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Historial de Autoridades Registradas</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-gray-50 dark:bg-slate-800/60 text-[10px] uppercase font-bold text-gray-500 border-b">
+                    <tr>
+                        <th class="px-6 py-3.5">Cargo Oficial</th>
+                        <th class="px-6 py-3.5">Nombre de la Autoridad</th>
+                        <th class="px-6 py-3.5">Resolución de Designación</th>
+                        <th class="px-6 py-3.5 text-center">Designado</th>
+                        <th class="px-6 py-3.5 text-center">Estado</th>
+                        <th class="px-6 py-3.5 text-right pr-8">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    {% for a in autoridades %}
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition">
+                        <td class="px-6 py-4 font-bold text-[#8b0000] dark:text-red-400">
+                            {{ a.get_cargo_display }}
+                        </td>
+                        <td class="px-6 py-4 font-semibold text-gray-900 dark:text-white">
+                            {{ a.nombre_completo }}
+                        </td>
+                        <td class="px-6 py-4 text-gray-600 dark:text-gray-400 font-mono">
+                            {{ a.resolucion_designacion }}
+                        </td>
+                        <td class="px-6 py-4 text-center font-mono">
+                            {{ a.fecha_designacion|date:"d/m/Y" }}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            {% if a.is_active %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">En Funciones</span>
+                            {% else %}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600">Histórico / Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-right pr-8">
+                            {% if not a.is_active %}
+                                <a href="{% url 'toggle_autoridad' a.id %}" class="px-3 py-1 bg-gray-800 hover:bg-black text-white rounded-lg text-[10px] font-bold">
+                                    Poner en Funciones
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODAL CREAR AUTORIDAD -->
+<div id="modalCrear" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+        <h3 class="text-base font-extrabold text-gray-900 dark:text-white border-b pb-2">Nueva Designación de Autoridad</h3>
+        <form method="POST" action="{% url 'crear_autoridad' %}" class="space-y-4 text-xs">
+            {% csrf_token %}
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Cargo Institucional *</label>
+                <select name="cargo" required class="w-full border rounded-xl p-2.5 font-bold bg-white dark:bg-slate-900">
+                    <option value="RPA">RPA (Responsable de Contrataciones)</option>
+                    <option value="SAF">Secretario(a) Administrativo Financiero (SAF)</option>
+                    <option value="MAE">Máxima Autoridad Ejecutiva (Gobernador)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre Completo *</label>
+                <input type="text" name="nombre_completo" placeholder="Ej: Lic. Flora Colque Calizaya" required class="w-full border rounded-xl p-2.5 font-bold">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Resolución de Designación *</label>
+                <input type="text" name="resolucion_designacion" placeholder="Ej: Resolución Administrativa N° 012/2026" required class="w-full border rounded-xl p-2.5 font-mono">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Fecha Designación *</label>
+                    <input type="date" name="fecha_designacion" value="{% now 'Y-m-d' %}" required class="w-full border rounded-xl p-2">
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Vigencia (Opcional)</label>
+                    <input type="date" name="fecha_vencimiento" class="w-full border rounded-xl p-2">
+                </div>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+                <input type="checkbox" name="is_active" id="chkActive" checked class="w-4 h-4 accent-[#8b0000]">
+                <label for="chkActive" class="font-bold text-gray-800 dark:text-gray-200">Poner inmediatamente en funciones (Vigente)</label>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t">
+                <button type="button" onclick="cerrarModalCrear()" class="px-4 py-2 border rounded-xl text-gray-600">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-[#8b0000] text-white font-bold rounded-xl shadow">Guardar Designación</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- MODAL EDITAR AUTORIDAD -->
+<div id="modalEditar" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+        <h3 class="text-base font-extrabold text-gray-900 dark:text-white border-b pb-2">Editar Autoridad</h3>
+        <form id="formEditar" method="POST" action="" class="space-y-4 text-xs">
+            {% csrf_token %}
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre Completo *</label>
+                <input type="text" id="editNombre" name="nombre_completo" required class="w-full border rounded-xl p-2.5 font-bold">
+            </div>
+            <div>
+                <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Resolución de Designación *</label>
+                <input type="text" id="editResolucion" name="resolucion_designacion" required class="w-full border rounded-xl p-2.5 font-mono">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Fecha Designación *</label>
+                    <input type="date" id="editDesignacion" name="fecha_designacion" required class="w-full border rounded-xl p-2">
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-700 dark:text-gray-300 mb-1">Vigencia (Opcional)</label>
+                    <input type="date" id="editVencimiento" name="fecha_vencimiento" class="w-full border rounded-xl p-2">
+                </div>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+                <input type="checkbox" name="is_active" id="editActive" class="w-4 h-4 accent-[#8b0000]">
+                <label for="editActive" class="font-bold text-gray-800 dark:text-gray-200">En funciones (Vigente)</label>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t">
+                <button type="button" onclick="cerrarModalEditar()" class="px-4 py-2 border rounded-xl text-gray-600">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function abrirModalCrear() { 
+        document.getElementById('modalCrear').classList.remove('hidden'); 
+    }
+    function cerrarModalCrear() { 
+        document.getElementById('modalCrear').classList.add('hidden'); 
+    }
+
+    function abrirModalEditar(btn) {
+        const id = btn.dataset.id;
+        document.getElementById('formEditar').action = `/compras/autoridades/editar/${id}/`;
+        document.getElementById('editNombre').value = btn.dataset.nombre;
+        document.getElementById('editResolucion').value = btn.dataset.resolucion;
+        document.getElementById('editDesignacion').value = btn.dataset.designacion;
+        document.getElementById('editVencimiento').value = btn.dataset.vencimiento;
+        document.getElementById('editActive').checked = true;
+        document.getElementById('modalEditar').classList.remove('hidden');
+    }
+
+    function cerrarModalEditar() { 
+        document.getElementById('modalEditar').classList.add('hidden'); 
+    }
+</script>
+
+{% endblock %}

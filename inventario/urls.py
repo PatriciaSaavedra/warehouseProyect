@@ -37,8 +37,19 @@ urlpatterns = [
     path('transferencias/', views.transferencia_list, name='transferencia_list'),
     path('transferencias/enviar/', views.enviar_transferencia, name='enviar_transferencia'),
     path('transferencias/<int:id>/recibir/', views.recibir_transferencia, name='recibir_transferencia'),
-    path('kardex/<int:id>/', views.kardex, name='kardex'),  
     path('gestion/cierre/', views.cierre_conciliacion_view, name='cierre_conciliacion'),
     path('stock-unidad/', views.inventario_por_unidad, name='inventario_por_unidad'),
 
+    # REPORTES OFICIALES DGCF Y CONSUMO POR DEPENDENCIAS
+    path('reportes/dgcf-r105/', views.reporte_dgcf_r105, name='reporte_dgcf_r105'),
+    path('reportes/dgcf-r106/', views.reporte_dgcf_r106, name='reporte_dgcf_r106'),
+    path('reportes/consumo-dependencias/', views.reporte_consumo_unidades, name='reporte_consumo_dependencias'),
+    path('reportes/especificaciones-tecnicas/', views.reporte_especificaciones_tecnicas, name='reporte_especificaciones_tecnicas'),
+# CRUD UNIDADES DE MEDIDA
+    path('unidades-medida/', views.unidad_medida_list, name='unidad_medida_list'),
+    path('unidades-medida/crear/', views.crear_unidad_medida, name='crear_unidad_medida'),
+    path('unidades-medida/editar/<int:id>/', views.editar_unidad_medida, name='editar_unidad_medida'),
+    path('unidades-medida/toggle/<int:id>/', views.toggle_unidad_medida, name='toggle_unidad_medida'),
+
+    path('reportes/', views.hub_reportes, name='hub_reportes'),
 ]

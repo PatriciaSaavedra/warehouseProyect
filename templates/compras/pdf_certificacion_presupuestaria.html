@@ -1,0 +1,149 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificación Presupuestaria - {{ proceso.codigo }}</title>
+    <style>
+        @page { size: letter landscape; margin: 1cm 1.2cm 1cm 1.2cm; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5px; color: #000; margin: 0; padding: 24px 16px; background-color: #eaedf1; }
+
+        .top-action-bar {
+            max-width: 1050px; margin: 0 auto 20px auto; background: #ffffff; border: 1px solid #d5d9df; border-radius: 14px; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+        .btn-print { background-color: #7c121e; color: #fff; border: none; padding: 7px 18px; border-radius: 8px; font-weight: bold; font-size: 11px; cursor: pointer; }
+        .btn-print:hover { background-color: #610c16; }
+
+        .document-page {
+            max-width: 1050px; background: #ffffff; border: 1px solid #cbd5e1; padding: 28px 34px; box-shadow: 0 12px 30px rgba(0,0,0,0.12); margin: 0 auto;
+        }
+
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .header-title { text-align: center; }
+        .header-title h3 { margin: 0; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .header-title h2 { margin: 3px 0 2px 0; font-size: 13.5px; font-weight: 800; }
+        
+        .doc-meta-box { border: 1px solid #000; text-align: center; padding: 6px 10px; width: 140px; margin-left: auto; }
+        .doc-meta-box .val-cert { font-size: 11px; font-weight: bold; color: #063b2f; font-family: monospace; }
+        .doc-meta-box .val-codigo { font-size: 8.5px; font-weight: bold; font-family: monospace; }
+
+        .info-tramite { background-color: #f8fafc; border: 1px solid #000; padding: 6px 10px; margin-bottom: 12px; font-size: 8.5px; line-height: 1.4; }
+
+        table.data { width: 100%; border-collapse: collapse; border: 1px solid #000; margin: 10px 0 15px 0; font-size: 8.5px; }
+        table.data th, table.data td { border: 1px solid #000; padding: 4px 6px; }
+        table.data th { background-color: #f1f5f9; font-weight: bold; text-align: center; font-size: 8px; text-transform: uppercase; }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-mono { font-family: monospace; }
+        .font-bold { font-weight: bold; }
+
+        .firmas { width: 100%; margin-top: 55px; border-collapse: collapse; page-break-inside: avoid; }
+        .firmas td { width: 50%; text-align: center; padding: 0 45px; vertical-align: top; }
+        .linea { border-top: 1px dashed #000; padding-top: 4px; font-weight: bold; font-size: 8.5px; }
+
+        @media print {
+            body { background: #fff !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .document-page { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-action-bar no-print">
+        <div style="font-size: 11px; color: #063b2f; font-weight: bold;">
+            <span>✔ Documento Oficial:</span> Certificación Presupuestaria Aprobada
+        </div>
+        <button class="btn-print" onclick="window.print()">
+            🖨️ Imprimir Certificación Oficial
+        </button>
+    </div>
+
+    <div class="document-page">
+        <table class="header-table">
+            <tr>
+                <td style="width: 20%;">
+                    <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo" style="max-height: 55px;">
+                </td>
+                <td style="width: 60%;" class="header-title">
+                    <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
+                    <h2>CERTIFICACIÓN PRESUPUESTARIA OFICIAL</h2>
+                    <p style="margin: 0; font-size: 8.5px; font-weight: bold; color: #333;">DIRECCIÓN DEPARTAMENTAL DE FINANZAS • UNIDAD DE PRESUPUESTOS</p>
+                </td>
+                <td style="width: 20%;">
+                    <div class="doc-meta-box">
+                        <span style="font-size: 8px; font-weight: bold;">N° CERTIFICACIÓN:</span>
+                        <div class="val-cert">{{ proceso.certificacion_nro|default:"CP-2026-001" }}</div>
+                        <span class="val-codigo">{{ proceso.codigo }}</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="info-tramite">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 65%;">
+                        <strong>Unidad Solicitante:</strong> {{ proceso.unidad_solicitante.nombre }}<br>
+                        <strong>Objeto:</strong> {{ proceso.objeto_contratacion }}
+                    </td>
+                    <td style="width: 35%; text-align: right;">
+                        <strong>CITE Nota SAF:</strong> {{ proceso.cite_nota_saf|default:"S/C" }}<br>
+                        <strong>Fecha Emisión:</strong> {{ proceso.fecha_solicitud|date:"d/m/Y" }}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <table class="data">
+            <thead>
+                <tr>
+                    <th style="width: 25px;">N°</th>
+                    <th>Descripción del Ítem</th>
+                    <th style="width: 80px;">Cant. / Medida</th>
+                    <th style="width: 85px;">Partida</th>
+                    <th style="width: 130px;">Fuente Finan.</th>
+                    <th style="width: 110px;">Org. Fin.</th>
+                    <th style="width: 110px;">Monto Certificado (Bs.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in proceso.items.all %}
+                <tr>
+                    <td class="text-center">{{ forloop.counter }}</td>
+                    <td>{{ it.descripcion }}</td>
+                    <td class="text-center">{{ it.cantidad }} {{ it.unidad_medida }}</td>
+                    <td class="text-center font-mono font-bold">{{ it.partida.codigo|default:'39100' }}</td>
+                    <td class="text-center">{{ it.fuente_financiamiento|default:'20 - Recursos Específicos' }}</td>
+                    <td class="text-center">{{ it.organismo_financiador|default:'111 - TGN' }}</td>
+                    <td class="text-right font-mono font-bold">Bs. {{ it.monto_certificado|default:it.subtotal_referencial|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+                <tr style="background: #f1f5f9; font-weight: bold;">
+                    <td colspan="6" class="text-right">TOTAL CERTIFICADO:</td>
+                    <td class="text-right font-mono font-bold">Bs. {{ proceso.monto_certificado_bs|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="firmas">
+            <tr>
+                <td>
+                    <div class="linea">
+                        Responsable de Presupuestos<br>
+                        <span style="font-size: 7.5px; font-weight: normal;">ELABORACIÓN Y VERIFICACIÓN</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="linea">
+                        Jefatura de Presupuestos / Finanzas<br>
+                        <span style="font-size: 7.5px; font-weight: normal;">AUTORIZACIÓN PRESUPUESTARIA</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+</body>
+</html>
