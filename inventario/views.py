@@ -18,7 +18,7 @@ from django.core.files.base import ContentFile
 from django.template.loader import render_to_string
 from xhtml2pdf import pisa
 import io
-
+import re
 from datetime import date
 from django.conf import settings
 from reportlab.pdfgen import canvas
@@ -1315,6 +1315,22 @@ def inventario_por_unidad(request):
         'total_almacenes': len(almacenes_a_consultar),
         'es_admin': es_admin,
     })
+
+def generar_correlativo_nota_ingreso():
+    """Calcula automáticamente el siguiente correlativo consecutivo ej: NI-00163"""
+    ultima = NotaIngreso.objects.order_by('-id').first()
+    if ultima and ultima.nro_nota:
+        nums = re.findall(r'\d+', ultima.nro_nota)
+        if nums:
+            ultimo_num = int(nums[-1])
+            siguiente = ultimo_num + 1
+            len_zeros = len(nums[-1])
+            prefix = ultima.nro_nota[:ultima.nro_nota.rfind(nums[-1])]
+            return f"{prefix}{siguiente:0{len_zeros}d}"
+    count = NotaIngreso.objects.count() + 1
+    return f"NI-{count:05d}"
+
+
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def entrada_inventario(request):
@@ -1330,63 +1346,71 @@ def entrada_inventario(request):
     materiales = Material.objects.filter(is_active=True).order_by('nombre')
     unidades_org = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
 
-    # Órdenes de compra autorizadas pendientes de ingreso físico
-    from compras.models import CompraMenor
-    compras_pendientes = CompraMenor.objects.filter(
-        tipo_orden='COMPRA',
-        completada=False
-    ).select_related('proveedor').order_by('-id')
-
     if request.method == 'POST':
         nro_nota = request.POST.get('nro_nota', '').strip()
-        proveedor_id = request.POST.get('proveedor')
-        almacen_id = request.POST.get('almacen_destino')
+        proveedor_id = request.POST.get('proveedor', '').strip()
+        almacen_id = request.POST.get('almacen_destino', '').strip()
         c31 = request.POST.get('c31', '').strip()
         nota_entrega = request.POST.get('nota_entrega', '').strip()
         factura = request.POST.get('factura', '').strip()
-        
-        # NUEVOS CAMPOS: Número de orden manual y vinculación con CompraMenor
         nro_orden_compra = request.POST.get('nro_orden_compra', '').strip()
-        compra_id = request.POST.get('compra_id', '').strip()
         observaciones = request.POST.get('observaciones', '').strip()
-
         reingreso = request.POST.get('reingreso') == 'true'
         fecha = request.POST.get('fecha')
-        payload_raw = request.POST.get('payload')
+        payload_raw = request.POST.get('payload', '{}')
 
+        # Diccionario para restaurar el formulario en caso de error
+        form_data = {
+            'nro_nota': nro_nota,
+            'proveedor_id': proveedor_id,
+            'almacen_id': almacen_id,
+            'c31': c31,
+            'nota_entrega': nota_entrega,
+            'factura': factura,
+            'nro_orden_compra': nro_orden_compra,
+            'observaciones': observaciones,
+            'fecha': fecha,
+        }
+
+        # Función auxiliar para volver a renderizar conservando TODO
+        def render_con_error(mensaje_error):
+            messages.error(request, mensaje_error)
+            return render(request, 'inventario/crear_entrada.html', {
+                'almacenes': almacenes,
+                'proveedores': proveedores,
+                'materiales': materiales,
+                'unidades_org': unidades_org,
+                'form_data': form_data,
+                'payload_raw': payload_raw,
+                'correlativo_sugerido': generar_correlativo_nota_ingreso(),
+            })
+
+        # 1. Validar campos requeridos
         if not nro_nota or not proveedor_id or not almacen_id or not fecha or not payload_raw:
-            messages.error(request, "Los campos con asterisco (*) son obligatorios.")
-            return redirect('entrada_inventario')
+            return render_con_error("Los campos con asterisco (*) son obligatorios.")
 
-        payload_raw = html.unescape(payload_raw) if hasattr(html, 'unescape') else payload_raw
+        # 2. Validar duplicidad sin borrar datos
+        if NotaIngreso.objects.filter(nro_nota=nro_nota).exists():
+            return render_con_error(f"Ya existe una Nota de Ingreso con el N° '{nro_nota}'. Modifique el número y presione Guardar nuevamente.")
+
+        # 3. Procesar JSON de materiales
+        payload_raw_unescaped = html.unescape(payload_raw) if hasattr(html, 'unescape') else payload_raw
         try:
-            payload = json.loads(payload_raw)
+            payload = json.loads(payload_raw_unescaped)
         except json.JSONDecodeError:
-            messages.error(request, "Error en el formato de los datos de entrada.")
-            return redirect('entrada_inventario')
+            return render_con_error("Error al leer el listado de materiales agregados.")
 
-        if not payload:
-            messages.error(request, "Debe agregar al menos un material a la nota de ingreso.")
-            return redirect('entrada_inventario')
+        if not payload or not isinstance(payload, dict):
+            return render_con_error("Debe agregar al menos un material a la nota de ingreso.")
 
         proveedor = get_object_or_404(Proveedor, id=proveedor_id)
         almacen = get_object_or_404(Almacen, id=almacen_id)
-        compra_origen = CompraMenor.objects.filter(id=compra_id).first() if compra_id else None
 
         if not perfil.tiene_acceso_almacen(almacen):
-            messages.error(request, f"No tiene autorización para registrar ingresos en: {almacen.nombre}")
-            return redirect('entrada_inventario')
-
-        if NotaIngreso.objects.filter(nro_nota=nro_nota).exists():
-            messages.error(request, f"Ya existe una Nota de Ingreso registrada con el nro: {nro_nota}.")
-            return redirect('entrada_inventario')
+            return render_con_error(f"No tiene autorización para registrar ingresos en: {almacen.nombre}")
 
         try:
             with transaction.atomic():
-                # Si vino seleccionada una orden y no escribió orden manual, tomar el número oficial
-                if compra_origen and not nro_orden_compra:
-                    nro_orden_compra = compra_origen.nro_orden
-
                 nota = NotaIngreso.objects.create(
                     nro_nota=nro_nota,
                     proveedor=proveedor,
@@ -1395,18 +1419,11 @@ def entrada_inventario(request):
                     nota_entrega=nota_entrega,
                     factura=factura,
                     nro_orden_compra=nro_orden_compra,
-                    compra_menor_origen=compra_origen,
                     observaciones=observaciones,
                     reingreso=reingreso,
                     fecha=fecha,
                     usuario=request.user
                 )
-
-                # Si estaba vinculada a una compra menor, actualizar su estado a RECEPCIONADA
-                if compra_origen:
-                    compra_origen.completada = True
-                    compra_origen.estado = 'RECEPCIONADA'
-                    compra_origen.save()
 
                 from inventario.models import AsignacionEntradaUnidad
 
@@ -1420,7 +1437,6 @@ def entrada_inventario(request):
 
                     precio_total = Decimal(cantidad) * precio_u
 
-                    # 1. Crear el detalle de la nota de ingreso
                     detalle_ingreso = NotaIngresoDetalle.objects.create(
                         nota_ingreso=nota,
                         material=material,
@@ -1429,7 +1445,6 @@ def entrada_inventario(request):
                         precio_total=precio_total
                     )
 
-                    # 2. Guardar asignaciones directas a Unidades Organizacionales
                     asignaciones = item_data.get('asignaciones', [])
                     suma_asignada = 0
                     for asig in asignaciones:
@@ -1445,13 +1460,9 @@ def entrada_inventario(request):
                             )
 
                     if suma_asignada > cantidad:
-                        raise ValueError(
-                            f"La suma de asignaciones ({suma_asignada}) de '{material.nombre}' "
-                            f"supera la cantidad total ingresada ({cantidad})."
-                        )
+                        raise ValueError(f"Las asignaciones de '{material.nombre}' ({suma_asignada}) superan la cantidad ingresada ({cantidad}).")
 
-                    # 3. Stock físico en Almacén
-                    inv, created = InventarioAlmacen.objects.get_or_create(
+                    inv, _ = InventarioAlmacen.objects.get_or_create(
                         material=material,
                         almacen=almacen,
                         defaults={'stock_fisico': 0, 'stock_reservado': 0}
@@ -1460,10 +1471,7 @@ def entrada_inventario(request):
                     inv.stock_fisico += cantidad
                     inv.save()
 
-                    # 4. Kardex y Lote PEPS
-                    fecha_venc_item = item_data.get('fecha_vencimiento') or None
-                    if fecha_venc_item:
-                        fecha_venc_item = parse_date(fecha_venc_item)
+                    fecha_venc_item = parse_date(item_data.get('fecha_vencimiento')) if item_data.get('fecha_vencimiento') else None
 
                     MovimientoInventario.objects.create(
                         material=material,
@@ -1480,27 +1488,27 @@ def entrada_inventario(request):
                         referencia=f"INGRESO NOTA {nro_nota}"
                     )
 
-                orden_info = f" (Orden: {nro_orden_compra})" if nro_orden_compra else ""
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
-                    accion='Registrar Entrada con Asignación Directa',
-                    descripcion=f'Se registró la Nota de Ingreso {nro_nota}{orden_info} en el almacén {almacen.nombre}'
+                    accion='Registrar Entrada Directa',
+                    descripcion=f'Se registró la Nota de Ingreso {nro_nota} en el almacén {almacen.nombre}'
                 )
 
-            messages.success(request, f"Nota de Ingreso {nro_nota} y asignaciones directas guardadas con éxito.")
+            messages.success(request, f"Nota de Ingreso {nro_nota} y asignaciones guardadas exitosamente.")
             return redirect('nota_ingreso_list')
 
         except Exception as e:
-            messages.error(request, f"Error al procesar el ingreso físico de materiales: {str(e)}")
-            return redirect('entrada_inventario')
+            return render_con_error(f"Error al procesar el ingreso físico: {str(e)}")
 
+    # GET inicial
     return render(request, 'inventario/crear_entrada.html', {
         'almacenes': almacenes,
         'proveedores': proveedores,
         'materiales': materiales,
         'unidades_org': unidades_org,
-        'compras_pendientes': compras_pendientes,
+        'correlativo_sugerido': generar_correlativo_nota_ingreso(),
+        'payload_raw': '{}',
     })
 
 @login_required

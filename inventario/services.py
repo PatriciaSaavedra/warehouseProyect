@@ -5,19 +5,88 @@ from django.db.models import F
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from .models import Material, MovimientoInventario, InventarioAlmacen, Almacen
-from presupuestos.models import POA, DetalleProgramacionPOA
-
+from .models import (
+    Material, 
+    MovimientoInventario, 
+    InventarioAlmacen, 
+    Almacen,
+    AsignacionEntradaUnidad,
+    AsignacionMaterialUnidad
+)
 
 # ========================================================
-# 1. SALIDAS VALORADAS (PEPS)
+# 1. MOTOR DE CÁLCULO Y DESGLOSE PEPS (EN TIEMPO REAL)
 # ========================================================
+
+def calcular_desglose_peps(material, almacen, cantidad_solicitada):
+    """
+    Simula en tiempo real cómo se cubrirá el pedido según PEPS sin alterar la BD.
+    Permite visualizar en pantalla exactamente qué lotes se consumirán, 
+    sus cantidades y sus precios unitarios (ej. 2 de 30 Bs. y 1 de 45 Bs. = 105 Bs.).
+    """
+    if not material or not almacen or cantidad_solicitada <= 0:
+        return {
+            'desglose_lotes': [],
+            'subtotal_real': Decimal('0.00'),
+            'costo_unitario_ponderado': Decimal('0.00'),
+            'cantidad_cubierta': 0,
+            'cantidad_faltante': cantidad_solicitada,
+            'alcanza_stock': False,
+        }
+
+    # Lotes de entrada con saldo físico en estantería ordenados por FIFO (fecha e id ascendente)
+    lotes_disponibles = MovimientoInventario.objects.filter(
+        material=material,
+        almacen=almacen,
+        tipo='ENTRADA',
+        saldo_disponible_lote__gt=0
+    ).order_by('fecha', 'id')
+
+    cantidad_pendiente = cantidad_solicitada
+    desglose_lotes = []
+    subtotal_real = Decimal('0.00')
+
+    for lote in lotes_disponibles:
+        if cantidad_pendiente <= 0:
+            break
+
+        disponible = lote.saldo_disponible_lote
+        a_tomar = min(cantidad_pendiente, disponible)
+        costo_capa = Decimal(str(a_tomar)) * lote.costo_unitario
+
+        # Referencia limpia de la Nota de Ingreso (ej. NI-00164)
+        ref_limpia = lote.referencia.replace("INGRESO NOTA ", "").replace("INGRESO: ", "").strip()
+
+        desglose_lotes.append({
+            'lote_id': lote.id,
+            'referencia': ref_limpia or f"Lote #{lote.id}",
+            'cantidad': a_tomar,
+            'costo_unitario': lote.costo_unitario,
+            'subtotal': costo_capa,
+            'fecha_ingreso': lote.fecha,
+        })
+
+        subtotal_real += costo_capa
+        cantidad_pendiente -= a_tomar
+
+    cantidad_cubierta = cantidad_solicitada - cantidad_pendiente
+    costo_ponderado = (subtotal_real / Decimal(str(cantidad_cubierta))) if cantidad_cubierta > 0 else Decimal('0.00')
+
+    return {
+        'desglose_lotes': desglose_lotes,
+        'subtotal_real': subtotal_real,
+        'costo_unitario_ponderado': costo_ponderado,
+        'cantidad_cubierta': cantidad_cubierta,
+        'cantidad_faltante': max(0, cantidad_pendiente),
+        'alcanza_stock': (cantidad_pendiente == 0),
+    }
+
 
 def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movimiento, referencia, usuario, unidad_destino=None, descontar_reserva=False):
     """
     Descuenta stock físico aplicando el método PEPS (FIFO) de manera aislada por Almacén.
     Agota cronológicamente los lotes de ENTRADA en el almacén especificado con saldo disponible y calcula el costo real.
-    Soporta consumo multicapa (ej. 5 de Lote 1 a 25 Bs. y 1 de Lote 2 a 30 Bs.).
+    Soporta consumo multicapa (ej. 2 de Lote 1 a 30 Bs. y 1 de Lote 2 a 45 Bs. = 105 Bs.).
     """
     if cantidad_salida <= 0:
         raise ValueError("La cantidad de salida debe ser estrictamente mayor a cero.")
@@ -112,7 +181,7 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
             costo_total=costo_total_egreso,
             stock_anterior=stock_anterior,
             stock_resultante=inventario_almacen.stock_fisico,
-            referencia=ref_final[:100],  # Respetar max_length
+            referencia=ref_final[:100],
             usuario=usuario,
             unidad_destino=unidad_destino,
         )
@@ -120,6 +189,7 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
         movimiento.desglose_peps = desglose_lotes
 
     return movimiento
+
 
 # ========================================================
 # 2. CONSULTAS DE INVENTARIO Y ALMACENES
@@ -162,23 +232,18 @@ def validar_operacion_almacen(usuario, almacen):
 
 
 # ========================================================
-# 4. MOTOR CENTRALIZADO DE ALERTAS TEMPRANAS SABS (TARJETA 7)
+# 4. MOTOR DE ALERTAS TEMPRANAS SABS (SIN POAS)
 # ========================================================
 
 def obtener_alertas_tempranas(usuario=None):
     """
-    Tarjeta 7: Motor centralizado de Alertas Tempranas del SGA (GAD Potosí).
-    Retorna un diccionario con alertas de:
-    - Vencimientos REALES por Lote físico en estantería (saldo_disponible_lote > 0)
-    - Stock físico crítico / agotado
-    - Techos presupuestarios POA (< 15%)
-    - Cuotas físicas Formulario 005 (> 85%)
+    Alertas operativas de Almacén basadas en existencias reales y asignaciones directas.
+    (Completamente independiente de POAs).
     """
     hoy = timezone.now().date()
     en_30_dias = hoy + timedelta(days=30)
-    gestion_actual = hoy.year
 
-    # 1. ALERTAS DE VENCIMIENTO REALES POR LOTE EN ESTANTERÍA CON EXISTENCIAS
+    # 1. ALERTAS DE VENCIMIENTO REALES POR LOTE EN ESTANTERÍA
     lotes_vencidos = MovimientoInventario.objects.filter(
         tipo='ENTRADA',
         saldo_disponible_lote__gt=0,
@@ -194,7 +259,7 @@ def obtener_alertas_tempranas(usuario=None):
         fecha_vencimiento__lte=en_30_dias
     ).select_related('material', 'almacen', 'material__unidad_medida_fk').order_by('fecha_vencimiento')
 
-    # 2. ALERTAS DE EXISTENCIAS (Agotados y Bajo Stock)
+    # 2. ALERTAS DE STOCK CRÍTICO / AGOTADO
     materiales_agotados = Material.objects.filter(
         is_active=True,
         stock_actual=0
@@ -208,77 +273,37 @@ def obtener_alertas_tempranas(usuario=None):
         .order_by('stock_actual')
     )
 
-    # 3. ALERTAS DE PRESUPUESTO CRÍTICO EN POA (< 15% disponible)
-    poas_criticos = []
-    poas_activos = POA.objects.filter(
-        gestion=gestion_actual,
-        monto_inicial__gt=0
-    ).select_related('unidad', 'unidad__secretaria', 'partida')
-
-    for p in poas_activos:
-        limite_15 = p.monto_inicial * Decimal('0.15')
-        if p.monto_disponible <= limite_15:
-            poas_criticos.append({
-                'poa': p,
-                'saldo_disponible': p.monto_disponible,
-                'monto_inicial': p.monto_inicial,
-                'pct_consumido': p.porcentaje_ejecucion,
-                'es_cero': (p.monto_disponible <= Decimal('0.00'))
-            })
-
-    poas_criticos.sort(key=lambda x: x['saldo_disponible'])
-
-    # 4. ALERTAS DE CUOTAS DEL FORMULARIO 005 (> 85% consumido)
+    # 3. ALERTAS DE CUOTAS POR ASIGNACIÓN DIRECTA (> 85% consumido por oficinas)
     cuotas_criticas = []
-    items_005 = DetalleProgramacionPOA.objects.filter(
-        poa__gestion=gestion_actual,
-        cantidad_programada__gt=0
-    ).select_related('poa__unidad', 'material', 'poa__partida')
+    asigs_directas = AsignacionEntradaUnidad.objects.filter(
+        cantidad_asignada__gt=0
+    ).select_related('unidad_organizacional', 'nota_ingreso_detalle__material')
 
-    for it in items_005:
-        pct_cant = (it.cantidad_consumida / it.cantidad_programada) * 100
-        if pct_cant >= 85:
+    for asig in asigs_directas:
+        pct_consumido = (asig.cantidad_retirada / asig.cantidad_asignada) * 100
+        if pct_consumido >= 85:
             cuotas_criticas.append({
-                'item': it,
-                'unidad': it.poa.unidad,
-                'material': it.material,
-                'programado': it.cantidad_programada,
-                'consumido': it.cantidad_consumida,
-                'disponible': it.cantidad_disponible,
-                'pct_consumido': round(pct_cant, 1),
-                'agotado': (it.cantidad_disponible == 0)
+                'item': asig,
+                'unidad': asig.unidad_organizacional,
+                'material': asig.nota_ingreso_detalle.material,
+                'programado': asig.cantidad_asignada,
+                'consumido': asig.cantidad_retirada,
+                'disponible': asig.saldo_disponible,
+                'pct_consumido': round(pct_consumido, 1),
+                'agotado': (asig.saldo_disponible == 0)
             })
 
-    cuotas_criticas.sort(key=lambda x: x['disponible'])
-
-    # Conteo de Alertas
-    total_criticas = (
-        lotes_vencidos.count() +
-        materiales_agotados.count() +
-        len([p for p in poas_criticos if p['es_cero']]) +
-        len([c for c in cuotas_criticas if c['agotado']])
-    )
-
-    total_advertencias = (
-        lotes_por_vencer.count() +
-        materiales_bajo_stock.count() +
-        len([p for p in poas_criticos if not p['es_cero']]) +
-        len([c for c in cuotas_criticas if not c['agotado']])
-    )
+    total_criticas = lotes_vencidos.count() + materiales_agotados.count() + len([c for c in cuotas_criticas if c['agotado']])
+    total_advertencias = lotes_por_vencer.count() + materiales_bajo_stock.count() + len([c for c in cuotas_criticas if not c['agotado']])
 
     return {
-        # Claves de lotes reales
         'lotes_vencidos': lotes_vencidos,
         'lotes_por_vencer': lotes_por_vencer,
-        # Claves de compatibilidad
-        'materiales_vencidos': lotes_vencidos,
-        'materiales_por_vencer': lotes_por_vencer,
         'materiales_agotados': materiales_agotados,
         'materiales_bajo_stock': materiales_bajo_stock,
-        'poas_criticos': poas_criticos,
         'cuotas_criticas': cuotas_criticas,
+        'poas_criticos': [],  # Se mantiene vacío para compatibilidad con plantillas
         'total_criticas': total_criticas,
         'total_advertencias': total_advertencias,
         'total_alertas': total_criticas + total_advertencias,
     }
-

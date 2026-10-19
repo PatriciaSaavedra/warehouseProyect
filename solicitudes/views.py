@@ -23,6 +23,8 @@ from reportlab.lib.pagesizes import letter, landscape
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics import renderPDF
+from inventario.services import calcular_desglose_peps
+
 
 from solicitudes.models import Solicitud
 
@@ -722,17 +724,45 @@ def detalle_solicitud(request, id):
             if solicitud.solicitante != request.user:
                 return HttpResponseForbidden("No tiene autorización para ver esta solicitud.")
 
+    # Almacén de origen (si no tiene, toma el Central por defecto)
+    almacen = getattr(solicitud, 'almacen_origen', None)
+    if not almacen:
+        almacen = Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
+
+    # Procesar PEPS multicapa para cada material solicitado
+    detalles = list(solicitud.detalles.select_related('material', 'material__unidad_medida_fk').all())
+    total_real_solicitud = Decimal('0.00')
+
+    for d in detalles:
+        if not d.es_nueva_adquisicion and d.material and almacen:
+            cant = d.cantidad_aprobada if d.cantidad_aprobada is not None else d.cantidad_solicitada
+            peps_info = calcular_desglose_peps(d.material, almacen, cant)
+
+            d.desglose_lotes = peps_info['desglose_lotes']
+            d.subtotal_real_peps = peps_info['subtotal_real']
+            d.alcanza_stock = peps_info['alcanza_stock']
+            d.cantidad_faltante = peps_info['cantidad_faltante']
+            total_real_solicitud += peps_info['subtotal_real']
+        else:
+            d.desglose_lotes = []
+            d.subtotal_real_peps = d.subtotal_referencial
+            d.alcanza_stock = True
+            d.cantidad_faltante = 0
+            total_real_solicitud += (d.subtotal_referencial or Decimal('0.00'))
+
     Bitacora.objects.create(
         usuario=request.user,
         modulo='Solicitudes',
         accion='Visualizar Detalle Solicitud',
         descripcion=f'El usuario visualizó en pantalla el detalle de la Solicitud Folio: {solicitud.codigo} (Estado: {solicitud.estado}).'
     )
+
     return render(request, 'solicitudes/detalle.html', {
         'solicitud': solicitud,
+        'detalles': detalles,
+        'total_real_solicitud': total_real_solicitud,
         'rol': rol
     })
-
 
 @login_required
 def revisar_solicitud(request, id):
@@ -1471,8 +1501,8 @@ def reabrir_solicitud(request, id):
 def solicitud_pdf(request, id):
     """
     Formulario Oficial de Pedido de Materiales y Bienes (Flujo 1).
-    Procesamiento seguro en Python: pre-calcula los campos para evitar
-    errores de VariableDoesNotExist en el template.
+    Desglosa automáticamente las capas PEPS en renglones independientes 
+    para que en el papel oficial cada línea cumpla Cantidad x P.Unit = Costo Total.
     """
     solicitud = get_object_or_404(
         Solicitud.objects.prefetch_related(
@@ -1492,9 +1522,8 @@ def solicitud_pdf(request, id):
         )
         return redirect('detalle_solicitud', id=solicitud.id)
 
-    from inventario.models import NotaSalidaDetalle
+    almacen = getattr(solicitud, 'almacen_origen', None) or Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
 
-    # Procesar ítems limpios en Python con salvaguarda para campos None
     items_procesados = []
     total_costo_pedido = Decimal('0.00')
     codigo_presupuesto = "343"
@@ -1508,11 +1537,11 @@ def solicitud_pdf(request, id):
         else:
             cod_item = "S/C"
 
-        # 2. Descripción segura
+        # 2. Descripción base
         if d.material and d.material.nombre:
-            desc_item = d.material.nombre
+            desc_base = d.material.nombre
         else:
-            desc_item = d.descripcion_material_no_catalogado or "Ítem no catalogado"
+            desc_base = d.descripcion_material_no_catalogado or "Ítem no catalogado"
 
         # 3. Unidad de medida segura
         if d.material and d.material.unidad_medida_fk:
@@ -1533,44 +1562,88 @@ def solicitud_pdf(request, id):
         if codigo_presupuesto == "343" and cod_partida != "343":
             codigo_presupuesto = cod_partida
 
-        # 5. Cantidad real entregada (Considera devoluciones en ventanilla)
+        # 5. Cantidad entregada real (evalúa devoluciones a 0)
         if solicitud.estado in ['ENTREGADA', 'CERRADA']:
-            cant_entrega = d.cantidad_entregada  # <-- Aquí toma el 0 real si hubo devolución
+            cant_entrega = d.cantidad_entregada if d.cantidad_entregada is not None else d.cantidad_solicitada
         else:
             cant_entrega = d.cantidad_aprobada if d.cantidad_aprobada is not None else d.cantidad_solicitada
 
-        # 6. Costo unitario y total real
+        # Caso: Devolución total en ventanilla (0 unidades entregadas)
+        if cant_entrega == 0:
+            items_procesados.append({
+                'codigo': cod_item,
+                'descripcion': f"{desc_base} (DEVUELTO AL STOCK)",
+                'unidad_medida': u_med,
+                'cantidad_solicitada': d.cantidad_solicitada,
+                'cantidad_entregada': 0,
+                'partida_codigo': cod_partida,
+                'costo_unitario': d.precio_unitario_referencial or Decimal('0.00'),
+                'costo_total': Decimal('0.00'),
+            })
+            continue
+
+        # 6. Cálculo y Desglose PEPS Multicapa para el Formulario Oficial
+        if d.material and almacen:
+            peps_info = calcular_desglose_peps(d.material, almacen, cant_entrega)
+            lotes = peps_info['desglose_lotes']
+
+            if len(lotes) > 1:
+                # Si consumió varios lotes, se imprime una fila para cada lote:
+                # Fila 1: Lavandina 4L [Lote: NI-00164] -> 2 u. x Bs. 30,00 = 60,00
+                # Fila 2: Lavandina 4L [Lote: NI-00165] -> 1 u. x Bs. 45,00 = 45,00
+                for lote in lotes:
+                    costo_lote_tot = lote['subtotal']
+                    total_costo_pedido += costo_lote_tot
+                    items_procesados.append({
+                        'codigo': cod_item,
+                        'descripcion': f"{desc_base} [Lote: {lote['referencia']}]",
+                        'unidad_medida': u_med,
+                        'cantidad_solicitada': lote['cantidad'],
+                        'cantidad_entregada': lote['cantidad'],
+                        'partida_codigo': cod_partida,
+                        'costo_unitario': lote['costo_unitario'],
+                        'costo_total': costo_lote_tot,
+                    })
+                continue
+            elif len(lotes) == 1:
+                # Si consumió un solo lote
+                costo_u = lotes[0]['costo_unitario']
+                costo_tot = lotes[0]['subtotal']
+                total_costo_pedido += costo_tot
+                items_procesados.append({
+                    'codigo': cod_item,
+                    'descripcion': f"{desc_base} [Lote: {lotes[0]['referencia']}]",
+                    'unidad_medida': u_med,
+                    'cantidad_solicitada': d.cantidad_solicitada,
+                    'cantidad_entregada': cant_entrega,
+                    'partida_codigo': cod_partida,
+                    'costo_unitario': costo_u,
+                    'costo_total': costo_tot,
+                })
+                continue
+
+        # Fallback estándar para ítems de compra directa sin lotes
         costo_u = d.precio_unitario_referencial or Decimal('0.00')
-        costo_total = Decimal('0.00')
-
-        if solicitud.estado in ['ENTREGADA', 'CERRADA'] and d.material:
-            ns_det = NotaSalidaDetalle.objects.filter(nota_salida__solicitud_origen=solicitud, material=d.material).first()
-            if ns_det:
-                costo_u = ns_det.costo_unitario_real or Decimal('0.00')
-                costo_total = ns_det.costo_total_real or Decimal('0.00') # Si se devolvió 0, la nota de salida det guardó 0 o se recalcula
-            else:
-                costo_total = Decimal(cant_entrega) * costo_u
-        else:
-            costo_total = Decimal(cant_entrega) * costo_u
-
-        total_costo_pedido += costo_total
-
+        costo_tot = Decimal(cant_entrega) * costo_u
+        total_costo_pedido += costo_tot
         items_procesados.append({
             'codigo': cod_item,
-            'descripcion': desc_item,
+            'descripcion': desc_base,
             'unidad_medida': u_med,
             'cantidad_solicitada': d.cantidad_solicitada,
             'cantidad_entregada': cant_entrega,
             'partida_codigo': cod_partida,
             'costo_unitario': costo_u,
-            'costo_total': costo_total,
+            'costo_total': costo_tot,
         })
+
     return render(request, 'solicitudes/pdf_formulario_pedido.html', {
         'solicitud': solicitud,
         'items': items_procesados,
         'total_costo': total_costo_pedido,
         'codigo_presupuesto': codigo_presupuesto,
     })
+
 @transaction.atomic
 @login_required
 @rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES'])
