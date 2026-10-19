@@ -13,7 +13,7 @@ cssselect2==0.10.1
 Django==6.0.4
 django-environ==0.14.0
 frozenlist==1.8.0
-html5lib==1.1python manage.py shell
+html5lib==1.1
 idna==3.20
 lxml==6.1.3
 multidict==6.9.1
