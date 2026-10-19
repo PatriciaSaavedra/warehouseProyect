@@ -1,0 +1,386 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Pedido de Material y/o Bienes - {{ solicitud.codigo }}</title>
+    <style>
+        /* MARGEN CERO SUPRIME LA URL Y ENCABEZADOS DEL NAVEGADOR */
+        @page {
+            size: letter landscape;
+            margin: 0;
+        }
+
+        *, *:before, *:after { box-sizing: border-box; }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 8.5px;
+            color: #000;
+            margin: 0;
+            padding: 20px 14px;
+            background-color: #eaedf1;
+        }
+
+        /* BARRA SUPERIOR DE ACCIONES (NO SE IMPRIME) */
+        .toolbar-top {
+            max-width: 1060px;
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            padding: 10px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+        .btn-print {
+            padding: 8px 20px;
+            background: #7c121e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-print:hover { background: #610c16; }
+
+        /* HOJA BLANCA FLOTANTE (CANVAS / SHEET) */
+        .sheet-container {
+            width: 100%;
+            max-width: 1060px;
+            min-height: 680px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 28px 36px 20px 36px;
+            border-radius: 3px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            border: 1px solid #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* INPUTS EDITABLES EN PANTALLA CON LÍNEAS PUNTEADAS */
+        .input-dotted {
+            border: none;
+            border-bottom: 1px dotted #000;
+            background: transparent;
+            font-family: inherit;
+            font-size: inherit;
+            font-weight: bold;
+            color: #000;
+            padding: 0 2px;
+            outline: none;
+        }
+        .input-dotted:focus {
+            background-color: #fef3c7;
+            border-bottom: 1px solid #b45309;
+        }
+
+        .top-section {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .header-left {
+            width: 32%;
+        }
+        .header-center {
+            width: 38%;
+            text-align: center;
+            padding-top: 10px;
+        }
+        .header-right {
+            width: 28%;
+            border: 1px solid #000;
+            padding: 4px 8px;
+            font-size: 8px;
+            line-height: 1.45;
+        }
+
+        /* TABLA CONTABLE OFICIAL DE 8 COLUMNAS */
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+            border: 1px solid #000;
+            margin-top: 6px;
+        }
+        table.data-table th, table.data-table td {
+            border: 1px solid #000;
+            padding: 3.5px 5px;
+        }
+        table.data-table th {
+            background: #ffffff;
+            font-weight: bold;
+            text-align: center;
+            font-size: 8px;
+            line-height: 1.2;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .font-mono { font-family: monospace; }
+        .font-bold { font-weight: bold; }
+        .row-total {
+            font-weight: bold;
+            background: #ffffff;
+        }
+
+        /* LAS 6 FIRMAS REGLAMENTARIAS */
+        .signatures-grid {
+            width: 100%;
+            margin-top: 40px;
+            border-collapse: collapse;
+            page-break-inside: avoid;
+        }
+        .signatures-grid td {
+            width: 16.66%;
+            text-align: center;
+            vertical-align: top;
+            padding: 0 6px;
+        }
+        .linea {
+            border-top: 1px solid #000;
+            padding-top: 3px;
+            font-weight: bold;
+            font-size: 7.5px;
+            line-height: 1.25;
+        }
+        .sub-cargo {
+            font-size: 6.5px;
+            font-weight: normal;
+            display: block;
+            text-transform: uppercase;
+        }
+
+        .print-footer-timestamp {
+            display: none;
+            width: 100%;
+            margin-top: 20px;
+            padding-top: 3px;
+            border-top: 0.5px solid #bbb;
+            font-size: 7px;
+            color: #444;
+            font-family: monospace;
+            justify-content: space-between;
+        }
+
+        @media print {
+            body { background: white !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .sheet-container {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 1.2cm 1.5cm 0.8cm 1.5cm !important;
+                max-width: 100% !important;
+                min-height: 100vh !important;
+                width: 100% !important;
+                margin: 0 !important;
+            }
+            .input-dotted {
+                border-bottom: none !important;
+                padding: 0 !important;
+            }
+            .print-footer-timestamp {
+                display: flex !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA SUPERIOR DE ACCIONES -->
+    <div class="toolbar-top no-print">
+        <div style="font-size: 11px; color: #063b2f; font-weight: bold;">
+            <span>Formulario Oficial:</span> Puedes editar la cabecera izquierda y la categoría programática derecha antes de imprimir.
+        </div>
+        <button type="button" onclick="window.print()" class="btn-print">
+            🖨️ Imprimir Formulario Oficial
+        </button>
+    </div>
+
+    <!-- HOJA BLANCA OFICIAL (LANDSCAPE) -->
+    <div class="sheet-container">
+        <div>
+            <!-- SECCIÓN SUPERIOR: IZQUIERDA FIJA (DATOS REALES) / DERECHA EDITABLE (PROGRAMÁTICA) -->
+            <div class="top-section">
+                
+                <!-- CABECERA IZQUIERDA: DATOS OFICIALES FIJOS (NO EDITABLE) -->
+                <div class="header-left">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                        <img src="{% static 'img/LOGO_GOBERNACION_NEGRO.png' %}" alt="GAD Potosí" style="width: 155px; height: auto; display: block;">
+                    </div>
+                    <div style="font-size: 8.5px; line-height: 1.5; color: #111;">
+                        <div style="font-weight: bold; font-size: 9px; margin-bottom: 2px;">
+                            {{ solicitud.almacen_origen.nombre|default:"Almacen Central" }} Del Gobierno Autonomo Departamental De Potosi
+                        </div>
+                        <div>
+                            <span>Fecha del Pedido:</span> 
+                            <strong>{{ solicitud.fecha|date:'d' }}</strong> de 
+                            <strong>{{ solicitud.fecha|date:'F'|upper }}</strong> de 
+                            <strong>20{{ solicitud.fecha|date:'y' }}</strong>
+                        </div>
+                        <div style="margin-top: 3px;">
+                            <span>Destino / Justif.:</span>
+                            <strong>{{ solicitud.justificacion|default:solicitud.unidad_solicitante.nombre|upper }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TÍTULO CENTRADO -->
+                <div class="header-center">
+                    <h1 style="font-size: 15px; font-weight: 800; margin: 0; letter-spacing: 0.3px;">
+                        PEDIDO DE MATERIAL y/o BIENES
+                    </h1>
+                    <span style="font-size: 7.5px; font-weight: bold; color: #7c121e; display: block; margin-top: 3px;">
+                        [ORIGEN: SALIDA Y CONSUMO REGULAR DE ALMACÉN]
+                    </span>
+                </div>
+
+                <!-- RECUADRO DERECHO: CATEGORÍA PROGRAMÁTICA (SÍ EDITABLE) -->
+                <div class="header-right">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Programa:</span>
+                        <span>.................. <input type="text" class="input-dotted text-center" style="width: 45px;" value="000"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Subprograma:</span>
+                        <span>............. <input type="text" class="input-dotted text-center" style="width: 45px;" value="0"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Proyecto:</span>
+                        <span>.................. <input type="text" class="input-dotted text-center" style="width: 45px;" value="0"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Act. U Obra:</span>
+                        <span>............... <input type="text" class="input-dotted text-center" style="width: 45px;" value="001"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Unid Ejec.:</span>
+                        <span>.................. <input type="text" class="input-dotted text-center" style="width: 45px;" value="1"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Codigo Presup.:</span>
+                        <span>........ <input type="text" class="input-dotted text-center" style="width: 45px;" value="{{ codigo_presupuesto|default:'343' }}"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Codigo Nº:</span>
+                        <span>................... <input type="text" class="input-dotted text-center font-bold" style="width: 65px; color: #7c121e;" value="{{ solicitud.codigo }}"></span>
+                    </div>
+                </div>
+
+            </div>
+            <!-- TABLA CONTABLE CONSUMIENDO LOS ÍTEMS PROCESADOS LIMPIOS -->
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 10%;">CODIGO</th>
+                        <th rowspan="2" style="width: 44%;">DESCRIPCION</th>
+                        <th rowspan="2" style="width: 10%;">Unidad de<br>Manejo</th>
+                        <th colspan="2" style="width: 14%;">Cantidad</th>
+                        <th rowspan="2" style="width: 8%;">Partida<br>Presupuestaria</th>
+                        <th colspan="2" style="width: 14%;">Costo</th>
+                    </tr>
+                    <tr>
+                        <th style="width: 7%;">Pedido</th>
+                        <th style="width: 7%;">Entrega</th>
+                        <th style="width: 7%;">Unidad</th>
+                        <th style="width: 7%;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in items %}
+                    <tr>
+                        <td class="text-center font-mono font-bold">{{ it.codigo }}</td>
+                        <td class="text-left font-bold">{{ it.descripcion|upper }}</td>
+                        <td class="text-center">{{ it.unidad_medida|upper }}</td>
+                        <td class="text-center font-mono">{{ it.cantidad_solicitada }}</td>
+                        <td class="text-center font-mono font-bold">{{ it.cantidad_entregada }}</td>
+                        <td class="text-center font-mono font-bold">{{ it.partida_codigo }}</td>
+                        <td class="text-right font-mono">{{ it.costo_unitario|floatformat:2 }}</td>
+                        <td class="text-right font-mono font-bold">{{ it.costo_total|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center p-4 text-gray-400">Sin materiales registrados en este pedido.</td>
+                    </tr>
+                    {% endfor %}
+                    <!-- FILA TOTAL -->
+                    <tr class="row-total">
+                        <td colspan="7" class="text-right font-bold">Total:</td>
+                        <td class="text-right font-mono font-bold">Bs. {{ total_costo|floatformat:2 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div>
+            <!-- LAS 6 FIRMAS REGLAMENTARIAS -->
+            <table class="signatures-grid">
+                <tr>
+                    <td>
+                        <div class="linea">
+                            Pedido Por:<br>
+                            {{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username|upper }}<br>
+                            <span class="sub-cargo">{{ solicitud.unidad_solicitante.nombre }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="linea">
+                            V.B. Por:<br>
+                            Jefe Administrativo<br>
+                            <span class="sub-cargo">REVISIÓN FORMAL</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="linea">
+                            Autorizado Por:<br>
+                            {{ solicitud.aprobado_por|default:solicitud.revisado_por.get_full_name|default:'JEFE DE UNIDAD'|upper }}<br>
+                            <span class="sub-cargo">AUTORIZACIÓN DE SALIDA</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="linea">
+                            Control Existencias:<br>
+                            RESPONSABLE KARDEX<br>
+                            <span class="sub-cargo">PROFESIONAL II KARDISTA</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="linea">
+                            Entregado Por:<br>
+                            {{ solicitud.entregado_por.get_full_name|default:solicitud.preparado_por.get_full_name|default:'ALMACENERO'|upper }}<br>
+                            <span class="sub-cargo">ENCARGADO DE ALMACENES</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="linea">
+                            Recibido Por:<br>
+                            {{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username|upper }}<br>
+                            <span class="sub-cargo">FUNCIONARIO RECEPTOR</span>
+                            <div style="margin-top: 4px; font-size: 7px; font-weight: bold;">
+                                Fecha de Salida: {{ solicitud.fecha_entrega|date:'d/m/Y'|default:'___/___/2026' }}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- PIE DE AUDITORÍA CON FECHA Y HORA -->
+            <div class="print-footer-timestamp">
+                <span>Fecha y hora de impresión: {% now "d/m/Y H:i:s" %}</span>
+                <span>SGA • Gobierno Autónomo Departamental de Potosí</span>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

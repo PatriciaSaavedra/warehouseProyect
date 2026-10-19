@@ -155,23 +155,25 @@
         }
 
         function toggleThemeGlobal() {
-            const html = document.documentElement;
-            const isDark = html.classList.contains('dark');
+            const htmlEl = document.documentElement;
+            const isDark = htmlEl.classList.contains('dark');
             const newTheme = isDark ? 'light' : 'dark';
 
+            // 1. Alternar la clase 'dark' en la raíz <html>
             if (newTheme === 'dark') {
-                html.classList.add('dark');
-                html.classList.remove('light');
+                htmlEl.classList.add('dark');
+                htmlEl.classList.remove('light');
             } else {
-                html.classList.remove('dark');
-                html.classList.add('light');
+                htmlEl.classList.remove('dark');
+                htmlEl.classList.add('light');
             }
+
+            // 2. Guardar preferencia en la cookie por 1 año para Django
             document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
-            
-            // Actualizar posibles iconos y textos
-            const icons = document.querySelectorAll('.theme-toggle-icon');
-            icons.forEach(icon => {
-                icon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+
+            // 3. Actualizar los iconos de sol/luna en tiempo real
+            document.querySelectorAll('.theme-toggle-icon, #theme-toggle .material-symbols-outlined').forEach(icon => {
+                icon.textContent = (newTheme === 'dark') ? 'light_mode' : 'dark_mode';
             });
         }
     </script>

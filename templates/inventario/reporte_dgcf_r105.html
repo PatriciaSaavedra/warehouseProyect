@@ -3,260 +3,380 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>DGCF - R1.05 RESUMEN DE ALMACENES</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DGCF - R1.05 Resumen de Almacenes</title>
     <style>
         @page {
             size: letter portrait;
             margin: 1.2cm 1.5cm 1.5cm 1.5cm;
         }
+
+        *, *:before, *:after { box-sizing: border-box; }
+
         body {
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 11px;
-            color: #111;
+            font-size: 10.5px;
+            color: #000;
             margin: 0;
-            padding: 20px;
-            background-color: #f8fafc;
+            padding: 20px 14px;
+            background-color: #eaedf1; /* Fondo gris institucional */
         }
 
-        /* BARRA SUPERIOR DE FILTROS (Solo en pantalla) */
-        .toolbar-container {
+        /* BARRA SUPERIOR DE ACCIONES (NO SE IMPRIME) */
+        .toolbar-top {
             max-width: 900px;
-            margin: 0 auto 20px auto;
+            margin: 0 auto 15px auto;
             background: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
             padding: 12px 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-radius: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 15px;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .filter-form {
-            display: flex;
+        .btn-print {
+            padding: 8px 18px;
+            background: #7c121e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-flex;
             align-items: center;
-            gap: 12px;
+            gap: 6px;
         }
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+        .btn-print:hover { background: #610c16; }
+
+        .btn-back {
+            padding: 8px 14px;
+            background: #ffffff;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 11px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-back:hover { background: #f8fafc; }
+
+        /* PANEL DE FILTROS AVANZADOS (NO SE IMPRIME) */
+        .filter-panel {
+            max-width: 900px;
+            margin: 0 auto 15px auto;
+            background: #ffffff;
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            align-items: flex-end;
         }
         .filter-group label {
-            font-size: 10px;
+            display: block;
+            font-size: 9.5px;
             font-weight: bold;
-            color: #64748b;
+            color: #475569;
             text-transform: uppercase;
+            margin-bottom: 4px;
         }
-        .filter-group input, .filter-group select {
-            padding: 6px 10px;
+        .filter-group select, .filter-group input {
+            width: 100%;
+            padding: 7px 10px;
             border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #1e293b;
-            background-color: #fff;
+            border-radius: 8px;
+            font-size: 11px;
+            background: #f8fafc;
+            color: #0f172a;
         }
         .btn-filter {
-            background-color: #8b0000;
+            background: #063b2f;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 7px 16px;
+            border-radius: 8px;
             font-weight: bold;
             font-size: 11px;
             cursor: pointer;
-            height: 32px;
-            margin-top: 14px;
+            width: 100%;
+            height: 34px;
         }
-        .btn-filter:hover { background-color: #6b0000; }
-        .btn-print {
-            background-color: #0284c7;
-            color: white;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 11px;
-            cursor: pointer;
-            height: 32px;
-            margin-top: 14px;
-        }
-        .btn-print:hover { background-color: #0369a1; }
+        .btn-filter:hover { background: #04271f; }
 
-        /* HOJA PAPEL FORMULARIO */
+        /* CHECKBOXES DE PARTIDAS (MULTISELCTOR) */
+        .partidas-dropdown {
+            margin-top: 10px;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 10px;
+        }
+        .partidas-list {
+            max-height: 110px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            background: #f8fafc;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+        .partida-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: #334155;
+            cursor: pointer;
+        }
+
+        /* HOJA BLANCA FLOTANTE (CANVAS) */
         .sheet-container {
+            width: 100%;
             max-width: 900px;
             margin: 0 auto;
             background: #ffffff;
+            padding: 36px 42px;
+            border-radius: 4px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
             border: 1px solid #cbd5e1;
-            padding: 40px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .header-table {
             width: 100%;
-            margin-bottom: 25px;
+            margin-bottom: 22px;
             border-collapse: collapse;
         }
         .header-table td { vertical-align: middle; }
-        .logo-box { width: 25%; text-align: left; }
-        .logo-box img { max-height: 65px; width: auto; }
-        .title-box { width: 55%; text-align: center; }
-        .title-box h3 { margin: 0; font-size: 12px; font-weight: bold; }
-        .title-box h2 { margin: 3px 0; font-size: 13px; font-weight: bold; }
-        .title-box p { margin: 2px 0; font-size: 10px; }
-        .code-box { width: 20%; text-align: right; font-size: 11px; font-weight: bold; }
+        .logo-box { width: 22%; text-align: left; }
+        .logo-box img { max-height: 55px; width: auto; display: block; }
+        .title-box { width: 58%; text-align: center; }
+        .title-box h3 { margin: 0; font-size: 11px; font-weight: bold; }
+        .title-box h2 { margin: 3px 0; font-size: 12.5px; font-weight: bold; text-transform: uppercase; }
+        .title-box p { margin: 2px 0; font-size: 9.5px; }
+        .code-box { width: 20%; text-align: right; font-size: 10px; font-weight: bold; font-family: monospace; }
 
         table.data-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 8px;
+            font-size: 9.5px;
         }
         table.data-table th, table.data-table td {
-            border: 1px solid #333;
-            padding: 6px 8px;
+            border: 1px solid #000;
+            padding: 5px 7px;
         }
         table.data-table th {
-            background-color: #555;
-            color: #fff;
+            background-color: #f1f5f9;
+            color: #000;
             text-align: center;
-            font-size: 9.5px;
+            font-size: 9px;
             font-weight: bold;
         }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .text-left { text-align: left; }
-        .row-total { font-weight: bold; background-color: #f1f5f9; }
+        .font-mono { font-family: monospace; }
+        .row-total { font-weight: bold; background-color: #ffffff; }
 
-        .firmas-container { margin-top: 100px; width: 100%; }
+        .firmas-container {
+            margin-top: 70px;
+            width: 100%;
+            page-break-inside: avoid;
+        }
         .firmas-table { width: 100%; border-collapse: collapse; }
-        .firmas-table td { text-align: center; vertical-align: top; width: 50%; padding: 10px 40px; }
+        .firmas-table td { text-align: center; vertical-align: top; width: 50%; padding: 0 30px; }
         .linea-firma {
-            border-top: 1px solid #111;
+            border-top: 1px solid #000;
             padding-top: 5px;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 9px;
         }
 
-        /* OCULTAR ELEMENTOS AL IMPRIMIR */
+        /* REGLAS DE IMPRESIÓN */
         @media print {
-            body { background: white; padding: 0; }
+            body { background: white !important; padding: 0 !important; }
             .no-print { display: none !important; }
-            .sheet-container { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+            .sheet-container {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+            }
+            table.data-table th { background-color: #f8fafc !important; }
         }
     </style>
 </head>
 <body>
 
-    <!-- BARRA INTERACTIVA DE FILTROS (NO SE IMPRIME) -->
-    <div class="toolbar-container no-print">
-        <form method="GET" class="filter-form">
-            <div class="filter-group">
-                <label>Almacén / Depósito</label>
-                <select name="almacen">
-                    <option value="">🏢 TODOS (Consolidado)</option>
-                    {% for alm in almacenes_disponibles %}
-                        <option value="{{ alm.id }}" {% if almacen_seleccionado.id == alm.id %}selected{% endif %}>
-                            📍 {{ alm.nombre }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Gestión Fiscal</label>
-                <input type="number" name="gestion" value="{{ gestion }}" min="2020" max="2035" style="width: 80px;">
-            </div>
-            <div class="filter-group">
-                <label>Fecha de Corte</label>
-                <input type="date" name="fecha_corte" value="{{ fecha_corte|date:'Y-m-d' }}">
-            </div>
-            <button type="submit" class="btn-filter">🔍 Filtrar y Recalcular</button>
-        </form>
-
-        <button onclick="window.print()" class="btn-print">
-            🖨️ Imprimir / Guardar en PDF
+    <!-- BARRA SUPERIOR DE ACCIONES -->
+    <div class="toolbar-top no-print">
+        <a href="javascript:history.back()" class="btn-back">
+            ← Volver
+        </a>
+        <div style="font-size: 11px; font-weight: bold; color: #063b2f;">
+            Formulario Oficial Contable: DGCF - R1.05
+        </div>
+        <button type="button" onclick="window.print()" class="btn-print">
+            🖨️ Imprimir / Guardar PDF
         </button>
     </div>
 
-    <!-- DOCUMENTO OFICIAL FORMULARIO DGCF - R1.05 -->
-    <div class="sheet-container">
-        <table class="header-table">
-            <tr>
-                <td class="logo-box">
-                    <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo Gobernación">
-                </td>
-                <td class="title-box">
-                    <h3>"GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ"</h3>
-                    <h2>RESUMEN DE ALMACENES (BIENES DE CONSUMO)</h2>
-                    <p>Al {{ fecha_corte|date:"d" }} de {{ fecha_corte|date:"F" }} de {{ gestion }}</p>
-                    <p><em>(Expresado en Bolivianos)</em></p>
-                    {% if almacen_seleccionado %}
-                        <p style="font-weight: bold; color: #8b0000; margin-top: 4px;">ALMACÉN: {{ almacen_seleccionado.nombre|upper }}</p>
-                    {% else %}
-                        <p style="font-weight: bold; margin-top: 4px;">CONSOLIDADO INSTITUCIONAL</p>
-                    {% endif %}
-                </td>
-                <td class="code-box">
-                    DGCF - R1.05<br>
-                    Versión 01
-                </td>
-            </tr>
-        </table>
+    <!-- PANEL DE FILTROS Y SELECTOR DE PARTIDAS -->
+    <div class="filter-panel no-print">
+        <form method="GET">
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <label>Almacén / Depósito</label>
+                    <select name="almacen">
+                        <option value="">🏢 TODOS (Consolidado Institucional)</option>
+                        {% for alm in almacenes_disponibles %}
+                            <option value="{{ alm.id }}" {% if almacen_seleccionado.id == alm.id %}selected{% endif %}>
+                                📍 {{ alm.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Gestión Fiscal</label>
+                    <input type="number" name="gestion" value="{{ gestion }}" min="2020" max="2035">
+                </div>
+                <div class="filter-group">
+                    <label>Fecha de Corte</label>
+                    <input type="date" name="fecha_corte" value="{{ fecha_corte|date:'Y-m-d' }}">
+                </div>
+            </div>
 
-        <table class="data-table">
-            <thead>
+            <!-- FILTRO DE PARTIDAS PRESUPUESTARIAS (CHECKBOXES MÚLTIPLES) -->
+            <div class="partidas-dropdown">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="font-size: 9.5px; font-weight: bold; color: #475569; text-transform: uppercase; margin: 0;">
+                        Filtrar Partidas Presupuestarias (Seleccione una o varias, o ninguna para ver todas):
+                    </label>
+                    <button type="button" onclick="marcarTodas(true)" style="background: none; border: none; color: #0284c7; font-size: 9px; cursor: pointer; font-weight: bold;">[ Marcar Todas ]</button>
+                    <button type="button" onclick="marcarTodas(false)" style="background: none; border: none; color: #7c121e; font-size: 9px; cursor: pointer; font-weight: bold;">[ Limpiar ]</button>
+                </div>
+                <div class="partidas-list">
+                    {% for p in todas_partidas %}
+                        <label class="partida-item">
+                            <input type="checkbox" name="partidas" value="{{ p.id }}" {% if p.id|stringformat:"s" in partidas_seleccionadas_ids %}checked{% endif %}>
+                            <span class="font-mono"><strong>{{ p.codigo }}</strong> - {{ p.nombre|truncatechars:35 }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+                <button type="submit" class="btn-filter" style="width: auto; padding: 7px 22px;">
+                    🔍 Aplicar Filtros y Partidas
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- HOJA BLANCA FLOTANTE (CANVAS) -->
+    <div class="sheet-container">
+        <div>
+            <table class="header-table">
                 <tr>
-                    <th style="width: 4%;">N°</th>
-                    <th style="width: 42%;">Partida Presupuestaria</th>
-                    <th style="width: 13%;">Cantidad Inicial<br>al 01/01/{{ gestion }}</th>
-                    <th style="width: 14%;">Saldo Inicial<br>al 01/01/{{ gestion }} (Bs)</th>
-                    <th style="width: 13%;">Cantidad Final<br>al {{ fecha_corte|date:"d/m/Y" }}</th>
-                    <th style="width: 14%;">Saldo Final<br>al {{ fecha_corte|date:"d/m/Y" }} (Bs)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for f in filas %}
-                <tr>
-                    <td class="text-center">{{ f.nro }}</td>
-                    <td class="text-left"><strong>{{ f.partida_codigo }}</strong> - {{ f.partida_nombre }}</td>
-                    <td class="text-center">{{ f.cant_inicial }}</td>
-                    <td class="text-right">{{ f.saldo_inicial_bs|floatformat:2 }}</td>
-                    <td class="text-center">{{ f.cant_final }}</td>
-                    <td class="text-right font-bold">{{ f.saldo_final_bs|floatformat:2 }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="text-center" style="padding: 20px;">
-                        No existen movimientos de existencias registrados para el periodo seleccionado.
+                    <td class="logo-box">
+                        <img 
+                            src="{% static 'img/LOGO_GOBERNACION_VERTICAL_NEGRO.png' %}" 
+                            data-fallback="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                            alt="Logo Gobernación" 
+                            onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}"
+                        >    
+                    </td>
+                    <td class="title-box">
+                        <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
+                        <h2>RESUMEN DE ALMACENES (BIENES DE CONSUMO)</h2>
+                        <p>Al {{ fecha_corte|date:"d" }} de {{ fecha_corte|date:"F" }} de {{ gestion }}</p>
+                        <p><em>(Expresado en Bolivianos)</em></p>
+                        {% if almacen_seleccionado %}
+                            <p style="font-weight: bold; color: #7c121e; margin-top: 3px;">ALMACÉN: {{ almacen_seleccionado.nombre|upper }}</p>
+                        {% else %}
+                            <p style="font-weight: bold; margin-top: 3px;">CONSOLIDADO INSTITUCIONAL</p>
+                        {% endif %}
+                    </td>
+                    <td class="code-box">
+                        DGCF - R1.05<br>
+                        <span style="font-size: 8.5px; font-weight: normal; color: #555;">SGA - GADP</span>
                     </td>
                 </tr>
-                {% endfor %}
-                <tr class="row-total">
-                    <td colspan="2" class="text-center">TOTAL</td>
-                    <td class="text-center">{{ total_cant_inicial }}</td>
-                    <td class="text-right">{{ total_saldo_inicial|floatformat:2 }}</td>
-                    <td class="text-center">{{ total_cant_final }}</td>
-                    <td class="text-right">{{ total_saldo_final|floatformat:2 }}</td>
-                </tr>
-            </tbody>
-        </table>
+            </table>
 
-        <!-- Firmas Oficiales -->
-        <div class="firmas-container">
-            <table class="firmas-table">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">N°</th>
+                        <th style="width: 41%;">Partida Presupuestaria</th>
+                        <th style="width: 13%;">Cantidad Inicial<br>al 01/01/{{ gestion }}</th>
+                        <th style="width: 14%;">Saldo Inicial<br>al 01/01/{{ gestion }} (Bs)</th>
+                        <th style="width: 13%;">Cantidad Final<br>al {{ fecha_corte|date:"d/m/Y" }}</th>
+                        <th style="width: 14%;">Saldo Final<br>al {{ fecha_corte|date:"d/m/Y" }} (Bs)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in filas %}
+                    <tr>
+                        <td class="text-center">{{ f.nro }}</td>
+                        <td class="text-left"><strong>{{ f.partida_codigo }}</strong> - {{ f.partida_nombre }}</td>
+                        <td class="text-center font-mono">{{ f.cant_inicial }}</td>
+                        <td class="text-right font-mono">{{ f.saldo_inicial_bs|floatformat:2 }}</td>
+                        <td class="text-center font-mono">{{ f.cant_final }}</td>
+                        <td class="text-right font-mono font-bold">{{ f.saldo_final_bs|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 25px; color: #64748b;">
+                            No existen movimientos de existencias registrados para las partidas y período seleccionados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="row-total">
+                        <td colspan="2" class="text-right" style="padding-right: 10px; font-weight: bold;">TOTAL GENERAL:</td>
+                        <td class="text-center font-mono font-bold">{{ total_cant_inicial }}</td>
+                        <td class="text-right font-mono font-bold">Bs. {{ total_saldo_inicial|floatformat:2 }}</td>
+                        <td class="text-center font-mono font-bold">{{ total_cant_final }}</td>
+                        <td class="text-right font-mono font-bold">Bs. {{ total_saldo_final|floatformat:2 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div>
+            <!-- Firmas Oficiales de Control -->
+            <table class="firmas-container firmas-table">
                 <tr>
                     <td><div class="linea-firma">Responsable del Área Financiera</div></td>
-                    <td><div class="linea-firma">Máxima Autoridad Ejecutiva</div></td>
-                </tr>
-                <tr>
-                    <td colspan="2" style="width: 100%; padding-top: 45px;">
-                        <div style="width: 45%; margin: 0 auto;" class="linea-firma">Contador General</div>
-                    </td>
+                    <td><div class="linea-firma">Contador General</div></td>
                 </tr>
             </table>
         </div>
     </div>
 
+    <!-- SCRIPT AUXILIAR PARA CHECKBOXES -->
+    <script>
+        function marcarTodas(marcar) {
+            const checkboxes = document.querySelectorAll('input[name="partidas"]');
+            checkboxes.forEach(cb => cb.checked = marcar);
+        }
+    </script>
 </body>
 </html>

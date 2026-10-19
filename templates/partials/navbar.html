@@ -39,7 +39,7 @@
                 type="text"
                 name="q"
                 value="{{ query|default:'' }}"
-                placeholder="Buscar por código SKU, Nro. Solicitud o Lote..."
+                placeholder="Buscar por código SABS, Nro. Solicitud o Lote..."
                 class="w-full h-9 pl-9 pr-4 text-xs rounded-xl transition-all duration-200
                        bg-white/15 placeholder-white/70 text-white border border-white/20 
                        hover:bg-white/20 hover:border-white/35
@@ -63,46 +63,117 @@
     <!-- LADO DERECHO: ACCIONES Y PERFIL -->
     <div class="flex items-center gap-2 sm:gap-4 shrink-0">
 
-        <!-- BOTÓN CAMBIAR TEMA -->
+        <!-- BOTÓN CAMBIAR TEMA (SIN ONCLICK CONFLICTIVO) -->
         <button 
             type="button"
             id="theme-toggle" 
-            onclick="toggleThemeGlobal()"
-            class="p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer
+            class="p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer select-none
                    dark:text-[#bdcabd] dark:hover:text-[#71dc95] dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-[#71dc95]/30" 
-            title="Alternar entre Modo Claro y Oscuro Esmeralda"
+            title="Alternar entre Modo Claro y Oscuro"
         >
             <span class="material-symbols-outlined text-[22px] transition-transform duration-300 hover:rotate-45 theme-toggle-icon">
-                {% if theme == 'light' %}dark_mode{% else %}light_mode{% endif %}
+                {% if theme == 'dark' %}light_mode{% else %}dark_mode{% endif %}
             </span>
         </button>
 
-        <!-- BOTÓN NOTIFICACIONES -->
-        <button 
-            type="button"
-            title="Notificaciones del Sistema"
-            class="relative p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer group
-                   dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-white/10"
-        >
-            <span class="material-symbols-outlined text-[22px] transition-transform duration-300 group-hover:rotate-12">
-                notifications
-            </span>
-            <!-- Indicador activo de notificación -->
-            <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#ff7577] ring-2 ring-[#008548] dark:ring-[#0c1511] transition-transform duration-200 group-hover:scale-125"></span>
-        </button>
+        <!-- BOTÓN NOTIFICACIONES INTERACTIVO (TARJETA 6) -->
+        <div class="relative" id="container-notificaciones">
+            <button 
+                type="button"
+                id="btn-notificaciones"
+                onclick="toggleMenuNotificaciones(event)"
+                title="Notificaciones del Sistema"
+                class="relative p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer group
+                       dark:text-[#bdcabd] dark:hover:text-white dark:hover:bg-[#18221d] dark:hover:border dark:hover:border-white/10"
+                aria-label="Ver alertas"
+            >
+                <span class="material-symbols-outlined text-[22px] transition-transform duration-300 group-hover:rotate-12">
+                    notifications
+                </span>
+
+                {% if conteo_notificaciones > 0 %}
+                    <span class="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-[#ff7577] text-[#0c1511] font-black text-[9px] font-mono shadow-md ring-2 ring-[#008548] dark:ring-[#0c1511] animate-pulse">
+                        {{ conteo_notificaciones }}
+                    </span>
+                {% endif %}
+            </button>
+
+            <!-- MENÚ DESPLEGABLE DE NOTIFICACIONES -->
+            <div 
+                id="menu-notificaciones" 
+                class="hidden absolute right-[-70px] sm:right-0 top-full mt-2 w-[310px] sm:w-[370px] z-50 transition-all duration-200 transform origin-top-right font-['Outfit']"
+            >
+                <div class="rounded-2xl shadow-2xl overflow-hidden border backdrop-blur-xl transition-colors duration-200
+                            bg-white/95 border-gray-200 text-gray-800 shadow-emerald-950/20
+                            dark:bg-[#141d19]/95 dark:border-[#232c27] dark:text-[#dbe5de] dark:shadow-black/70">
+                    
+                    <div class="px-4 py-3 border-b border-gray-100 dark:border-[#232c27] flex items-center justify-between bg-gray-50/70 dark:bg-[#18221d]/60">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px] text-[#008548] dark:text-[#71dc95]">
+                                notifications_active
+                            </span>
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-gray-900 dark:text-white">
+                                Avisos del Sistema
+                            </h3>
+                        </div>
+                        {% if conteo_notificaciones > 0 %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-[#71dc95]/20 dark:text-[#71dc95]">
+                                {{ conteo_notificaciones }} pendiente{{ conteo_notificaciones|pluralize:"s" }}
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-[#232c27]/60">
+                        {% for noti in notificaciones_usuario %}
+                        <a 
+                            href="{{ noti.url }}" 
+                            class="p-3.5 flex items-start gap-3 transition-colors duration-150 group block
+                                   hover:bg-emerald-50/70 dark:hover:bg-[#18221d]"
+                        >
+                            <div class="w-8 h-8 rounded-xl {{ noti.color_bg }} border flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                <span class="material-symbols-outlined text-[17px]">{{ noti.icono }}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1 mb-0.5">
+                                    <h4 class="text-xs font-bold truncate text-gray-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-[#71dc95] transition-colors">
+                                        {{ noti.titulo }}
+                                    </h4>
+                                    <span class="text-[9px] font-mono text-gray-400 shrink-0">{{ noti.tiempo }}</span>
+                                </div>
+                                <p class="text-[11px] text-gray-500 dark:text-[#889488] line-clamp-2 leading-relaxed">
+                                    {{ noti.mensaje }}
+                                </p>
+                            </div>
+                        </a>
+                        {% empty %}
+                        <div class="p-8 text-center text-gray-400 dark:text-[#889488] space-y-1">
+                            <span class="material-symbols-outlined text-3xl text-emerald-600 dark:text-[#71dc95] block mb-1">
+                                check_circle
+                            </span>
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-200">Todo al día</p>
+                            <p class="text-[11px] text-gray-400 dark:text-[#889488]">No tienes trámites urgentes ni alertas de stock en este momento.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="px-4 py-2.5 bg-gray-50/70 dark:bg-[#18221d]/80 border-t border-gray-100 dark:border-[#232c27] text-center">
+                        <a href="{% url 'solicitudes_general' %}" class="text-[11px] font-bold text-[#008548] dark:text-[#71dc95] hover:underline flex items-center justify-center gap-1">
+                            <span>Abrir Bandeja de Gestión</span>
+                            <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- SEPARADOR -->
         <div class="h-6 w-px bg-white/20 dark:bg-[#232c27] hidden sm:block"></div>
 
-        <!-- PERFIL CON MENÚ DESPLEGABLE MEJORADO (CON PUENTE ANTI-PARPADEO) -->
+        <!-- PERFIL CON MENÚ DESPLEGABLE -->
         <div class="relative group py-1.5">
-
-            <!-- Cápsula Trigger con Hover Suave -->
             <div class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-2xl cursor-pointer transition-all duration-200 select-none
                         hover:bg-white/15 active:scale-[0.98]
                         dark:hover:bg-white/5 dark:hover:border dark:hover:border-white/10">
-                
-                <!-- Datos de Usuario -->
                 <div class="text-right hidden sm:block leading-tight">
                     <p class="font-bold text-xs font-['Outfit'] truncate max-w-[150px] text-white dark:text-[#dbe5de] transition-colors duration-200 group-hover:text-emerald-100 dark:group-hover:text-white">
                         {% if request.user.first_name or request.user.last_name %}
@@ -112,15 +183,10 @@
                         {% endif %}
                     </p>
                     <p class="text-[10px] font-semibold tracking-wider uppercase mt-0.5 text-[#8df9af] dark:text-[#eec14b]">
-                        {% if request.user.perfilusuario %}
-                            {{ request.user.perfilusuario.get_rol_display }}
-                        {% else %}
-                            Usuario
-                        {% endif %}
+                        {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
                     </p>
                 </div>
 
-                <!-- Avatar con Anillo de Enfoque en Hover -->
                 <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm select-none transition-all duration-200
                             bg-white text-[#006938] group-hover:shadow-[0_0_12px_rgba(255,255,255,0.45)] group-hover:scale-105
                             dark:bg-[#008548] dark:text-white dark:border dark:border-[#71dc95]/40 dark:group-hover:border-[#71dc95] dark:group-hover:shadow-[0_0_12px_rgba(113,220,149,0.35)]">
@@ -131,33 +197,19 @@
                     {% endif %}
                 </div>
 
-                <!-- Flechita indicadora micro-animada -->
                 <span class="material-symbols-outlined text-[16px] text-white/60 dark:text-[#889488] transition-transform duration-200 group-hover:rotate-180 group-hover:text-white dark:group-hover:text-[#71dc95] hidden sm:inline-block">
                     expand_more
                 </span>
             </div>
 
-            <!-- MENÚ DESPLEGABLE CON PUENTE INVISIBLE ANTI-CIERRE -->
+            <!-- DROPDOWN PERFIL -->
             <div class="absolute right-0 top-full pt-2 w-56 z-50 transition-all duration-200 transform origin-top-right
                         opacity-0 invisible pointer-events-none translate-y-1
                         group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0
                         before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-4">
-                
                 <div class="rounded-2xl shadow-2xl py-2 overflow-hidden border backdrop-blur-xl transition-colors duration-200
                             bg-white/95 border-gray-100 text-gray-800 shadow-emerald-950/10
                             dark:bg-[#141d19]/95 dark:border-[#232c27] dark:text-[#dbe5de] dark:shadow-black/60">
-                    
-                    <!-- Encabezado de Usuario para Móviles -->
-                    <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#232c27] sm:hidden bg-gray-50/50 dark:bg-[#18221d]/50">
-                        <p class="font-bold text-xs font-['Outfit'] truncate text-gray-900 dark:text-white">
-                            {{ request.user.get_full_name|default:request.user.username }}
-                        </p>
-                        <p class="text-[10px] text-emerald-600 dark:text-[#71dc95] font-semibold uppercase mt-0.5">
-                            {{ request.user.perfilusuario.get_rol_display|default:"Usuario" }}
-                        </p>
-                    </div>
-
-                    <!-- Enlace Perfil con Desplazamiento Suave -->
                     <a 
                         href="{% url 'perfil' %}"
                         class="group/item flex items-center gap-3 px-4 py-2.5 text-xs font-medium transition-all duration-150
@@ -169,10 +221,7 @@
                         </span> 
                         <span>Mi Perfil Institucional</span>
                     </a>
-
                     <hr class="border-gray-100 dark:border-[#232c27] my-1.5">
-
-                    <!-- Botón Cerrar Sesión con Hover de Alerta Roja -->
                     <form method="POST" action="{% url 'logout' %}">
                         {% csrf_token %}
                         <button 
@@ -187,12 +236,67 @@
                             <span>Cerrar Sesión</span>
                         </button>
                     </form>
-
                 </div>
             </div>
-
         </div>
 
     </div>
 
 </header>
+
+<!-- SCRIPT AUTÓNOMO BLINDADO: NOTIFICACIONES + CAMBIO DE TEMA 100% GARANTIZADO -->
+<script>
+    // 1. Control del Menú de Notificaciones
+    function toggleMenuNotificaciones(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('menu-notificaciones');
+        if (menu) {
+            menu.classList.toggle('hidden');
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('container-notificaciones');
+        const menu = document.getElementById('menu-notificaciones');
+        if (menu && container && !container.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+
+    // 2. Control del Tema: Se ejecuta de forma única sin duplicar eventos
+    (function initThemeControl() {
+        const btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+
+        // Clonamos el botón para eliminar cualquier event listener duplicado anterior
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+
+            // Alternar clase en la raíz <html>
+            if (newTheme === 'dark') {
+                html.classList.add('dark');
+                html.classList.remove('light');
+            } else {
+                html.classList.remove('dark');
+                html.classList.add('light');
+            }
+
+            // Guardar cookie por 1 año
+            document.cookie = `theme=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+
+            // Actualizar icono inmediatamente
+            const icon = newBtn.querySelector('.material-symbols-outlined, .theme-toggle-icon');
+            if (icon) {
+                icon.textContent = (newTheme === 'dark') ? 'light_mode' : 'dark_mode';
+            }
+        });
+    })();
+</script>

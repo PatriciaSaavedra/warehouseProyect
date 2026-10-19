@@ -3,230 +3,558 @@
 {% block title %} Registrar Nuevo Material {% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto relative px-4 py-6">
+<div class="max-w-4xl mx-auto relative px-4 py-8 font-['Outfit']">
 
-    <!-- CABECERA -->
+    <!-- CABECERA DE PÁGINA -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-            <h1 class="text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-['Outfit'] tracking-tight">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#7c121e]/10 text-[#7c121e] dark:bg-[#7c121e]/20 dark:text-rose-400">
+                    <span class="material-symbols-outlined text-[20px]">inventory_2</span>
+                </span>
+                <span class="text-xs font-bold tracking-wider uppercase text-[#7c121e] dark:text-rose-400">Almacén & Catálogo</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">
                 Registrar Material
             </h1>
             <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Añadir un nuevo artículo de consumo o activo al catálogo base de Almacenes
+                Alta de nuevo artículo con políticas de inventario y semáforo dinámico de reposición.
             </p>
         </div>
-        <a href="{% url 'inventario_por_almacen' %}" 
-           class="inline-flex items-center gap-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm active:scale-98">
+        <a href="{% url 'inventario' %}" 
+           class="inline-flex items-center gap-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm">
             <span class="material-symbols-outlined text-[18px]">arrow_back</span>
             Volver
         </a>
     </div>
 
-    <!-- MENSAJES DE ERROR/ALERTAS -->
-    {% if messages %}
-        <div class="mb-6 space-y-2">
-            {% for message in messages %}
-                <div class="p-4 rounded-xl text-sm border bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-900/30 flex items-center gap-2 animate-fade-in">
-                    <span class="material-symbols-outlined text-[18px]">error</span>
-                    {{ message }}
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    <!-- FORMULARIO -->
-    <form method="POST" class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm transition-all duration-300">
+    <!-- FORMULARIO PRINCIPAL -->
+    <form method="POST" id="form-material" class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-7">
         {% csrf_token %}
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             <!-- CODIGO DEL MATERIAL -->
             <div>
-                <label class="block mb-1.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 font-['Outfit']">
-                    Código de Material <span class="text-rose-500">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    name="codigo" 
-                    required 
-                    placeholder="Ej. 31100-0015" 
-                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 font-mono"
-                >
-                <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 leading-relaxed">Siga el formato de codificación oficial SABS de la Gobernación.</p>
-            </div>
-
-            <!-- PARTIDA PRESUPUESTARIA -->
-            <div>
-                <label class="block mb-1.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 font-['Outfit']">
-                    Partida Presupuestaria
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Código de Material SABS <span class="text-rose-500">*</span>
                 </label>
                 <div class="relative">
-                    <select name="partida" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 appearance-none pr-10 cursor-pointer">
-                        <option value="">-- Seleccionar Partida (Opcional) --</option>
-                        {% for partida in partidas %}
-                            <option value="{{ partida.id }}">{{ partida.codigo }} - {{ partida.nombre }}</option>
-                        {% endfor %}
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[20px]">keyboard_arrow_down</span>
+                    <input 
+                        type="text" 
+                        name="codigo" 
+                        id="codigo_material"
+                        required 
+                        placeholder="Ej. 31100-0015" 
+                        class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl px-3.5 py-3 text-sm font-mono tracking-wide focus:outline-none focus:ring-2 focus:ring-[#7c121e] focus:border-transparent transition-all"
+                    >
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] pointer-events-none">tag</span>
+                </div>
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[13px]">info</span>
+                    Se auto-rellena al seleccionar la partida presupuestaria.
+                </p>
+            </div>
+
+            <!-- PARTIDA PRESUPUESTARIA CON BUSCADOR POR TECLADO -->
+            <div>
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Partida Presupuestaria
+                </label>
+                
+                <!-- COMBOBOX PARTIDA -->
+                <div class="relative custom-combobox" id="combobox-partida" data-name="partida">
+                    <input type="hidden" name="partida" id="input_partida" value="">
+                    
+                    <button type="button" class="combobox-trigger w-full flex items-center justify-between border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl px-3.5 py-3 text-sm text-left focus:outline-none focus:ring-2 focus:ring-[#7c121e] transition-all">
+                        <span class="combobox-label truncate text-slate-400">Seleccionar o escribir partida...</span>
+                        <span class="material-symbols-outlined text-slate-400 text-[20px] transition-transform duration-200">unfold_more</span>
+                    </button>
+
+                    <!-- MENÚ DESPLEGABLE CON BUSCADOR POR TECLADO -->
+                    <div class="combobox-panel hidden absolute z-30 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
+                        <!-- Buscador instantáneo -->
+                        <div class="p-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-950/40">
+                            <span class="material-symbols-outlined text-slate-400 text-[18px]">search</span>
+                            <input type="text" class="combobox-search w-full bg-transparent text-xs sm:text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none font-medium" placeholder="Escribe para buscar (teclado ↑ / ↓)..." autocomplete="off">
+                            <span class="text-[10px] text-slate-400 font-mono px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">ESC</span>
+                        </div>
+                        
+                        <!-- Lista de Opciones -->
+                        <ul class="combobox-options max-h-56 overflow-y-auto p-1.5 space-y-1 text-sm">
+                            <li data-value="" data-text="-- Ninguna Partida --" class="combobox-option px-3 py-2 rounded-lg text-slate-400 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-xs">
+                                -- Ninguna Partida --
+                            </li>
+                            {% for partida in partidas %}
+                                <li data-value="{{ partida.id }}" data-codigo="{{ partida.codigo }}" data-text="{{ partida.codigo }} - {{ partida.nombre }}" class="combobox-option px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between">
+                                    <span class="font-medium truncate">{{ partida.nombre }}</span>
+                                    <span class="text-[11px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded ml-2">{{ partida.codigo }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
             </div>
 
             <!-- NOMBRE DEL MATERIAL -->
             <div class="md:col-span-2">
-                <label class="block mb-1.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 font-['Outfit']">
-                    Nombre del Material <span class="text-rose-500">*</span>
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Nombre del Material / Subartículo <span class="text-rose-500">*</span>
                 </label>
                 <input 
                     type="text" 
                     name="nombre" 
                     required 
-                    placeholder="Ej. Bolígrafos de tinta líquida azul" 
-                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 font-medium"
+                    placeholder="Ej. Papel Bond tamaño carta 75g color blanco" 
+                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl px-3.5 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#7c121e] focus:border-transparent transition-all"
                 >
             </div>
 
-            <!-- UNIDAD DE MEDIDA CON ACCESO DIRECTO (+) -->
+            <!-- UNIDAD DE MEDIDA CON BUSCADOR POR TECLADO -->
             <div class="md:col-span-2">
-                <label class="block mb-1.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 font-['Outfit']">
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
                     Unidad de Medida <span class="text-rose-500">*</span>
                 </label>
                 <div class="flex gap-2">
-                    <div class="relative flex-1">
-                        <select name="unidad_medida_fk" id="unidad_medida_select" required class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 appearance-none pr-10 cursor-pointer">
-                            <option value="">-- Seleccionar Unidad --</option>
-                            {% for unidad in unidades %}
-                                <option value="{{ unidad.id }}">{{ unidad.codigo }} - {{ unidad.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[20px]">keyboard_arrow_down</span>
+                    
+                    <!-- COMBOBOX UNIDAD -->
+                    <div class="relative custom-combobox flex-1" id="combobox-unidad" data-name="unidad_medida_fk">
+                        <input type="hidden" name="unidad_medida_fk" id="input_unidad_medida" required value="">
+                        
+                        <button type="button" class="combobox-trigger w-full flex items-center justify-between border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl px-3.5 py-3 text-sm text-left focus:outline-none focus:ring-2 focus:ring-[#7c121e] transition-all">
+                            <span class="combobox-label truncate text-slate-400">Seleccionar o escribir unidad (Ej. Unidad, Kg, Paquete)...</span>
+                            <span class="material-symbols-outlined text-slate-400 text-[20px]">unfold_more</span>
+                        </button>
+
+                        <div class="combobox-panel hidden absolute z-30 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
+                            <div class="p-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-950/40">
+                                <span class="material-symbols-outlined text-slate-400 text-[18px]">search</span>
+                                <input type="text" class="combobox-search w-full bg-transparent text-xs sm:text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none font-medium" placeholder="Escribe para filtrar unidad..." autocomplete="off">
+                                <span class="text-[10px] text-slate-400 font-mono px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">ESC</span>
+                            </div>
+                            <ul class="combobox-options max-h-52 overflow-y-auto p-1.5 space-y-1 text-sm">
+                                {% for unidad in unidades %}
+                                    <li data-value="{{ unidad.id }}" data-text="{{ unidad.codigo }} - {{ unidad.nombre }}" class="combobox-option px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between">
+                                        <span>{{ unidad.nombre }}</span>
+                                        <span class="text-xs font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{{ unidad.codigo }}</span>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
                     </div>
-                    <!-- Botón '+' estilizado para lucir integrado con el select -->
+
+                    <!-- BOTÓN AGREGAR UNIDAD AJAX -->
                     <button 
                         type="button" 
                         onclick="abrirModalUnidad()"
-                        class="w-12 h-[46px] bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow active:scale-95 cursor-pointer focus:ring-4 focus:ring-slate-500/10 focus:outline-none"
+                        class="w-12 h-[46px] bg-[#063b2f] hover:bg-[#04271f] text-white rounded-xl flex items-center justify-center transition-all shadow-sm shrink-0 active:scale-95"
                         title="Crear nueva Unidad de Medida"
                     >
                         <span class="material-symbols-outlined text-[20px]">add</span>
                     </button>
                 </div>
             </div>
-            
 
-            <!-- DESCRIPCION -->
+            <!-- DESCRIPCIÓN TÉCNICA -->
             <div class="md:col-span-2">
-                <label class="block mb-1.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 font-['Outfit']">
-                    Descripción / Especificaciones
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Descripción / Especificaciones Técnicas
                 </label>
                 <textarea 
                     name="descripcion" 
                     rows="3" 
-                    placeholder="Escriba dimensiones, marca, color o detalles específicos..." 
-                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 resize-none"
+                    placeholder="Detalles complementarios, marca de referencia, gramaje, dimensiones o características del subartículo..." 
+                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl p-3.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#7c121e] focus:border-transparent transition-all"
                 ></textarea>
             </div>
+
+            <!-- ========================================================================= -->
+            <!-- POLÍTICA DE SEMÁFORO DE INVENTARIO CON UX DINÁMICA -->
+            <!-- ========================================================================= -->
+            <div class="md:col-span-2 pt-5 border-t border-slate-200/70 dark:border-slate-800 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                            <span class="material-symbols-outlined text-[22px]">traffic</span>
+                        </span>
+                        <div>
+                            <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                                Semáforo de Reposición y Control de Stock
+                            </h3>
+                            <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                                Establece las cotas numéricas para las alertas automáticas de abastecimiento.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ALERTA DE COHERENCIA EN VIVO -->
+                <div id="stock-error" class="hidden p-3 rounded-xl text-xs bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">error</span>
+                    <span>El <strong>Stock Mínimo</strong> debe ser menor al <strong>Stock Medio</strong>, y este a su vez menor al <strong>Stock Alto</strong>.</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Stock Mínimo (Rojo) -->
+                    <div class="group relative p-4 rounded-2xl bg-red-50/60 dark:bg-red-950/20 border border-red-200/70 dark:border-red-900/40 transition-all focus-within:ring-2 focus-within:ring-red-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-red-800 dark:text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse"></span>
+                                Mínimo *
+                            </label>
+                            <span class="text-[9px] font-mono font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded-full">Alerta Crítica</span>
+                        </div>
+                        <input 
+                            type="number" 
+                            name="stock_minimo" 
+                            id="stock_minimo"
+                            value="5" 
+                            min="1" 
+                            required 
+                            class="stock-input w-full text-center font-bold text-lg border-none bg-white dark:bg-slate-900 text-red-900 dark:text-red-200 rounded-xl py-2.5 font-mono shadow-sm focus:outline-none"
+                        >
+                        <span class="text-[11px] text-red-700/70 dark:text-red-400/80 block mt-2 text-center leading-tight">
+                            Desabastecimiento inminente.
+                        </span>
+                    </div>
+
+                    <!-- Stock Medio (Amarillo) -->
+                    <div class="group relative p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 transition-all focus-within:ring-2 focus-within:ring-amber-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                                Medio *
+                            </label>
+                            <span class="text-[9px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">Reorden</span>
+                        </div>
+                        <input 
+                            type="number" 
+                            name="stock_medio" 
+                            id="stock_medio"
+                            value="15" 
+                            min="1" 
+                            required 
+                            class="stock-input w-full text-center font-bold text-lg border-none bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-200 rounded-xl py-2.5 font-mono shadow-sm focus:outline-none"
+                        >
+                        <span class="text-[11px] text-amber-700/70 dark:text-amber-400/80 block mt-2 text-center leading-tight">
+                            Punto para iniciar nueva compra.
+                        </span>
+                    </div>
+
+                    <!-- Stock Alto (Verde) -->
+                    <div class="group relative p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-900/40 transition-all focus-within:ring-2 focus-within:ring-emerald-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                Alto (Máx) *
+                            </label>
+                            <span class="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/50 px-2 py-0.5 rounded-full">Óptimo</span>
+                        </div>
+                        <input 
+                            type="number" 
+                            name="stock_maximo" 
+                            id="stock_maximo"
+                            value="50" 
+                            min="1" 
+                            required 
+                            class="stock-input w-full text-center font-bold text-lg border-none bg-white dark:bg-slate-900 text-emerald-900 dark:text-emerald-200 rounded-xl py-2.5 font-mono shadow-sm focus:outline-none"
+                        >
+                        <span class="text-[11px] text-emerald-700/70 dark:text-emerald-400/80 block mt-2 text-center leading-tight">
+                            Tope físico de almacenamiento.
+                        </span>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
-        <!-- ACCIONES (BOTONES) -->
-        <div class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
-            <a href="{% url 'inventario_por_almacen' %}" 
-               class="text-center border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-98">
+        <!-- ACCIONES INFERIORES -->
+        <div class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
+            <a href="{% url 'inventario' %}" 
+               class="text-center border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-6 py-3 rounded-xl font-semibold text-sm transition">
                Cancelar
             </a>
             <button type="submit" 
-                    class="bg-[#8b0000] hover:bg-[#720000] active:scale-98 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer font-['Outfit'] focus:ring-4 focus:ring-red-500/20 focus:outline-none">
+                    id="btn-submit"
+                    class="bg-[#7c121e] hover:bg-[#650e18] text-white px-7 py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 active:scale-98">
                 <span class="material-symbols-outlined text-[18px]">save</span>
-                Guardar Material
+                Guardar Material en Catálogo
             </button>
         </div>
     </form>
 
-    <!-- ========================================================================= -->
-    <!-- MINI FORMULARIO FLOTANTE (MODAL AJAX CON BLUR Y ANIMACIÓN SUAVE) -->
-    <!-- ========================================================================= -->
-    <div id="modal_unidad" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm hidden transition-opacity duration-300">
-        <div class="bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-900 w-full max-w-[420px] mx-4 p-6 sm:p-8 rounded-2xl shadow-2xl space-y-6 transform scale-95 transition-transform duration-300">
-            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-900 pb-4">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[#8b0000] dark:text-rose-500 text-[22px]">add_box</span>
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 font-['Outfit']">Nueva Unidad</h3>
+    <!-- MODAL AJAX DE NUEVA UNIDAD DE MEDIDA -->
+    <div id="modal_unidad" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm hidden transition-all">
+        <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 w-full max-w-[420px] mx-4 p-6 sm:p-7 rounded-3xl shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="p-1.5 rounded-lg bg-[#063b2f]/10 text-[#063b2f] dark:text-emerald-400">
+                        <span class="material-symbols-outlined text-[20px]">add_box</span>
+                    </span>
+                    <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Nueva Unidad</h3>
                 </div>
-                <button type="button" onclick="cerrarModalUnidad()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                    <span class="material-symbols-outlined">close</span>
+                <button type="button" onclick="cerrarModalUnidad()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
                 </button>
             </div>
 
-            <!-- Mensaje de Error Interno del Modal -->
-            <div id="error_modal" class="p-3 rounded-xl text-xs bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30 hidden"></div>
+            <div id="error_modal" class="p-3 rounded-xl text-xs bg-rose-50 text-rose-700 border border-rose-100 hidden"></div>
 
             <div class="space-y-4">
                 <div>
-                    <label class="block mb-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Código / Sigla *</label>
-                    <input type="text" id="modal_codigo" placeholder="Ej. KGR o RLO" max_length="10" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200 font-mono uppercase">
+                    <label class="block mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Código / Sigla *</label>
+                    <input type="text" id="modal_codigo" placeholder="Ej. KGR o RLO" maxlength="10" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 rounded-xl p-3 text-sm font-mono uppercase focus:ring-2 focus:ring-[#063b2f] focus:outline-none">
                 </div>
                 <div>
-                    <label class="block mb-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nombre Completo *</label>
-                    <input type="text" id="modal_nombre" placeholder="Ej. Kilogramo o Rollo" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-800 dark:text-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-[#8b0000] dark:focus:ring-red-950/20 transition-all duration-200">
+                    <label class="block mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo *</label>
+                    <input type="text" id="modal_nombre" placeholder="Ej. Kilogramo o Rollo" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 rounded-xl p-3 text-sm focus:ring-2 focus:ring-[#063b2f] focus:outline-none">
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-900">
-                <button type="button" onclick="cerrarModalUnidad()" class="border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl text-xs font-semibold transition">Cancelar</button>
-                <button type="button" onclick="guardarUnidadMedida()" class="bg-[#8b0000] hover:bg-[#720000] text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm active:scale-98">Guardar Unidad</button>
+            <div class="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button type="button" onclick="cerrarModalUnidad()" class="border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-xl text-xs font-semibold transition">Cancelar</button>
+                <button type="button" onclick="guardarUnidadMedida()" class="bg-[#063b2f] hover:bg-[#04271f] text-white px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition">Guardar Unidad</button>
             </div>
         </div>
     </div>
 
 </div>
 
-<!-- SCRIPT DE INTERACCIÓN AJAX Y AUTOCOMPLETADO SABS -->
+<!-- COMPONENTE COMBOBOX BUSCADOR POR TECLADO & LÓGICA -->
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const partidaSelect = document.querySelector('select[name="partida"]');
-    const codigoInput = document.querySelector('input[name="codigo"]');
+class SearchableCombobox {
+    constructor(container, onSelectCallback = null) {
+        this.container = container;
+        this.trigger = container.querySelector('.combobox-trigger');
+        this.label = container.querySelector('.combobox-label');
+        this.panel = container.querySelector('.combobox-panel');
+        this.search = container.querySelector('.combobox-search');
+        this.hiddenInput = container.querySelector('input[type="hidden"]');
+        this.optionsList = container.querySelector('.combobox-options');
+        this.onSelectCallback = onSelectCallback;
+        this.highlightedIndex = -1;
 
-    if (partidaSelect && codigoInput) {
-        partidaSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            
-            if (selectedOption && selectedOption.value !== "") {
-                const partidaTexto = selectedOption.text;
-                const codigoPartida = partidaTexto.split(' - ')[0].trim();
-                
-                codigoInput.value = `${codigoPartida}-`;
-                codigoInput.focus();
-            } else {
-                codigoInput.value = '';
+        this.init();
+    }
+
+    init() {
+        this.trigger.addEventListener('click', () => this.toggle());
+
+        // Búsqueda en tiempo real por teclado
+        this.search.addEventListener('input', (e) => this.filter(e.target.value));
+
+        // Control y navegación por teclado (Flechas, Enter, Escape)
+        this.search.addEventListener('keydown', (e) => this.handleKeydown(e));
+        this.trigger.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.open();
+            }
+        });
+
+        // Selección por clic
+        this.optionsList.addEventListener('click', (e) => {
+            const opt = e.target.closest('.combobox-option');
+            if (opt) {
+                this.selectOption(opt);
+            }
+        });
+
+        // Cerrar al hacer clic fuera
+        document.addEventListener('click', (e) => {
+            if (!this.container.contains(e.target)) {
+                this.close();
             }
         });
     }
+
+    toggle() {
+        if (this.panel.classList.contains('hidden')) {
+            this.open();
+        } else {
+            this.close();
+        }
+    }
+
+    open() {
+        // Cerrar otros comboboxes abiertos
+        document.querySelectorAll('.combobox-panel').forEach(p => p.classList.add('hidden'));
+        
+        this.panel.classList.remove('hidden');
+        this.search.value = '';
+        this.filter('');
+        this.search.focus();
+        this.highlightedIndex = -1;
+    }
+
+    close() {
+        this.panel.classList.add('hidden');
+        this.highlightedIndex = -1;
+    }
+
+    getVisibleOptions() {
+        return Array.from(this.optionsList.querySelectorAll('.combobox-option:not(.hidden)'));
+    }
+
+    filter(query) {
+        const q = query.toLowerCase().trim();
+        const options = this.optionsList.querySelectorAll('.combobox-option');
+        let count = 0;
+
+        options.forEach(opt => {
+            const text = (opt.getAttribute('data-text') || opt.textContent).toLowerCase();
+            if (text.includes(q)) {
+                opt.classList.remove('hidden');
+                count++;
+            } else {
+                opt.classList.add('hidden');
+            }
+        });
+
+        this.highlightedIndex = count > 0 ? 0 : -1;
+        this.updateHighlight();
+    }
+
+    handleKeydown(e) {
+        const visible = this.getVisibleOptions();
+        if (visible.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.highlightedIndex = (this.highlightedIndex + 1) % visible.length;
+            this.updateHighlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.highlightedIndex = (this.highlightedIndex - 1 + visible.length) % visible.length;
+            this.updateHighlight();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (this.highlightedIndex >= 0 && visible[this.highlightedIndex]) {
+                this.selectOption(visible[this.highlightedIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            this.close();
+            this.trigger.focus();
+        }
+    }
+
+    updateHighlight() {
+        const visible = this.getVisibleOptions();
+        visible.forEach((opt, idx) => {
+            if (idx === this.highlightedIndex) {
+                opt.classList.add('bg-slate-100', 'dark:bg-slate-800', 'text-[#7c121e]', 'font-semibold');
+                opt.scrollIntoView({ block: 'nearest' });
+            } else {
+                opt.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-[#7c121e]', 'font-semibold');
+            }
+        });
+    }
+
+    selectOption(optionEl) {
+        const val = optionEl.getAttribute('data-value');
+        const text = optionEl.getAttribute('data-text') || optionEl.textContent.trim();
+
+        this.hiddenInput.value = val;
+        this.label.textContent = text;
+        this.label.classList.remove('text-slate-400');
+        this.label.classList.add('text-slate-800', 'dark:text-slate-100', 'font-medium');
+
+        this.close();
+        this.trigger.focus();
+
+        if (this.onSelectCallback) {
+            this.onSelectCallback(val, optionEl);
+        }
+    }
+
+    // Agregar elemento dinámicamente (para la creación por AJAX)
+    addAndSelect(val, text, codigo) {
+        const li = document.createElement('li');
+        li.setAttribute('data-value', val);
+        li.setAttribute('data-text', `${codigo} - ${text}`);
+        li.className = 'combobox-option px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between';
+        li.innerHTML = `<span>${text}</span><span class="text-xs font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">${codigo}</span>`;
+        this.optionsList.prepend(li);
+        this.selectOption(li);
+    }
+}
+
+// =========================================================================
+// INICIALIZACIÓN Y REGLAS DE NEGOCIO
+// =========================================================================
+let comboUnidadInstance;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const codigoInput = document.getElementById('codigo_material');
+
+    // 1. Instanciar Combobox de Partidas con Autocompletado SABS
+    new SearchableCombobox(document.getElementById('combobox-partida'), (val, optionEl) => {
+        const codigoPartida = optionEl.getAttribute('data-codigo');
+        if (codigoPartida) {
+            codigoInput.value = `${codigoPartida}-`;
+            codigoInput.focus();
+        } else {
+            codigoInput.value = '';
+        }
+    });
+
+    // 2. Instanciar Combobox de Unidad de Medida
+    comboUnidadInstance = new SearchableCombobox(document.getElementById('combobox-unidad'));
+
+    // 3. Validación de coherencia del Semáforo de Stock en tiempo real
+    const sMin = document.getElementById('stock_minimo');
+    const sMed = document.getElementById('stock_medio');
+    const sMax = document.getElementById('stock_maximo');
+    const stockErr = document.getElementById('stock-error');
+    const btnSubmit = document.getElementById('btn-submit');
+
+    function validarStock() {
+        const minVal = parseFloat(sMin.value) || 0;
+        const medVal = parseFloat(sMed.value) || 0;
+        const maxVal = parseFloat(sMax.value) || 0;
+
+        if (minVal >= medVal || medVal >= maxVal) {
+            stockErr.classList.remove('hidden');
+            btnSubmit.classList.add('opacity-50', 'pointer-events-none');
+        } else {
+            stockErr.classList.add('hidden');
+            btnSubmit.classList.remove('opacity-50', 'pointer-events-none');
+        }
+    }
+
+    [sMin, sMed, sMax].forEach(inp => inp.addEventListener('input', validarStock));
+
+    // Validar antes de enviar el formulario que la unidad esté seleccionada
+    document.getElementById('form-material').addEventListener('submit', (e) => {
+        const unidadVal = document.getElementById('input_unidad_medida').value;
+        if (!unidadVal) {
+            e.preventDefault();
+            comboUnidadInstance.open();
+        }
+    });
 });
 
-// --- FUNCIONES DEL MODAL AJAX ---
+// =========================================================================
+// MODAL AJAX UNIDAD DE MEDIDA
+// =========================================================================
 function abrirModalUnidad() {
-    const modal = document.getElementById('modal_unidad');
-    const errDiv = document.getElementById('error_modal');
-    errDiv.classList.add('hidden');
-    errDiv.textContent = '';
+    document.getElementById('error_modal').classList.add('hidden');
     document.getElementById('modal_codigo').value = '';
     document.getElementById('modal_nombre').value = '';
-    
-    modal.classList.remove('hidden');
-    // Animación de entrada
-    setTimeout(() => {
-        modal.firstElementChild.classList.remove('scale-95');
-        modal.firstElementChild.classList.add('scale-100');
-    }, 10);
+    document.getElementById('modal_unidad').classList.remove('hidden');
+    setTimeout(() => document.getElementById('modal_codigo').focus(), 50);
 }
 
 function cerrarModalUnidad() {
-    const modal = document.getElementById('modal_unidad');
-    modal.firstElementChild.classList.remove('scale-100');
-    modal.firstElementChild.classList.add('scale-95');
-    setTimeout(() => {
-        modal.classList.add('hidden');
-    }, 150);
+    document.getElementById('modal_unidad').classList.add('hidden');
 }
+
+// Cerrar modal con tecla Escape
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !document.getElementById('modal_unidad').classList.contains('hidden')) {
+        cerrarModalUnidad();
+    }
+});
 
 function guardarUnidadMedida() {
     const codigo = document.getElementById('modal_codigo').value.trim();
@@ -234,7 +562,7 @@ function guardarUnidadMedida() {
     const errDiv = document.getElementById('error_modal');
 
     if (!codigo || !nombre) {
-        errDiv.textContent = "El Código y el Nombre son requeridos.";
+        errDiv.textContent = "El Código y el Nombre son obligatorios.";
         errDiv.classList.remove('hidden');
         return;
     }
@@ -245,29 +573,20 @@ function guardarUnidadMedida() {
             "Content-Type": "application/json",
             "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: JSON.stringify({
-            codigo: codigo,
-            nombre: nombre
-        })
+        body: JSON.stringify({ codigo, nombre })
     })
-    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(r => r.json().then(data => ({ status: r.status, body: data })))
     .then(res => {
         if (res.status === 200 && res.body.ok) {
-            const select = document.getElementById('unidad_medida_select');
-            const option = document.createElement('option');
-            option.value = res.body.id;
-            option.textContent = `${res.body.codigo} - ${res.body.nombre}`;
-            select.appendChild(option);
-
-            select.value = res.body.id;
+            comboUnidadInstance.addAndSelect(res.body.id, res.body.nombre, res.body.codigo);
             cerrarModalUnidad();
         } else {
-            errDiv.textContent = res.body.error || "Hubo un error al registrar la unidad.";
+            errDiv.textContent = res.body.error || "Error al registrar la unidad.";
             errDiv.classList.remove('hidden');
         }
     })
-    .catch(err => {
-        errDiv.textContent = "Error de red al procesar el guardado.";
+    .catch(() => {
+        errDiv.textContent = "Error de conexión con el servidor.";
         errDiv.classList.remove('hidden');
     });
 }

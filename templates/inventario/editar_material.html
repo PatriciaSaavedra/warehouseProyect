@@ -1,212 +1,567 @@
 {% extends 'base.html' %}
 
-{% block title %}
-Editar Material
-{% endblock %}
+{% block title %} Editar Material - {{ material.nombre }} {% endblock %}
 
 {% block content %}
-
-<div class="max-w-4xl mx-auto relative">
+<div class="max-w-4xl mx-auto relative px-4 py-8 font-['Outfit']">
 
     <!-- CABECERA -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-            <h1 class="text-3xl font-extrabold text-gray-800 font-['Outfit']">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#7c121e]/10 text-[#7c121e] dark:bg-[#7c121e]/20 dark:text-rose-400">
+                    <span class="material-symbols-outlined text-[20px]">edit_note</span>
+                </span>
+                <span class="text-xs font-bold tracking-wider uppercase text-[#7c121e] dark:text-rose-400">Catálogo de Almacén</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">
                 Editar Material
             </h1>
-            <p class="text-sm text-gray-500 mt-1">
-                Modifica la información básica del material seleccionado en el catálogo
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Actualizar ficha técnica y calibrar los umbrales del semáforo de existencias.
             </p>
         </div>
         
-        <!-- Botón Volver con historial del navegador -->
-        <a
-            href="javascript:history.back()"
-            class="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-2xl text-sm font-semibold transition"
-        >
-            <span class="material-symbols-outlined text-[18px]">
-                arrow_back
-            </span>
+        <a href="javascript:history.back()"
+           class="inline-flex items-center gap-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
             Volver
         </a>
     </div>
 
-    <!-- MENSAJES DE ERROR -->
-    {% if error %}
-    <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-center gap-3">
-        <span class="material-symbols-outlined text-[22px]">
-            error
-        </span>
-        <span class="text-sm font-medium">
-            {{ error }}
-        </span>
-    </div>
-    {% endif %}
-
-    <!-- FORMULARIO DE EDICIÓN (Usando la clase .card) -->
-    <form method="POST" class="card p-8 shadow-sm">
+    <!-- FORMULARIO DE EDICIÓN -->
+    <form method="POST" id="form-editar-material" class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-7">
         {% csrf_token %}
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            <!-- CODIGO (Solo lectura) -->
+            <!-- CODIGO SABS (Solo Lectura) -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Código del Material
-                </label>
-                <input
-                    type="text"
-                    value="{{ material.codigo }}"
-                    class="w-full border border-gray-200 rounded-2xl p-3 bg-gray-50 text-gray-400 cursor-not-allowed select-none font-medium focus:outline-none"
-                    readonly
-                >
-                <p class="text-xs text-gray-400 mt-1.5">
-                    El código del material no se puede modificar.
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Código SABS del Material
+                    </label>
+                    <span class="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[12px]">lock</span> Inmutable
+                    </span>
+                </div>
+                <div class="relative">
+                    <input
+                        type="text"
+                        value="{{ material.codigo }}"
+                        class="w-full border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-3 bg-slate-100/70 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 font-mono font-bold cursor-not-allowed select-none focus:outline-none"
+                        readonly
+                    >
+                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] pointer-events-none">tag</span>
+                </div>
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[13px]">info</span>
+                    Código oficial protegido para preservar la trazabilidad en Kárdex.
                 </p>
             </div>
 
-            <!-- NOMBRE -->
+            <!-- NOMBRE DEL MATERIAL -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                    Nombre <span class="text-[#8b0000]">*</span>
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Nombre del Material / Subartículo <span class="text-rose-500">*</span>
                 </label>
-                <input
-                    type="text"
-                    name="nombre"
-                    value="{{ material.nombre }}"
-                    class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
-                    placeholder="Ej. Papel Bond A4"
-                    required
-                >
-            </div>
-
-        </div>
-        
-        <!-- DESCRIPCION -->
-        <div class="mt-6">
-            <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                Descripción
-            </label>
-            <textarea
-                name="descripcion"
-                class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150"
-                rows="4"
-                placeholder="Ingresa los detalles o especificaciones técnicas del material..."
-            >{{ material.descripcion }}</textarea>
-        </div>
-
-        <!-- UNIDAD DE MEDIDA CON ACCESO DIRECTO (+) -->
-        <div class="mt-6">
-            <label class="block mb-2 text-sm font-bold text-gray-700 font-['Outfit']">
-                Unidad de Medida <span class="text-[#8b0000]">*</span>
-            </label>
-            <div class="flex gap-2">
-                <div class="relative flex-1">
-                    <select
-                        name="unidad_medida_fk"
-                        id="unidad_medida_select"
-                        class="w-full border border-gray-300 rounded-2xl p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:border-transparent transition duration-150 appearance-none bg-white pr-10"
+                <div class="relative">
+                    <input
+                        type="text"
+                        name="nombre"
+                        value="{{ material.nombre }}"
                         required
+                        placeholder="Ej. Papel Bond tamaño carta"
+                        class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl px-3.5 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#7c121e] focus:border-transparent transition-all"
                     >
-                        {% for unidad in unidades %}
-                            <option
-                                value="{{ unidad.id }}"
-                                {% if material.unidad_medida_fk.id == unidad.id %}
-                                    selected
-                                {% endif %}
-                            >
-                                {{ unidad.codigo }} - {{ unidad.nombre }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                        keyboard_arrow_down
-                    </span>
                 </div>
-                <!-- Botón '+' para abrir el mini-formulario flotante (Modal) -->
-                <button 
-                    type="button" 
-                    onclick="abrirModalUnidad()"
-                    class="w-12 h-[48px] bg-gray-900 hover:bg-gray-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl flex items-center justify-center transition shadow-sm hover:shadow active:scale-95 cursor-pointer"
-                    title="Crear nueva Unidad de Medida de forma rápida"
-                >
-                    <span class="material-symbols-outlined text-[20px]">add</span>
-                </button>
             </div>
+
+            <!-- UNIDAD DE MEDIDA: BUSCADOR DIRECTO POR TECLADO (NO DESLIZABLE) -->
+            <div class="md:col-span-2">
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Unidad de Medida <span class="text-rose-500">*</span>
+                </label>
+                <div class="flex gap-2">
+                    
+                    <div class="relative flex-1" id="box-buscador-unidad">
+                        <!-- Input real que recibe Django -->
+                        <input 
+                            type="hidden" 
+                            name="unidad_medida_fk" 
+                            id="input_unidad_id" 
+                            value="{{ material.unidad_medida_fk.id|default:'' }}"
+                            required
+                        >
+                        
+                        <!-- Caja de búsqueda directa (tecleas directamente sin desplegables) -->
+                        <div class="relative flex items-center">
+                            <span class="material-symbols-outlined absolute left-3.5 text-slate-400 text-[20px] pointer-events-none">search</span>
+                            
+                            <input 
+                                type="text" 
+                                id="buscador_unidad_input"
+                                autocomplete="off"
+                                value="{% if material.unidad_medida_fk %}{{ material.unidad_medida_fk.codigo }} - {{ material.unidad_medida_fk.nombre }}{% endif %}"
+                                placeholder="Escribe para buscar unidad por nombre o sigla (Ej. KGR, Paquete)..." 
+                                class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl pl-11 pr-10 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#7c121e] focus:border-transparent transition-all"
+                            >
+
+                            <!-- Botón limpiar con teclado/mouse -->
+                            <button 
+                                type="button" 
+                                id="btn_limpiar_unidad" 
+                                class="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition {% if not material.unidad_medida_fk %}hidden{% endif %}"
+                                title="Borrar y teclear otra unidad"
+                            >
+                                <span class="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        </div>
+
+                        <!-- PANEL FLOTANTE DE RESULTADOS (Capa fija, no mueve el formulario) -->
+                        <ul 
+                            id="lista_sugerencias_unidad" 
+                            class="hidden absolute left-0 right-0 top-full mt-2 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-h-56 overflow-y-auto p-1.5 space-y-1 text-sm backdrop-blur-md"
+                        >
+                            {% for unidad in unidades %}
+                                <li 
+                                    data-value="{{ unidad.id }}" 
+                                    data-codigo="{{ unidad.codigo }}"
+                                    data-nombre="{{ unidad.nombre }}"
+                                    data-search="{{ unidad.codigo|lower }} {{ unidad.nombre|lower }}"
+                                    class="item-unidad px-3.5 py-2.5 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-between transition-colors {% if material.unidad_medida_fk.id == unidad.id %}bg-slate-100 dark:bg-slate-800 font-semibold{% endif %}"
+                                >
+                                    <span class="truncate">{{ unidad.nombre }}</span>
+                                    <span class="text-xs font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{{ unidad.codigo }}</span>
+                                </li>
+                            {% endfor %}
+                            <li id="sin_resultados_unidad" class="hidden px-4 py-3 text-xs text-slate-400 text-center">
+                                No se encontraron unidades coincidentes.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- BOTÓN AGREGAR UNIDAD AJAX -->
+                    <button 
+                        type="button" 
+                        onclick="abrirModalUnidad()"
+                        class="w-12 h-[46px] bg-[#063b2f] hover:bg-[#04271f] text-white rounded-xl flex items-center justify-center transition-all shadow-sm shrink-0 active:scale-95"
+                        title="Crear nueva Unidad de Medida"
+                    >
+                        <span class="material-symbols-outlined text-[20px]">add</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- DESCRIPCIÓN -->
+            <div class="md:col-span-2">
+                <label class="block mb-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Descripción / Especificaciones Técnicas
+                </label>
+                <textarea
+                    name="descripcion"
+                    rows="3"
+                    placeholder="Detalles técnicos, marca, gramaje o dimensiones..."
+                    class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 rounded-xl p-3.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#7c121e] focus:border-transparent transition-all"
+                >{{ material.descripcion|default:'' }}</textarea>
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- POLÍTICA DE GESTIÓN DE STOCK (SEMÁFORO) -->
+            <!-- ========================================================================= -->
+            <div class="md:col-span-2 pt-5 border-t border-slate-200/70 dark:border-slate-800 space-y-4">
+                <div class="flex items-center gap-2.5">
+                    <span class="p-2 rounded-xl bg-[#c59b27]/10 text-[#c59b27] dark:text-[#dfb26c]">
+                        <span class="material-symbols-outlined text-[22px]">traffic</span>
+                    </span>
+                    <div>
+                        <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                            Umbrales de Control de Stock (Semáforo de Reposición)
+                        </h3>
+                        <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                            Calibra los límites físicos para las alertas del Dashboard y la campanita de notificaciones.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- ALERTA DE COHERENCIA EN VIVO -->
+                <div id="stock-error" class="hidden p-3 rounded-xl text-xs bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">error</span>
+                    <span>El <strong>Stock Mínimo</strong> debe ser menor al <strong>Stock Medio</strong>, y este a su vez menor al <strong>Stock Alto</strong>.</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Stock Mínimo (Rojo) -->
+                    <div class="group relative p-4 rounded-2xl bg-red-50/60 dark:bg-red-950/20 border border-red-200/70 dark:border-red-900/40 transition-all focus-within:ring-2 focus-within:ring-red-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-red-800 dark:text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse"></span>
+                                Mínimo *
+                            </label>
+                            <span class="text-[9px] font-mono font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded-full">Crítico</span>
+                        </div>
+                        <input 
+                            type="number" 
+                            name="stock_minimo" 
+                            id="stock_minimo"
+                            value="{{ material.stock_minimo|default:5 }}" 
+                            min="1" 
+                            required 
+                            class="stock-input w-full text-center font-bold text-lg border-none bg-white dark:bg-slate-900 text-red-900 dark:text-red-200 rounded-xl py-2.5 font-mono shadow-sm focus:outline-none"
+                        >
+                        <span class="text-[11px] text-red-700/70 dark:text-red-400/80 block mt-2 text-center leading-tight">
+                            Alerta urgente de desabastecimiento.
+                        </span>
+                    </div>
+
+                    <!-- Stock Medio (Amarillo / Reorden) -->
+                    <div class="group relative p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 transition-all focus-within:ring-2 focus-within:ring-amber-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                                Medio *
+                            </label>
+                            <span class="text-[9px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">Reorden</span>
+                        </div>
+                        <input 
+                            type="number" 
+                            name="stock_medio" 
+                            id="stock_medio"
+                            value="{{ material.stock_medio|default:15 }}" 
+                            min="1" 
+                            required 
+                            class="stock-input w-full text-center font-bold text-lg border-none bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-200 rounded-xl py-2.5 font-mono shadow-sm focus:outline-none"
+                        >
+                        <span class="text-[11px] text-amber-700/70 dark:text-amber-400/80 block mt-2 text-center leading-tight">
+                            Aviso para iniciar compras de reposición.
+                        </span>
+                    </div>
+
+                    <!-- Stock Alto (Verde / Techo Máximo) -->
+                    <div class="group relative p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-900/40 transition-all focus-within:ring-2 focus-within:ring-emerald-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                Alto (Máx) *
+                            </label>
+                            <span class="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/50 px-2 py-0.5 rounded-full">Óptimo</span>
+                        </div>
+                        <input 
+                            type="number" 
+                            name="stock_maximo" 
+                            id="stock_maximo"
+                            value="{{ material.stock_maximo|default:50 }}" 
+                            min="1" 
+                            required 
+                            class="stock-input w-full text-center font-bold text-lg border-none bg-white dark:bg-slate-900 text-emerald-900 dark:text-emerald-200 rounded-xl py-2.5 font-mono shadow-sm focus:outline-none"
+                        >
+                        <span class="text-[11px] text-emerald-700/70 dark:text-emerald-400/80 block mt-2 text-center leading-tight">
+                            Límite para evitar sobre-stock y merma.
+                        </span>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- ACCIONES -->
-        <div class="mt-8 pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
-            
+        <div class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-3">
             <a
                 href="javascript:history.back()"
-                class="text-center border border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-3 rounded-2xl font-semibold text-sm transition"
+                class="text-center border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-6 py-3 rounded-xl font-semibold text-sm transition"
             >
                 Cancelar
             </a>
 
             <button
                 type="submit"
-                class="btn-primary px-6 py-3 rounded-2xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+                id="btn-submit"
+                class="bg-[#7c121e] hover:bg-[#650e18] text-white px-7 py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 active:scale-98"
             >
-                <span class="material-symbols-outlined text-[18px]">
-                    save
-                </span>
+                <span class="material-symbols-outlined text-[18px]">save</span>
                 Actualizar Material
             </button>
-
         </div>
 
     </form>
 
-    <!-- ========================================================================= -->
-    <!-- MINI FORMULARIO FLOTANTE (MODAL AJAX NATIVO EN TAILWIND) -->
-    <!-- ========================================================================= -->
-    <div id="modal_unidad" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-xs hidden transition-opacity duration-300">
-        <div class="bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 w-[420px] p-8 rounded-3xl shadow-xl space-y-6">
-            <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-4">
-                <span class="material-symbols-outlined text-[#8b0000] dark:text-red-500">add_box</span>
-                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 font-['Outfit']">Nueva Unidad de Medida</h3>
+    <!-- MODAL AJAX DE NUEVA UNIDAD DE MEDIDA -->
+    <div id="modal_unidad" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm hidden transition-all">
+        <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 w-full max-w-[420px] mx-4 p-6 sm:p-7 rounded-3xl shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="p-1.5 rounded-lg bg-[#063b2f]/10 text-[#063b2f] dark:text-emerald-400">
+                        <span class="material-symbols-outlined text-[20px]">add_box</span>
+                    </span>
+                    <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Nueva Unidad</h3>
+                </div>
+                <button type="button" onclick="cerrarModalUnidad()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
             </div>
 
-            <!-- Mensaje de Error Interno del Modal -->
-            <div id="error_modal" class="p-3 rounded-xl text-xs bg-red-50 text-red-700 border border-red-200 hidden"></div>
+            <div id="error_modal" class="p-3 rounded-xl text-xs bg-rose-50 text-rose-700 border border-rose-100 hidden"></div>
 
             <div class="space-y-4">
                 <div>
-                    <label class="block mb-2 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Código / Sigla *</label>
-                    <input type="text" id="modal_codigo" placeholder="Ej. KGR o RLO" max_length="10" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition font-mono uppercase">
+                    <label class="block mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Código / Sigla *</label>
+                    <input type="text" id="modal_codigo" placeholder="Ej. KGR o RLO" maxlength="10" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 rounded-xl p-3 text-sm font-mono uppercase focus:ring-2 focus:ring-[#063b2f] focus:outline-none">
                 </div>
                 <div>
-                    <label class="block mb-2 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Nombre Completo *</label>
-                    <input type="text" id="modal_nombre" placeholder="Ej. Kilogramo o Rollo" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8b0000] transition">
+                    <label class="block mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo *</label>
+                    <input type="text" id="modal_nombre" placeholder="Ej. Kilogramo o Rollo" class="w-full border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 rounded-xl p-3 text-sm focus:ring-2 focus:ring-[#063b2f] focus:outline-none">
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
-                <button type="button" onclick="cerrarModalUnidad()" class="border border-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl text-xs font-semibold transition">Cancelar</button>
-                <button type="button" onclick="guardarUnidadMedida()" class="bg-gray-900 hover:bg-gray-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">Guardar Unidad</button>
+            <div class="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button type="button" onclick="cerrarModalUnidad()" class="border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-xl text-xs font-semibold transition">Cancelar</button>
+                <button type="button" onclick="guardarUnidadMedida()" class="bg-[#063b2f] hover:bg-[#04271f] text-white px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition">Guardar Unidad</button>
             </div>
         </div>
     </div>
 
 </div>
 
-<!-- SCRIPT AJAX PARA GUARDADO DINÁMICO DE UNIDADES -->
+<!-- SCRIPT DEL BUSCADOR DIRECTO POR TECLADO -->
 <script>
+class DirectKeyboardSearcher {
+    constructor(config) {
+        this.container = document.getElementById(config.containerId);
+        this.input = document.getElementById(config.inputId);
+        this.hiddenInput = document.getElementById(config.hiddenId);
+        this.list = document.getElementById(config.listId);
+        this.clearBtn = document.getElementById(config.clearBtnId);
+        this.noResults = document.getElementById(config.noResultsId);
+        this.highlightIndex = -1;
+
+        this.init();
+    }
+
+    init() {
+        // Al escribir en el campo: búsqueda directa inmediata
+        this.input.addEventListener('input', () => {
+            this.showList();
+            this.filter(this.input.value);
+            this.toggleClearBtn();
+        });
+
+        // Al recibir foco: mostrar sugerencias
+        this.input.addEventListener('focus', () => {
+            this.showList();
+            this.filter(this.input.value);
+        });
+
+        // Navegación 100% por teclado (Flechas, Enter, Escape)
+        this.input.addEventListener('keydown', (e) => this.handleKeyboard(e));
+
+        // Clic en una opción
+        this.list.addEventListener('click', (e) => {
+            const item = e.target.closest('.item-unidad');
+            if (item) this.selectItem(item);
+        });
+
+        // Botón limpiar
+        if (this.clearBtn) {
+            this.clearBtn.addEventListener('click', () => {
+                this.input.value = '';
+                this.hiddenInput.value = '';
+                this.toggleClearBtn();
+                this.input.focus();
+                this.showList();
+                this.filter('');
+            });
+        }
+
+        // Clic fuera del buscador para cerrar la capa
+        document.addEventListener('click', (e) => {
+            if (!this.container.contains(e.target)) {
+                this.hideList();
+            }
+        });
+    }
+
+    showList() {
+        this.list.classList.remove('hidden');
+    }
+
+    hideList() {
+        this.list.classList.add('hidden');
+        this.highlightIndex = -1;
+        this.clearHighlight();
+    }
+
+    toggleClearBtn() {
+        if (!this.clearBtn) return;
+        if (this.input.value.trim().length > 0) {
+            this.clearBtn.classList.remove('hidden');
+        } else {
+            this.clearBtn.classList.add('hidden');
+        }
+    }
+
+    getVisibleItems() {
+        return Array.from(this.list.querySelectorAll('.item-unidad:not(.hidden)'));
+    }
+
+    filter(text) {
+        const query = text.toLowerCase().trim();
+        const items = this.list.querySelectorAll('.item-unidad');
+        let matches = 0;
+
+        items.forEach(item => {
+            const searchData = item.getAttribute('data-search') || '';
+            if (searchData.includes(query)) {
+                item.classList.remove('hidden');
+                matches++;
+            } else {
+                item.classList.add('hidden');
+            }
+        });
+
+        if (this.noResults) {
+            this.noResults.classList.toggle('hidden', matches > 0);
+        }
+
+        this.highlightIndex = matches > 0 ? 0 : -1;
+        this.updateHighlight();
+    }
+
+    handleKeyboard(e) {
+        const visible = this.getVisibleItems();
+        if (visible.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.highlightIndex = (this.highlightIndex + 1) % visible.length;
+            this.updateHighlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.highlightIndex = (this.highlightIndex - 1 + visible.length) % visible.length;
+            this.updateHighlight();
+        } else if (e.key === 'Enter') {
+            // Evitar que el formulario se envíe al presionar Enter en el buscador
+            if (!this.list.classList.contains('hidden') && this.highlightIndex >= 0) {
+                e.preventDefault();
+                this.selectItem(visible[this.highlightIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            this.hideList();
+        }
+    }
+
+    updateHighlight() {
+        const visible = this.getVisibleItems();
+        visible.forEach((item, index) => {
+            if (index === this.highlightIndex) {
+                item.classList.add('bg-slate-100', 'dark:bg-slate-800', 'text-[#7c121e]', 'dark:text-rose-400', 'font-semibold');
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-[#7c121e]', 'dark:text-rose-400', 'font-semibold');
+            }
+        });
+    }
+
+    clearHighlight() {
+        this.list.querySelectorAll('.item-unidad').forEach(i => {
+            i.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-[#7c121e]', 'dark:text-rose-400', 'font-semibold');
+        });
+    }
+
+    selectItem(item) {
+        const id = item.getAttribute('data-value');
+        const codigo = item.getAttribute('data-codigo');
+        const nombre = item.getAttribute('data-nombre');
+
+        this.hiddenInput.value = id;
+        this.input.value = `${codigo} - ${nombre}`;
+        this.toggleClearBtn();
+        this.hideList();
+    }
+
+    // Inserción directa tras creación por AJAX
+    addItemAndSelect(id, codigo, nombre) {
+        const li = document.createElement('li');
+        li.setAttribute('data-value', id);
+        li.setAttribute('data-codigo', codigo);
+        li.setAttribute('data-nombre', nombre);
+        li.setAttribute('data-search', `${codigo.toLowerCase()} ${nombre.toLowerCase()}`);
+        li.className = 'item-unidad px-3.5 py-2.5 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-between transition-colors font-semibold';
+        li.innerHTML = `<span class="truncate">${nombre}</span><span class="text-xs font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">${codigo}</span>`;
+
+        this.list.prepend(li);
+        this.selectItem(li);
+    }
+}
+
+// INICIALIZACIÓN
+let searcherUnidad;
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Instanciar buscador directo por teclado
+    searcherUnidad = new DirectKeyboardSearcher({
+        containerId: 'box-buscador-unidad',
+        inputId: 'buscador_unidad_input',
+        hiddenId: 'input_unidad_id',
+        listId: 'lista_sugerencias_unidad',
+        clearBtnId: 'btn_limpiar_unidad',
+        noResultsId: 'sin_resultados_unidad'
+    });
+
+    // 2. Validación de Stock Semáforo en tiempo real
+    const sMin = document.getElementById('stock_minimo');
+    const sMed = document.getElementById('stock_medio');
+    const sMax = document.getElementById('stock_maximo');
+    const stockErr = document.getElementById('stock-error');
+    const btnSubmit = document.getElementById('btn-submit');
+
+    function validarStock() {
+        const minVal = parseFloat(sMin.value) || 0;
+        const medVal = parseFloat(sMed.value) || 0;
+        const maxVal = parseFloat(sMax.value) || 0;
+
+        if (minVal >= medVal || medVal >= maxVal) {
+            stockErr.classList.remove('hidden');
+            btnSubmit.classList.add('opacity-50', 'pointer-events-none');
+        } else {
+            stockErr.classList.add('hidden');
+            btnSubmit.classList.remove('opacity-50', 'pointer-events-none');
+        }
+    }
+
+    [sMin, sMed, sMax].forEach(inp => inp.addEventListener('input', validarStock));
+    validarStock();
+
+    // 3. Validar antes de enviar
+    document.getElementById('form-editar-material').addEventListener('submit', (e) => {
+        const hiddenVal = document.getElementById('input_unidad_id').value;
+        if (!hiddenVal) {
+            e.preventDefault();
+            const inputTxt = document.getElementById('buscador_unidad_input');
+            inputTxt.focus();
+            inputTxt.classList.add('ring-2', 'ring-rose-500');
+            setTimeout(() => inputTxt.classList.remove('ring-2', 'ring-rose-500'), 2000);
+        }
+    });
+});
+
+// MODAL AJAX
 function abrirModalUnidad() {
-    const modal = document.getElementById('modal_unidad');
-    const errDiv = document.getElementById('error_modal');
-    errDiv.classList.add('hidden');
-    errDiv.textContent = '';
+    document.getElementById('error_modal').classList.add('hidden');
     document.getElementById('modal_codigo').value = '';
     document.getElementById('modal_nombre').value = '';
-    modal.classList.remove('hidden');
+    document.getElementById('modal_unidad').classList.remove('hidden');
+    setTimeout(() => document.getElementById('modal_codigo').focus(), 50);
 }
 
 function cerrarModalUnidad() {
     document.getElementById('modal_unidad').classList.add('hidden');
 }
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !document.getElementById('modal_unidad').classList.contains('hidden')) {
+        cerrarModalUnidad();
+    }
+});
 
 function guardarUnidadMedida() {
     const codigo = document.getElementById('modal_codigo').value.trim();
@@ -214,7 +569,7 @@ function guardarUnidadMedida() {
     const errDiv = document.getElementById('error_modal');
 
     if (!codigo || !nombre) {
-        errDiv.textContent = "El Código y el Nombre son requeridos.";
+        errDiv.textContent = "El Código y el Nombre son obligatorios.";
         errDiv.classList.remove('hidden');
         return;
     }
@@ -225,32 +580,22 @@ function guardarUnidadMedida() {
             "Content-Type": "application/json",
             "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: JSON.stringify({
-            codigo: codigo,
-            nombre: nombre
-        })
+        body: JSON.stringify({ codigo, nombre })
     })
-    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(r => r.json().then(data => ({ status: r.status, body: data })))
     .then(res => {
         if (res.status === 200 && res.body.ok) {
-            const select = document.getElementById('unidad_medida_select');
-            const option = document.createElement('option');
-            option.value = res.body.id;
-            option.textContent = `${res.body.codigo} - ${res.body.nombre}`;
-            select.appendChild(option);
-
-            select.value = res.body.id; // Deja seleccionada la nueva unidad [28]
+            searcherUnidad.addItemAndSelect(res.body.id, res.body.codigo, res.body.nombre);
             cerrarModalUnidad();
         } else {
-            errDiv.textContent = res.body.error || "Hubo un error al registrar la unidad.";
+            errDiv.textContent = res.body.error || "Error al registrar la unidad.";
             errDiv.classList.remove('hidden');
         }
     })
-    .catch(err => {
-        errDiv.textContent = "Error de red al procesar el guardado.";
+    .catch(() => {
+        errDiv.textContent = "Error de conexión con el servidor.";
         errDiv.classList.remove('hidden');
     });
 }
 </script>
-
 {% endblock %}

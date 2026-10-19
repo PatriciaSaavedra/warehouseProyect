@@ -8,14 +8,34 @@
 <!-- TARJETA CON PROFUNDIDAD ADAPTABLE AL TEMA -->
 <div class="animate-fade w-full max-w-md bg-white/90 dark:bg-[#071713]/90 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-950/10 dark:shadow-black/40 border border-black/5 dark:border-amber-500/15 p-8 sm:p-10 font-['Outfit'] transition-colors duration-300">
 
-    <!-- ESCUDO OFICIAL -->
+<!-- ESCUDO OFICIAL ADAPTABLE AL TEMA (CLARO / OSCURO) -->
     <div class="flex justify-center mb-6">
-        <div class="p-3.5 rounded-3xl bg-gradient-to-b from-stone-50 to-white dark:from-[#0d221c] dark:to-[#071713] shadow-md border border-amber-300/40 dark:border-amber-500/20">
-            <img
-                src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
-                alt="Escudo Oficial GAD Potosí"
-                class="w-20 h-20 object-contain drop-shadow-sm"
-            />
+        <div class="relative group">
+            <!-- Resplandor ambiental de fondo -->
+            <div class="absolute -inset-1 rounded-3xl bg-gradient-to-r from-amber-500/20 via-[#7c121e]/20 to-emerald-600/20 blur-xl opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+            <!-- Contenedor del Escudo -->
+            <div class="relative w-24 h-24 rounded-3xl bg-gradient-to-b from-white via-stone-50 to-amber-50/40 dark:from-slate-900 dark:via-[#09221a] dark:to-[#051611] shadow-lg shadow-black/5 dark:shadow-black/40 border border-amber-300/50 dark:border-amber-400/30 transition-all duration-300 group-hover:scale-105 flex items-center justify-center p-3 overflow-hidden">
+                
+                <!-- LOGO MODO CLARO -->
+                <img
+                    src="{% static 'img/LOGO_GOBERNACION_VERTICAL_NEGRO.png' %}"
+                    data-fallback="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                    alt="Escudo GAD Potosí (Claro)"
+                    class="w-full h-full object-contain drop-shadow-sm dark:hidden"
+                    onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}"
+                />
+
+                <!-- LOGO MODO OSCURO -->
+                <img
+                    src="{% static 'img/LOGO_GOBERNACION_BLANCO_VERTICAL.png' %}"
+                    data-fallback="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                    alt="Escudo GAD Potosí (Oscuro)"
+                    class="w-full h-full object-contain drop-shadow-sm hidden dark:block"
+                    onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}"
+                />
+
+            </div>
         </div>
     </div>
 
@@ -36,7 +56,7 @@
     <!-- ERROR -->
     {% if error %}
         <div class="mb-5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-[#7c121e] dark:text-red-300 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold shadow-sm animate-fade font-sans">
-            <span class="material-symbols-outlined text-[18px] text-[#7c121e] dark:text-red-400">
+            <span class="material-symbols-outlined text-[18px] text-[#7c121e] dark:text-red-400 shrink-0">
                 error
             </span>
             <span>{{ error }}</span>
@@ -123,19 +143,21 @@
 
 </div>
 
-<!-- SCRIPT VISIBILIDAD DE CONTRASEÑA -->
+<!-- SCRIPT DE VISIBILIDAD -->
 <script>
-function togglePassword() {
-    const password = document.getElementById('password');
-    const eyeIcon = document.getElementById('eyeIcon');
-    if (password.type === 'password') {
-        password.type = 'text';
-        eyeIcon.innerText = 'visibility_off';
-    } else {
-        password.type = 'password';
-        eyeIcon.innerText = 'visibility';
+    function togglePassword() {
+        const password = document.getElementById('password');
+        const eyeIcon = document.getElementById('eyeIcon');
+        if (!password || !eyeIcon) return;
+
+        if (password.type === 'password') {
+            password.type = 'text';
+            eyeIcon.innerText = 'visibility_off';
+        } else {
+            password.type = 'password';
+            eyeIcon.innerText = 'visibility';
+        }
     }
-}
 </script>
 
 {% endblock %}

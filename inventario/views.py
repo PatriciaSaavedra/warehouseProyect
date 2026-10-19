@@ -7,7 +7,7 @@ import html
 from django.contrib import messages
 from django.utils import timezone
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, request
 from decimal import Decimal
 from django.db.models import Sum, Q, F, Prefetch
 from django.utils.dateparse import parse_date
@@ -1647,7 +1647,7 @@ def registrar_baja(request):
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def nuevo_material(request):
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
-    unidades = UnidadMedida.objects.all().order_by('nombre')
+    unidades = UnidadMedida.objects.filter(is_active=True).order_by('nombre')
 
     if request.method == 'POST':
         partida_id = request.POST.get('partida')
@@ -1655,21 +1655,22 @@ def nuevo_material(request):
         nombre = request.POST.get('nombre', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
         unidad_id = request.POST.get('unidad_medida_fk')
-        stock_minimo = request.POST.get('stock_minimo', 5)
         
-        # Captura fecha de vencimiento (opcional)
-        fecha_venc_raw = request.POST.get('fecha_vencimiento', '').strip()
+        # Umbrales del semáforo
+        stock_minimo = int(request.POST.get('stock_minimo', 5))
+        stock_medio = int(request.POST.get('stock_medio', 15))
+        stock_maximo = int(request.POST.get('stock_maximo', 50))
 
         if not codigo or not nombre or not unidad_id:
             messages.error(request, "Los campos Código, Nombre y Unidad de Medida son obligatorios.")
             return redirect('nuevo_material')
 
-        partida = get_object_or_404(PartidaPresupuestaria, id=partida_id) if partida_id else None
-        unidad = get_object_or_404(UnidadMedida, id=unidad_id)
-
         if Material.objects.filter(codigo=codigo).exists():
             messages.error(request, f"Ya existe un material con el código '{codigo}'.")
             return redirect('nuevo_material')
+
+        partida = get_object_or_404(PartidaPresupuestaria, id=partida_id) if partida_id else None
+        unidad = get_object_or_404(UnidadMedida, id=unidad_id)
 
         try:
             Material.objects.create(
@@ -1680,14 +1681,16 @@ def nuevo_material(request):
                 unidad_medida_fk=unidad,
                 unidad_medida=unidad.nombre,
                 stock_actual=0,
-                stock_minimo=int(stock_minimo) if stock_minimo else 5,
+                stock_minimo=stock_minimo,
+                stock_medio=stock_medio,
+                stock_maximo=stock_maximo,
             )
 
             Bitacora.objects.create(
                 usuario=request.user,
                 modulo='Inventario',
                 accion='Registrar Material',
-                descripcion=f'Se registró el material {nombre} ({codigo}). Vencimiento: {fecha_venc_raw or "No perecedero"}'
+                descripcion=f'Se registró el material {nombre} ({codigo}). Umbrales: Min {stock_minimo} / Med {stock_medio} / Max {stock_maximo}'
             )
 
             messages.success(request, f"El material '{nombre}' ha sido registrado en el catálogo.")
@@ -1701,23 +1704,22 @@ def nuevo_material(request):
         'partidas': partidas,
         'unidades': unidades
     })
-
-
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
 def editar_material(request, id):
     material = get_object_or_404(Material, id=id)
-    unidades = UnidadMedida.objects.all().order_by('nombre')
+    unidades = UnidadMedida.objects.filter(is_active=True).order_by('nombre')
     partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
 
     if request.method == 'POST':
         nombre = request.POST.get('nombre', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
         unidad_id = request.POST.get('unidad_medida_fk')
-        stock_minimo = request.POST.get('stock_minimo', 5)
         
-        # Actualiza fecha de vencimiento (opcional)
-        fecha_venc_raw = request.POST.get('fecha_vencimiento', '').strip()
+        # Umbrales del semáforo
+        stock_minimo = int(request.POST.get('stock_minimo', 5))
+        stock_medio = int(request.POST.get('stock_medio', 15))
+        stock_maximo = int(request.POST.get('stock_maximo', 50))
 
         if not nombre or not unidad_id:
             messages.error(request, "Nombre y Unidad de Medida son obligatorios.")
@@ -1731,14 +1733,16 @@ def editar_material(request, id):
                 material.descripcion = descripcion
                 material.unidad_medida_fk = unidad
                 material.unidad_medida = unidad.nombre
-                material.stock_minimo = int(stock_minimo) if stock_minimo else 5
+                material.stock_minimo = stock_minimo
+                material.stock_medio = stock_medio
+                material.stock_maximo = stock_maximo
                 material.save()
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Inventario',
                     accion='Editar Material',
-                    descripcion=f'Se actualizaron los datos de {nombre} ({material.codigo})'
+                    descripcion=f'Se actualizaron los datos y umbrales de {nombre} ({material.codigo})'
                 )
 
             messages.success(request, f"Ficha del material '{nombre}' actualizada correctamente.")
@@ -1753,7 +1757,6 @@ def editar_material(request, id):
         'unidades': unidades,
         'partidas': partidas
     })
-
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def crear_unidad_medida_ajax(request):
@@ -2933,15 +2936,17 @@ def cierre_conciliacion_view(request):
 def reporte_dgcf_r105(request):
     """
     Genera el Formulario DGCF - R1.05 (Resumen de Almacenes - Bienes de Consumo).
-    Soporta filtro por Almacén específico o Consolidado Institucional (todos).
+    Soporta filtro por Almacén, fecha de corte y selector múltiple de Partidas Presupuestarias.
     """
     gestion = int(request.GET.get('gestion', 2026))
     fecha_corte_str = request.GET.get('fecha_corte', f"{gestion}-12-31")
     fecha_corte = date.fromisoformat(fecha_corte_str)
     fecha_inicio = date(gestion, 1, 1)
 
-    # 1. Filtro opcional por Almacén
-    # LÓGICA BLINDADA:
+    # Capturar IDs de partidas seleccionadas vía checkboxes (si no se marca nada, por defecto se muestran todas)
+    partidas_seleccionadas_ids = request.GET.getlist('partidas')
+
+    # Validación de permisos de almacén
     es_admin_o_central = (
         request.user.perfilusuario.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'PRESUPUESTOS', 'SECRETARIO_SAF'] or 
         request.user.is_superuser
@@ -2954,20 +2959,21 @@ def reporte_dgcf_r105(request):
     filtro_almacen_id = request.GET.get('almacen', '').strip()
 
     if es_admin_o_central:
-        # Administradores y Central pueden ver consolidado y todos los almacenes
         almacenes_disponibles = Almacen.objects.filter(is_active=True).order_by('nombre')
         almacen_seleccionado = get_object_or_404(Almacen, id=filtro_almacen_id) if filtro_almacen_id else None
-        puede_ver_consolidado = True
     else:
-        # SUBALMACÉN (SIGEPRO): Solo ve su propio almacén, forzado obligatoriamente
         almacenes_disponibles = almacenes_usuario
         almacen_seleccionado = almacenes_usuario.first()
         filtro_almacen_id = str(almacen_seleccionado.id) if almacen_seleccionado else ''
-        puede_ver_consolidado = False
 
-    partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
+    # Filtrar partidas según selección del usuario
+    partidas_query = PartidaPresupuestaria.objects.all().order_by('codigo')
+    if partidas_seleccionadas_ids:
+        partidas = partidas_query.filter(id__in=partidas_seleccionadas_ids)
+    else:
+        partidas = partidas_query
+
     filas = []
-    
     total_cant_inicial = 0
     total_saldo_inicial = Decimal('0.00')
     total_cant_final = 0
@@ -3023,7 +3029,8 @@ def reporte_dgcf_r105(request):
             total_saldo_final += saldo_final_bs
             correlativo += 1
 
-    logo_path = os.path.join(settings.BASE_DIR, 'static', 'img', 'logo_gober_horizontal.png')
+    # Todas las partidas disponibles en el sis  tema para renderizar los checkboxes del filtro
+    todas_partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
 
     context = {
         'gestion': gestion,
@@ -3035,11 +3042,10 @@ def reporte_dgcf_r105(request):
         'total_saldo_final': total_saldo_final,
         'almacenes_disponibles': almacenes_disponibles,
         'almacen_seleccionado': almacen_seleccionado,
-        'logo_path': logo_path if os.path.exists(logo_path) else None,
+        'todas_partidas': todas_partidas,
+        'partidas_seleccionadas_ids': [str(pid) for pid in partidas_seleccionadas_ids],
     }
     return render(request, 'inventario/reporte_dgcf_r105.html', context)
-
-
 @login_required
 def reporte_dgcf_r106(request):
     """
@@ -3259,43 +3265,31 @@ def reporte_consumo_dependencias(request):
 
     return render(request, 'inventario/reporte_consumo_dependencias.html', context)
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'BIENES_SERVICIOS', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@rol_requerido(['ALMACENERO', 'KARDISTA', 'BIENES_SERVICIOS', 'ADMINISTRADOR', 'ADMIN_ALMACENES', 'RPA'])
 def reporte_especificaciones_tecnicas(request):
     """
-    Matriz de Especificaciones Técnicas y Consolidación de Demanda por Secretaría.
-    Cruza los Formularios 005 de una Partida contra TODAS las Secretarías de la Gobernación
-    (idéntico a la hoja física oficial para el DBC de contratación).
+    Matriz de Especificaciones Técnicas y Consolidación de Demanda (DBC).
+    Inteligencia añadida: Si no existe programación POA/Cuotas, consolida la demanda 
+    basándose en las compras y asignaciones reales ingresadas a almacén.
     """
-    from presupuestos.models import POA, DetalleProgramacionPOA
     from organizacion.models import Secretaria
+    from inventario.models import AsignacionMaterialUnidad, AsignacionEntradaUnidad
+    try:
+        from presupuestos.models import DetalleProgramacionPOA
+    except ImportError:
+        DetalleProgramacionPOA = None
 
     gestion = int(request.GET.get('gestion', 2026))
     
-    # Partidas disponibles en el POA de esta gestión
-    partidas_disponibles = PartidaPresupuestaria.objects.filter(
-        poas__gestion=gestion
-    ).distinct().order_by('codigo')
+    partidas_disponibles = PartidaPresupuestaria.objects.all().order_by('codigo')
 
     partida_id = request.GET.get('partida', '').strip()
-    partida_seleccionada = None
     if partida_id:
         partida_seleccionada = get_object_or_404(PartidaPresupuestaria, id=partida_id)
     else:
-        partida_seleccionada = partidas_disponibles.filter(codigo='39500').first() or partidas_disponibles.first()
+        partida_seleccionada = partidas_disponibles.filter(codigo='32100').first() or partidas_disponibles.first()
 
-    if not partida_seleccionada:
-        return render(request, 'inventario/reporte_especificaciones_tecnicas.html', {
-            'partidas_disponibles': [],
-            'error': 'No existen partidas con programación POA para esta gestión.'
-        })
-
-    # ========================================================
-    # 1. OBTENER TODAS LAS SECRETARÍAS DE LA GOBERNACIÓN
-    # (Para que salgan todas las columnas como en la hoja física)
-    # ========================================================
     secretarias = list(Secretaria.objects.filter(is_active=True).order_by('id'))
-
-    # Si hay secretaría duplicada por nombre similar, nos aseguramos que sean únicas
     secretarias_unicas = []
     nombres_vistos = set()
     for s in secretarias:
@@ -3305,101 +3299,104 @@ def reporte_especificaciones_tecnicas(request):
             secretarias_unicas.append(s)
     secretarias = secretarias_unicas
 
-    # 2. Requerimientos programados en esta partida y gestión
-    detalles_partida = DetalleProgramacionPOA.objects.filter(
-        poa__partida=partida_seleccionada,
-        poa__gestion=gestion
-    ).select_related('poa__unidad__secretaria', 'material', 'material__unidad_medida_fk')
+    for sec in secretarias:
+        nom = sec.nombre.upper()
+        if "ADMINISTRATIVA" in nom: sec.nombre_corto = "SEC. ADM. FINANCIERA"
+        elif "JURIDICA" in nom or "JURÍDICA" in nom: sec.nombre_corto = "SEC. ASUNTOS JURÍDICOS"
+        elif "PLANIFICACION" in nom or "PLANIFICACIÓN" in nom: sec.nombre_corto = "SEC. PLANIFICACIÓN"
+        elif "OBRAS" in nom: sec.nombre_corto = "SEC. OBRAS PÚBLICAS"
+        elif "DESPACHO" in nom or "GOBERNADOR" in nom: sec.nombre_corto = "DESPACHO GOBERNADOR"
+        elif "PRODUCTIVO" in nom: sec.nombre_corto = "SEC. DES. PRODUCTIVO"
+        elif "MINERIA" in nom or "MINERÍA" in nom: sec.nombre_corto = "SEC. MINERÍA Y METALURGIA"
+        elif "TURISMO" in nom: sec.nombre_corto = "SEC. TURISMO Y CULTURA"
+        else: sec.nombre_corto = nom[:20]
 
-    # 3. Materiales únicos demandados en esta partida
-    materiales_ids = detalles_partida.values_list('material_id', flat=True).distinct()
-    materiales = Material.objects.filter(id__in=materiales_ids).select_related('unidad_medida_fk').order_by('id')
-
-    # Si no hay ítems en DetalleProgramacionPOA, buscar los materiales catalogados en esa partida
-    if not materiales.exists():
-        materiales = Material.objects.filter(partida=partida_seleccionada, is_active=True).order_by('codigo')
-
-    # 4. Construcción de la matriz
     matriz_filas = []
     totales_por_secretaria = {sec.id: {'cant': 0, 'total_bs': Decimal('0.00')} for sec in secretarias}
     gran_total_bs = Decimal('0.00')
     gran_total_cant = 0
 
-    correlativo = 1
-    for mat in materiales:
-        dets_mat = detalles_partida.filter(material=mat)
+    if partida_seleccionada:
+        materiales = Material.objects.filter(
+            partida=partida_seleccionada, 
+            is_active=True
+        ).select_related('unidad_medida_fk').order_by('codigo')
 
-        primer_det = dets_mat.first()
-        precio_u = primer_det.precio_unitario_estimado if primer_det else Decimal('0.00')
-        u_medida = mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else (mat.unidad_medida or 'PZA')
-
-        columnas_sec = []
-        fila_total_cant = 0
-        fila_total_bs = Decimal('0.00')
-
-        for sec in secretarias:
-            # Buscar si alguna unidad de esta secretaría programó este material
-            dets_sec = dets_mat.filter(poa__unidad__secretaria=sec)
+        correlativo = 1
+        for mat in materiales:
+            columnas_sec = []
+            fila_total_cant = 0
+            fila_total_bs = Decimal('0.00')
             
-            # También soportar coincidencia por nombre si la secretaría se vinculó con id distinto
-            if not dets_sec.exists():
-                dets_sec = dets_mat.filter(poa__unidad__secretaria__nombre__iexact=sec.nombre)
+            # Precio base (última compra)
+            ultimo_ingreso = MovimientoInventario.objects.filter(material=mat, tipo='ENTRADA').order_by('-fecha').first()
+            precio_u_ref = ultimo_ingreso.costo_unitario if ultimo_ingreso else Decimal('0.00')
 
-            cant_sec = sum(d.cantidad_programada for d in dets_sec)
-            subtotal_sec = sum(d.subtotal for d in dets_sec)
+            for sec in secretarias:
+                cant_planificada = 0
+                cant_ejecutada = 0
+                subtotal_sec = Decimal('0.00')
 
-            columnas_sec.append({
-                'secretaria_id': sec.id,
-                'cantidad': cant_sec,
-                'total_bs': subtotal_sec,
+                # 1. Buscar en Planificación (POA o Cuotas Anuales)
+                if DetalleProgramacionPOA:
+                    dets_poa = DetalleProgramacionPOA.objects.filter(
+                        material=mat, poa__gestion=gestion
+                    ).filter(Q(poa__unidad__secretaria=sec) | Q(poa__unidad__secretaria__nombre__iexact=sec.nombre))
+                    for d in dets_poa:
+                        cant_planificada += d.cantidad_programada
+                        if precio_u_ref == Decimal('0.00') and getattr(d, 'precio_unitario_estimado', 0) > 0:
+                            precio_u_ref = d.precio_unitario_estimado
+
+                asigs_planificadas = AsignacionMaterialUnidad.objects.filter(
+                    material=mat, gestion=gestion
+                ).filter(Q(unidad__secretaria=sec) | Q(unidad__secretaria__nombre__iexact=sec.nombre))
+                cant_planificada += sum(a.cantidad_asignada for a in asigs_planificadas)
+
+                # 2. Buscar en Asignaciones de Compras Reales (Tus 80 unidades de la Imagen 1)
+                asigs_compras = AsignacionEntradaUnidad.objects.filter(
+                    nota_ingreso_detalle__material=mat,
+                    nota_ingreso_detalle__nota_ingreso__fecha__year=gestion
+                ).filter(Q(unidad_organizacional__secretaria=sec) | Q(unidad_organizacional__secretaria__nombre__iexact=sec.nombre))
+                
+                for ac in asigs_compras:
+                    cant_ejecutada += ac.cantidad_asignada
+                    if precio_u_ref == Decimal('0.00'):
+                        precio_u_ref = ac.nota_ingreso_detalle.precio_unitario
+
+                # LOGICA INTELIGENTE: Si no planificaron pero compraron, mostramos lo comprado.
+                cant_final_celda = max(cant_planificada, cant_ejecutada)
+                subtotal_sec = Decimal(cant_final_celda) * precio_u_ref
+
+                columnas_sec.append({
+                    'secretaria_id': sec.id,
+                    'cantidad': cant_final_celda,
+                    'total_bs': subtotal_sec,
+                })
+
+                fila_total_cant += cant_final_celda
+                fila_total_bs += subtotal_sec
+                totales_por_secretaria[sec.id]['cant'] += cant_final_celda
+                totales_por_secretaria[sec.id]['total_bs'] += subtotal_sec
+
+            gran_total_cant += fila_total_cant
+            gran_total_bs += fila_total_bs
+
+            desc_tecnica = mat.descripcion if (mat.descripcion and len(mat.descripcion) > 10) else mat.nombre
+            u_medida = mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else (mat.unidad_medida or 'UND')
+
+            matriz_filas.append({
+                'nro': correlativo,
+                'material': mat,
+                'desc_tecnica': desc_tecnica,
+                'unidad_medida': u_medida,
+                'precio_unitario': precio_u_ref,
+                'valores_secretarias': columnas_sec,
+                'total_fila_bs': fila_total_bs,
+                'total_fila_cant': fila_total_cant,
             })
-
-            fila_total_cant += cant_sec
-            fila_total_bs += subtotal_sec
-
-            totales_por_secretaria[sec.id]['cant'] += cant_sec
-            totales_por_secretaria[sec.id]['total_bs'] += subtotal_sec
-
-        gran_total_cant += fila_total_cant
-        gran_total_bs += fila_total_bs
-
-        desc_tecnica = mat.descripcion if (mat.descripcion and len(mat.descripcion) > 15) else mat.nombre
-
-        matriz_filas.append({
-            'nro': correlativo,
-            'material': mat,
-            'desc_tecnica': desc_tecnica,
-            'unidad_medida': u_medida,
-            'precio_unitario': precio_u,
-            'valores_secretarias': columnas_sec,
-            'total_fila_bs': fila_total_bs,
-            'total_fila_cant': fila_total_cant,
-        })
-        correlativo += 1
+            correlativo += 1
 
     resumen_columnas_totales = [totales_por_secretaria[sec.id] for sec in secretarias]
-
-    # Asignar nombres cortos/amigables a las cabeceras para que no se desborden
-    for sec in secretarias:
-        nom = sec.nombre.upper()
-        if "ADMINISTRATIVA" in nom:
-            sec.nombre_corto = "SEC. ADM. FINANCIERA"
-        elif "JURIDICA" in nom or "JURÍDICA" in nom:
-            sec.nombre_corto = "SEC. ASUNTOS JURÍDICOS"
-        elif "PLANIFICACION" in nom or "PLANIFICACIÓN" in nom:
-            sec.nombre_corto = "SEC. PLANIFICACIÓN"
-        elif "OBRAS" in nom:
-            sec.nombre_corto = "SEC. OBRAS PÚBLICAS"
-        elif "DESPACHO" in nom or "GOBERNADOR" in nom:
-            sec.nombre_corto = "DESPACHO GOBERNADOR"
-        elif "DESARROLLO PRODUCTIVO" in nom:
-            sec.nombre_corto = "SEC. DES. PRODUCTIVO"
-        elif "MINERIA" in nom or "MINERÍA" in nom:
-            sec.nombre_corto = "SEC. MINERÍA Y METALURGIA"
-        elif "TURISMO" in nom:
-            sec.nombre_corto = "SEC. TURISMO Y CULTURA"
-        else:
-            sec.nombre_corto = nom[:20]
 
     context = {
         'gestion': gestion,
@@ -3412,8 +3409,6 @@ def reporte_especificaciones_tecnicas(request):
         'gran_total_bs': gran_total_bs,
     }
     return render(request, 'inventario/reporte_especificaciones_tecnicas.html', context)
-
-
 # ========================================================
 # CRUD UNIDADES DE MEDIDA CON BAJA LÓGICA
 # ========================================================

@@ -55,7 +55,12 @@
     <table class="header-table">
         <tr>
             <td class="logo-box">
-                <img src="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}" alt="Logo Gobernación">
+                <img 
+                    src="{% static 'img/LOGO_GOBERNACION_VERTICAL_NEGRO.png' %}" 
+                    data-fallback="{% static 'img/cropped-cropped-logo-vertical-gober.jpg' %}"
+                    alt="Logo Gobernación"
+                    onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}"
+                >
             </td>
             <td class="title-box">
                 <h3>GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ</h3>
@@ -78,11 +83,12 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width: 38%;">Unidad / Área Organizacional</th>
-                    <th style="width: 15%;">Cant. Asignada</th>
-                    <th style="width: 15%;">Cant. Retirada</th>
-                    <th style="width: 15%;">Saldo Pendiente</th>
-                    <th style="width: 17%;">Valorado Retirado (Bs.)</th>
+                    <th style="width: 25%;">Unidad / Área Organizacional</th>
+                    <th style="width: 10%;">Cant. Asignada</th>
+                    <th style="width: 10%;">Cant. Retirada</th>
+                    <th style="width: 10%;">Saldo Pendiente</th>
+                    <th style="width: 15%;">Valorado Retirado (Bs.)</th>
+                    <th style="width: 30%;">Detalle de Materiales Retirados</th>
                 </tr>
             </thead>
             <tbody>
@@ -93,6 +99,13 @@
                     <td class="text-center font-bold">{{ u.cant_retirada }} u.</td>
                     <td class="text-center">{{ u.saldo_pendiente }} u.</td>
                     <td class="text-right font-bold">Bs. {{ u.val_retirado|floatformat:2 }}</td>
+                    <td class="text-left" style="font-size: 7.5px;">
+                        {% for mat in u.top_materiales %}
+                            {{ mat.material__nombre|truncatechars:35 }} ({{ mat.cant_total }}){% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            <span style="color: #666; font-style: italic;">Sin retiros</span>
+                        {% endfor %}
+                    </td>
                 </tr>
                 {% endfor %}
                 <tr class="row-total">
@@ -101,6 +114,7 @@
                     <td class="text-center">{{ grupo.total_retirado }} u.</td>
                     <td class="text-center">{{ grupo.total_pendiente }} u.</td>
                     <td class="text-right">Bs. {{ grupo.total_valorado|floatformat:2 }}</td>
+                    <td></td>
                 </tr>
             </tbody>
         </table>
@@ -109,12 +123,12 @@
     <!-- TOTAL GENERAL INSTITUCIONAL -->
     <table class="data-table" style="margin-top: 10px;">
         <tr class="row-total" style="background: #cbd5e1; font-size: 10px;">
-            <td style="width: 40%;" class="text-right">TOTAL CONSOLIDADO GOBERNACIÓN:</td>
-            <td style="width: 12%;" class="text-center">{{ total_general_fisico }} u.</td>
+            <td style="width: 25%;" class="text-right">TOTAL CONSOLIDADO GOBERNACIÓN:</td>
+            <td style="width: 10%;" class="text-center">{{ total_general_asignado }} u.</td>
+            <td style="width: 10%;" class="text-center">{{ total_general_retirado }} u.</td>
+            <td style="width: 10%;" class="text-center">{{ total_general_pendiente }} u.</td>
             <td style="width: 15%;" class="text-right">Bs. {{ total_general_valorado|floatformat:2 }}</td>
-            <td style="width: 15%;" class="text-right">Bs. {{ total_general_poa|floatformat:2 }}</td>
-            <td style="width: 15%;" class="text-right">—</td>
-            <td style="width: 10%;" class="text-center">{{ pct_global }}%</td>
+            <td style="width: 30%;"></td>
         </tr>
     </table>
 

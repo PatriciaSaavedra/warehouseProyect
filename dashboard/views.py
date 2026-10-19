@@ -121,13 +121,33 @@ def dashboard_view(request):
         total_materiales = inventario_items.values('material_id').distinct().count()
         total_stock_fisico = inventario_items.aggregate(t=Sum('stock_fisico'))['t'] or 0
 
-        # 2. Materiales bajo stock mínimo
-        ids_bajos = [
-            inv.material_id for inv in inventario_items.select_related('material')
-            if inv.stock_fisico <= inv.material.stock_minimo
-        ]
-        materiales_bajos = Material.objects.filter(id__in=ids_bajos).select_related('partida', 'unidad_medida_fk')[:5]
+# 2. Semáforo de Stock: Críticos (Rojo) y Punto de Reorden (Amarillo)
+        items_con_material = list(inventario_items.select_related('material', 'material__partida', 'material__unidad_medida_fk'))
 
+        materiales_criticos = []
+        materiales_reorden = []
+
+        for inv in items_con_material:
+            mat = inv.material
+            stock_med = getattr(mat, 'stock_medio', 15)
+            
+            if inv.stock_fisico <= mat.stock_minimo:
+                materiales_criticos.append({
+                    'material': mat,
+                    'stock_fisico': inv.stock_fisico,
+                    'stock_minimo': mat.stock_minimo,
+                    'almacen': inv.almacen
+                })
+            elif mat.stock_minimo < inv.stock_fisico <= stock_med:
+                materiales_reorden.append({
+                    'material': mat,
+                    'stock_fisico': inv.stock_fisico,
+                    'stock_medio': stock_med,
+                    'stock_minimo': mat.stock_minimo,
+                    'almacen': inv.almacen
+                })
+
+        materiales_bajos_count = len(materiales_criticos) + len(materiales_reorden)
         # 3. Alertas de Lotes Perecederos (< 30 días o vencidos)
         fecha_umbral = hoy + timedelta(days=30)
         lotes_activos = movimientos_base.filter(
@@ -159,7 +179,9 @@ def dashboard_view(request):
             'es_central_o_admin': es_central_o_admin,
             'total_materiales': total_materiales,
             'total_stock_fisico': total_stock_fisico,
-            'materiales_bajos': materiales_bajos,
+            'materiales_criticos': materiales_criticos[:5],
+            'materiales_reorden': materiales_reorden[:5],
+            'materiales_bajos_count': materiales_bajos_count,
             'lotes_vencidos': lotes_vencidos,
             'lotes_por_vencer': lotes_por_vencer,
             'pedidos_por_entregar': pedidos_por_entregar,

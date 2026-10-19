@@ -206,7 +206,7 @@
          ========================================================================= -->
     {% elif rol in 'ALMACENERO,KARDISTA,ADMINISTRADOR,ADMIN_ALMACENES' %}
 
-    <!-- 4 KPIS OPERATIVOS DEL DEPÓSITO -->
+    <!-- 4 KPIS OPERATIVOS CON EL SEMÁFORO DE REPOSICIÓN INTEGRADO -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -238,13 +238,17 @@
             </div>
         </div>
 
+        <!-- KPI 4: SEMÁFORO DE REPOSICIÓN DUAL (CRÍTICO + REORDEN) -->
         <div class="card p-5 bg-white dark:bg-slate-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl bg-amber-50 text-[#d97706] flex items-center justify-center">
-                <span class="material-symbols-outlined text-2xl">warning</span>
+                <span class="material-symbols-outlined text-2xl">traffic</span>
             </div>
             <div>
-                <span class="text-[10px] font-bold uppercase text-gray-400 block">Stock Mínimo / Crítico</span>
-                <span class="text-2xl font-black text-[#d97706] font-mono">{{ materiales_bajos.count }} ítems</span>
+                <span class="text-[10px] font-bold uppercase text-gray-400 block">Semáforo de Reposición</span>
+                <span class="text-xl font-black text-gray-900 dark:text-gray-100 font-mono">
+                    <span class="text-red-600 font-black">{{ materiales_criticos|length }}</span> crít. / 
+                    <span class="text-amber-600 font-bold">{{ materiales_reorden|length }}</span> reorden
+                </span>
             </div>
         </div>
     </div>
@@ -298,39 +302,72 @@
     <!-- SEMÁFORO DE ALERTAS Y GRÁFICO REAL -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <!-- ALERTAS: LOTES CADUCIDAD Y STOCK BAJO -->
+        <!-- ALERTAS: LOTES CADUCIDAD Y SEMÁFORO DE STOCK (3 NIVELES) -->
         <div class="card p-6 bg-white dark:bg-slate-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-sm space-y-4">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                <span class="material-symbols-outlined text-amber-600">notification_important</span>
-                Alertas de Stock y Caducidad en este Depósito
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-amber-600 text-[18px]">traffic</span>
+                    Semáforo de Stock y Caducidad en este Depósito
+                </span>
+                <span class="text-[10px] font-mono text-gray-400">Control Físico</span>
             </h3>
 
             <div class="space-y-2">
-                {% for m in materiales_bajos %}
-                <div class="flex justify-between items-center p-3 rounded-xl bg-red-50/60 dark:bg-red-950/30 border border-red-200 text-xs">
+                <!-- 🔴 ALERTAS CRÍTICAS (STOCK MÍNIMO) -->
+                {% for item in materiales_criticos %}
+                <div class="flex justify-between items-center p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-xs">
                     <div>
-                        <span class="font-bold text-gray-800 dark:text-gray-200">{{ m.nombre }}</span>
-                        <span class="text-[10px] text-gray-400 block font-mono">Partida {{ m.partida.codigo }}</span>
+                        <span class="font-bold text-gray-900 dark:text-gray-100">{{ item.material.nombre }}</span>
+                        <span class="text-[10px] text-gray-500 block font-mono">Partida {{ item.material.partida.codigo }} • Mínimo: {{ item.stock_minimo }} u.</span>
                     </div>
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800">
-                        Stock Mínimo ({{ m.stock_actual }} u.)
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-200 font-mono">
+                        🔴 Crítico ({{ item.stock_fisico }} u.)
                     </span>
                 </div>
-                {% empty %}
-                <p class="text-xs text-gray-400 text-center py-3">✓ Existencias de materiales en niveles óptimos</p>
                 {% endfor %}
 
+                <!-- 🟡 ALERTAS PREVENTIVAS (PUNTO DE REORDEN) -->
+                {% for item in materiales_reorden %}
+                <div class="flex justify-between items-center p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs">
+                    <div>
+                        <span class="font-bold text-gray-900 dark:text-gray-100">{{ item.material.nombre }}</span>
+                        <span class="text-[10px] text-gray-500 block font-mono">Partida {{ item.material.partida.codigo }} • Reorden: {{ item.stock_medio }} u.</span>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 font-mono">
+                        🟡 Reorden ({{ item.stock_fisico }} u.)
+                    </span>
+                </div>
+                {% endfor %}
+
+                <!-- ⏳ LOTES POR VENCER -->
                 {% for l in lotes_por_vencer %}
-                <div class="flex justify-between items-center p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 text-xs">
+                <div class="flex justify-between items-center p-3 rounded-xl bg-orange-50/60 dark:bg-orange-950/30 border border-orange-200 text-xs">
                     <div>
                         <span class="font-bold text-gray-800 dark:text-gray-200">{{ l.material.nombre }}</span>
                         <span class="text-[10px] text-gray-400 block font-mono">Vence: {{ l.fecha_vencimiento|date:"d/m/Y" }}</span>
                     </div>
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 font-mono">
-                        {{ l.dias_para_vencer }} días
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 font-mono">
+                        ⏳ {{ l.dias_para_vencer }} días
                     </span>
                 </div>
                 {% endfor %}
+
+                <!-- VENCIDOS -->
+                {% for l in lotes_vencidos %}
+                <div class="flex justify-between items-center p-3 rounded-xl bg-rose-100/70 dark:bg-rose-950/40 border border-rose-300 text-xs">
+                    <div>
+                        <span class="font-bold text-rose-900 dark:text-rose-200">{{ l.material.nombre }}</span>
+                        <span class="text-[10px] text-rose-600 dark:text-rose-400 block font-mono">Caducó el: {{ l.fecha_vencimiento|date:"d/m/Y" }}</span>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-200 text-rose-900 font-mono">
+                        VENCIDO
+                    </span>
+                </div>
+                {% endfor %}
+
+                {% if not materiales_criticos and not materiales_reorden and not lotes_por_vencer and not lotes_vencidos %}
+                <p class="text-xs text-gray-400 text-center py-4">✓ Todos los materiales se encuentran en niveles óptimos de almacenamiento.</p>
+                {% endif %}
             </div>
         </div>
 
@@ -409,7 +446,6 @@
 
 </div>
 
-<!-- CHART.JS CON DATOS REALES DEL DEPÓSITO -->
 <!-- CHART.JS CON DATOS LEÍDOS DESDE EL CANVAS (0 ERRORES EN VS CODE) -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
