@@ -9,12 +9,16 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-
+from django.db import connection
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
+import uuid
 
+from decimal import Decimal, InvalidOperation
+from django.db import transaction, DatabaseError
+from django.views.decorators.http import require_POST
 from auditoria.models import Bitacora
 from solicitudes.models import Solicitud
 from inventario.models import Material, UnidadMedida, PartidaPresupuestaria, Proveedor, Almacen
@@ -268,51 +272,274 @@ def adquisiciones_list(request):
 
 @login_required
 def crear_adquisicion(request):
-    """Paso 1: Inicio del Flujo 2 con Checklist Dinámico de Requisitos Documentales."""
+    """Flujo 2: registro de adquisición de bienes."""
+
     perfil = getattr(request.user, 'perfilusuario', None)
     unidad = perfil.unidad if perfil else None
 
     if not unidad:
-        messages.error(request, "Su usuario no tiene una Unidad Organizacional asignada para tramitar adquisiciones.")
+        messages.error(
+            request,
+            "Su usuario no tiene una Unidad Organizacional asignada."
+        )
         return redirect('adquisiciones_list')
 
-    autoridad_saf = AutoridadInstitucional.objects.filter(cargo='SAF', is_active=True).first()
-    autoridad_rpa = AutoridadInstitucional.objects.filter(cargo='RPA', is_active=True).first()
+    autoridad_saf = AutoridadInstitucional.objects.filter(
+        cargo='SAF', is_active=True
+    ).first()
 
-    requisitos_db = RequisitoCatalogo.objects.filter(is_active=True).order_by('id')
-    materiales_catalogo = Material.objects.filter(is_active=True).values('id', 'codigo', 'nombre', 'unidad_medida')
-    unidades_medida = UnidadMedida.objects.filter(is_active=True).order_by('nombre')
+    autoridad_rpa = AutoridadInstitucional.objects.filter(
+        cargo='RPA', is_active=True
+    ).first()
+
+    requisitos_db = RequisitoCatalogo.objects.filter(
+        is_active=True
+    ).order_by('id')
+
+    materiales_catalogo = Material.objects.filter(
+        is_active=True
+    ).values('id', 'codigo', 'nombre', 'unidad_medida')
+
+    unidades_medida = UnidadMedida.objects.filter(
+        is_active=True
+    ).order_by('nombre')
 
     if request.method == 'POST':
-        tipo = request.POST.get('tipo', 'BIEN')
-        objeto = request.POST.get('objeto_contratacion', '').strip()
-        justificacion = request.POST.get('justificacion', '').strip()
-        cite_solicitud = request.POST.get('cite_solicitud', '').strip()
-        payload_items_raw = request.POST.get('payload_items', '{}')
+        tipo = request.POST.get('tipo', 'BIEN').strip()
+        objeto = request.POST.get(
+            'objeto_contratacion', ''
+        ).strip()
+        justificacion = request.POST.get(
+            'justificacion', ''
+        ).strip()
+        cite_solicitud = request.POST.get(
+            'cite_solicitud', ''
+        ).strip()
+
+        if tipo != 'BIEN':
+            messages.error(
+                request,
+                "El Flujo 2 permite exclusivamente "
+                "adquisiciones de bienes."
+            )
+            return redirect('crear_adquisicion')
 
         if not objeto or not justificacion:
-            messages.error(request, "El Objeto de Contratación y la Justificación son campos obligatorios.")
+            messages.error(
+                request,
+                "El objeto de contratación y la "
+                "justificación son obligatorios."
+            )
+            return redirect('crear_adquisicion')
+
+        if len(objeto) > 300 or len(cite_solicitud) > 100:
+            messages.error(
+                request,
+                "El objeto o el CITE supera la longitud permitida."
+            )
             return redirect('crear_adquisicion')
 
         try:
-            payload_items = json.loads(payload_items_raw)
-        except json.JSONDecodeError:
-            payload_items = {}
+            payload_items = json.loads(
+                request.POST.get('payload_items', '{}')
+            )
 
-        if not payload_items:
-            messages.error(request, "Debe agregar al menos un bien o servicio a la solicitud de adquisición.")
-            return redirect('crear_adquisicion')
+            if not isinstance(payload_items, dict) or not payload_items:
+                raise ValueError(
+                    "Debe registrar al menos un bien."
+                )
 
-        try:
+            requisitos = {
+                str(r.id): r
+                for r in RequisitoCatalogo.objects.filter(
+                    is_active=True,
+                    aplica_a__in=['BIEN', 'AMBOS']
+                )
+            }
+
+            obligatorios = {
+                clave
+                for clave, requisito in requisitos.items()
+                if requisito.es_obligatorio
+            }
+
+            datos_items = []
+            total_estimado = Decimal('0.00')
+
+            for item_data in payload_items.values():
+                if not isinstance(item_data, dict):
+                    raise ValueError(
+                        "La información de un bien no es válida."
+                    )
+
+                try:
+                    cantidad = int(item_data.get('cantidad', 0))
+                    precio = Decimal(
+                        str(item_data.get('precio_unitario', ''))
+                    )
+                except (ValueError, TypeError, InvalidOperation):
+                    raise ValueError(
+                        "La cantidad o el precio de un bien "
+                        "no tiene un formato válido."
+                    )
+
+                if cantidad <= 0 or cantidad > 2147483647:
+                    raise ValueError(
+                        "La cantidad debe ser un entero positivo válido."
+                    )
+
+                if not precio.is_finite() or precio < 0:
+                    raise ValueError(
+                        "El precio referencial debe ser "
+                        "un número válido y no negativo."
+                    )
+
+                if (
+                    precio.as_tuple().exponent < -2
+                    or precio >= Decimal('10000000000')
+                ):
+                    raise ValueError(
+                        "El precio referencial supera la "
+                        "precisión permitida."
+                    )
+
+                descripcion = str(
+                    item_data.get('descripcion') or ''
+                ).strip()
+
+                unidad_medida = str(
+                    item_data.get('unidad_medida') or ''
+                ).strip()
+
+                if not descripcion:
+                    raise ValueError(
+                        "Cada bien debe tener una descripción."
+                    )
+
+                if not unidad_medida or len(unidad_medida) > 50:
+                    raise ValueError(
+                        "La unidad de medida no es válida."
+                    )
+
+                material_id = item_data.get('material_id')
+                material = None
+
+                if material_id not in (None, ''):
+                    if (
+                        isinstance(material_id, bool)
+                        or not str(material_id).isdigit()
+                    ):
+                        raise ValueError(
+                            "El identificador del material no es válido."
+                        )
+
+                    material = Material.objects.filter(
+                        pk=int(material_id),
+                        is_active=True
+                    ).first()
+
+                    if material is None:
+                        raise ValueError(
+                            "El material seleccionado no existe "
+                            "o está inactivo."
+                        )
+
+                checklist = item_data.get('checklist', {})
+
+                if not isinstance(checklist, dict):
+                    raise ValueError(
+                        "El checklist del bien no es válido."
+                    )
+
+                respuestas = []
+                cumplidos = set()
+
+                for req_id, respuesta in checklist.items():
+                    requisito = requisitos.get(str(req_id))
+
+                    if requisito is None:
+                        raise ValueError(
+                            "El checklist contiene un requisito "
+                            "inexistente o no aplicable."
+                        )
+
+                    if not isinstance(respuesta, dict):
+                        raise ValueError(
+                            "La respuesta del requisito no es válida."
+                        )
+
+                    estado = respuesta.get('estado', '')
+
+                    if estado not in (
+                        'CUMPLE', 'NO_CUMPLE', 'NO_APLICA'
+                    ):
+                        raise ValueError(
+                            "El estado del requisito no es válido."
+                        )
+
+                    documento = str(
+                        respuesta.get('doc_respaldo') or ''
+                    ).strip()
+
+                    observacion = str(
+                        respuesta.get('observacion') or ''
+                    ).strip()
+
+                    if len(documento) > 200 or len(observacion) > 300:
+                        raise ValueError(
+                            "Los datos del checklist superan "
+                            "la longitud permitida."
+                        )
+
+                    if requisito.es_obligatorio:
+                        if estado != 'CUMPLE':
+                            raise ValueError(
+                                f"El requisito obligatorio "
+                                f"'{requisito.nombre}' debe cumplirse."
+                            )
+                        cumplidos.add(str(req_id))
+
+                    respuestas.append({
+                        'requisito': requisito,
+                        'estado': estado,
+                        'documento_respaldo': documento,
+                        'observaciones': observacion
+                    })
+
+                faltantes = obligatorios - cumplidos
+
+                if faltantes:
+                    raise ValueError(
+                        "Faltan requisitos obligatorios "
+                        "del checklist de adquisición."
+                    )
+
+                total_estimado += precio * cantidad
+
+                if total_estimado >= Decimal('10000000000'):
+                    raise ValueError(
+                        "El total estimado supera el límite permitido."
+                    )
+
+                datos_items.append({
+                    'material': material,
+                    'descripcion': descripcion,
+                    'unidad_medida': unidad_medida,
+                    'cantidad': cantidad,
+                    'precio': precio,
+                    'checklist': respuestas
+                })
+
             with transaction.atomic():
-                anio = timezone.now().year
-                ultimo = ProcesoAdquisicion.objects.select_for_update().order_by('id').last()
-                numero = (ultimo.id + 1) if ultimo else 1
-                codigo = f"ADQ-{anio}-{numero:04d}"
+                # Código provisional único para evitar colisiones
+                # mientras se obtiene el identificador definitivo.
+                codigo_temporal = (
+                    f"TMP-{uuid.uuid4().hex}"
+                )
 
                 proceso = ProcesoAdquisicion.objects.create(
-                    codigo=codigo,
-                    tipo=tipo,
+                    codigo=codigo_temporal,
+                    tipo='BIEN',
                     unidad_solicitante=unidad,
                     solicitante=request.user,
                     objeto_contratacion=objeto,
@@ -320,57 +547,93 @@ def crear_adquisicion(request):
                     cite_solicitud=cite_solicitud,
                     autoridad_saf=autoridad_saf,
                     autoridad_rpa=autoridad_rpa,
-                    programa=request.POST.get('programa', '000').strip(),
-                    proyecto_actividad=request.POST.get('proyecto_actividad', '001').strip(),
-                    fuente_financiamiento=request.POST.get('fuente_financiamiento', '20').strip(),
-                    organismo_financiador=request.POST.get('organismo_financiador', '220').strip(),
+                    programa=request.POST.get(
+                        'programa', '000'
+                    ).strip(),
+                    proyecto_actividad=request.POST.get(
+                        'proyecto_actividad', '001'
+                    ).strip(),
+                    fuente_financiamiento=request.POST.get(
+                        'fuente_financiamiento', '20'
+                    ).strip(),
+                    organismo_financiador=request.POST.get(
+                        'organismo_financiador', '220'
+                    ).strip(),
                     estado='CHECKLIST_VERIFICADO'
                 )
 
-                total_estimado = Decimal('0.00')
-                for _, item_data in payload_items.items():
-                    cant = int(item_data.get('cantidad', 1))
-                    precio_ref = Decimal(str(item_data.get('precio_unitario', '0.00')))
-                    mat_id = item_data.get('material_id')
+                # Generar un código institucional único por año.
+                # El bloqueo evita duplicados en solicitudes simultáneas.
+                # Identificador reservado para la numeración de adquisiciones.
+                BLOQUEO_CODIGOS_ADQUISICION = 2026
+                anio = timezone.now().year
 
-                    subtot = Decimal(cant) * precio_ref
-                    total_estimado += subtot
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT pg_advisory_xact_lock(%s, %s)",
+                        [BLOQUEO_CODIGOS_ADQUISICION, anio]
+                    )
 
-                    item_obj = ProcesoItemDetalle.objects.create(
+                prefijo = f"ADQ-{anio}-"
+
+                codigos_existentes = ProcesoAdquisicion.objects.filter(
+                    codigo__startswith=prefijo
+                ).values_list('codigo', flat=True)
+
+                numeros = [
+                    int(codigo_existente[len(prefijo):])
+                    for codigo_existente in codigos_existentes
+                    if codigo_existente[len(prefijo):].isdigit()
+                ]
+
+                siguiente_numero = max(numeros, default=0) + 1
+                codigo = f"{prefijo}{siguiente_numero:04d}"
+
+                proceso.codigo = codigo
+                proceso.save(update_fields=['codigo'])
+
+                for datos in datos_items:
+                    item = ProcesoItemDetalle.objects.create(
                         proceso=proceso,
-                        material_id=mat_id if mat_id else None,
-                        descripcion=item_data.get('descripcion', '').strip(),
-                        unidad_medida=item_data.get('unidad_medida', 'PIEZA').strip(),
-                        cantidad=cant,
-                        precio_referencial_estimado=precio_ref,
+                        material=datos['material'],
+                        descripcion=datos['descripcion'],
+                        unidad_medida=datos['unidad_medida'],
+                        cantidad=datos['cantidad'],
+                        precio_referencial_estimado=datos['precio'],
                         precio_oficial_unitario=Decimal('0.00')
                     )
 
-                    checklist_dict = item_data.get('checklist', {})
-                    for req_id_str, resp in checklist_dict.items():
-                        req_id = int(req_id_str)
+                    for respuesta in datos['checklist']:
                         ProcesoChecklistDetalle.objects.create(
                             proceso=proceso,
-                            item_adquisicion=item_obj,
-                            requisito_id=req_id,
-                            estado=resp.get('estado', 'CUMPLE'),
-                            documento_respaldo=resp.get('doc_respaldo', '').strip(),
-                            observaciones=resp.get('observacion', '').strip()
+                            item_adquisicion=item,
+                            **respuesta
                         )
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Compras',
                     accion='Iniciar Proceso Adquisición (Flujo 2)',
-                    descripcion=f'Se inició el proceso {codigo} ({tipo}): {objeto[:80]}. Total ref: Bs. {total_estimado:.2f}.'
+                    descripcion=(
+                        f'Se inició el proceso {codigo} (BIEN): '
+                        f'{objeto[:80]}. '
+                        f'Total referencial: Bs {total_estimado:.2f}.'
+                    )
                 )
 
-            messages.success(request, f"Proceso de Adquisición {codigo} registrado con éxito.")
-            return redirect('detalle_adquisicion', id=proceso.id)
-
-        except Exception as e:
-            messages.error(request, f"Error al procesar el requerimiento: {str(e)}")
+        except (ValueError, TypeError, InvalidOperation) as e:
+            messages.error(request, str(e))
             return redirect('crear_adquisicion')
+
+        except DatabaseError:
+            messages.error(request, "No fue posible registrar el proceso de adquisición.")
+            return redirect('crear_adquisicion')
+
+        messages.success(
+            request,
+            f"Proceso de adquisición {codigo} registrado correctamente."
+        )
+        return redirect('detalle_adquisicion', id=proceso.pk)
 
     return render(request, 'compras/crear_adquisicion.html', {
         'unidad': unidad,
@@ -380,7 +643,6 @@ def crear_adquisicion(request):
         'materiales_catalogo': list(materiales_catalogo),
         'unidades_medida': unidades_medida,
     })
-
 
 @login_required
 def detalle_adquisicion(request, id):
@@ -425,199 +687,701 @@ def detalle_adquisicion(request, id):
 # 3. TRANSICIONES ADMINISTRATIVAS DEL FLUJO 2 (CANDADOS SABS)
 # ========================================================
 
+
 @login_required
-@rol_requerido(['UNIDAD_SOLICITANTE', 'SECRETARIO_SAF', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@rol_requerido([
+    'UNIDAD_SOLICITANTE',
+    'SECRETARIO_SAF',
+    'ADMINISTRADOR',
+    'ADMIN_ALMACENES'
+])
 def emitir_nota_saf(request, id):
-    """Paso 2: Registra el CITE de la nota enviada a la SAF."""
-    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    """
+    Flujo 2: registra el CITE de la nota dirigida a SAF.
+    Solo admite adquisiciones de bienes con checklist verificado.
+    """
 
-    if request.user.perfilusuario.rol == 'UNIDAD_SOLICITANTE' and proceso.solicitante != request.user:
-        return HttpResponseForbidden("Solo el solicitante titular puede emitir la nota a SAF.")
+    if request.method != 'POST':
+        return HttpResponse(
+            "Método no permitido. Utilice el formulario correspondiente.",
+            status=405
+        )
 
-    if request.method == 'POST':
-        cite_saf = request.POST.get('cite_nota_saf', '').strip()
-        if not cite_saf:
-            messages.error(request, "Debe ingresar el CITE oficial de la nota enviada a la SAF.")
+    cite_saf = request.POST.get('cite_nota_saf', '').strip()
+
+    if not cite_saf:
+        messages.error(
+            request,
+            "Debe ingresar el CITE oficial de la nota enviada a SAF."
+        )
+        return redirect('detalle_adquisicion', id=id)
+
+    with transaction.atomic():
+        proceso = get_object_or_404(
+            ProcesoAdquisicion.objects.select_for_update(),
+            id=id
+        )
+
+        rol = request.user.perfilusuario.rol
+
+        if (
+            rol == 'UNIDAD_SOLICITANTE'
+            and proceso.solicitante_id != request.user.id
+        ):
+            return HttpResponseForbidden(
+                "Solo el solicitante titular puede emitir la nota a SAF."
+            )
+
+        if proceso.tipo != 'BIEN':
+            messages.error(
+                request,
+                "El Flujo 2 solo admite adquisiciones de bienes."
+            )
+            return redirect('detalle_adquisicion', id=proceso.id)
+
+        if proceso.estado != 'CHECKLIST_VERIFICADO':
+            messages.error(
+                request,
+                "El expediente debe tener el checklist verificado "
+                "antes de emitir la nota a SAF."
+            )
             return redirect('detalle_adquisicion', id=proceso.id)
 
         proceso.cite_nota_saf = cite_saf
         proceso.estado = 'NOTA_SAF_EMITIDA'
-        proceso.save()
-        messages.success(request, f"Nota formal {cite_saf} registrada y remitida a la SAF.")
-    return redirect('detalle_adquisicion', id=proceso.id)
+        proceso.save(update_fields=[
+            'cite_nota_saf',
+            'estado'
+        ])
+
+        Bitacora.objects.create(
+            usuario=request.user,
+            modulo='Compras',
+            accion='Emisión de Nota SAF',
+            descripcion=(
+                f'Se registró la nota {cite_saf} '
+                f'para el proceso {proceso.codigo}.'
+            )
+        )
+
+    messages.success(
+        request,
+        f"Nota {cite_saf} registrada correctamente y remitida a SAF."
+    )
+
+    return redirect('detalle_adquisicion', id=id)
+
 
 
 @login_required
 @rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
+@require_POST
 def certificar_presupuesto_adquisicion(request, id):
     """
-    Paso 3: Exclusivo de PRESUPUESTOS.
-    Certifica partida, fuente, organismo y monto ítem por ítem.
+    Flujo 2: certificación presupuestaria documental por ítem.
+    No realiza movimientos ni compromisos sobre el POA.
     """
-    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
 
-    if proceso.estado != 'NOTA_SAF_EMITIDA':
-        messages.error(request, "El trámite no se encuentra en fase de Certificación Presupuestaria.")
-        return redirect('detalle_adquisicion', id=proceso.id)
+    cert_nro = request.POST.get(
+        'certificacion_nro', ''
+    ).strip()
 
-    if request.method == 'POST':
-        cert_nro = request.POST.get('certificacion_nro', '').strip()
-        if not cert_nro:
-            messages.error(request, "El número de Certificación Presupuestaria es obligatorio.")
-            return redirect('detalle_adquisicion', id=proceso.id)
+    if not cert_nro or len(cert_nro) > 50:
+        messages.error(
+            request,
+            "Ingrese un número de certificación válido (máximo 50 caracteres)."
+        )
+        return redirect('detalle_adquisicion', id=id)
 
-        try:
-            with transaction.atomic():
-                total_certificado = Decimal('0.00')
+    try:
+        with transaction.atomic():
+            proceso = get_object_or_404(
+                ProcesoAdquisicion.objects.select_for_update(),
+                id=id
+            )
 
-                for item in proceso.items.all():
-                    partida_id = request.POST.get(f'item_partida_{item.id}')
-                    fuente = request.POST.get(f'item_fuente_{item.id}', '20 - Recursos Específicos').strip()
-                    organismo = request.POST.get(f'item_organismo_{item.id}', '111 - TGN').strip()
-                    monto_str = request.POST.get(f'item_monto_{item.id}', '0').strip()
+            if proceso.tipo != 'BIEN':
+                messages.error(
+                    request,
+                    "La certificación solo corresponde a adquisiciones de bienes."
+                )
+                return redirect('detalle_adquisicion', id=id)
 
-                    monto_item = Decimal(monto_str) if monto_str else item.subtotal_referencial
+            if proceso.estado != 'NOTA_SAF_EMITIDA':
+                messages.error(
+                    request,
+                    "El expediente debe tener registrada la nota a SAF."
+                )
+                return redirect('detalle_adquisicion', id=id)
 
-                    item.partida_id = partida_id if partida_id else None
-                    item.fuente_financiamiento = fuente
-                    item.organismo_financiador = organismo
-                    item.monto_certificado = monto_item
-                    item.save()
+            items = list(
+                proceso.items.select_for_update().order_by('id')
+            )
 
-                    total_certificado += monto_item
+            if not items:
+                messages.error(
+                    request,
+                    "El expediente no contiene bienes para certificar."
+                )
+                return redirect('detalle_adquisicion', id=id)
 
-                proceso.certificacion_nro = cert_nro
-                proceso.monto_certificado_bs = total_certificado
-                proceso.estado = 'CERTIFICADA'
-                proceso.save()
+            datos_validados = []
+            total_certificado = Decimal('0.00')
 
-                Bitacora.objects.create(
-                    usuario=request.user,
-                    modulo='Compras',
-                    accion='Certificación Presupuestaria',
-                    descripcion=f'Presupuestos certificó el trámite {proceso.codigo} ({cert_nro}) por Bs. {total_certificado:.2f}.'
+            for item in items:
+                if item.cantidad <= 0:
+                    raise ValueError(
+                        f"Cantidad inválida en el ítem {item.id}."
+                    )
+
+                partida_id = request.POST.get(
+                    f'item_partida_{item.id}', ''
+                ).strip()
+
+                if not partida_id.isdigit():
+                    raise ValueError(
+                        f"Seleccione una partida válida para el ítem {item.id}."
+                    )
+
+                partida = PartidaPresupuestaria.objects.filter(
+                    pk=int(partida_id)
+                ).first()
+
+                if partida is None:
+                    raise ValueError(
+                        f"La partida del ítem {item.id} no existe."
+                    )
+
+                fuente = request.POST.get(
+                    f'item_fuente_{item.id}',
+                    '20 - Recursos Específicos'
+                ).strip()
+
+                organismo = request.POST.get(
+                    f'item_organismo_{item.id}',
+                    '111 - TGN'
+                ).strip()
+
+                if not fuente or len(fuente) > 100:
+                    raise ValueError(
+                        f"Fuente de financiamiento inválida en el ítem {item.id}."
+                    )
+
+                if not organismo or len(organismo) > 100:
+                    raise ValueError(
+                        f"Organismo financiador inválido en el ítem {item.id}."
+                    )
+
+                monto_str = request.POST.get(
+                    f'item_monto_{item.id}', ''
+                ).strip()
+
+                try:
+                    monto = (
+                        Decimal(monto_str)
+                        if monto_str
+                        else item.subtotal_referencial
+                    )
+                except (InvalidOperation, ValueError):
+                    raise ValueError(
+                        f"Monto inválido en el ítem {item.id}."
+                    )
+
+                if not monto.is_finite() or monto < 0:
+                    raise ValueError(
+                        f"El monto del ítem {item.id} debe ser finito y no negativo."
+                    )
+
+                if monto.as_tuple().exponent < -2:
+                    raise ValueError(
+                        f"El monto del ítem {item.id} admite máximo dos decimales."
+                    )
+
+                if monto >= Decimal('10000000000'):
+                    raise ValueError(
+                        f"El monto del ítem {item.id} excede el límite permitido."
+                    )
+
+                total_certificado += monto
+
+                datos_validados.append((
+                    item, partida, fuente, organismo, monto
+                ))
+
+            if total_certificado <= 0:
+                raise ValueError(
+                    "El monto total certificado debe ser mayor a cero."
                 )
 
-            messages.success(request, f"Certificación Presupuestaria {cert_nro} aprobada por Bs. {total_certificado:.2f}.")
-        except Exception as e:
-            messages.error(request, f"Error al guardar certificación presupuestaria: {str(e)}")
+            if total_certificado >= Decimal('10000000000'):
+                raise ValueError(
+                    "El total certificado excede el límite permitido."
+                )
 
-    return redirect('detalle_adquisicion', id=proceso.id)
+            for item, partida, fuente, organismo, monto in datos_validados:
+                item.partida = partida
+                item.fuente_financiamiento = fuente
+                item.organismo_financiador = organismo
+                item.monto_certificado = monto
+
+                item.save(update_fields=[
+                    'partida',
+                    'fuente_financiamiento',
+                    'organismo_financiador',
+                    'monto_certificado'
+                ])
+
+            proceso.certificacion_nro = cert_nro
+            proceso.monto_certificado_bs = total_certificado
+            proceso.estado = 'CERTIFICADA'
+
+            proceso.save(update_fields=[
+                'certificacion_nro',
+                'monto_certificado_bs',
+                'estado'
+            ])
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Compras',
+                accion='Certificación Presupuestaria',
+                descripcion=(
+                    f'Se certificó el proceso {proceso.codigo} '
+                    f'con documento {cert_nro} '
+                    f'por Bs. {total_certificado:.2f}.'
+                )
+            )
+
+    except (ValueError, InvalidOperation) as e:
+        messages.error(request, str(e))
+        return redirect('detalle_adquisicion', id=id)
+
+    except DatabaseError:
+        messages.error(
+            request,
+            "No fue posible registrar la certificación presupuestaria."
+        )
+        return redirect('detalle_adquisicion', id=id)
+
+    messages.success(
+        request,
+        f"Certificación {cert_nro} registrada por Bs. {total_certificado:.2f}."
+    )
+
+    return redirect('detalle_adquisicion', id=id)
+
 
 
 @login_required
 @rol_requerido(['RPA', 'ADMINISTRADOR'])
+@require_POST
 def aprobar_rpa_adquisicion(request, id):
-    """Paso 4: Exclusivo del RPA. Aprueba el inicio de contratación menor."""
-    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    """
+    Flujo 2 - Paso 4:
+    Aprobación obligatoria del RPA para adquisiciones
+    de bienes previamente certificadas.
+    """
 
-    if proceso.estado != 'CERTIFICADA':
-        messages.error(request, "Solo procesos con Certificación Presupuestaria pueden ser aprobados por el RPA.")
-        return redirect('detalle_adquisicion', id=proceso.id)
+    cite_rpa = request.POST.get(
+        'cite_aprobacion_rpa', ''
+    ).strip()
 
-    if request.method == 'POST':
-        cite_rpa = request.POST.get('cite_aprobacion_rpa', '').strip()
-        proceso.cite_aprobacion_rpa = cite_rpa or "RESOLUCIÓN RPA"
-        proceso.estado = 'APROBADA_RPA'
-        proceso.save()
-
-        Bitacora.objects.create(
-            usuario=request.user,
-            modulo='Compras',
-            accion='Aprobación Inicio RPA',
-            descripcion=f'El RPA aprobó la contratación {proceso.codigo} mediante CITE: {proceso.cite_aprobacion_rpa}'
+    if not cite_rpa:
+        messages.error(
+            request,
+            "Debe registrar el CITE oficial de aprobación del RPA."
         )
-        messages.success(request, f"Proceso {proceso.codigo} aprobado formalmente por el RPA.")
-    return redirect('detalle_adquisicion', id=proceso.id)
+        return redirect('detalle_adquisicion', id=id)
+
+    try:
+        with transaction.atomic():
+            proceso = get_object_or_404(
+                ProcesoAdquisicion.objects.select_for_update(),
+                id=id
+            )
+
+            if proceso.tipo != 'BIEN':
+                messages.error(
+                    request,
+                    "La aprobación del RPA solo corresponde "
+                    "a adquisiciones de bienes."
+                )
+                return redirect(
+                    'detalle_adquisicion',
+                    id=proceso.id
+                )
+
+            if proceso.estado != 'CERTIFICADA':
+                messages.error(
+                    request,
+                    "Solo los procesos con certificación "
+                    "presupuestaria pueden ser aprobados por el RPA."
+                )
+                return redirect(
+                    'detalle_adquisicion',
+                    id=proceso.id
+                )
+
+            if not proceso.certificacion_nro:
+                messages.error(
+                    request,
+                    "El expediente no tiene un número de "
+                    "certificación presupuestaria registrado."
+                )
+                return redirect(
+                    'detalle_adquisicion',
+                    id=proceso.id
+                )
+
+            proceso.cite_aprobacion_rpa = cite_rpa
+            proceso.estado = 'APROBADA_RPA'
+
+            proceso.save(update_fields=[
+                'cite_aprobacion_rpa',
+                'estado'
+            ])
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Compras',
+                accion='Aprobación Inicio RPA',
+                descripcion=(
+                    f'El RPA aprobó la contratación '
+                    f'{proceso.codigo} mediante CITE: {cite_rpa}'
+                )
+            )
+
+    except DatabaseError:
+        messages.error(
+            request,
+            "No fue posible registrar la aprobación del RPA."
+        )
+        return redirect('detalle_adquisicion', id=id)
+
+    messages.success(
+        request,
+        f"Proceso {proceso.codigo} aprobado formalmente por el RPA."
+    )
+
+    return redirect('detalle_adquisicion', id=id)
 
 
 @login_required
 @rol_requerido(['BIENES_SERVICIOS', 'ADMINISTRADOR'])
+@require_POST
 def emitir_orden_adquisicion(request, id):
-    """Paso 5: Exclusivo de BIENES Y SERVICIOS. Adjudica y fija precios oficiales."""
-    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
+    """
+    Flujo 2 - Paso 5:
+    Adjudicación y emisión documental de Orden de Compra.
+    Requiere aprobación obligatoria del RPA.
+    No genera movimientos de inventario.
+    """
 
-    if proceso.estado != 'APROBADA_RPA':
-        messages.error(request, "Solo procesos aprobados por el RPA pueden pasar a emisión de Orden de Compra.")
-        return redirect('detalle_adquisicion', id=proceso.id)
+    proveedor_id = request.POST.get('proveedor', '').strip()
+    nro_orden = request.POST.get(
+        'nro_orden_compra', ''
+    ).strip()
 
-    if request.method == 'POST':
-        proveedor_id = request.POST.get('proveedor')
-        nro_orden = request.POST.get('nro_orden_compra', '').strip()
-        hecho_bolivia = request.POST.get('hecho_en_bolivia', 'NO_APLICA')
-        doc_hb = request.POST.get('documento_hecho_en_bolivia', '').strip()
+    hecho_bolivia = request.POST.get(
+        'hecho_en_bolivia', 'NO_APLICA'
+    )
 
-        if not proveedor_id or not nro_orden:
-            messages.error(request, "Debe seleccionar un Proveedor y registrar el N° oficial de Orden de Compra.")
-            return redirect('detalle_adquisicion', id=proceso.id)
+    doc_hb = request.POST.get(
+        'documento_hecho_en_bolivia', ''
+    ).strip()
+    if len(nro_orden) > 100:
+        messages.error(
+            request,
+            "El número de Orden de Compra no puede superar 100 caracteres."
+        )
+        return redirect('detalle_adquisicion', id=id)
 
-        try:
-            with transaction.atomic():
-                total_oficial = Decimal('0.00')
+    if hecho_bolivia not in ('SI', 'NO', 'NO_APLICA'):
+        messages.error(
+            request,
+            "La opción Hecho en Bolivia no es válida."
+        )
+        return redirect('detalle_adquisicion', id=id)
 
-                for item in proceso.items.all():
-                    precio_str = request.POST.get(f"item_precio_oficial_{item.id}", '0').strip()
-                    precio_oficial = Decimal(precio_str) if precio_str else item.precio_referencial_estimado
-                    item.precio_oficial_unitario = precio_oficial
-                    item.save()
-                    total_oficial += item.subtotal_oficial
+    if len(doc_hb) > 150:
+        messages.error(
+            request,
+            "El documento Hecho en Bolivia no puede superar 150 caracteres."
+        )
+        return redirect('detalle_adquisicion', id=id)
+    if not proveedor_id.isdigit() or not nro_orden:
+        messages.error(
+            request,
+            "Debe seleccionar un proveedor y registrar "
+            "el número oficial de Orden de Compra."
+        )
+        return redirect('detalle_adquisicion', id=id)
 
-                proceso.proveedor_id = proveedor_id
-                proceso.nro_orden_compra = nro_orden
-                proceso.precio_oficial_adjudicado_bs = total_oficial
-                proceso.hecho_en_bolivia = hecho_bolivia
-                proceso.documento_hecho_en_bolivia = doc_hb
-                proceso.estado = 'ORDEN_EMITIDA'
-                proceso.save()
+    try:
+        with transaction.atomic():
+            proceso = get_object_or_404(
+                ProcesoAdquisicion.objects.select_for_update(),
+                id=id
+            )
 
-                Bitacora.objects.create(
-                    usuario=request.user,
-                    modulo='Compras',
-                    accion='Emitir Orden de Compra/Servicio',
-                    descripcion=f'Se emitió la Orden {nro_orden} para {proceso.codigo} por Bs. {total_oficial:.2f}.'
+            if proceso.tipo != 'BIEN':
+                raise ValueError(
+                    "Solo se permiten órdenes de compra de bienes."
                 )
 
-            messages.success(request, f"Orden de Compra {nro_orden} emitida con éxito por un total de Bs. {total_oficial:.2f}.")
-        except Exception as e:
-            messages.error(request, f"Error al emitir la orden: {str(e)}")
+            if proceso.estado != 'APROBADA_RPA':
+                raise ValueError(
+                    "El proceso requiere aprobación previa del RPA."
+                )
 
-    return redirect('detalle_adquisicion', id=proceso.id)
+            if not proceso.cite_aprobacion_rpa:
+                raise ValueError(
+                    "No existe un CITE de aprobación del RPA."
+                )
+
+            proveedor = Proveedor.objects.filter(
+                pk=int(proveedor_id),
+                is_active=True
+            ).first()
+
+            if proveedor is None:
+                raise ValueError(
+                    "El proveedor seleccionado no existe "
+                    "o se encuentra inactivo."
+                )
+
+            items = list(
+                proceso.items.select_for_update().order_by('id')
+            )
+
+            if not items:
+                raise ValueError(
+                    "El proceso no contiene bienes para adjudicar."
+                )
+
+            datos_validados = []
+            total_oficial = Decimal('0.00')
+
+            for item in items:
+                if item.cantidad <= 0:
+                    raise ValueError(
+                        f"Cantidad inválida en el ítem {item.id}."
+                    )
+
+                precio_str = request.POST.get(
+                    f'item_precio_oficial_{item.id}', ''
+                ).strip()
+
+                try:
+                    precio = (
+                        Decimal(precio_str)
+                        if precio_str
+                        else item.precio_referencial_estimado
+                    )
+                except (InvalidOperation, ValueError):
+                    raise ValueError(
+                        f"Precio oficial inválido en el ítem {item.id}."
+                    )
+
+                if not precio.is_finite() or precio < 0:
+                    raise ValueError(
+                        f"El precio del ítem {item.id} "
+                        "debe ser finito y no negativo."
+                    )
+
+                if precio.as_tuple().exponent < -2:
+                    raise ValueError(
+                        f"El precio del ítem {item.id} "
+                        "admite máximo dos decimales."
+                    )
+
+                if precio >= Decimal('10000000000'):
+                    raise ValueError(
+                        f"El precio del ítem {item.id} "
+                        "excede el límite permitido."
+                    )
+
+                subtotal = precio * item.cantidad
+                total_oficial += subtotal
+                datos_validados.append((item, precio))
+
+            if total_oficial <= 0:
+                raise ValueError(
+                    "El total adjudicado debe ser mayor a cero."
+                )
+
+            if total_oficial >= Decimal('10000000000'):
+                raise ValueError(
+                    "El total adjudicado excede el límite permitido."
+                )
+
+            for item, precio in datos_validados:
+                item.precio_oficial_unitario = precio
+                item.save(update_fields=[
+                    'precio_oficial_unitario'
+                ])
+
+            proceso.proveedor = proveedor
+            proceso.nro_orden_compra = nro_orden
+            proceso.precio_oficial_adjudicado_bs = total_oficial
+            proceso.hecho_en_bolivia = hecho_bolivia
+            proceso.documento_hecho_en_bolivia = doc_hb
+            proceso.estado = 'ORDEN_EMITIDA'
+
+            proceso.save(update_fields=[
+                'proveedor',
+                'nro_orden_compra',
+                'precio_oficial_adjudicado_bs',
+                'hecho_en_bolivia',
+                'documento_hecho_en_bolivia',
+                'estado'
+            ])
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Compras',
+                accion='Emitir Orden de Compra',
+                descripcion=(
+                    f'Se emitió la Orden de Compra {nro_orden} '
+                    f'para el proceso {proceso.codigo}, '
+                    f'proveedor {proveedor.razon_social}, '
+                    f'por Bs. {total_oficial:.2f}.'
+                )
+            )
+
+    except (ValueError, InvalidOperation) as e:
+        messages.error(request, str(e))
+        return redirect('detalle_adquisicion', id=id)
+
+    except DatabaseError:
+        messages.error(
+            request,
+            "No fue posible emitir la Orden de Compra."
+        )
+        return redirect('detalle_adquisicion', id=id)
+
+    messages.success(
+        request,
+        f"Orden de Compra {nro_orden} emitida correctamente "
+        f"por Bs. {total_oficial:.2f}."
+    )
+
+    return redirect('detalle_adquisicion', id=id)
 
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR'])
+@require_POST
 def recepcion_documental_almacen(request, id):
     """
-    Paso 6: Exclusivo de ALMACENERO (Recepción física) o Administrador.
-    El KARDISTA NO PUEDE FIRMAR RECEPCIÓN: Solo registra el asiento en Kárdex posterior.
+    Flujo 2 - Paso 6:
+    Recepción documental y cierre de adquisición de bienes.
+
+    No genera Nota de Ingreso, movimientos de inventario
+    ni registros de Kardex.
     """
-    proceso = get_object_or_404(ProcesoAdquisicion, id=id)
 
-    if proceso.estado != 'ORDEN_EMITIDA':
-        messages.error(request, "Solo procesos con Orden Emitida pueden recepcionarse en Almacenes.")
-        return redirect('detalle_adquisicion', id=proceso.id)
+    nro_recepcion = request.POST.get(
+        'nro_nota_recepcion', ''
+    ).strip()
 
-    if request.method == 'POST':
-        nro_recepcion = request.POST.get('nro_nota_recepcion', '').strip()
-        obs = request.POST.get('observaciones_recepcion', '').strip()
+    observaciones = request.POST.get(
+        'observaciones_recepcion', ''
+    ).strip()
 
-        proceso.recepcion_conforme = True
-        proceso.fecha_recepcion = timezone.now().date()
-        proceso.nro_nota_recepcion = nro_recepcion or f"REC-DOC-{proceso.id}"
-        proceso.observaciones_recepcion = obs
-        proceso.estado = 'CONCLUIDA'
-        proceso.save()
-
-        Bitacora.objects.create(
-            usuario=request.user,
-            modulo='Compras',
-            accion='Recepción Documental Almacén',
-            descripcion=f'Almacenes recepcionó y concluyó la orden {proceso.nro_orden_compra} mediante Acta {proceso.nro_nota_recepcion}.'
+    if len(nro_recepcion) > 50:
+        messages.error(
+            request,
+            "El número de Nota de Recepción "
+            "no puede superar 50 caracteres."
         )
+        return redirect('detalle_adquisicion', id=id)
 
-        messages.success(request, f"Recepción documental {proceso.nro_nota_recepcion} concluida. Trámite archivado.")
-    return redirect('detalle_adquisicion', id=proceso.id)
+    try:
+        with transaction.atomic():
+            proceso = get_object_or_404(
+                ProcesoAdquisicion.objects.select_for_update(),
+                id=id
+            )
 
+            if proceso.tipo != 'BIEN':
+                raise ValueError(
+                    "Solo se permite la recepción "
+                    "documental de adquisiciones de bienes."
+                )
+
+            if proceso.estado != 'ORDEN_EMITIDA':
+                raise ValueError(
+                    "Solo los procesos con Orden de Compra "
+                    "emitida pueden pasar a recepción documental."
+                )
+
+            if not proceso.cite_aprobacion_rpa:
+                raise ValueError(
+                    "El expediente no tiene aprobación "
+                    "formal del RPA."
+                )
+
+            if not proceso.nro_orden_compra:
+                raise ValueError(
+                    "El expediente no tiene un número "
+                    "de Orden de Compra registrado."
+                )
+
+            if not proceso.proveedor_id:
+                raise ValueError(
+                    "El expediente no tiene un proveedor adjudicado."
+                )
+
+            proceso.recepcion_conforme = True
+            proceso.fecha_recepcion = timezone.now().date()
+
+            proceso.nro_nota_recepcion = (
+                nro_recepcion or f"REC-DOC-{proceso.id}"
+            )
+
+            proceso.observaciones_recepcion = observaciones
+            proceso.estado = 'CONCLUIDA'
+
+            proceso.save(update_fields=[
+                'recepcion_conforme',
+                'fecha_recepcion',
+                'nro_nota_recepcion',
+                'observaciones_recepcion',
+                'estado'
+            ])
+
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Compras',
+                accion='Recepción Documental Almacén',
+                descripcion=(
+                    f'Almacenes registró la recepción documental '
+                    f'del proceso {proceso.codigo}, '
+                    f'Orden de Compra {proceso.nro_orden_compra}, '
+                    f'Nota de Recepción {proceso.nro_nota_recepcion}. '
+                    f'Expediente concluido sin movimientos de inventario.'
+                )
+            )
+
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect('detalle_adquisicion', id=id)
+
+    except DatabaseError:
+        messages.error(
+            request,
+            "No fue posible registrar la recepción documental."
+        )
+        return redirect('detalle_adquisicion', id=id)
+
+    messages.success(
+        request,
+        f"Recepción documental {proceso.nro_nota_recepcion} "
+        "registrada correctamente. Expediente concluido."
+    )
+
+    return redirect('detalle_adquisicion', id=id)
 
 # ========================================================
 # 4. CONTROL DE EDICIÓN EN PREVISUALIZACIONES PDF
