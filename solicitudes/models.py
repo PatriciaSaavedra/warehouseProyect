@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from inventario.models import Material
-from organizacion.models import UnidadOrganizacional 
+from organizacion.models import UnidadOrganizacional
 from decimal import Decimal
 FLUJOS_ATENCION = [
     ('SALIDA_ALMACEN', 'Salida de Almacén (Stock Disponible)'),
@@ -12,8 +12,10 @@ FLUJOS_ATENCION = [
 # =========================================
 # FLUJO DE ESTADOS OFICIAL (RE-SABS / GAD POTOSÍ)
 # =========================================
+
 ESTADOS_SOLICITUD = [
     ('REGISTRADA', 'Creada'),
+    ('REVISADA', 'Revisada y autorizada'),
     ('VALIDADA_SAF', 'Validada por SAF'),
     ('VALIDADA_PRESUPUESTOS', 'Validada por Presupuestos'),
     ('VALIDADA_RPA', 'Validada por RPA'),
@@ -24,6 +26,7 @@ ESTADOS_SOLICITUD = [
     ('RECHAZADA', 'Rechazada'),
 ]
 
+
 # OPCIONES DE REQUERIMIENTO (No se incluye "ACTIVO" de acuerdo a la regla funcional)
 TIPO_REQUERIMIENTO_CHOICES = [
     ('BIEN', 'Bien'),
@@ -33,6 +36,14 @@ TIPO_REQUERIMIENTO_CHOICES = [
 class Solicitud(models.Model):
     codigo = models.CharField(max_length=20, unique=True)
     unidad_solicitante = models.ForeignKey('organizacion.UnidadOrganizacional', on_delete=models.CASCADE)
+    almacen_asignado = models.ForeignKey(
+        'inventario.Almacen',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='solicitudes_asignadas',
+        verbose_name='Almacén de origen asignado'
+    )
     solicitante = models.ForeignKey(User, on_delete=models.CASCADE)
     fecha = models.DateField()
     justificacion = models.TextField()
@@ -40,19 +51,19 @@ class Solicitud(models.Model):
     aprobado_por = models.CharField(max_length=200, blank=True, null=True)
     motivo_rechazo = models.TextField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
-    
+
     # Tarjeta 1: Incorporar tipo de requerimiento
     tipo_requerimiento = models.CharField(
-        max_length=15, 
-        choices=TIPO_REQUERIMIENTO_CHOICES, 
+        max_length=15,
+        choices=TIPO_REQUERIMIENTO_CHOICES,
         default='BIEN'
     )
     flujo_atencion = models.CharField(
-        max_length=30, 
-        choices=FLUJOS_ATENCION, 
-        null=True, 
+        max_length=30,
+        choices=FLUJOS_ATENCION,
+        null=True,
         blank=True
-    
+
     )
 
     # --- CAMPOS DE TRAZABILIDAD Y AUDITORÍA DE LA CADENA SABS ---
@@ -83,15 +94,15 @@ class Solicitud(models.Model):
     @property
     def progreso_porcentaje(self):
         map_estados = {
-            'REGISTRADA': 0,              
-            'REVISADA': 25,                
-            'VALIDADA_SAF': 25,           
-            'VALIDADA_RPA': 50,            
-            'VALIDADA_PRESUPUESTOS': 50,   
-            'VALIDADA_JEFATURA': 75,       
-            'PREPARADA': 75,              
-            'ENTREGADA': 100,             
-            'CERRADA': 100,                
+            'REGISTRADA': 0,
+            'REVISADA': 25,
+            'VALIDADA_SAF': 25,
+            'VALIDADA_RPA': 50,
+            'VALIDADA_PRESUPUESTOS': 50,
+            'VALIDADA_JEFATURA': 75,
+            'PREPARADA': 75,
+            'ENTREGADA': 100,
+            'CERRADA': 100,
             'RECHAZADA': 0,
         }
         return map_estados.get(self.estado, 0)
@@ -114,26 +125,29 @@ class Solicitud(models.Model):
             'RECHAZADA': 0,
         }
         return map_estados.get(self.estado, 0)
+
     @property
     def almacen_origen(self):
         """
-        Tarjeta 9: Resuelve dinámicamente el almacén de origen del requerimiento.
-        Si la Unidad Solicitante tiene un Subalmacén asignado, se usa ese;
-        de lo contrario, se deriva automáticamente al Almacén Central de la Gobernación.
+        Devuelve el almacén asignado a la solicitud.
+
+        Si todavía no existe asignación persistida,
+        utiliza la resolución automática como respaldo.
         """
-        from inventario.models import Almacen
-        
-        # 1. Buscar un subalmacén activo asociado a la unidad solicitante
-        subalmacen = Almacen.objects.filter(
-            unidad_organizacional=self.unidad_solicitante, 
-            is_active=True
-        ).first()
-        
-        if subalmacen:
-            return subalmacen
-            
-        # 2. Fallback al Almacén Central de la Gobernación
-        return Almacen.objects.filter(tipo='CENTRAL', is_active=True).first()
+        if self.almacen_asignado_id:
+            return self.almacen_asignado
+
+        from solicitudes.services import resolver_almacen_para_unidad
+
+        try:
+            return resolver_almacen_para_unidad(
+                self.unidad_solicitante
+            )
+        except (
+            Exception
+        ):
+            return None
+
     # Tarjeta 2: Calcular automáticamente el total referencial de la solicitud
     @property
     def total_referencial(self):
@@ -156,26 +170,26 @@ class Solicitud(models.Model):
                 self.flujo_atencion = 'CONTRATACION_SERVICIO'
             else:
                 hay_insuficiencia_stock = False
-                
+
                 # Validamos el stock disponible de cada uno de los detalles
                 for detalle in self.detalles.all():
                     # Si es una nueva adquisición no catalogada, asumimos sin stock
                     if detalle.es_nueva_adquisicion or not detalle.material:
                         hay_insuficiencia_stock = True
                         break
-                    
+
                     # Tarjeta 5: Comparar cantidad solicitada contra cantidad disponible
                     if detalle.material.stock_actual < detalle.cantidad_solicitada:
                         hay_insuficiencia_stock = True
                         break
-                
+
                 if hay_insuficiencia_stock:
                     self.flujo_atencion = 'ADQUISICION'
                 else:
                     self.flujo_atencion = 'SALIDA_ALMACEN'
-            
+
             self.save()
-        
+
 # =========================================
 # DETALLE SOLICITUD
 # =========================================
@@ -192,7 +206,7 @@ class DetalleSolicitud(models.Model):
         null=True,
         blank=True
     )
-    
+
     # CORREGIDO: Se alineó correctamente la sangría de este campo
     partida = models.ForeignKey(
         'inventario.PartidaPresupuestaria',
@@ -201,18 +215,18 @@ class DetalleSolicitud(models.Model):
         blank=True,
         related_name='detalles_solicitud'
     )
-    
+
     es_nueva_adquisicion = models.BooleanField(default=False)
     descripcion_material_no_catalogado = models.CharField(max_length=200, blank=True, null=True)
-    
+
     cantidad_solicitada = models.IntegerField()
     cantidad_aprobada = models.IntegerField(null=True, blank=True)
     cantidad_entregada = models.IntegerField(default=0)
     observacion = models.TextField(blank=True, null=True)
-    
+
     precio_unitario_referencial = models.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
+        max_digits=12,
+        decimal_places=2,
         default=Decimal('0.00')
     )
 

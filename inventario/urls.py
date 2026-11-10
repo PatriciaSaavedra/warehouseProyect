@@ -34,9 +34,9 @@ urlpatterns = [
     path('entradas/pdf/<int:id>/', views.nota_recepcion_pdf, name='nota_recepcion_pdf'),       
     path('kardex/fisico/pdf/<int:id>/', views.kardex_fisico_pdf, name='kardex_fisico_pdf'),   
     path('reporte/inventario/pdf/', views.reporte_inventario_oficial_pdf, name='reporte_inventario_oficial_pdf'),
-    path('transferencias/', views.transferencia_list, name='transferencia_list'),
-    path('transferencias/enviar/', views.enviar_transferencia, name='enviar_transferencia'),
-    path('transferencias/<int:id>/recibir/', views.recibir_transferencia, name='recibir_transferencia'),
+    # path('transferencias/', views.transferencia_list, name='transferencia_list'),
+    # path('transferencias/enviar/', views.enviar_transferencia, name='enviar_transferencia'),
+    # path('transferencias/<int:id>/recibir/', views.recibir_transferencia, name='recibir_transferencia'),
     path('gestion/cierre/', views.cierre_conciliacion_view, name='cierre_conciliacion'),
     path('stock-unidad/', views.inventario_por_unidad, name='inventario_por_unidad'),
 

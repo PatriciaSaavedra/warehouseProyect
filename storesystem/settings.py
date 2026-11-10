@@ -100,9 +100,9 @@ WSGI_APPLICATION = 'storesystem.wsgi.application'
 DATABASES = {
     'default': env.db('DATABASE_URL')
 }
+
 DATABASES['default']['ATOMIC_REQUESTS'] = True
-
-
+DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 

@@ -156,7 +156,10 @@ class TestValoracionPEPS(TestCase):
         )
         self.almacen = Almacen.objects.create(nombre="Almacén Central", tipo="CENTRAL", is_active=True)
         self.inv = InventarioAlmacen.objects.create(material=self.material, almacen=self.almacen, stock_fisico=0)
-
+        self.proveedor = Proveedor.objects.create(
+            nit="987654321",
+            razon_social="Proveedor Pruebas PEPS"
+        )
     def test_consumo_peps_lotes_diferentes(self):
         """
         PRUEBA DE ESCRITORIO:
@@ -195,6 +198,53 @@ class TestValoracionPEPS(TestCase):
         print("📦 [INGRESO] Lote 2: 2 u. a 75.00 Bs  -> (Costo Lote: 150.00 Bs)")
         print("📊 STOCK FÍSICO DISPONIBLE: 7 unidades.")
 
+        # Crear documentos que respaldan los dos lotes PEPS.
+        nota1 = NotaIngreso.objects.create(
+            nro_nota="NI-PEPS-001",
+            proveedor=self.proveedor,
+            almacen_destino=self.almacen,
+            fecha="2026-05-10",
+            usuario=self.user
+        )
+
+        detalle1 = NotaIngresoDetalle.objects.create(
+            nota_ingreso=nota1,
+            material=self.material,
+            cantidad=5,
+            precio_unitario=Decimal('25.00'),
+            precio_total=Decimal('125.00')
+        )
+
+        asignacion1 = AsignacionEntradaUnidad.objects.create(
+            nota_ingreso_detalle=detalle1,
+            unidad_organizacional=self.unidad_colegio,
+            cantidad_asignada=5,
+            cantidad_retirada=0
+        )
+
+        nota2 = NotaIngreso.objects.create(
+            nro_nota="NI-PEPS-002",
+            proveedor=self.proveedor,
+            almacen_destino=self.almacen,
+            fecha="2026-05-11",
+            usuario=self.user
+        )
+
+        detalle2 = NotaIngresoDetalle.objects.create(
+            nota_ingreso=nota2,
+            material=self.material,
+            cantidad=2,
+            precio_unitario=Decimal('75.00'),
+            precio_total=Decimal('150.00')
+        )
+
+        asignacion2 = AsignacionEntradaUnidad.objects.create(
+            nota_ingreso_detalle=detalle2,
+            unidad_organizacional=self.unidad_colegio,
+            cantidad_asignada=2,
+            cantidad_retirada=0
+        )
+
         # ---------------------------------------------------------
         # 3. EL DESPACHO O NOTA DE SALIDA
         # ---------------------------------------------------------
@@ -232,6 +282,33 @@ class TestValoracionPEPS(TestCase):
 
         # D) ¿El inventario físico bajó a 1?
         self.assertEqual(self.inv.stock_fisico, 1, "Fallo: El stock físico final debe ser 1 unidad.")
+
+        # D) ¿El inventario físico bajó a 1?
+        self.assertEqual(
+            self.inv.stock_fisico,
+            1,
+            "Fallo: El stock físico final debe ser 1 unidad."
+        )
+
+        # E) Verificar consumo de asignaciones directas
+        asignacion1.refresh_from_db()
+        asignacion2.refresh_from_db()
+
+        self.assertEqual(asignacion1.cantidad_retirada, 5)
+        self.assertEqual(asignacion2.cantidad_retirada, 1)
+
+        self.assertEqual(asignacion1.saldo_disponible, 0)
+        self.assertEqual(asignacion2.saldo_disponible, 1)
+
+        # F) Verificar que se registró una sola salida
+        self.assertEqual(
+            MovimientoInventario.objects.filter(
+                material=self.material,
+                almacen=self.almacen,
+                tipo='SALIDA'
+            ).count(),
+            1
+        )
 
         print("✅ [PEPS APLICADO] Se vació el Lote 1 (5 u. x 25 Bs = 125 Bs).")
         print("✅ [PEPS APLICADO] Se extrajo 1 unidad del Lote 2 (1 u. x 75 Bs = 75 Bs).")

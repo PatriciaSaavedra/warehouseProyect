@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %} Requerimiento de Adquisición o Servicio {% endblock %}
+{% block title %}Nueva Adquisición de Bienes{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
@@ -12,7 +12,8 @@
                 Requerimiento de Adquisición
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Solicitud de compras de bienes sin stock o contratación de servicios generales [11]
+                Registro de requerimientos para la nueva adquisición de bienes,
+                materiales y suministros.
             </p>
         </div>
         <a href="{% url 'solicitudes' %}" class="flex items-center gap-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-2xl text-sm font-semibold transition">
@@ -35,19 +36,24 @@
 
             <!-- TIPO DE REQUERIMIENTO -->
             <div>
-                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']">Tipo de Requerimiento <span class="text-[#8b0000]">*</span></label>
-                <select name="tipo_requerimiento" id="tipo_requerimiento" required onchange="adaptarFormularioPorTipo()" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10">
-                    <option value="BIEN" selected>Bien (Adquisición de Materiales / Equipos)</option>
-                    <option value="SERVICIO">Servicio (Contrataciones / Consultorías)</option>
-                </select>
-            </div>
+                <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+                    Tipo de Requerimiento
+                </label>
 
+                <input type="hidden" name="tipo_requerimiento" id="tipo_requerimiento" value="BIEN">
+
+                <div class="w-full border border-gray-200 dark:border-gray-700
+                            bg-gray-50 dark:bg-slate-900 rounded-2xl p-3
+                            text-gray-800 dark:text-gray-200">
+                    Bien — Nueva Adquisición
+                </div>
+            </div>
             <!-- BUSCADOR / AGREGADOR -->
             <div class="md:col-span-2">
                 <label class="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-200 font-['Outfit']" id="label_seccion_items">Artículos requeridos</label>
                 <div class="grid grid-cols-12 gap-3 items-start">
-                    
-                    <!-- Buscador / Selector en nueva_solicitud_compra.html -->
+
+                   <!-- Selector de Partidas Presupuestarias para bienes nuevos -->
                     <div class="col-span-12 sm:col-span-6">
                         <!-- Selector de catálogo -->
                         <select id="material_select" class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition appearance-none pr-10" onchange="document.getElementById('buscador_material').value = '';">
@@ -60,9 +66,9 @@
                         </select>
 
                         <div class="mt-2 relative">
-                            <input type="text" id="buscador_material" placeholder="Escribe la descripción del ítem o servicio..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition" onkeyup="buscarMateriales()">
+                            <input type="text" id="buscador_material" placeholder="Escribe la descripción del bien que deseas adquirir..." class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200 rounded-2xl p-3 focus:ring-2 focus:ring-[#8b0000] transition" onkeyup="buscarMateriales()">
                             <div id="resultados_busqueda" class="absolute bg-white dark:bg-[#151010] w-full border border-gray-100 dark:border-gray-800 rounded-xl mt-1 shadow-lg z-50 hidden"></div>
-                        </div>                        
+                        </div>
                     </div>
 
                     <!-- Tarjeta 8: Selector de Partidas Presupuestarias (Aparece para servicios o ítems nuevos) -->
@@ -108,7 +114,7 @@
                 <tbody id="tabla_materiales" class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
                 </tbody>
             </table>
-            
+
             <div class="p-4 bg-gray-50 dark:bg-slate-900/40 flex justify-between items-center text-sm font-['Outfit'] border-t border-gray-200 dark:border-gray-800">
                 <span class="font-bold text-gray-700 dark:text-gray-300">Total Referencial de Adquisición:</span>
                 <span id="total_referencial_form" class="font-extrabold text-base text-[#8b0000] dark:text-red-400 font-mono">Bs. 0.00</span>
@@ -144,29 +150,16 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function adaptarFormularioPorTipo() {
-    const tipo = document.getElementById('tipo_requerimiento').value;
     const selectCat = document.getElementById('material_select');
     const labelItems = document.getElementById('label_seccion_items');
     const buscador = document.getElementById('buscador_material');
-    const partidaSelectDiv = document.getElementById('seccion_partida_adicional');
 
-    if (tipo === 'SERVICIO') {
-        labelItems.textContent = "Servicios requeridos";
-        selectCat.classList.add('hidden'); // Ocultar catálogo
-        selectCat.value = '';
-        buscador.placeholder = "Describe de forma detallada el servicio a contratar...";
-        partidaSelectDiv.classList.remove('hidden'); // Forzar selección de partida
-    } else {
-        labelItems.textContent = "Artículos de adquisición requeridos";
-        selectCat.classList.remove('hidden');
-        buscador.placeholder = "Escribe una descripción si no está en el catálogo...";
-    }
-    
-    carrito = {};
-    renderTabla();
-    renderInputs();
+    labelItems.textContent = "Bienes requeridos para adquisición";
+    selectCat.classList.remove('hidden');
+
+    buscador.placeholder =
+        "Escribe la descripción de un bien no catalogado...";
 }
-
 function agregarItem() {
     const select = document.getElementById('material_select');
     const cantidadInput = document.getElementById('cantidad_input');
@@ -186,21 +179,21 @@ function agregarItem() {
         alert("Defina una cantidad válida mayor a 0.");
         return;
     }
-    
+
     if (isNaN(precioRef) || precioRef < 0) {
         alert("Defina un precio unitario referencial válido.");
         return;
     }
 
-    // --- ESCENARIO A: NUEVO CONCEPTO / SERVICIO (Texto libre) ---
+    // ESCENARIO A: BIEN NUEVO NO CATALOGADO
     if (!materialId && buscador.value.trim() !== "") {
         if (!partidaId) {
-            alert("Debe seleccionar una Partida Presupuestaria para registrar un concepto nuevo o servicio.");
+            alert("Debe seleccionar una partida presupuestaria para registrar un bien nuevo.");
             return;
         }
-        
+
         const nombreDescriptivo = buscador.value.trim();
-        const tempId = "temp_" + Date.now();
+        const tempId = "temp_" + crypto.randomUUID();
 
         carrito[tempId] = {
             nombre: nombreDescriptivo,
@@ -219,9 +212,9 @@ function agregarItem() {
     }
 
     // --- ESCENARIO B: MATERIAL CATALOGADO SIN STOCK (Selector de catálogo) ---
-    if (tipo === 'BIEN' && materialId && selectedOption) {
+    if (materialId && selectedOption) {
         const materialNombre = selectedOption.text;
-        
+
         if (carrito[materialId]) {
             carrito[materialId].cantidad += cantidad;
             carrito[materialId].precio_referencial = precioRef;
@@ -263,7 +256,7 @@ function renderTabla() {
         tabla.innerHTML = `
             <tr>
                 <td colspan="5" class="p-8 text-center text-gray-400 bg-transparent">
-                    Agregue los conceptos de contratación o adquisición desde el panel superior.
+                    Agregue los bienes que desea adquirir desde el panel superior.
                 </td>
             </tr>
         `;
@@ -282,9 +275,9 @@ function renderTabla() {
             <tr class="hover:bg-gray-50/50 dark:hover:bg-slate-900/30 transition">
                 <td class="p-4 text-gray-800 dark:text-gray-200 font-medium">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <span>${item.nombre}</span>
-                        ${item.es_nuevo ? 
-                            `<span class="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 border border-amber-200 py-0.5 px-2 rounded-full font-bold">Partida: ${item.partida_codigo}</span>` : 
+                        <span>${escaparHTML(item.nombre)}</span>
+                        ${item.es_nuevo ?
+                            `<span class="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 border border-amber-200 py-0.5 px-2 rounded-full font-bold">Partida: ${item.partida_codigo}</span>` :
                             '<span class="text-[9px] bg-blue-50 dark:bg-blue-950/20 text-blue-700 border border-blue-200 py-0.5 px-2 rounded-full font-bold">Del Catálogo</span>'
                         }
                     </div>
@@ -307,7 +300,15 @@ function renderTabla() {
 
     document.getElementById('total_referencial_form').textContent = `Bs. ${totalAcumulado.toFixed(2)}`;
 }
-
+function escaparHTML(valor) {
+    return String(valor).replace(/[&<>"']/g, caracter => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[caracter]);
+}
 function editarCantidad(id, inputElement) {
     let nuevaCantidad = parseInt(inputElement.value) || 1;
     if (nuevaCantidad < 1) nuevaCantidad = 1;
@@ -353,45 +354,94 @@ function renderInputs() {
             es_nuevo: carrito[id].es_nuevo,
             nombre: carrito[id].nombre,
             precio_referencial: carrito[id].precio_referencial,
-            partida_id: carrito[id].partida_id  // <-- CORREGIDO: Se envía físicamente al backend
+            partida_id: carrito[id].partida_id
         };
     });
 
-    contenedor.innerHTML = `
-        <input type="hidden" name="payload" value='${JSON.stringify(payload)}'>
-    `;
+    contenedor.replaceChildren();
+
+    const inputPayload = document.createElement('input');
+    inputPayload.type = 'hidden';
+    inputPayload.name = 'payload';
+    inputPayload.value = JSON.stringify(payload);
+
+    contenedor.appendChild(inputPayload);
 }
 
-function buscarMateriales() {
-    const query = document.getElementById('buscador_material').value;
-    const resultados = document.getElementById('resultados_busqueda');
-    const tipo = document.getElementById('tipo_requerimiento').value;
 
-    if (query.length < 2 || tipo === 'SERVICIO') {
-        resultados.innerHTML = '';
+function buscarMateriales() {
+    const query = document.getElementById('buscador_material').value.trim();
+    const resultados = document.getElementById('resultados_busqueda');
+
+    resultados.replaceChildren();
+
+    if (query.length < 2) {
         resultados.classList.add('hidden');
         return;
     }
 
-    fetch(`/solicitudes/buscar-materiales/?q=${query}&solo_con_stock=false`)
-        .then(response => response.json())
+    const url = `/solicitudes/buscar-materiales/?q=${encodeURIComponent(query)}&solo_con_stock=false`;
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Error al buscar materiales.");
+            }
+            return response.json();
+        })
         .then(data => {
-            resultados.innerHTML = '';
+            resultados.replaceChildren();
+
+            if (!Array.isArray(data)) {
+                throw new Error("Respuesta de búsqueda no válida.");
+            }
+
             if (data.length === 0) {
-                resultados.innerHTML = '<div class="p-3 text-gray-500 text-sm text-center">Sin coincidencias</div>';
+                const mensaje = document.createElement('div');
+                mensaje.className =
+                    'p-3 text-gray-500 text-sm text-center';
+                mensaje.textContent = 'Sin coincidencias';
+                resultados.appendChild(mensaje);
             } else {
                 data.forEach(material => {
                     const div = document.createElement('div');
-                    div.className = "p-3 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer text-sm border-b border-gray-100 last:border-none";
-                    div.innerHTML = `
-                        <span class="font-medium text-gray-800 dark:text-gray-200">${material.nombre}</span>
-                        <span class="text-xs text-gray-400 block mt-0.5">(Existencias en almacén: ${material.stock})</span>
-                    `;
-                    div.addEventListener('click', () => seleccionarMaterial(material.id, material.nombre, material.stock));
+                    div.className =
+                        'p-3 hover:bg-gray-100 dark:hover:bg-slate-800 ' +
+                        'cursor-pointer text-sm border-b ' +
+                        'border-gray-100 last:border-none';
+
+                    const nombre = document.createElement('span');
+                    nombre.className =
+                        'font-medium text-gray-800 dark:text-gray-200';
+                    nombre.textContent = material.nombre;
+
+                    const stock = document.createElement('span');
+                    stock.className =
+                        'text-xs text-gray-400 block mt-0.5';
+                    stock.textContent =
+                        `Existencias registradas: ${material.stock}`;
+
+                    div.appendChild(nombre);
+                    div.appendChild(stock);
+
+                    div.addEventListener('click', () => {
+                        seleccionarMaterial(
+                            material.id,
+                            material.nombre,
+                            material.stock
+                        );
+                    });
+
                     resultados.appendChild(div);
                 });
             }
+
             resultados.classList.remove('hidden');
+        })
+        .catch(error => {
+            console.error(error);
+            resultados.replaceChildren();
+            resultados.classList.add('hidden');
         });
 }
 

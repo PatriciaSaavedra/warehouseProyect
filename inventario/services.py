@@ -82,49 +82,161 @@ def calcular_desglose_peps(material, almacen, cantidad_solicitada):
     }
 
 
-def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movimiento, referencia, usuario, unidad_destino=None, descontar_reserva=False):
+def registrar_salida_valorada_peps(
+    material,
+    almacen,
+    cantidad_salida,
+    tipo_movimiento,
+    referencia,
+    usuario,
+    unidad_destino=None,
+    descontar_reserva=False
+):
     """
-    Descuenta stock físico aplicando el método PEPS (FIFO) de manera aislada por Almacén.
-    Agota cronológicamente los lotes de ENTRADA en el almacén especificado con saldo disponible y calcula el costo real.
-    Soporta consumo multicapa (ej. 2 de Lote 1 a 30 Bs. y 1 de Lote 2 a 45 Bs. = 105 Bs.).
+    Descuenta stock físico aplicando el método PEPS (FIFO)
+    de manera aislada por almacén.
+
+    Valida estrictamente que la unidad destino posea
+    asignación física directa con saldo disponible.
     """
+
     if cantidad_salida <= 0:
-        raise ValueError("La cantidad de salida debe ser estrictamente mayor a cero.")
+        raise ValueError(
+            "La cantidad de salida debe ser estrictamente mayor a cero."
+        )
+
+    if tipo_movimiento == 'SALIDA' and unidad_destino is None:
+        raise ValidationError(
+            "No se puede registrar una salida sin identificar "
+            "la unidad organizacional destinataria."
+        )
 
     with transaction.atomic():
+
+        # =========================================================
+        # 1. BLOQUEAR INVENTARIO DEL ALMACÉN
+        # =========================================================
+
         try:
-            inventario_almacen = InventarioAlmacen.objects.select_for_update().get(material=material, almacen=almacen)
+            inventario_almacen = (
+                InventarioAlmacen.objects
+                .select_for_update()
+                .get(
+                    material=material,
+                    almacen=almacen
+                )
+            )
         except InventarioAlmacen.DoesNotExist:
-            raise ValueError(f"No existe un registro de inventario para {material.nombre} en el almacén {almacen.nombre}.")
+            raise ValueError(
+                f"No existe un registro de inventario para "
+                f"{material.nombre} en el almacén {almacen.nombre}."
+            )
+
+        # =========================================================
+        # 2. VALIDAR ASIGNACIÓN DIRECTA DE LA UNIDAD
+        # =========================================================
+
+        asignaciones_disponibles = []
+
+        if unidad_destino and tipo_movimiento == 'SALIDA':
+
+            asignaciones_disponibles = list(
+                AsignacionEntradaUnidad.objects
+                .select_for_update()
+                .filter(
+                    unidad_organizacional=unidad_destino,
+                    nota_ingreso_detalle__material=material,
+                    nota_ingreso_detalle__nota_ingreso__almacen_destino=almacen
+                )
+                .order_by(
+                    'nota_ingreso_detalle__nota_ingreso__fecha',
+                    'id'
+                )
+            )
+
+            total_cupo_disponible = sum(
+                a.saldo_disponible
+                for a in asignaciones_disponibles
+            )
+
+            if total_cupo_disponible <= 0:
+                raise ValidationError(
+                    f"La unidad '{unidad_destino.nombre}' no cuenta "
+                    f"con ninguna ASIGNACIÓN FÍSICA DIRECTA o tiene "
+                    f"su cupo agotado para el material "
+                    f"'{material.nombre}' en el almacén "
+                    f"{almacen.nombre}."
+                )
+
+            if cantidad_salida > total_cupo_disponible:
+                raise ValidationError(
+                    f"La cantidad solicitada ({cantidad_salida} u.) "
+                    f"supera el cupo de asignación disponible para "
+                    f"'{unidad_destino.nombre}' "
+                    f"({total_cupo_disponible} u. disponibles)."
+                )
+
+        # =========================================================
+        # 3. VALIDAR STOCK FÍSICO Y RESERVAS
+        # =========================================================
 
         if cantidad_salida > inventario_almacen.stock_fisico:
             raise ValueError(
-                f"No existe suficiente stock físico disponible en el almacén {almacen.nombre} "
-                f"({inventario_almacen.stock_fisico} disponibles, solicitado: {cantidad_salida})."
+                f"No existe suficiente stock físico disponible "
+                f"en el almacén {almacen.nombre} "
+                f"({inventario_almacen.stock_fisico} disponibles, "
+                f"solicitado: {cantidad_salida})."
             )
 
-        # Lotes de entrada más antiguos con saldo disponible (PEPS)
-        lotes_disponibles = MovimientoInventario.objects.select_for_update().filter(
-            material=material,
-            almacen=almacen,
-            tipo='ENTRADA',
-            saldo_disponible_lote__gt=0
-        ).order_by('fecha', 'id')
+        if descontar_reserva:
+            if inventario_almacen.stock_reservado < cantidad_salida:
+                raise ValidationError(
+                    f"Reserva insuficiente para '{material.nombre}'. "
+                    f"Reservado: {inventario_almacen.stock_reservado}, "
+                    f"cantidad a entregar: {cantidad_salida}."
+                )
+
+        # =========================================================
+        # 4. OBTENER LOTES DISPONIBLES SEGÚN PEPS
+        # =========================================================
+
+        lotes_disponibles = (
+            MovimientoInventario.objects
+            .select_for_update()
+            .filter(
+                material=material,
+                almacen=almacen,
+                tipo='ENTRADA',
+                saldo_disponible_lote__gt=0
+            )
+            .order_by('fecha', 'id')
+        )
 
         cantidad_restante = cantidad_salida
         costo_total_egreso = Decimal('0.00')
         desglose_lotes = []
 
+        # =========================================================
+        # 5. DESCONTAR LOTES PEPS
+        # =========================================================
+
         for lote in lotes_disponibles:
+
             if cantidad_restante <= 0:
                 break
 
             if lote.saldo_disponible_lote >= cantidad_restante:
-                subtotal_capa = Decimal(cantidad_restante) * lote.costo_unitario
+
+                subtotal_capa = (
+                    Decimal(cantidad_restante)
+                    * lote.costo_unitario
+                )
+
                 costo_total_egreso += subtotal_capa
+
                 lote.saldo_disponible_lote -= cantidad_restante
                 lote.save()
-                
+
                 desglose_lotes.append({
                     'lote_id': lote.id,
                     'fecha_ingreso': lote.fecha,
@@ -132,15 +244,24 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
                     'costo_unitario': lote.costo_unitario,
                     'subtotal': subtotal_capa
                 })
+
                 cantidad_restante = 0
+
             else:
+
                 cant_tomada = lote.saldo_disponible_lote
-                subtotal_capa = Decimal(cant_tomada) * lote.costo_unitario
+
+                subtotal_capa = (
+                    Decimal(cant_tomada)
+                    * lote.costo_unitario
+                )
+
                 costo_total_egreso += subtotal_capa
                 cantidad_restante -= cant_tomada
+
                 lote.saldo_disponible_lote = 0
                 lote.save()
-                
+
                 desglose_lotes.append({
                     'lote_id': lote.id,
                     'fecha_ingreso': lote.fecha,
@@ -150,27 +271,88 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
                 })
 
         if cantidad_restante > 0:
-            raise ValueError("Inconsistencia en el inventario: La suma de lotes valorados PEPS es menor al stock físico.")
+            raise ValueError(
+                "Inconsistencia en el inventario: "
+                "La suma de lotes valorados PEPS "
+                "es menor al stock físico."
+            )
 
-        # Actualizar stock en el inventario del almacén
+        # =========================================================
+        # 6. DESCONTAR ASIGNACIÓN DIRECTA DE LA UNIDAD
+        # =========================================================
+
+        if unidad_destino and tipo_movimiento == 'SALIDA':
+
+            cant_a_descontar_oficina = cantidad_salida
+
+            for asig_comercial in asignaciones_disponibles:
+
+                if cant_a_descontar_oficina <= 0:
+                    break
+
+                disponible_asig = asig_comercial.saldo_disponible
+
+                if disponible_asig > 0:
+
+                    toma_asig = min(
+                        cant_a_descontar_oficina,
+                        disponible_asig
+                    )
+
+                    asig_comercial.cantidad_retirada += toma_asig
+
+                    asig_comercial.save(
+                        update_fields=['cantidad_retirada']
+                    )
+
+                    cant_a_descontar_oficina -= toma_asig
+
+            if cant_a_descontar_oficina != 0:
+                raise ValidationError(
+                    "No se pudo descontar completamente la cantidad "
+                    "de las asignaciones de la unidad organizacional."
+                )
+
+        # =========================================================
+        # 7. ACTUALIZAR INVENTARIO DEL ALMACÉN
+        # =========================================================
+
         stock_anterior = inventario_almacen.stock_fisico
+
         inventario_almacen.stock_fisico -= cantidad_salida
-        
+
         if descontar_reserva:
-            if inventario_almacen.stock_reservado >= cantidad_salida:
-                inventario_almacen.stock_reservado -= cantidad_salida
-            else:
-                inventario_almacen.stock_reservado = 0
+            inventario_almacen.stock_reservado -= cantidad_salida
 
         inventario_almacen.save()
 
-        costo_unitario_ponderado = costo_total_egreso / Decimal(cantidad_salida)
+        # =========================================================
+        # 8. CALCULAR COSTO UNITARIO VALORADO
+        # =========================================================
 
-        # Si hubo consumo de múltiples capas con precios diferentes, agregar detalle a la referencia
+        costo_unitario_ponderado = (
+            costo_total_egreso / Decimal(cantidad_salida)
+        )
+
         ref_final = referencia
+
         if len(desglose_lotes) > 1:
-            resumen_peps = " + ".join([f"{d['cantidad']}u x Bs.{d['costo_unitario']:.2f}" for d in desglose_lotes])
-            ref_final = f"{referencia} [PEPS: {resumen_peps}]"
+
+            resumen_peps = " + ".join(
+                [
+                    f"{d['cantidad']}u x "
+                    f"Bs.{d['costo_unitario']:.2f}"
+                    for d in desglose_lotes
+                ]
+            )
+
+            ref_final = (
+                f"{referencia} [PEPS: {resumen_peps}]"
+            )
+
+        # =========================================================
+        # 9. REGISTRAR MOVIMIENTO DE SALIDA
+        # =========================================================
 
         movimiento = MovimientoInventario.objects.create(
             material=material,
@@ -189,7 +371,6 @@ def registrar_salida_valorada_peps(material, almacen, cantidad_salida, tipo_movi
         movimiento.desglose_peps = desglose_lotes
 
     return movimiento
-
 
 # ========================================================
 # 2. CONSULTAS DE INVENTARIO Y ALMACENES

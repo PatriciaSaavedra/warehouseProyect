@@ -3,7 +3,7 @@ import html
 from decimal import Decimal, InvalidOperation
 import datetime
 from django.urls import reverse
-from django.utils import timezone 
+from django.utils import timezone
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, request
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect, get_object_or_404
@@ -12,9 +12,15 @@ from django.db import transaction, DatabaseError
 from django.contrib import messages
 from django.db.models import Q, Sum, F
 from django.core.paginator import Paginator
-import os
-
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction, DatabaseError
+import uuid
 from django.conf import settings
+
+from datetime import date
+
+from django.db import transaction, DatabaseError, IntegrityError
+from django.utils.dateparse import parse_date
 
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
@@ -24,7 +30,7 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics import renderPDF
 from inventario.services import calcular_desglose_peps
-
+from django.contrib.auth.decorators import login_required
 
 from solicitudes.models import Solicitud
 
@@ -35,21 +41,24 @@ from reportlab.lib import colors
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
-
+from django.views.decorators.http import require_POST
 from organizacion.models import UnidadOrganizacional
 from presupuestos.models import POA
 from auditoria.models import Bitacora
 
 from .models import Solicitud, DetalleSolicitud, ESTADOS_SOLICITUD, FLUJOS_ATENCION
 from inventario.models import (
-    InventarioAlmacen, Material, MovimientoInventario, 
-    PartidaPresupuestaria, UnidadMedida, Almacen, AsignacionMaterialUnidad  
+    InventarioAlmacen, Material, MovimientoInventario,
+    PartidaPresupuestaria, UnidadMedida, Almacen,
+    AsignacionMaterialUnidad, AsignacionEntradaUnidad
 )
 try:
-    from inventario.models import AsignacionMaterialUnidad
+    from inventario.models import AsignacionMaterialUnidad, AsignacionEntradaUnidad
 except ImportError:
     AsignacionMaterialUnidad = None
+    AsignacionEntradaUnidad = None
 from inventario.services import registrar_salida_valorada_peps
+from solicitudes.services import liberar_reservas_solicitud
 from usuarios.decorators import tiene_rol, rol_requerido
 
 GESTION_ACTUAL = timezone.now().year
@@ -60,7 +69,7 @@ GESTION_ACTUAL = timezone.now().year
 def redirigir_despues_de_accion(request, solicitud):
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
-    
+
     if rol == 'UNIDAD_SOLICITANTE':
         destino_default = 'solicitudes'
     else:
@@ -69,7 +78,7 @@ def redirigir_despues_de_accion(request, solicitud):
     referer = request.META.get('HTTP_REFERER', '')
     if 'detalle' in referer or 'revisar' in referer or 'rechazar' in referer:
         return redirect('detalle_solicitud', id=solicitud.id)
-        
+
     return redirect(referer if referer else destino_default)
 
 
@@ -124,7 +133,7 @@ def solicitudes(request):
     })
 @login_required
 @rol_requerido([
-    'JEFE_INMEDIATO', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'RPA', 
+    'JEFE_INMEDIATO', 'SECRETARIO_SAF', 'PRESUPUESTOS', 'RPA',
     'JEFE_ADMINISTRATIVO', 'ALMACENERO', 'KARDISTA', 'ADMINISTRADOR',
     'ADMIN_ALMACENES', 'BIENES_SERVICIOS'
 ])
@@ -165,7 +174,7 @@ def solicitudes_general(request):
 
     # Roles con supervisión administrativa general
     roles_supervisores = [
-        'ADMINISTRADOR', 'ADMIN_ALMACENES', 'RPA', 
+        'ADMINISTRADOR', 'ADMIN_ALMACENES', 'RPA',
         'SECRETARIO_SAF', 'PRESUPUESTOS', 'BIENES_SERVICIOS'
     ]
 
@@ -179,7 +188,7 @@ def solicitudes_general(request):
         almacenes_usuario = Almacen.objects.filter(unidad_organizacional=perfil.unidad, is_active=True)
 
     es_central = (
-        almacenes_usuario.filter(tipo='CENTRAL').exists() or 
+        almacenes_usuario.filter(tipo='CENTRAL').exists() or
         rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']
     )
 
@@ -255,7 +264,7 @@ def solicitudes_general(request):
     # 6. KPIS CONTEXTUALES ACOTADOS A LA JURISDICCIÓN DEL ROL
     # =========================================================
     hoy = timezone.now().date()
-    
+
     if rol == 'RPA':
         pendientes_accion = ProcesoAdquisicion.objects.filter(estado='CERTIFICADA').count()
         accion_label = "Esperando su Aprobación RPA"
@@ -327,6 +336,11 @@ def solicitudes_general(request):
     })
 @login_required
 def buscar_materiales(request):
+    """
+    API de búsqueda estricta (Control Férreo):
+    Solo retorna materiales que posean Asignación Directa con saldo disponible
+    para la unidad solicitante. Si no tiene asignación (> 0), retorna vacío.
+    """
     q = request.GET.get('q', '').strip()
     unidad_id = request.GET.get('unidad_id')
 
@@ -339,78 +353,76 @@ def buscar_materiales(request):
     else:
         unidad = perfil.unidad if perfil else None
 
-    from inventario.models import Material, AsignacionEntradaUnidad
-    from django.db.models import F, Q, Sum
+    if not unidad:
+        return JsonResponse([], safe=False)
+    almacenes_autorizados = Almacen.objects.filter(
+        unidades_atendidas=unidad,
+        is_active=True
+    )
+    from solicitudes.services import (
+        resolver_almacen_para_unidad,
+        AlmacenNoDisponible,
+        ConfiguracionAlmacenAmbigua,
+    )
 
-    es_admin_o_almacen = perfil and perfil.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES', 'ALMACENERO']
+    try:
+        almacen_origen = resolver_almacen_para_unidad(unidad)
+    except (AlmacenNoDisponible, ConfiguracionAlmacenAmbigua):
+        return JsonResponse([], safe=False)
 
-    data = []
+    if not almacenes_autorizados.exists():
+        almacenes_autorizados = Almacen.objects.filter(
+            tipo='CENTRAL',
+            is_active=True
+        )
+        # Búsqueda estrictamente acotada a las asignaciones directas de la unidad
+    asignaciones = AsignacionEntradaUnidad.objects.filter(
+        unidad_organizacional=unidad,
+        cantidad_asignada__gt=F('cantidad_retirada'),
+        nota_ingreso_detalle__material__is_active=True,
+        nota_ingreso_detalle__nota_ingreso__almacen_destino=almacen_origen
+    ).filter(
+        Q(nota_ingreso_detalle__material__nombre__icontains=q) |
+        Q(nota_ingreso_detalle__material__codigo__icontains=q)
+    ).select_related(
+        'nota_ingreso_detalle__material',
+        'nota_ingreso_detalle__material__unidad_medida_fk'
+    )
+    materiales_dict = {}
+    for asig in asignaciones:
+        mat = asig.nota_ingreso_detalle.material
+        saldo_asig = asig.saldo_disponible
 
-    # CASO 1: UNIDAD SOLICITANTE NORMAL (Filtrar por Asignación Física Directa)
-    if unidad and not es_admin_o_almacen:
-        # Buscamos asignaciones activas de esta unidad que tengan saldo disponible
-        asignaciones = AsignacionEntradaUnidad.objects.filter(
-            unidad_organizacional=unidad,
-            cantidad_asignada__gt=F('cantidad_retirada'),
-            nota_ingreso_detalle__material__is_active=True
-        ).filter(
-            Q(nota_ingreso_detalle__material__nombre__icontains=q) |
-            Q(nota_ingreso_detalle__material__codigo__icontains=q)
-        ).select_related('nota_ingreso_detalle__material', 'nota_ingreso_detalle__material__unidad_medida_fk')
-
-        # Agrupar por material para sumar el saldo de distintos lotes asignados a la misma oficina
-        materiales_dict = {}
-        for asig in asignaciones:
-            mat = asig.nota_ingreso_detalle.material
-            saldo_asig = asig.saldo_disponible
-
+        if saldo_asig > 0:
             if mat.id not in materiales_dict:
                 u_med = mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else (mat.unidad_medida or 'UND')
                 materiales_dict[mat.id] = {
                     'id': mat.id,
-                    'codigo': mat.codigo,
-                    'nombre': mat.nombre,
-                    'unidad': u_med,
-                    'saldo_disponible': saldo_asig,
+                    'nombre': f"{mat.codigo} - {mat.nombre} (Cupo Asignado: {saldo_asig} {u_med})",
+                    'stock': saldo_asig
                 }
             else:
-                materiales_dict[mat.id]['saldo_disponible'] += saldo_asig
+                materiales_dict[mat.id]['stock'] += saldo_asig
 
-        data = [
-            {
-                'id': item['id'],
-                'nombre': f"{item['codigo']} - {item['nombre']} (Cupo: {item['saldo_disponible']} {item['unidad']})",
-                'stock': item['saldo_disponible']  # Su tope de pedido es su saldo asignado
-            }
-            for item in materiales_dict.values()
-        ][:10]
+                u_med = (
+                    mat.unidad_medida_fk.codigo
+                    if mat.unidad_medida_fk
+                    else (mat.unidad_medida or 'UND')
+                )
 
-    # CASO 2: ADMINISTRADOR / ALMACENERO (Búsqueda general en catálogo)
-    else:
-        query = Material.objects.filter(
-            Q(nombre__icontains=q) | Q(codigo__icontains=q),
-            stock_actual__gt=0,
-            is_active=True
-        ).select_related('unidad_medida_fk')[:10]
-
-        data = [
-            {
-                'id': m.id,
-                'nombre': f"{m.codigo} - {m.nombre} (Stock Global: {m.stock_actual})",
-                'stock': m.stock_actual
-            }
-            for m in query
-        ]
-
+                materiales_dict[mat.id]['nombre'] = (
+                    f"{mat.codigo} - {mat.nombre} "
+                    f"(Cupo Asignado: {materiales_dict[mat.id]['stock']} {u_med})"
+                )
+    data = list(materiales_dict.values())[:10]
     return JsonResponse(data, safe=False)
-
 @login_required
 def nueva_solicitud(request):
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
         payload_raw = request.POST.get("payload")
         tipo_requerimiento = request.POST.get('tipo_requerimiento', '').strip()
-        
+
         if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
             messages.error(request, "Debe seleccionar un Tipo de Requerimiento válido (Bien o Servicio).")
             return redirect('nueva_solicitud')
@@ -477,6 +489,7 @@ def nueva_solicitud(request):
                             cantidad_solicitada=cantidad,
                             precio_unitario_referencial=precio_ref
                         )
+
                     else:
                         material = Material.objects.get(id=item_key)
                         DetalleSolicitud.objects.create(
@@ -509,124 +522,322 @@ def nueva_solicitud(request):
     return render(request, 'solicitudes/nueva.html', {'materiales': materiales})
 
 
+
 @login_required
 def nueva_solicitud_compra(request):
+    """
+    SIGAL - Flujo 2: Nueva Adquisición de Bienes.
+
+    Registra requerimientos documentales de bienes catalogados
+    y no catalogados.
+
+    No genera movimientos de inventario, lotes ni stock.
+    """
+
     if request.method == 'POST':
-        fecha = request.POST.get('fecha')
-        payload_raw = request.POST.get("payload")
-        tipo_requerimiento = request.POST.get('tipo_requerimiento', '').strip()
 
-        if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
-            messages.error(request, "Debe seleccionar un Tipo de Requerimiento válido (Bien o Servicio).")
+        # -----------------------------------------
+        # 1. VALIDACIÓN DEL TIPO DE REQUERIMIENTO
+        # -----------------------------------------
+        tipo_requerimiento = request.POST.get(
+            'tipo_requerimiento', ''
+        ).strip()
+
+        if tipo_requerimiento != 'BIEN':
+            messages.error(
+                request,
+                "Solo se permite registrar nuevas adquisiciones de bienes."
+            )
             return redirect('nueva_solicitud_compra')
 
-        if not payload_raw:
-            messages.error(request, "No se recibió información de ítems.")
-            return redirect('nueva_solicitud_compra')
-
-        payload_raw = html.unescape(payload_raw)
-        try:
-            payload = json.loads(payload_raw)
-        except json.JSONDecodeError:
-            messages.error(request, "Error en el formato de los datos enviados.")
-            return redirect('nueva_solicitud_compra')
-
-        if not payload:
-            messages.error(request, "Debe agregar al menos un ítem.")
-            return redirect('nueva_solicitud_compra')
-
-        justificacion = request.POST.get('justificacion', '').strip()
+        # -----------------------------------------
+        # 2. VALIDACIÓN DE UNIDAD SOLICITANTE
+        # -----------------------------------------
         perfil = getattr(request.user, 'perfilusuario', None)
         unidad_solicitante = perfil.unidad if perfil else None
 
         if not unidad_solicitante:
-            messages.error(request, "Su usuario no tiene asignada una Unidad Organizacional.")
+            messages.error(
+                request,
+                "Su usuario no tiene asignada una Unidad Organizacional."
+            )
+            return redirect('nueva_solicitud_compra')
+
+        # -----------------------------------------
+        # 3. VALIDACIÓN DE FECHA Y JUSTIFICACIÓN
+        # -----------------------------------------
+        fecha_raw = request.POST.get('fecha', '').strip()
+        fecha = parse_date(fecha_raw) if fecha_raw else date.today()
+
+        if fecha is None:
+            messages.error(request, "La fecha indicada no es válida.")
+            return redirect('nueva_solicitud_compra')
+
+        justificacion = request.POST.get(
+            'justificacion', ''
+        ).strip()
+
+        if not justificacion:
+            messages.error(
+                request,
+                "Debe ingresar la justificación de la adquisición."
+            )
+            return redirect('nueva_solicitud_compra')
+
+        # -----------------------------------------
+        # 4. VALIDACIÓN DEL PAYLOAD
+        # -----------------------------------------
+        payload_raw = request.POST.get('payload', '')
+
+        if not payload_raw:
+            messages.error(
+                request,
+                "No se recibió información de los bienes requeridos."
+            )
             return redirect('nueva_solicitud_compra')
 
         try:
-            with transaction.atomic():
-                ultima = Solicitud.objects.select_for_update().order_by('id').last()
-                numero = (ultima.id + 1) if ultima else 1
-                
-                if tipo_requerimiento == 'SERVICIO':
-                    codigo = f'REQ-SRV-{numero:05d}'
-                    flujo = 'CONTRATACION_SERVICIO'
+            payload = json.loads(payload_raw)
+        except (json.JSONDecodeError, TypeError):
+            messages.error(
+                request,
+                "El formato de los bienes enviados no es válido."
+            )
+            return redirect('nueva_solicitud_compra')
+
+        if not isinstance(payload, dict) or not payload:
+            messages.error(
+                request,
+                "Debe agregar al menos un bien a la solicitud."
+            )
+            return redirect('nueva_solicitud_compra')
+
+        # -----------------------------------------
+        # 5. VALIDACIÓN PREVIA DE LOS BIENES
+        # -----------------------------------------
+        detalles_validados = []
+
+        try:
+            for item_key, item_data in payload.items():
+
+                if not isinstance(item_data, dict):
+                    raise ValueError(
+                        "Se encontró un bien con información inválida."
+                    )
+
+                es_nuevo = item_data.get('es_nuevo', False)
+
+                if not isinstance(es_nuevo, bool):
+                    raise ValueError(
+                        "El tipo de bien enviado no es válido."
+                    )
+
+                cantidad_raw = item_data.get('cantidad')
+
+                if (
+                    isinstance(cantidad_raw, bool)
+                    or not str(cantidad_raw).isdigit()
+                ):
+                    raise ValueError(
+                        "La cantidad debe ser un número entero positivo."
+                    )
+
+                cantidad = int(cantidad_raw)
+
+                if cantidad <= 0:
+                    raise ValueError(
+                        "La cantidad solicitada debe ser mayor a cero."
+                    )
+
+                precio_raw = item_data.get(
+                    'precio_referencial', 0
+                )
+
+                try:
+                    precio_ref = Decimal(str(precio_raw))
+                except (ValueError, TypeError, InvalidOperation):
+                    raise ValueError(
+                        "El precio referencial no es válido."
+                    )
+
+                if not precio_ref.is_finite() or precio_ref < 0:
+                    raise ValueError(
+                        "El precio referencial debe ser finito "
+                        "y mayor o igual a cero."
+                    )
+                if precio_ref.as_tuple().exponent < -2:
+                    raise ValueError(
+                        "El precio referencial admite como máximo 2 decimales."
+                    )
+
+                if precio_ref >= Decimal('10000000000'):
+                    raise ValueError(
+                        "El precio referencial supera el máximo permitido."
+                    )
+                if es_nuevo:
+                    # Bien que todavía no existe en el catálogo SIGAL
+                    nombre = str(
+                        item_data.get('nombre') or ''
+                    ).strip()
+
+                    if not nombre:
+                        raise ValueError(
+                            "Debe especificar la descripción "
+                            "del bien no catalogado."
+                        )
+                    if len(nombre) > 200:
+                        raise ValueError(
+                            "La descripción del bien no puede superar los 200 caracteres."
+                        )
+                    partida_id = item_data.get('partida_id')
+
+                    if not partida_id:
+                        raise ValueError(
+                            f"Debe seleccionar una partida "
+                            f"presupuestaria para el bien: {nombre}."
+                        )
+
+                    try:
+                        partida = PartidaPresupuestaria.objects.get(
+                            pk=partida_id
+                        )
+                    except (
+                        PartidaPresupuestaria.DoesNotExist,
+                        ValueError,
+                        TypeError
+                    ):
+                        raise ValueError(
+                            f"La partida seleccionada para "
+                            f"'{nombre}' no existe."
+                        )
+
+                    detalles_validados.append({
+                        'material': None,
+                        'partida': partida,
+                        'es_nueva_adquisicion': True,
+                        'descripcion_material_no_catalogado': nombre,
+                        'cantidad_solicitada': cantidad,
+                        'precio_unitario_referencial': precio_ref
+                    })
+
                 else:
-                    codigo = f'REQ-ADQ-{numero:05d}'
-                    flujo = 'ADQUISICION'
+                    # Bien existente en el catálogo SIGAL
+                    try:
+                        material = Material.objects.get(
+                            pk=item_key
+                        )
+                    except (
+                        Material.DoesNotExist,
+                        ValueError,
+                        TypeError
+                    ):
+                        raise ValueError(
+                            "Uno de los materiales seleccionados "
+                            "no existe en el catálogo SIGAL."
+                        )
+
+                    detalles_validados.append({
+                        'material': material,
+                        'partida': None,
+                        'es_nueva_adquisicion': False,
+                        'cantidad_solicitada': cantidad,
+                        'precio_unitario_referencial': precio_ref
+                    })
+
+        except ValueError as error:
+            messages.error(request, str(error))
+            return redirect('nueva_solicitud_compra')
+
+        # -----------------------------------------
+        # 6. REGISTRO TRANSACCIONAL
+        # -----------------------------------------
+        try:
+            with transaction.atomic():
+
+                # Código temporal único, dentro del límite de 20 caracteres.
+                codigo_temporal = (
+                    f"TMP-{uuid.uuid4().hex[:16]}"
+                )
 
                 solicitud = Solicitud.objects.create(
-                    codigo=codigo,
+                    codigo=codigo_temporal,
                     unidad_solicitante=unidad_solicitante,
                     solicitante=request.user,
                     fecha=fecha,
                     justificacion=justificacion,
-                    tipo_requerimiento=tipo_requerimiento,
-                    flujo_atencion=flujo,
+                    tipo_requerimiento='BIEN',
+                    flujo_atencion='ADQUISICION',
                     estado='REGISTRADA'
                 )
 
-                for item_key, item_data in payload.items():
-                    cantidad = int(item_data.get('cantidad', 1))
-                    es_nuevo = item_data.get('es_nuevo', False)
-                    precio_ref_raw = item_data.get('precio_referencial', 0)
-                    partida_id = item_data.get('partida_id')
-                    partida_obj = PartidaPresupuestaria.objects.get(id=partida_id) if partida_id else None
+                # El ID es generado por PostgreSQL.
+                codigo = f"REQ-ADQ-{solicitud.pk:05d}"
 
-                    try:
-                        precio_ref = Decimal(str(precio_ref_raw))
-                    except (ValueError, TypeError, InvalidOperation):
-                        precio_ref = Decimal('0.00')
+                solicitud.codigo = codigo
+                solicitud.save(update_fields=['codigo'])
 
-                    if cantidad <= 0:
-                        raise ValueError("La cantidad solicitada debe ser mayor a cero.")
-                    if precio_ref < 0:
-                        raise ValueError("El precio unitario referencial debe ser mayor o igual a 0.")
+                # Registrar todos los detalles de la adquisición.
+                for detalle_data in detalles_validados:
+                    DetalleSolicitud.objects.create(
+                        solicitud=solicitud,
+                        **detalle_data
+                    )
 
-                    if es_nuevo:
-                        DetalleSolicitud.objects.create(
-                            solicitud=solicitud,
-                            material=None,
-                            partida=partida_obj,
-                            es_nueva_adquisicion=True,
-                            descripcion_material_no_catalogado=item_data.get('nombre'),
-                            cantidad_solicitada=cantidad,
-                            precio_unitario_referencial=precio_ref
-                        )
-                    else:
-                        material = Material.objects.get(id=item_key)
-                        DetalleSolicitud.objects.create(
-                            solicitud=solicitud,
-                            material=material,
-                            partida=None,
-                            cantidad_solicitada=cantidad,
-                            precio_unitario_referencial=precio_ref
-                        )
-
+                # Registrar trazabilidad institucional.
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Solicitudes',
-                    accion='Registrar Solicitud Compra/Servicio',
-                    descripcion=f'Se registró el Requerimiento de Adquisición {codigo} ({tipo_requerimiento})'
+                    accion='Registrar Nueva Adquisición de Bienes',
+                    descripcion=(
+                        f"Se registró el requerimiento {codigo} "
+                        f"para la nueva adquisición de bienes."
+                    )
                 )
 
-            messages.success(request, f"Requerimiento {codigo} registrado correctamente.")
+            messages.success(
+                request,
+                f"Requerimiento {codigo} registrado correctamente."
+            )
+
             return redirect('solicitudes')
 
-        except ValueError as e:
-            messages.error(request, str(e))
+        except IntegrityError:
+            messages.error(
+                request,
+                "No se pudo registrar el requerimiento debido "
+                "a un conflicto de integridad de datos."
+            )
             return redirect('nueva_solicitud_compra')
+
         except DatabaseError:
-            messages.error(request, "Hubo un error al guardar el requerimiento en la base de datos.")
+            messages.error(
+                request,
+                "Ocurrió un error de base de datos al registrar "
+                "el requerimiento."
+            )
             return redirect('nueva_solicitud_compra')
 
-    materiales = Material.objects.all().values('id', 'nombre', 'stock_actual')
-    partidas = PartidaPresupuestaria.objects.all().order_by('codigo')
-    return render(request, 'solicitudes/nueva_solicitud_compra.html', {
-        'materiales': materiales,
-        'partidas': partidas
-    })
+    # -----------------------------------------
+    # 7. FORMULARIO GET
+    # -----------------------------------------
+    materiales = Material.objects.all().values(
+        'id',
+        'nombre',
+        'stock_actual'
+    )
 
+    partidas = PartidaPresupuestaria.objects.all().order_by(
+        'codigo'
+    )
+
+    return render(
+        request,
+        'solicitudes/nueva_solicitud_compra.html',
+        {
+            'materiales': materiales,
+            'partidas': partidas
+        }
+    )
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -706,13 +917,13 @@ def detalle_solicitud(request, id):
     rol = perfil.rol
 
     roles_globales = [
-        'ADMINISTRADOR', 
+        'ADMINISTRADOR',
         'ADMIN_ALMACENES',
-        'ALMACENERO', 
-        'KARDISTA', 
-        'SECRETARIO_SAF', 
-        'PRESUPUESTOS', 
-        'RPA', 
+        'ALMACENERO',
+        'KARDISTA',
+        'SECRETARIO_SAF',
+        'PRESUPUESTOS',
+        'RPA',
         'JEFE_ADMINISTRATIVO'
     ]
 
@@ -764,81 +975,238 @@ def detalle_solicitud(request, id):
         'rol': rol
     })
 
+
 @login_required
 def revisar_solicitud(request, id):
-    if not tiene_rol(request.user, ['JEFE_INMEDIATO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']):
+    if not tiene_rol(
+        request.user,
+        ['JEFE_INMEDIATO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']
+    ):
         return HttpResponseForbidden("No autorizado.")
 
-    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
-    
-    if not solicitud.tiene_detalles():
-        messages.error(request, "La solicitud no contiene ningún material registrado y no puede ser procesada.")
-        return redirigir_despues_de_accion(request, solicitud)
+    solicitud = get_object_or_404(Solicitud, id=id)
+    # Restringir al Jefe Inmediato a su unidad organizacional
+    perfil = getattr(request.user, 'perfilusuario', None)
 
-    if solicitud.estado != 'REGISTRADA':
-        messages.error(request, "Esta solicitud ya no se encuentra en estado Registrada.")
-        return redirigir_despues_de_accion(request, solicitud)
-
-    detalles = solicitud.detalles.select_related('material')
-
+    if (
+        perfil
+        and perfil.rol == 'JEFE_INMEDIATO'
+        and perfil.unidad_id != solicitud.unidad_solicitante_id
+    ):
+        return HttpResponseForbidden(
+            "No está autorizado para revisar solicitudes de otra unidad."
+        )
     if request.method == 'POST':
         try:
             with transaction.atomic():
+                # Bloquear la solicitud antes de comprobar su estado
+                solicitud = Solicitud.objects.select_for_update().get(pk=id)
+                # Verificar autorización después de bloquear la solicitud
+                perfil = getattr(request.user, 'perfilusuario', None)
+
+                if perfil and perfil.rol == 'JEFE_INMEDIATO':
+                    if perfil.unidad_id != solicitud.unidad_solicitante_id:
+                        return HttpResponseForbidden(
+                            "No está autorizado para revisar solicitudes de otra unidad."
+                        )
+                if solicitud.estado != 'REGISTRADA':
+                    raise ValueError(
+                        "Esta solicitud ya fue procesada o no está "
+                        "en estado REGISTRADA."
+                    )
+
+                detalles = list(
+                    solicitud.detalles.select_related('material')
+                    .order_by('material_id', 'id')
+                )
+
+                if not detalles:
+                    raise ValueError(
+                        "La solicitud no contiene materiales registrados."
+                    )
+
                 almacen_origen = solicitud.almacen_origen
                 if not almacen_origen:
                     raise ValueError(
-                        "No se pudo determinar el almacén de origen para esta solicitud. "
-                        "Asegúrese de haber registrado un Almacén Central activo (Tipo: 'CENTRAL') "
-                        "en el Panel de Administración de Django."
+                        "No se pudo determinar el almacén de origen."
                     )
 
+                # Acumular cantidades por material para validar
+                # correctamente los detalles repetidos
+                cantidades_por_material = {}
+
                 for detalle in detalles:
-                    aprobada = int(request.POST.get(f"aprobado_{detalle.id}") or 0)
-                    if aprobada < 0:
-                        aprobada = 0
-
-                    detalle.cantidad_aprobada = aprobada
-                    detalle.save()
-
-                    if solicitud.flujo_atencion == 'SALIDA_ALMACEN' and detalle.material:
-                        inv, created = InventarioAlmacen.objects.get_or_create(
-                            material=detalle.material,
-                            almacen=almacen_origen,
-                            defaults={'stock_fisico': 0, 'stock_reservado': 0}
+                    try:
+                        aprobada = int(
+                            request.POST.get(f"aprobado_{detalle.id}", "0")
+                        )
+                    except (TypeError, ValueError):
+                        raise ValueError(
+                            "La cantidad aprobada debe ser un número entero."
                         )
 
-                        if inv.stock_disponible < aprobada:
-                            raise ValueError(
-                                f"No es posible autorizar. Stock disponible insuficiente en "
-                                f"'{detalle.material.nombre}' para el {almacen_origen.nombre}. "
-                                f"Solicitado: {aprobada} | Disponible: {inv.stock_disponible}"
+                    if aprobada < 0 or aprobada > detalle.cantidad_solicitada:
+                        raise ValueError(
+                            f"Cantidad aprobada inválida para "
+                            f"'{detalle.material.nombre if detalle.material else 'material'}'."
+                        )
+
+                    detalle.cantidad_aprobada = aprobada
+
+                    if (
+                        solicitud.flujo_atencion == 'SALIDA_ALMACEN'
+                        and detalle.material
+                        and aprobada > 0
+                    ):
+                        material_id = detalle.material_id
+                        cantidades_por_material[material_id] = (
+                            cantidades_por_material.get(material_id, 0)
+                            + aprobada
+                        )
+
+                if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+                    # Bloquear inventarios en orden estable
+                    for material_id in sorted(cantidades_por_material):
+                        cantidad_total = cantidades_por_material[material_id]
+
+                        inv = (
+                            InventarioAlmacen.objects
+                            .select_for_update()
+                            .filter(
+                                material_id=material_id,
+                                almacen=almacen_origen
                             )
-                        
-                        inv.stock_reservado += aprobada
+                            .first()
+                        )
+
+                        if inv is None:
+                            raise ValueError(
+                                f"No existe inventario para el material "
+                                f"ID {material_id} en el almacén asignado."
+                            )
+
+                        if inv.stock_disponible < cantidad_total:
+                            raise ValueError(
+                                f"Stock insuficiente para "
+                                f"'{inv.material.nombre}'. "
+                                f"Disponible: {inv.stock_disponible}; "
+                                f"aprobado: {cantidad_total}."
+                            )
+
+                        # Validar asignaciones directas de la unidad
+                        asignaciones = (
+                            AsignacionEntradaUnidad.objects
+                            .select_for_update()
+                            .filter(
+                                unidad_organizacional=solicitud.unidad_solicitante,
+                                nota_ingreso_detalle__material_id=material_id,
+                                nota_ingreso_detalle__nota_ingreso__almacen_destino=almacen_origen
+                            )
+                            .order_by('id')
+                        )
+
+                        # Saldo asignado pendiente de retiro
+                        saldo_asignado = sum(
+                            a.saldo_disponible for a in asignaciones
+                        )
+
+                        # Reservas pendientes de otras solicitudes de la misma
+                        # unidad, material y almacén.
+                        # Consultar solicitudes con reservas pendientes de esta unidad
+                        detalles_pendientes = (
+                            DetalleSolicitud.objects
+                            .filter(
+                                solicitud__unidad_solicitante=solicitud.unidad_solicitante,
+                                solicitud__flujo_atencion='SALIDA_ALMACEN',
+                                solicitud__estado__in=['REVISADA', 'PREPARADA'],
+                                material_id=material_id,
+                            )
+                            .select_related(
+                                'solicitud',
+                                'solicitud__almacen_asignado',
+                                'solicitud__unidad_solicitante'
+                            )
+                        )
+
+                        reservas_pendientes = 0
+
+                        for detalle_pendiente in detalles_pendientes:
+                            solicitud_pendiente = detalle_pendiente.solicitud
+
+                            # La propiedad resuelve también solicitudes antiguas
+                            # sin almacén persistido.
+                            almacen_pendiente = solicitud_pendiente.almacen_origen
+
+                            if almacen_pendiente and almacen_pendiente.pk == almacen_origen.pk:
+                                reservas_pendientes += detalle_pendiente.cantidad_aprobada or 0
+
+                        saldo_real_disponible = saldo_asignado - reservas_pendientes
+
+                        if cantidad_total > saldo_real_disponible:
+                            raise ValueError(
+                                f"La unidad solicitante no tiene suficiente "
+                                f"asignación para '{inv.material.nombre}'. "
+                                f"Asignado disponible: {saldo_real_disponible}; "
+                                f"aprobado: {cantidad_total}."
+                            )
+
+                        inv.stock_reservado += cantidad_total
                         inv.save()
 
+                for detalle in detalles:
+                    detalle.save(update_fields=['cantidad_aprobada'])
+
                 solicitud.estado = 'REVISADA'
-                solicitud.aprobado_por = request.user.get_full_name() or request.user.username
-                solicitud.revisado_por = request.user            
-                solicitud.fecha_revision = timezone.now()         
+                solicitud.aprobado_por = (
+                    request.user.get_full_name()
+                    or request.user.username
+                )
+                solicitud.revisado_por = request.user
+                solicitud.fecha_revision = timezone.now()
                 solicitud.save()
 
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Solicitudes',
                     accion='Revisar Solicitud',
-                    descripcion=f'El jefe inmediato revisó, autorizó y reservó stock para la solicitud {solicitud.codigo}'
+                    descripcion=(
+                        f"Se revisó la solicitud {solicitud.codigo} "
+                        "y se reservaron los materiales autorizados."
+                    )
                 )
 
-            messages.success(request, f"Solicitud {solicitud.codigo} revisada y autorizada correctamente.")
-            return redirigir_despues_de_accion(request, solicitud)
+            messages.success(
+                request,
+                f"Solicitud {solicitud.codigo} revisada correctamente."
+            )
 
-        except ValueError as e:
+        except (ValueError, ValidationError) as e:
             messages.error(request, str(e))
-            return redirigir_despues_de_accion(request, solicitud)
-        except DatabaseError as e:
-            messages.error(request, "Error de base de datos al procesar la revisión de la solicitud.")
-            return redirigir_despues_de_accion(request, solicitud)
+
+        except DatabaseError:
+            messages.error(
+                request,
+                "Error de base de datos al revisar la solicitud."
+            )
+
+        return redirigir_despues_de_accion(request, solicitud)
+
+    # Consulta GET: no se bloquean registros
+    if solicitud.estado != 'REGISTRADA':
+        messages.error(
+            request,
+            "Esta solicitud ya no se encuentra en estado REGISTRADA."
+        )
+        return redirigir_despues_de_accion(request, solicitud)
+
+    detalles = solicitud.detalles.select_related('material')
+
+    if not detalles.exists():
+        messages.error(
+            request,
+            "La solicitud no contiene materiales registrados."
+        )
+        return redirigir_despues_de_accion(request, solicitud)
 
     return render(request, 'solicitudes/aprobar.html', {
         'solicitud': solicitud,
@@ -846,39 +1214,108 @@ def revisar_solicitud(request, id):
     })
 
 
+
 @login_required
-@rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@rol_requerido(['SECRETARIO_SAF', 'ADMINISTRADOR'])
 def validar_saf(request, id):
-    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+    """
+    Validación documental SAF para nuevas adquisiciones de bienes.
 
-    if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-        messages.warning(request, "Las solicitudes con stock disponible pasan directamente de Autorización de Unidad a Preparación en Almacén.")
-        return redirigir_despues_de_accion(request, solicitud)
+    No modifica POA, presupuesto ni inventario.
+    """
 
-    if solicitud.estado != 'REVISADA':
-        messages.error(request, "La solicitud aún no ha sido revisada ni autorizada por su Jefe de Unidad.")
-        return redirigir_despues_de_accion(request, solicitud)
+    # La validación debe realizarse únicamente mediante POST.
+    if request.method != 'POST':
+        messages.error(
+            request,
+            "La validación SAF debe realizarse mediante una solicitud POST."
+        )
+        return redirect('solicitudes')
 
     try:
         with transaction.atomic():
+
+            # Bloquear la solicitud dentro de la transacción.
+            solicitud = get_object_or_404(
+                Solicitud.objects.select_for_update(),
+                id=id
+            )
+
+            # Verificar que corresponda al Flujo 2.
+            if (
+                solicitud.flujo_atencion != 'ADQUISICION'
+                or solicitud.tipo_requerimiento != 'BIEN'
+            ):
+                messages.error(
+                    request,
+                    "La validación SAF solo corresponde a "
+                    "nuevas adquisiciones de bienes."
+                )
+                return redirigir_despues_de_accion(
+                    request, solicitud
+                )
+
+            # Verificar el estado actual.
+            if solicitud.estado != 'REVISADA':
+                messages.error(
+                    request,
+                    "La solicitud debe estar revisada y autorizada "
+                    "antes de la validación SAF."
+                )
+                return redirigir_despues_de_accion(
+                    request, solicitud
+                )
+
+            # Verificar que existan detalles.
+            if not solicitud.detalles.exists():
+                messages.error(
+                    request,
+                    "La solicitud no contiene bienes registrados."
+                )
+                return redirigir_despues_de_accion(
+                    request, solicitud
+                )
+
+            # Registrar validación SAF.
             solicitud.estado = 'VALIDADA_SAF'
             solicitud.saf_por = request.user
             solicitud.fecha_saf = timezone.now()
-            solicitud.save()
 
+            solicitud.save(
+                update_fields=[
+                    'estado',
+                    'saf_por',
+                    'fecha_saf'
+                ]
+            )
+
+            # Registrar auditoría.
             Bitacora.objects.create(
                 usuario=request.user,
                 modulo='Solicitudes',
                 accion='Validación SAF',
-                descripcion=f'El Secretario SAF validó la solicitud {solicitud.codigo}'
+                descripcion=(
+                    f"Se validó documentalmente la solicitud "
+                    f"de adquisición de bienes {solicitud.codigo}."
+                )
             )
 
-        messages.success(request, f"Solicitud {solicitud.codigo} validada por la SAF.")
-    except Exception as e:
-        messages.error(request, f"Error al procesar validación SAF: {str(e)}")
+        messages.success(
+            request,
+            f"Solicitud {solicitud.codigo} validada por SAF."
+        )
 
-    return redirigir_despues_de_accion(request, solicitud)
+        return redirigir_despues_de_accion(
+            request, solicitud
+        )
 
+    except DatabaseError:
+        messages.error(
+            request,
+            "Ocurrió un error de base de datos durante "
+            "la validación SAF."
+        )
+        return redirect('solicitudes')
 
 @login_required
 @rol_requerido(['PRESUPUESTOS', 'ADMINISTRADOR'])
@@ -902,12 +1339,12 @@ def aprobar_solicitud(request, id):
     try:
         with transaction.atomic():
             costos_partidas = {}
-            
+
             for detalle in detalles:
                 partida = detalle.partida_afectada
                 if not partida:
                     messages.error(
-                        request, 
+                        request,
                         f"Error: El concepto '{detalle.descripcion_material_no_catalogado or detalle}' no tiene asociada una Partida Presupuestaria."
                     )
                     return redirigir_despues_de_accion(request, solicitud)
@@ -924,14 +1361,14 @@ def aprobar_solicitud(request, id):
 
                 if not poa:
                     messages.error(
-                        request, 
+                        request,
                         f"La unidad {solicitud.unidad_solicitante.nombre} no tiene registrada la partida {partida.codigo} en su POA {GESTION_ACTUAL}."
                     )
                     return redirigir_despues_de_accion(request, solicitud)
 
                 if poa.monto_disponible < costo:
                     messages.error(
-                        request, 
+                        request,
                         f"Presupuesto insuficiente en la partida {partida.codigo}. "
                         f"Requerido: {costo:.2f} Bs. | Disponible: {poa.monto_disponible:.2f} Bs."
                     )
@@ -1024,47 +1461,89 @@ def validar_jefatura(request, id):
     return redirigir_despues_de_accion(request, solicitud)
 
 
+def puede_operar_almacen(usuario, almacen):
+    if not usuario.is_authenticated or almacen is None:
+        return False
+
+    perfil = getattr(usuario, 'perfilusuario', None)
+
+    if perfil is None:
+        return False
+
+    if perfil.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
+        return True
+
+    if perfil.rol != 'ALMACENERO':
+        return False
+
+    return (
+        almacen.responsable_id == usuario.id
+        or almacen.usuarios_autorizados.filter(
+            pk=perfil.pk
+        ).exists()
+    )
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def preparar_solicitud(request, id):
     solicitud = get_object_or_404(Solicitud, id=id)
+    if not puede_operar_almacen(request.user, solicitud.almacen_origen):
+        return HttpResponseForbidden(
+            "No está autorizado para preparar solicitudes de este almacén."
+        )
+
+    if solicitud.estado != 'REVISADA':
+        messages.error(
+            request,
+            "Solo las solicitudes REVISADAS pueden prepararse."
+        )
+        return redirigir_despues_de_accion(request, solicitud)
 
     if request.method == 'POST':
-        # El almacenero envía las cantidades reales que va a entregar
-        with transaction.atomic():
-            for det in solicitud.detalles.all():
-                campo_cant = f"cantidad_aprobar_{det.id}"
-                if campo_cant in request.POST:
-                    cant_a_entregar = int(request.POST.get(campo_cant, 0))
-                    
-                    # Validar contra stock real del almacén
-                    inv = InventarioAlmacen.objects.filter(
-                        material=det.material, 
-                        almacen=solicitud.almacen_origen
-                    ).first()
-                    
-                    stock_real = inv.stock_disponible if inv else 0
-                    
-                    # No puede entregar más de lo que hay físicamente
-                    if cant_a_entregar > stock_real:
-                        messages.error(request, f"No puedes entregar {cant_a_entregar} de {det.material.nombre}, solo hay {stock_real} en estantería.")
-                        return redirect('preparar_solicitud', id=solicitud.id)
-                    
-                    # Se asigna la cantidad física verificada
-                    det.cantidad_aprobada = cant_a_entregar
-                    det.cantidad_entregada = cant_a_entregar
-                    det.save()
+        try:
+            with transaction.atomic():
+                solicitud = Solicitud.objects.select_for_update().get(pk=id)
+                if not puede_operar_almacen(
+                    request.user, solicitud.almacen_origen
+                ):
+                    raise PermissionDenied(
+                        "No está autorizado para operar este almacén."
+                    )
+                if solicitud.estado != 'REVISADA':
+                    raise ValueError(
+                        "La solicitud ya no está en estado REVISADA."
+                    )
 
-            # Pasa al estado que habilita la impresión
-            solicitud.estado = 'PREPARADA'
-            solicitud.preparado_por = request.user
-            solicitud.fecha_preparado = timezone.now()
-            solicitud.save()
+                if not solicitud.almacen_origen:
+                    raise ValueError(
+                        "La solicitud no tiene un almacén asignado."
+                    )
 
-            messages.success(request, f"Solicitud {solicitud.codigo} preparada con éxito. Formulario listo para impresión y entrega.")
+                solicitud.estado = 'PREPARADA'
+                solicitud.preparado_por = request.user
+                solicitud.fecha_preparado = timezone.now()
+                solicitud.save(
+                    update_fields=[
+                        'estado',
+                        'preparado_por',
+                        'fecha_preparado'
+                    ]
+                )
+
+            messages.success(
+                request,
+                f"Solicitud {solicitud.codigo} preparada correctamente."
+            )
             return redirect('detalle_solicitud', id=solicitud.id)
 
-    return render(request, 'solicitudes/preparar.html', {'solicitud': solicitud})
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirigir_despues_de_accion(request, solicitud)
+
+    return render(
+        request,
+        'solicitudes/preparar.html',
+        {'solicitud': solicitud}
+    )
 
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -1074,7 +1553,18 @@ def entregar_solicitud(request, id):
     Si un ítem es retirado o se entrega menos de lo aprobado, libera automáticamente
     la reserva física de almacén y exige justificativo obligatorio.
     """
+    if not tiene_rol(
+        request.user,
+        ['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES']
+    ):
+        return HttpResponseForbidden(
+            "No está autorizado para entregar materiales."
+        )
     solicitud = get_object_or_404(Solicitud, id=id)
+    if not puede_operar_almacen(request.user, solicitud.almacen_origen):
+        return HttpResponseForbidden(
+            "No está autorizado para entregar materiales de este almacén."
+        )
 
     if solicitud.flujo_atencion == 'CONTRATACION_SERVICIO':
         messages.error(request, "Un requerimiento de SERVICIO no admite entrega física de inventario.")
@@ -1089,7 +1579,11 @@ def entregar_solicitud(request, id):
         messages.error(request, "No se encontró un Almacén activo asignado para esta solicitud.")
         return redirigir_despues_de_accion(request, solicitud)
 
-    detalles = solicitud.detalles.select_related('material', 'material__partida', 'material__unidad_medida_fk')
+    detalles = solicitud.detalles.select_related(
+        'material',
+        'material__partida',
+        'material__unidad_medida_fk'
+    ).order_by('material_id', 'id')
     from inventario.models import AsignacionEntradaUnidad, NotaSalida, NotaSalidaDetalle
 
     # =========================================================
@@ -1108,6 +1602,7 @@ def entregar_solicitud(request, id):
             asigs = AsignacionEntradaUnidad.objects.filter(
                 unidad_organizacional=solicitud.unidad_solicitante,
                 nota_ingreso_detalle__material=material,
+                nota_ingreso_detalle__nota_ingreso__almacen_destino=almacen_origen,
                 cantidad_asignada__gt=F('cantidad_retirada')
             )
             tot_asig = asigs.aggregate(s=Sum('cantidad_asignada'))['s'] or 0
@@ -1136,13 +1631,25 @@ def entregar_solicitud(request, id):
     try:
         with transaction.atomic():
             solicitud_lock = Solicitud.objects.select_for_update().get(id=id)
+            if not puede_operar_almacen(
+                request.user, solicitud_lock.almacen_origen
+            ):
+                return HttpResponseForbidden(
+                    "No está autorizado para despachar desde este almacén."
+                )
+            if solicitud_lock.estado != 'PREPARADA':
+                raise ValueError(
+                    f"La solicitud {solicitud_lock.codigo} ya no está "
+                    "en estado PREPARADA. No se puede procesar "
+                    "nuevamente su despacho."
+                )
 
             # Validar primero si hay devoluciones sin justificar
             for detalle in detalles:
                 cant_aprobada = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
                 es_devolucion = request.POST.get(f"devolver_{detalle.id}") == 'true'
                 cant_post = request.POST.get(f"entregado_{detalle.id}", '').strip()
-                
+
                 cant_real = 0 if es_devolucion else (int(cant_post) if cant_post else cant_aprobada)
                 justificativo = request.POST.get(f"justificativo_{detalle.id}", '').strip()
 
@@ -1159,23 +1666,32 @@ def entregar_solicitud(request, id):
                 cant_post = request.POST.get(f"entregado_{detalle.id}", '').strip()
                 cant_aprobada = detalle.cantidad_aprobada if detalle.cantidad_aprobada is not None else detalle.cantidad_solicitada
                 cant_real = 0 if es_devolucion else (int(cant_post) if cant_post else cant_aprobada)
+                if cant_real < 0 or cant_real > cant_aprobada:
+                    raise ValueError(
+                        f"Cantidad inválida para '{detalle.material.nombre}'. "
+                        f"Se aprobaron {cant_aprobada} unidades y se intentan entregar {cant_real}."
+                    )
                 if cant_real > 0:
                     items_a_entregar.append((detalle, cant_real))
 
             nota_salida = None
             if items_a_entregar:
-                ultima_salida = NotaSalida.objects.select_for_update().order_by('id').last()
-                nro_salida_num = (ultima_salida.id + 1) if ultima_salida else 1
-                nro_nota_salida = f"NS-{nro_salida_num:05d}"
+                codigo_temporal = f"TMP-{uuid.uuid4().hex}"
 
                 nota_salida = NotaSalida.objects.create(
-                    nro_nota=nro_nota_salida,
+                    nro_nota=codigo_temporal,
                     solicitud_origen=solicitud_lock,
                     almacen_origen=almacen_origen,
                     unidad_destino=solicitud_lock.unidad_solicitante,
                     fecha=timezone.now().date(),
                     usuario=request.user
                 )
+
+                # Generar correlativo a partir del ID asignado
+                nro_nota_salida = f"NS-{nota_salida.pk:05d}"
+
+                nota_salida.nro_nota = nro_nota_salida
+                nota_salida.save(update_fields=['nro_nota'])
 
             # Procesar cada material (Despacho real o Devolución/Liberación)
             for detalle in detalles:
@@ -1186,14 +1702,34 @@ def entregar_solicitud(request, id):
                 cant_despacho = 0 if es_devolucion else (int(cant_post) if cant_post else cant_aprobada)
                 justificativo = request.POST.get(f"justificativo_{detalle.id}", '').strip()
 
+                if cant_despacho < 0 or cant_despacho > cant_aprobada:
+                    raise ValueError(
+                        f"Cantidad de despacho inválida para '{material.nombre}'. "
+                        f"Se aprobaron {cant_aprobada} unidades y "
+                        f"se intentan entregar {cant_despacho}."
+                    )
+
                 inv = InventarioAlmacen.objects.select_for_update().filter(material=material, almacen=almacen_origen).first()
                 diferencia_devuelta = max(0, cant_aprobada - cant_despacho)
 
                 # 1. CASO DEVOLUCIÓN TOTAL O PARCIAL: Liberar reserva de stock a estantería
-                if diferencia_devuelta > 0 and inv:
-                    inv.stock_reservado = max(0, inv.stock_reservado - diferencia_devuelta)
-                    inv.save()
-                    
+                if diferencia_devuelta > 0:
+                    if inv is None:
+                        raise ValidationError(
+                            f"No existe inventario para '{material.nombre}' "
+                            "en el almacén de origen."
+                        )
+
+                    if inv.stock_reservado < cant_aprobada:
+                        raise ValidationError(
+                            f"Reserva insuficiente para procesar el despacho de "
+                            f"'{material.nombre}'. "
+                            f"Reservado: {inv.stock_reservado}; "
+                            f"aprobado: {cant_aprobada}."
+                        )
+
+                    inv.stock_reservado -= diferencia_devuelta
+                    inv.save(update_fields=['stock_reservado'])
                     detalle.observacion = (
                         f"DEVOLUCIÓN EN VENTANILLA: {diferencia_devuelta} u. devueltas/canceladas al stock. "
                         f"Motivo: {justificativo}"
@@ -1211,27 +1747,6 @@ def entregar_solicitud(request, id):
                         unidad_destino=solicitud_lock.unidad_solicitante,
                         descontar_reserva=True
                     )
-
-                    # Descontar del cupo asignado a la oficina
-                    asignaciones_oficina = AsignacionEntradaUnidad.objects.select_for_update().filter(
-                        unidad_organizacional=solicitud_lock.unidad_solicitante,
-                        nota_ingreso_detalle__material=material,
-                        cantidad_asignada__gt=F('cantidad_retirada')
-                    ).order_by('id')
-
-                    cant_a_descontar = cant_despacho
-                    for asig in asignaciones_oficina:
-                        if cant_a_descontar <= 0:
-                            break
-                        disp = asig.saldo_disponible
-                        if disp >= cant_a_descontar:
-                            asig.cantidad_retirada += cant_a_descontar
-                            asig.save()
-                            cant_a_descontar = 0
-                        else:
-                            asig.cantidad_retirada += disp
-                            asig.save()
-                            cant_a_descontar -= disp
 
                     detalle.cantidad_entregada = cant_despacho
                     detalle.precio_unitario_referencial = mov.costo_unitario
@@ -1298,27 +1813,53 @@ def cerrar_solicitud(request, id):
     return redirigir_despues_de_accion(request, solicitud)
 
 
+
 @login_required
 def editar_solicitud(request, id):
+    perfil = getattr(request.user, 'perfilusuario', None)
+
+    if perfil is None:
+        return HttpResponseForbidden(
+            "Su usuario no tiene un perfil institucional asignado."
+        )
+
     solicitud = get_object_or_404(Solicitud, id=id)
-    perfil = request.user.perfilusuario
 
     if perfil.rol not in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
-        if solicitud.unidad_solicitante != perfil.unidad:
-            return HttpResponseForbidden("No tiene permisos para modificar solicitudes de otra unidad.")
+        if solicitud.unidad_solicitante_id != perfil.unidad_id:
+            return HttpResponseForbidden(
+                "No tiene permisos para modificar solicitudes de otra unidad."
+            )
 
     if solicitud.estado != 'REGISTRADA':
-        return HttpResponseForbidden("Esta solicitud ya se encuentra en proceso de revisión y no es editable.")
+        return HttpResponseForbidden(
+            "Esta solicitud ya se encuentra en proceso de revisión "
+            "y no es editable."
+        )
 
+    # ---------------------------------------------------------
+    # GET: Mostrar formulario de edición
+    # ---------------------------------------------------------
     if request.method == "GET":
         detalles = solicitud.detalles.select_related('material')
+
         detalles_json = json.dumps([
             {
                 "id": d.material.id if d.material else d.id,
-                "nombre": d.material.nombre if d.material else d.descripcion_material_no_catalogado,
+                "nombre": (
+                    d.material.nombre
+                    if d.material
+                    else d.descripcion_material_no_catalogado
+                ),
                 "cantidad": d.cantidad_solicitada,
-                "stock": d.material.stock_actual if d.material else 0,
-                "precio_referencial": float(d.precio_unitario_referencial),
+                "stock": (
+                    d.material.stock_actual
+                    if d.material
+                    else 0
+                ),
+                "precio_referencial": float(
+                    d.precio_unitario_referencial
+                ),
                 "es_nuevo": d.es_nueva_adquisicion
             }
             for d in detalles
@@ -1329,92 +1870,235 @@ def editar_solicitud(request, id):
             "detalles_json": detalles_json
         })
 
+    if request.method != "POST":
+        return JsonResponse(
+            {"ok": False, "error": "Método HTTP no permitido."},
+            status=405
+        )
+
+    # ---------------------------------------------------------
+    # POST: Actualizar solicitud
+    # ---------------------------------------------------------
     try:
         data = json.loads(request.body.decode("utf-8"))
+
+        if not isinstance(data, dict):
+            raise ValueError("El contenido enviado no es válido.")
+
         payload = data.get("payload", {})
-        justificacion = data.get("justificacion", "")
-        tipo_requerimiento = data.get("tipo_requerimiento", "BIEN")
+        justificacion = str(
+            data.get("justificacion") or ""
+        ).strip()
 
-        if not tipo_requerimiento or tipo_requerimiento not in ['BIEN', 'SERVICIO']:
-            return JsonResponse({"ok": False, "error": "Debe seleccionar un tipo de requerimiento válido (Bien o Servicio)."}, status=400)
+        tipo_requerimiento = data.get(
+            "tipo_requerimiento", "BIEN"
+        )
 
-        if not payload:
-            return JsonResponse({"ok": False, "error": "Debe agregar al menos un material a la solicitud"}, status=400)
+        # SIGAL: Nueva adquisición exclusivamente de bienes.
+        if tipo_requerimiento != 'BIEN':
+            raise ValueError(
+                "SIGAL únicamente permite requerimientos de bienes."
+            )
 
-        with transaction.atomic():
-            solicitud.justificacion = justificacion
-            solicitud.tipo_requerimiento = tipo_requerimiento
-            solicitud.save()
-            solicitud.detalles.all().delete()
+        if not isinstance(payload, dict) or not payload:
+            raise ValueError(
+                "Debe agregar al menos un material a la solicitud."
+            )
 
-            for material_id, item_data in payload.items():
-                if isinstance(item_data, dict):
-                    cantidad = int(item_data.get('cantidad', 1))
-                    precio_ref_raw = item_data.get('precio_referencial', 0)
-                    es_nuevo = item_data.get('es_nuevo', False)
-                    nombre_no_catalogado = item_data.get('nombre', '')
-                else:
-                    cantidad = int(item_data)
-                    precio_ref_raw = 0
-                    es_nuevo = False
-                    nombre_no_catalogado = ''
+        if not justificacion:
+            raise ValueError(
+                "Debe ingresar la justificación de la solicitud."
+            )
 
-                try:
-                    precio_ref = Decimal(str(precio_ref_raw))
-                except (ValueError, TypeError):
-                    precio_ref = Decimal('0.00')
+        # -----------------------------------------------------
+        # Validar todos los materiales antes de modificar datos
+        # -----------------------------------------------------
+        detalles_validados = []
 
-                if cantidad <= 0:
-                    return JsonResponse({"ok": False, "error": "La cantidad de los ítems debe ser mayor a cero."}, status=400)
+        for material_id, item_data in payload.items():
 
-                if precio_ref < 0:
-                    return JsonResponse({"ok": False, "error": "El precio referencial no puede ser negativo."}, status=400)
+            if isinstance(item_data, dict):
+                cantidad_raw = item_data.get('cantidad', 1)
+                precio_ref_raw = item_data.get(
+                    'precio_referencial', 0
+                )
+                es_nuevo = item_data.get('es_nuevo', False)
+                nombre_no_catalogado = str(
+                    item_data.get('nombre') or ''
+                ).strip()
+            else:
+                cantidad_raw = item_data
+                precio_ref_raw = 0
+                es_nuevo = False
+                nombre_no_catalogado = ''
 
-                if es_nuevo or not str(material_id).isdigit():
-                    DetalleSolicitud.objects.create(
-                        solicitud=solicitud,
-                        material=None,
-                        es_nueva_adquisicion=True,
-                        descripcion_material_no_catalogado=nombre_no_catalogado,
-                        cantidad_solicitada=cantidad,
-                        precio_unitario_referencial=precio_ref
-                    )
-                else:
-                    material = Material.objects.get(id=material_id)
-                    DetalleSolicitud.objects.create(
-                        solicitud=solicitud,
-                        material=material,
-                        cantidad_solicitada=cantidad,
-                        precio_unitario_referencial=precio_ref
-                    )
-
-                solicitud.determinar_y_asignar_flujo()
-
-                Bitacora.objects.create(
-                    usuario=request.user,
-                    modulo='Solicitudes',
-                    accion='Registrar Solicitud',
-                    descripcion=f'Se registró la Solicitud {solicitud.codigo} con flujo asignado: {solicitud.get_flujo_atencion_display()}'
+            try:
+                cantidad = int(cantidad_raw)
+            except (ValueError, TypeError, OverflowError):
+                raise ValueError(
+                    "La cantidad de los materiales debe ser "
+                    "un número entero válido."
                 )
 
-        return JsonResponse({"ok": True})
+            if cantidad <= 0:
+                raise ValueError(
+                    "La cantidad de los materiales debe "
+                    "ser mayor a cero."
+                )
+
+            try:
+                precio_ref = Decimal(str(precio_ref_raw))
+            except (ValueError, TypeError, InvalidOperation):
+                raise ValueError(
+                    "El precio referencial debe ser numérico."
+                )
+
+            if not precio_ref.is_finite() or precio_ref < 0:
+                raise ValueError(
+                    "El precio referencial debe ser un número "
+                    "finito mayor o igual a cero."
+                )
+
+            if es_nuevo or not str(material_id).isdigit():
+                if not nombre_no_catalogado:
+                    raise ValueError(
+                        "Debe ingresar el nombre del bien "
+                        "que desea adquirir."
+                    )
+
+                detalles_validados.append({
+                    'material': None,
+                    'es_nueva_adquisicion': True,
+                    'descripcion_material_no_catalogado': (
+                        nombre_no_catalogado
+                    ),
+                    'cantidad_solicitada': cantidad,
+                    'precio_unitario_referencial': precio_ref
+                })
+
+            else:
+                try:
+                    material = Material.objects.get(
+                        pk=material_id
+                    )
+                except Material.DoesNotExist:
+                    raise ValueError(
+                        f"El material con ID {material_id} "
+                        "no existe en el catálogo."
+                    )
+
+                detalles_validados.append({
+                    'material': material,
+                    'es_nueva_adquisicion': False,
+                    'cantidad_solicitada': cantidad,
+                    'precio_unitario_referencial': precio_ref
+                })
+
+        # -----------------------------------------------------
+        # Actualización atómica
+        # -----------------------------------------------------
+        with transaction.atomic():
+
+            solicitud = (
+                Solicitud.objects
+                .select_for_update()
+                .get(pk=id)
+            )
+
+            # Revalidar permisos y estado dentro de la transacción
+            if perfil.rol not in [
+                'ADMINISTRADOR', 'ADMIN_ALMACENES'
+            ]:
+                if solicitud.unidad_solicitante_id != perfil.unidad_id:
+                    raise PermissionError(
+                        "No tiene permisos para modificar "
+                        "solicitudes de otra unidad."
+                    )
+
+            if solicitud.estado != 'REGISTRADA':
+                raise ValueError(
+                    "La solicitud ya fue procesada y "
+                    "no puede modificarse."
+                )
+
+            solicitud.justificacion = justificacion
+            solicitud.tipo_requerimiento = tipo_requerimiento
+            solicitud.save(
+                update_fields=[
+                    'justificacion',
+                    'tipo_requerimiento'
+                ]
+            )
+
+            # Sustituir detalles anteriores
+            solicitud.detalles.all().delete()
+
+            for detalle_data in detalles_validados:
+                DetalleSolicitud.objects.create(
+                    solicitud=solicitud,
+                    **detalle_data
+                )
+
+            # Determinar el flujo una sola vez,
+            # cuando todos los detalles ya existen.
+            solicitud.determinar_y_asignar_flujo()
+
+            # Registrar una sola entrada en bitácora
+            Bitacora.objects.create(
+                usuario=request.user,
+                modulo='Solicitudes',
+                accion='Editar Solicitud',
+                descripcion=(
+                    f"Se actualizó la solicitud "
+                    f"{solicitud.codigo}. "
+                    f"Flujo asignado: "
+                    f"{solicitud.get_flujo_atencion_display()}."
+                )
+            )
+
+        return JsonResponse({
+            "ok": True,
+            "mensaje": "Solicitud actualizada correctamente.",
+            "flujo_atencion": solicitud.flujo_atencion
+        })
 
     except json.JSONDecodeError:
-        return JsonResponse({"ok": False, "error": "Formato de datos JSON inválido"}, status=400)
+        return JsonResponse({
+            "ok": False,
+            "error": "Formato de datos JSON inválido."
+        }, status=400)
+
+    except PermissionError as e:
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=403)
+
+    except ValueError as e:
+        return JsonResponse({
+            "ok": False,
+            "error": str(e)
+        }, status=400)
+
+    except DatabaseError:
+        return JsonResponse({
+            "ok": False,
+            "error": "Error de base de datos al actualizar la solicitud."
+        }, status=500)
 
 
 @login_required
 def rechazar_solicitud(request, id):
     roles_revisores = [
-        'JEFE_INMEDIATO', 
-        'SECRETARIO_SAF', 
-        'PRESUPUESTOS', 
-        'RPA', 
-        'JEFE_ADMINISTRATIVO', 
+        'JEFE_INMEDIATO',
+        'SECRETARIO_SAF',
+        'PRESUPUESTOS',
+        'RPA',
+        'JEFE_ADMINISTRATIVO',
         'ADMINISTRADOR',
         'ADMIN_ALMACENES'
     ]
-    
+
     if not tiene_rol(request.user, roles_revisores):
         return HttpResponseForbidden("No tiene permisos para realizar esta acción.")
 
@@ -1428,19 +2112,17 @@ def rechazar_solicitud(request, id):
         try:
             with transaction.atomic():
                 solicitud = Solicitud.objects.select_for_update().get(id=id)
+                if solicitud.estado in ['RECHAZADA', 'ENTREGADA', 'CERRADA']:
+                    raise ValidationError(
+                        "No se puede rechazar una solicitud que ya fue "
+                        "rechazada, entregada o cerrada."
+                    )
 
-                if solicitud.estado in ['REVISADA', 'PREPARADA'] and solicitud.flujo_atencion == 'SALIDA_ALMACEN':
-                    for detalle in solicitud.detalles.all():
-                        if detalle.material:
-                            inv = InventarioAlmacen.objects.select_for_update().filter(
-                                material=detalle.material,
-                                almacen=solicitud.almacen_origen
-                            ).first()
-                            if inv:
-                                cantidad_reserva = detalle.cantidad_aprobada or detalle.cantidad_solicitada
-                                inv.stock_reservado -= cantidad_reserva
-                                inv.save()
-                
+                if (
+                    solicitud.flujo_atencion == 'SALIDA_ALMACEN'
+                    and solicitud.estado in ['REVISADA', 'PREPARADA']
+                ):
+                    liberar_reservas_solicitud(solicitud)
                 estados_con_reserva = ['VALIDADA_PRESUPUESTOS', 'VALIDADA_RPA', 'VALIDADA_JEFATURA', 'PREPARADA']
                 if solicitud.estado in estados_con_reserva and solicitud.flujo_atencion in ['ADQUISICION', 'CONTRATACION_SERVICIO']:
                     for detalle in solicitud.detalles.all():
@@ -1451,7 +2133,7 @@ def rechazar_solicitud(request, id):
                                 partida=partida,
                                 gestion=GESTION_ACTUAL
                             ).first()
-                            
+
                             if poa:
                                 costo_estimado = detalle.subtotal_referencial
                                 poa.monto_comprometido -= costo_estimado
@@ -1463,20 +2145,40 @@ def rechazar_solicitud(request, id):
                 solicitud.aprobado_por = request.user.get_full_name() or request.user.username
                 solicitud.save()
 
+                if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
+                    descripcion_liberacion = "Se liberaron las reservas de materiales correspondientes."
+                    mensaje_liberacion = "Se liberaron las reservas de materiales."
+                else:
+                    descripcion_liberacion = "Se procesó la liberación presupuestaria cuando correspondía."
+                    mensaje_liberacion = "Se procesaron las liberaciones correspondientes."
+
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Solicitudes',
                     accion='Rechazar Solicitud',
-                    descripcion=f'Se rechazó la solicitud {solicitud.codigo} por: {motivo}. Fondos del POA liberados.'
+                    descripcion=(
+                        f'Se rechazó la solicitud {solicitud.codigo} '
+                        f'por: {motivo}. {descripcion_liberacion}'
+                    )
                 )
 
-            messages.info(request, f"La solicitud {solicitud.codigo} ha sido rechazada y sus fondos han sido liberados.")
+                messages.info(
+                    request,
+                    f"La solicitud {solicitud.codigo} ha sido rechazada. "
+                    f"{mensaje_liberacion}"
+                )
+                return redirigir_despues_de_accion(request, solicitud)
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
             return redirigir_despues_de_accion(request, solicitud)
 
-        except Exception as e:
-            messages.error(request, f"Error al procesar el rechazo de la solicitud: {str(e)}")
+        except Exception:
+            messages.error(
+                request,
+                "No se pudo procesar el rechazo de la solicitud. "
+                "Verifique los datos e inténtelo nuevamente."
+            )
             return redirigir_despues_de_accion(request, solicitud)
-
     return render(request, 'solicitudes/rechazar.html', {'solicitud': solicitud})
 
 
@@ -1501,7 +2203,7 @@ def reabrir_solicitud(request, id):
 def solicitud_pdf(request, id):
     """
     Formulario Oficial de Pedido de Materiales y Bienes (Flujo 1).
-    Desglosa automáticamente las capas PEPS en renglones independientes 
+    Desglosa automáticamente las capas PEPS en renglones independientes
     para que en el papel oficial cada línea cumpla Cantidad x P.Unit = Costo Total.
     """
     solicitud = get_object_or_404(
@@ -1517,7 +2219,7 @@ def solicitud_pdf(request, id):
 
     if solicitud.estado not in ['PREPARADA', 'ENTREGADA', 'CERRADA']:
         messages.warning(
-            request, 
+            request,
             "El Formulario Oficial de Pedido no puede imprimirse hasta que Almacén verifique existencias y prepare el despacho."
         )
         return redirect('detalle_solicitud', id=solicitud.id)
@@ -1644,66 +2346,97 @@ def solicitud_pdf(request, id):
         'codigo_presupuesto': codigo_presupuesto,
     })
 
+
 @transaction.atomic
 @login_required
 @rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES'])
+@require_POST
 def retroceder_estado_solicitud(request, id):
-    solicitud = get_object_or_404(Solicitud.objects.select_for_update(), id=id)
+    solicitud = get_object_or_404(
+        Solicitud.objects.select_for_update(),
+        id=id
+    )
+
     estado_actual = solicitud.estado
 
     if solicitud.flujo_atencion == 'SALIDA_ALMACEN':
         map_retroceso = {
-            'REVISADA': ('REGISTRADA', 'revisado_por', 'fecha_revision'),
-            'PREPARADA': ('REVISADA', 'preparado_por', 'fecha_preparado'),
+            'REVISADA': (
+                'REGISTRADA',
+                'revisado_por',
+                'fecha_revision'
+            ),
+            'PREPARADA': (
+                'REVISADA',
+                'preparado_por',
+                'fecha_preparado'
+            ),
         }
     else:
         map_retroceso = {
             'REVISADA': ('REGISTRADA', 'revisado_por', 'fecha_revision'),
             'VALIDADA_SAF': ('REVISADA', 'saf_por', 'fecha_saf'),
-            'VALIDADA_PRESUPUESTOS': ('VALIDADA_SAF', 'presupuestado_por', 'fecha_presupuesto'),
-            'VALIDADA_RPA': ('VALIDADA_PRESUPUESTOS', 'rpa_por', 'fecha_rpa'),
-            'VALIDADA_JEFATURA': ('VALIDADA_RPA', 'jefatura_por', 'fecha_jefatura'),
-            'PREPARADA': ('VALIDADA_JEFATURA', 'preparado_por', 'fecha_preparado'),
+            'VALIDADA_PRESUPUESTOS': (
+                'VALIDADA_SAF', 'presupuestado_por', 'fecha_presupuesto'
+            ),
+            'VALIDADA_RPA': (
+                'VALIDADA_PRESUPUESTOS', 'rpa_por', 'fecha_rpa'
+            ),
+            'VALIDADA_JEFATURA': (
+                'VALIDADA_RPA', 'jefatura_por', 'fecha_jefatura'
+            ),
+            'PREPARADA': (
+                'VALIDADA_JEFATURA', 'preparado_por', 'fecha_preparado'
+            ),
         }
 
     if estado_actual not in map_retroceso:
         messages.error(
-            request, 
-            f"No es posible revertir el estado de una solicitud en fase {solicitud.get_estado_display()} "
-            "o que ya ha sido entregada físicamente en Almacén."
+            request,
+            "No es posible retroceder esta solicitud."
         )
-        return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+        return redirigir_despues_de_accion(request, solicitud)
 
     nuevo_estado, campo_usuario, campo_fecha = map_retroceso[estado_actual]
 
-    try:
-        with transaction.atomic():
-            solicitud.estado = nuevo_estado
-            setattr(solicitud, campo_usuario, None)
-            setattr(solicitud, campo_fecha, None)
-            solicitud.save()
 
-            Bitacora.objects.create(
-                usuario=request.user,
-                modulo='Solicitudes',
-                accion='Reversión de Estado Administrativo',
-                descripcion=(
-                    f'El Administrador revirtió el estado de la solicitud {solicitud.codigo} '
-                    f'desde {estado_actual} al paso anterior: {nuevo_estado}.'
-                )
-            )
+    # Liberar la reserva al regresar de REVISADA a REGISTRADA.
+    if (
+        solicitud.flujo_atencion == 'SALIDA_ALMACEN'
+        and estado_actual == 'REVISADA'
+        and nuevo_estado == 'REGISTRADA'
+    ):
+        liberar_reservas_solicitud(solicitud)
 
-        messages.success(request, f"Se ha revertido con éxito el estado de la solicitud {solicitud.codigo} a '{solicitud.get_estado_display()}'.")
-    except Exception as e:
-        messages.error(request, f"Error al procesar la reversión del estado: {str(e)}")
+    solicitud.estado = nuevo_estado
+    setattr(solicitud, campo_usuario, None)
+    setattr(solicitud, campo_fecha, None)
+    solicitud.save()
 
-    return redirect(request.META.get('HTTP_REFERER', 'solicitudes'))
+    Bitacora.objects.create(
+        usuario=request.user,
+        modulo='Solicitudes',
+        accion='Reversión de Estado Administrativo',
+        descripcion=(
+            f'El administrador revirtió la solicitud '
+            f'{solicitud.codigo} desde {estado_actual} '
+            f'hasta {nuevo_estado}.'
+        )
+    )
+
+    messages.success(
+        request,
+        f"La solicitud {solicitud.codigo} volvió al estado "
+        f"{solicitud.get_estado_display()}."
+    )
+
+    return redirigir_despues_de_accion(request, solicitud)
 
 @login_required
 def nuevo_pedido_almacen(request):
     """
-    Registra pedidos de consumo de oficina validados contra la ASIGNACIÓN FÍSICA DIRECTA
-    recibida en las Notas de Entrada de Almacén (Sin dependencia de techos POA).
+    Registro de pedidos con Control Estricto Total:
+    Solo permite solicitar materiales que posean Asignación Directa > 0.
     """
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
@@ -1757,14 +2490,30 @@ def nuevo_pedido_almacen(request):
             return redirect('nuevo_pedido_almacen')
 
         try:
-            with transaction.atomic():
-                ultima = Solicitud.objects.select_for_update().order_by('id').last()
-                numero = (ultima.id + 1) if ultima else 1
-                codigo = f'PED-{numero:05d}'
 
+            with transaction.atomic():
+                # 1. Resolver el almacén antes de crear la solicitud
+                from solicitudes.services import (
+                    resolver_almacen_para_unidad,
+                    AlmacenNoDisponible,
+                    ConfiguracionAlmacenAmbigua
+                )
+
+                try:
+                    almacen_origen = resolver_almacen_para_unidad(
+                        unidad_solicitante
+                    )
+                except (AlmacenNoDisponible, ConfiguracionAlmacenAmbigua) as e:
+                    raise ValueError(str(e))
+
+                # 2. Generar código temporal único
+                codigo_temporal = f"TMP-{uuid.uuid4().hex[:16]}"
+
+                # 3. Crear la solicitud
                 solicitud = Solicitud.objects.create(
-                    codigo=codigo,
+                    codigo=codigo_temporal,
                     unidad_solicitante=unidad_solicitante,
+                    almacen_asignado=almacen_origen,
                     solicitante=request.user,
                     fecha=fecha,
                     justificacion=justificacion,
@@ -1773,53 +2522,113 @@ def nuevo_pedido_almacen(request):
                     estado='REGISTRADA'
                 )
 
+                # 4. Generar código institucional sin duplicados
+                from django.db import connection
+                import re
+
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT pg_advisory_xact_lock(%s)",
+                        [2026001]
+                    )
+
+                codigos = Solicitud.objects.filter(
+                    codigo__startswith='PED-'
+                ).values_list('codigo', flat=True)
+
+                numeros = [
+                    int(coincidencia.group(1))
+                    for codigo_existente in codigos
+                    if (coincidencia := re.fullmatch(r'PED-(\d+)', codigo_existente))
+                ]
+
+                siguiente_numero = max(numeros, default=0) + 1
+                codigo = f"PED-{siguiente_numero:05d}"
+
+                solicitud.codigo = codigo
+                solicitud.save(update_fields=['codigo'])
+
+                #5. Validar y registrar los materiales del pedido
+                if not isinstance(payload, dict):
+                    raise ValueError(
+                        "El formato de los materiales no es válido."
+                    )
+
                 for item_key, item_data in payload.items():
-                    cantidad = int(item_data.get('cantidad', 1))
-                    if cantidad <= 0:
-                        raise ValueError("La cantidad solicitada debe ser mayor a cero.")
-
-                    material = Material.objects.select_related('partida').get(id=item_key)
-
-                    # 1. Validar existencia física neta en Almacén
-                    stock_almacen = InventarioAlmacen.objects.filter(
-                        material=material,
-                        almacen__in=almacenes_autorizados
-                    ).aggregate(
-                        disponible=Sum(F('stock_fisico') - F('stock_reservado'))
-                    )['disponible'] or 0
-
-                    if stock_almacen < cantidad:
+                    if not isinstance(item_data, dict):
                         raise ValueError(
-                            f"Stock insuficiente en almacén para '{material.nombre}'. "
-                            f"Disponible en estantería: {stock_almacen} (solicitado: {cantidad})."
+                            "Los datos de un material no son válidos."
                         )
 
-                    # 2. VALIDAR CUPO ASIGNADO DE LA UNIDAD (Consulta directa robusta)
-                    asigs = AsignacionEntradaUnidad.objects.filter(
+                    try:
+                        cantidad = int(item_data.get('cantidad', 0))
+                    except (TypeError, ValueError):
+                        raise ValueError(
+                            "La cantidad solicitada debe ser un número entero."
+                        )
+
+                    if cantidad <= 0:
+                        raise ValueError(
+                            "La cantidad solicitada debe ser mayor a cero."
+                        )
+
+                    material = Material.objects.get(pk=item_key)
+
+                    # Validar el saldo asignado a esta unidad
+                    # exclusivamente en el almacén de origen.
+                    asignaciones = AsignacionEntradaUnidad.objects.filter(
                         unidad_organizacional=unidad_solicitante,
                         nota_ingreso_detalle__material=material,
+                        nota_ingreso_detalle__nota_ingreso__almacen_destino=almacen_origen,
                         cantidad_asignada__gt=F('cantidad_retirada')
                     )
-                    tot_asig = asigs.aggregate(s=Sum('cantidad_asignada'))['s'] or 0
-                    tot_ret = asigs.aggregate(s=Sum('cantidad_retirada'))['s'] or 0
-                    saldo_cupo = max(0, tot_asig - tot_ret)
 
-                    # Si tiene cupo asignado, no puede pedir más que su cupo
-                    if saldo_cupo > 0 and cantidad > saldo_cupo:
+                    totales = asignaciones.aggregate(
+                        asignado=Sum('cantidad_asignada'),
+                        retirado=Sum('cantidad_retirada')
+                    )
+
+                    saldo_cupo = (
+                        (totales['asignado'] or 0)
+                        - (totales['retirado'] or 0)
+                    )
+
+                    if cantidad > saldo_cupo:
                         raise ValueError(
-                            f"Cupo asignado insuficiente para '{material.nombre}'. "
-                            f"Su oficina tiene {saldo_cupo} unidades asignadas disponibles (solicitó: {cantidad})."
+                            f"Cupo insuficiente para '{material.nombre}'. "
+                            f"Disponible: {saldo_cupo}; "
+                            f"solicitado: {cantidad}."
                         )
 
-                    # 3. Costo referencial del lote PEPS activo más antiguo
+                    # Validar stock físico disponible
+                    inventario = InventarioAlmacen.objects.filter(
+                        material=material,
+                        almacen=almacen_origen
+                    ).first()
+
+                    stock_disponible = (
+                        inventario.stock_disponible if inventario else 0
+                    )
+
+                    if cantidad > stock_disponible:
+                        raise ValueError(
+                            f"Stock insuficiente para '{material.nombre}'. "
+                            f"Disponible: {stock_disponible}; "
+                            f"solicitado: {cantidad}."
+                        )
+
+                    # Consultar costo referencial PEPS
                     lote_peps = MovimientoInventario.objects.filter(
                         material=material,
+                        almacen=almacen_origen,
                         tipo='ENTRADA',
-                        almacen__in=almacenes_autorizados,
                         saldo_disponible_lote__gt=0
                     ).order_by('fecha', 'id').first()
 
-                    costo_referencial = lote_peps.costo_unitario if lote_peps else Decimal('0.00')
+                    costo_referencial = (
+                        lote_peps.costo_unitario
+                        if lote_peps else Decimal('0.00')
+                    )
 
                     DetalleSolicitud.objects.create(
                         solicitud=solicitud,
@@ -1828,13 +2637,17 @@ def nuevo_pedido_almacen(request):
                         precio_unitario_referencial=costo_referencial
                     )
 
+                #6. Registrar la operación en auditoría
                 Bitacora.objects.create(
                     usuario=request.user,
                     modulo='Solicitudes',
                     accion='Registrar Pedido Almacén (Asignación Directa)',
-                    descripcion=f'Se registró el Pedido {codigo} para {unidad_solicitante.nombre} validado contra cupos de entrada.'
+                    descripcion=(
+                        f'Se registró el pedido {codigo} '
+                        f'para {unidad_solicitante.nombre}, '
+                        f'validado contra asignaciones directas.'
+                    )
                 )
-
             messages.success(request, f"Pedido de Almacén {codigo} registrado exitosamente.")
             return redirect('solicitudes')
 
@@ -1847,15 +2660,24 @@ def nuevo_pedido_almacen(request):
             return redirect('nuevo_pedido_almacen')
 
     # =========================================================
-    # GET: CARGAR ARTÍCULOS PRIORIZANDO LA ASIGNACIÓN DE LA UNIDAD
+    # GET: CARGAR ÚNICAMENTE MATERIALES CON ASIGNACIÓN DIRECTA > 0 (ESTRICTO TOTAL)
     # =========================================================
-    materiales_filtrados = []
+    from solicitudes.services import (
+        resolver_almacen_para_unidad,
+        AlmacenNoDisponible,
+        ConfiguracionAlmacenAmbigua,
+    )
 
-    # 1. Asignaciones específicas de la unidad_solicitante
+    try:
+        almacen_origen = resolver_almacen_para_unidad(unidad_solicitante)
+    except (AlmacenNoDisponible, ConfiguracionAlmacenAmbigua) as e:
+        messages.error(request, str(e))
+        return redirect('solicitudes')
     asignaciones = AsignacionEntradaUnidad.objects.filter(
         unidad_organizacional=unidad_solicitante,
         cantidad_asignada__gt=F('cantidad_retirada'),
-        nota_ingreso_detalle__material__is_active=True
+        nota_ingreso_detalle__material__is_active=True,
+        nota_ingreso_detalle__nota_ingreso__almacen_destino=almacen_origen
     ).select_related(
         'nota_ingreso_detalle__material',
         'nota_ingreso_detalle__material__partida',
@@ -1867,82 +2689,46 @@ def nuevo_pedido_almacen(request):
         mat = asig.nota_ingreso_detalle.material
         saldo_asig = asig.saldo_disponible
 
-        if mat.id not in materiales_dict:
-            u_med = mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida
-            partida_cod = mat.partida.codigo if mat.partida else "—"
-            partida_nom = mat.partida.nombre if mat.partida else ""
-
-            inv = InventarioAlmacen.objects.filter(material=mat, almacen__in=almacenes_autorizados).first()
-            stock_real = inv.stock_disponible if inv else 0
-            tope = min(saldo_asig, stock_real)
-
-            materiales_dict[mat.id] = {
-                'id': mat.id,
-                'nombre': mat.nombre,
-                'codigo': mat.codigo,
-                'partida_codigo': partida_cod,
-                'partida_nombre': partida_nom,
-                'unidad_medida': u_med,
-                'stock_almacen': stock_real,
-                'costo_unitario': float(asig.nota_ingreso_detalle.precio_unitario),
-                'cupo_asignado': saldo_asig,
-                'cuota_saldo': saldo_asig,
-                'max_solicitable': tope,
-                'modalidad': 'ASIGNACION_DIRECTA',
-                'modalidad_label': f'Asignación Directa ({saldo_asig} {u_med})',
-                'almacen_despacho': almacenes_autorizados.first().nombre if almacenes_autorizados.first() else "Almacén Central"
-            }
-        else:
-            materiales_dict[mat.id]['cupo_asignado'] += saldo_asig
-            materiales_dict[mat.id]['cuota_saldo'] += saldo_asig
-            nuevo_tope = min(
-                materiales_dict[mat.id]['cupo_asignado'],
-                materiales_dict[mat.id]['stock_almacen']
-            )
-            materiales_dict[mat.id]['max_solicitable'] = nuevo_tope
-            materiales_dict[mat.id]['modalidad_label'] = f"Asignación Directa ({materiales_dict[mat.id]['cupo_asignado']} {materiales_dict[mat.id]['unidad_medida']})"
-
-    materiales_filtrados = list(materiales_dict.values())
-
-    # 2. Si el Administrador está operando, también le mostramos el resto de materiales de almacén (Bolsa Libre)
-    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
-        inventarios_extra = InventarioAlmacen.objects.filter(
-            almacen__in=almacenes_autorizados,
-            stock_fisico__gt=0,
-            material__is_active=True
-        ).exclude(
-            material_id__in=materiales_dict.keys()
-        ).select_related('material', 'material__partida', 'material__unidad_medida_fk', 'almacen')
-
-        for inv in inventarios_extra:
-            mat = inv.material
-            disp = inv.stock_disponible
-            if disp > 0:
-                lote = MovimientoInventario.objects.filter(
-                    material=mat,
-                    tipo='ENTRADA',
-                    almacen=inv.almacen,
-                    saldo_disponible_lote__gt=0
-                ).order_by('fecha', 'id').first()
-                costo_u = lote.costo_unitario if lote else Decimal('0.00')
-
+        if saldo_asig > 0:
+            if mat.id not in materiales_dict:
                 u_med = mat.unidad_medida_fk.codigo if mat.unidad_medida_fk else mat.unidad_medida
-                materiales_filtrados.append({
+                partida_cod = mat.partida.codigo if mat.partida else "—"
+                partida_nom = mat.partida.nombre if mat.partida else ""
+
+                inv = InventarioAlmacen.objects.filter(
+                    material=mat,
+                    almacen=almacen_origen
+                ).first()
+                stock_real = inv.stock_disponible if inv else 0
+                tope = min(saldo_asig, stock_real)
+
+                materiales_dict[mat.id] = {
                     'id': mat.id,
                     'nombre': mat.nombre,
                     'codigo': mat.codigo,
-                    'partida_codigo': mat.partida.codigo if mat.partida else "—",
-                    'partida_nombre': mat.partida.nombre if mat.partida else "",
+                    'partida_codigo': partida_cod,
+                    'partida_nombre': partida_nom,
                     'unidad_medida': u_med,
-                    'stock_almacen': disp,
-                    'costo_unitario': float(costo_u),
-                    'cupo_asignado': disp,
-                    'cuota_saldo': disp,
-                    'max_solicitable': disp,
-                    'modalidad': 'BOLSA_COMUN',
-                    'modalidad_label': f'Bolsa Libre Almacén ({disp} {u_med})',
-                    'almacen_despacho': inv.almacen.nombre
-                })
+                    'stock_almacen': stock_real,
+                    'costo_unitario': float(asig.nota_ingreso_detalle.precio_unitario),
+                    'cupo_asignado': saldo_asig,
+                    'cuota_saldo': saldo_asig,
+                    'max_solicitable': tope,
+                    'modalidad': 'ASIGNACION_DIRECTA',
+                    'modalidad_label': f'Asignación Directa ({saldo_asig} {u_med})',
+                    'almacen_despacho': almacen_origen.nombre
+                }
+            else:
+                materiales_dict[mat.id]['cupo_asignado'] += saldo_asig
+                materiales_dict[mat.id]['cuota_saldo'] += saldo_asig
+                nuevo_tope = min(
+                    materiales_dict[mat.id]['cupo_asignado'],
+                    materiales_dict[mat.id]['stock_almacen']
+                )
+                materiales_dict[mat.id]['max_solicitable'] = nuevo_tope
+                materiales_dict[mat.id]['modalidad_label'] = f"Asignación Directa ({materiales_dict[mat.id]['cupo_asignado']} {materiales_dict[mat.id]['unidad_medida']})"
+
+    materiales_filtrados = list(materiales_dict.values())
 
     return render(request, 'solicitudes/nuevo_pedido_almacen.html', {
         'materiales': materiales_filtrados,
