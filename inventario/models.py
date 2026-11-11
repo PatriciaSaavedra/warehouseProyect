@@ -6,7 +6,7 @@ import hashlib
 from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
-
+from django.utils import timezone as django_timezone
 # ========================================================
 # 1. MODELOS DE CONFIGURACIÓN Y CATÁLOGOS BASE
 # ========================================================
@@ -181,12 +181,19 @@ class MovimientoInventario(models.Model):
     almacen = models.ForeignKey(Almacen, on_delete=models.PROTECT, related_name='movimientos', null=True, blank=True)
     tipo = models.CharField(max_length=20, choices=TIPOS_MOVIMIENTO)
     cantidad = models.IntegerField()
-    costo_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    costo_unitario = models.DecimalField(
+        max_digits=15,
+        decimal_places=5,
+        default=Decimal('0.00000')
+    )
+    fecha = models.DateTimeField(
+        default=django_timezone.now
+    )
+
     costo_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     stock_anterior = models.IntegerField(default=0)
     stock_resultante = models.IntegerField(default=0)
     referencia = models.CharField(max_length=100)
-    fecha = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     saldo_disponible_lote = models.IntegerField(default=0)
     unidad_destino = models.ForeignKey('organizacion.UnidadOrganizacional', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumos')
