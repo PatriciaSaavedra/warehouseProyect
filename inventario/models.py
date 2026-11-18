@@ -6,7 +6,7 @@ import hashlib
 from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
-
+from django.utils import timezone as django_timezone
 # ========================================================
 # 1. MODELOS DE CONFIGURACIÓN Y CATÁLOGOS BASE
 # ========================================================
@@ -174,6 +174,9 @@ class InventarioAlmacen(models.Model):
 TIPOS_MOVIMIENTO = [
     ('ENTRADA', 'Entrada'),
     ('SALIDA', 'Salida'),
+    ('BAJA', 'Baja de material'),
+    ('AJUSTE_ENTRADA', 'Ajuste positivo por conciliación'),
+    ('AJUSTE_SALIDA', 'Ajuste negativo por conciliación'),
 ]
 
 class MovimientoInventario(models.Model):
@@ -181,12 +184,19 @@ class MovimientoInventario(models.Model):
     almacen = models.ForeignKey(Almacen, on_delete=models.PROTECT, related_name='movimientos', null=True, blank=True)
     tipo = models.CharField(max_length=20, choices=TIPOS_MOVIMIENTO)
     cantidad = models.IntegerField()
-    costo_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    costo_unitario = models.DecimalField(
+        max_digits=15,
+        decimal_places=5,
+        default=Decimal('0.00000')
+    )
+    fecha = models.DateTimeField(
+        default=django_timezone.now
+    )
+
     costo_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     stock_anterior = models.IntegerField(default=0)
     stock_resultante = models.IntegerField(default=0)
     referencia = models.CharField(max_length=100)
-    fecha = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     saldo_disponible_lote = models.IntegerField(default=0)
     unidad_destino = models.ForeignKey('organizacion.UnidadOrganizacional', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumos')
@@ -584,3 +594,149 @@ class AsignacionEntradaUnidad(models.Model):
         verbose_name = "Asignación de Entrada a Unidad"
         verbose_name_plural = "Asignaciones de Entrada a Unidades"
         unique_together = ('nota_ingreso_detalle', 'unidad_organizacional')
+
+
+# ========================================================
+# CIERRE ANUAL Y CONCILIACION FISICA - SIGAL
+# ========================================================
+
+class ConciliacionFisica(models.Model):
+    ESTADOS = [
+        ('BORRADOR', 'Borrador'),
+        ('EN_REVISION', 'En revision'),
+        ('APROBADA', 'Aprobada'),
+        ('ANULADA', 'Anulada'),
+    ]
+
+    almacen = models.ForeignKey(
+        'Almacen', on_delete=models.PROTECT,
+        related_name='conciliaciones_fisicas'
+    )
+    gestion = models.PositiveIntegerField()
+    fecha_corte = models.DateField()
+    estado = models.CharField(
+        max_length=20, choices=ESTADOS, default='BORRADOR'
+    )
+    responsable = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='conciliaciones_registradas'
+    )
+    aprobado_por = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='conciliaciones_aprobadas'
+    )
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+    fecha_aprobacion = models.DateTimeField(null=True, blank=True)
+    observaciones = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-gestion', 'almacen_id', '-fecha_registro']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['almacen', 'gestion'],
+                condition=models.Q(
+                    estado__in=['BORRADOR', 'EN_REVISION', 'APROBADA']
+                ),
+                name='uniq_conciliacion_activa_alm_gestion',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Conciliacion {self.gestion} - {self.almacen.nombre}"
+
+
+class ConciliacionFisicaDetalle(models.Model):
+    conciliacion = models.ForeignKey(
+        'ConciliacionFisica', on_delete=models.PROTECT,
+        related_name='detalles'
+    )
+    material = models.ForeignKey('Material', on_delete=models.PROTECT)
+    cantidad_sistema = models.IntegerField()
+    cantidad_fisica = models.PositiveIntegerField()
+    diferencia = models.IntegerField(default=0)
+    observaciones = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['conciliacion', 'material'],
+                name='uniq_conciliacion_material_sigal'
+            )
+        ]
+
+
+class CierreGestion(models.Model):
+    ESTADOS = [
+        ('BORRADOR', 'Borrador'),
+        ('APROBADO', 'Aprobado'),
+        ('ANULADO', 'Anulado'),
+    ]
+
+    almacen = models.ForeignKey(
+        'Almacen', on_delete=models.PROTECT,
+        related_name='cierres_gestion'
+    )
+    gestion = models.PositiveIntegerField()
+    fecha_corte = models.DateField()
+    conciliacion = models.ForeignKey(
+        'ConciliacionFisica', on_delete=models.PROTECT,
+        related_name='cierres',
+        null=True, blank=True
+    )
+    estado = models.CharField(
+        max_length=20, choices=ESTADOS, default='BORRADOR'
+    )
+    total_materiales = models.PositiveIntegerField(default=0)
+    valor_total_bs = models.DecimalField(
+        max_digits=18, decimal_places=2,
+        default=Decimal('0.00')
+    )
+    creado_por = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='cierres_creados'
+    )
+    aprobado_por = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='cierres_aprobados'
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_aprobacion = models.DateTimeField(null=True, blank=True)
+    observaciones = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['almacen', 'gestion'],
+                name='uniq_cierre_almacen_gestion_sigal'
+            )
+        ]
+        ordering = ['-gestion', 'almacen_id']
+
+    def __str__(self):
+        return f"Cierre {self.gestion} - {self.almacen.nombre}"
+
+
+class CierreGestionDetalle(models.Model):
+    cierre = models.ForeignKey(
+        'CierreGestion', on_delete=models.PROTECT,
+        related_name='detalles'
+    )
+    material = models.ForeignKey('Material', on_delete=models.PROTECT)
+    cantidad_fisica = models.IntegerField(default=0)
+    cantidad_reservada = models.IntegerField(default=0)
+    valor_peps_bs = models.DecimalField(
+        max_digits=18, decimal_places=2,
+        default=Decimal('0.00')
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cierre', 'material'],
+                name='uniq_cierre_material_sigal'
+            )
+        ]
+
+from .historico_models import MovimientoHistoricoPendiente

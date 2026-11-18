@@ -1,3 +1,4 @@
+from inventario.conciliacion_peps import lotes_peps_operativos
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -1116,25 +1117,117 @@ def reporte_inventario_oficial_pdf(request):
     """Redirige al reporte oficial clasificado por partidas presupuestarias."""
     return reporte_inventario(request)
 @login_required
-@rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def movimientos(request):
     almacenes_user = obtener_almacenes_usuario(request.user)
-    es_admin = (request.user.perfilusuario.rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES'] or request.user.is_superuser)
 
-    # SUBALMACÉN: Solo audita movimientos ocurridos en su depósito
+    es_admin = (
+        request.user.is_superuser
+        or request.user.perfilusuario.rol in (
+            'ADMINISTRADOR',
+            'ADMIN_ALMACENES'
+        )
+    )
+
+    # Mantener el aislamiento de almacenes.
     if es_admin:
         movimientos_qs = MovimientoInventario.objects.all()
+        almacenes_disponibles = Almacen.objects.all().order_by('nombre')
     else:
-        movimientos_qs = MovimientoInventario.objects.filter(almacen__in=almacenes_user)
+        movimientos_qs = MovimientoInventario.objects.filter(
+            almacen__in=almacenes_user
+        )
+        almacenes_disponibles = almacenes_user.order_by('nombre')
 
-    movimientos_qs = movimientos_qs.select_related('material', 'almacen', 'usuario', 'unidad_destino').order_by('-id')
-    
+    # Parámetros recibidos por GET.
+    tipo = request.GET.get('tipo', '').strip().upper()
+    fecha_desde = request.GET.get('desde', '').strip()
+    fecha_hasta = request.GET.get('hasta', '').strip()
+    almacen_id = request.GET.get('almacen', '').strip()
+    unidad_id = request.GET.get('destino', '').strip()
+
+    # Filtrar por tipo.
+    if tipo in ('ENTRADA', 'SALIDA'):
+        movimientos_qs = movimientos_qs.filter(tipo=tipo)
+    else:
+        tipo = ''
+
+    # Filtrar por fechas.
+    desde = parse_date(fecha_desde)
+    hasta = parse_date(fecha_hasta)
+
+    if desde:
+        movimientos_qs = movimientos_qs.filter(
+            fecha__date__gte=desde
+        )
+    else:
+        fecha_desde = ''
+
+    if hasta:
+        movimientos_qs = movimientos_qs.filter(
+            fecha__date__lte=hasta
+        )
+    else:
+        fecha_hasta = ''
+
+    # Filtrar por almacén, respetando los permisos.
+    if almacen_id.isdigit():
+        if almacenes_disponibles.filter(pk=int(almacen_id)).exists():
+            movimientos_qs = movimientos_qs.filter(
+                almacen_id=int(almacen_id)
+            )
+        else:
+            almacen_id = ''
+    else:
+        almacen_id = ''
+
+    # Filtrar por unidad de destino.
+    if unidad_id == 'SIN_DESTINO':
+        movimientos_qs = movimientos_qs.filter(
+            unidad_destino__isnull=True
+        )
+    elif unidad_id == 'CON_DESTINO':
+        movimientos_qs = movimientos_qs.filter(
+            unidad_destino__isnull=False
+        )
+    elif unidad_id.isdigit():
+        if UnidadOrganizacional.objects.filter(pk=int(unidad_id)).exists():
+            movimientos_qs = movimientos_qs.filter(
+                unidad_destino_id=int(unidad_id)
+            )
+        else:
+            unidad_id = ''
+    else:
+        unidad_id = ''
+
+    movimientos_qs = (
+        movimientos_qs
+        .select_related(
+            'material',
+            'almacen',
+            'usuario',
+            'unidad_destino'
+        )
+        .order_by('-fecha', '-id')
+    )
+
+    # Mantener los filtros en la paginación.
+    parametros = request.GET.copy()
+    parametros.pop('page', None)
+
     paginator = Paginator(movimientos_qs, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'inventario/movimientos.html', {
         'movimientos': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        'tipo_seleccionado': tipo,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'almacen_seleccionado': almacen_id,
+        'destino_seleccionado': unidad_id,
+        'almacenes_disponibles': almacenes_disponibles,
+        'unidades_disponibles': UnidadOrganizacional.objects.all().order_by('nombre'),
+        'filtros_query': parametros.urlencode(),
     })
 @login_required
 @rol_requerido(['ALMACENERO', 'KARDISTA', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
@@ -1262,7 +1355,7 @@ def inventario_por_unidad(request):
                 tope_permitido = stock_almacen_disp
                 total_unidades_kpi += stock_almacen_disp
 
-            lote_activo = MovimientoInventario.objects.filter(
+            lote_activo = lotes_peps_operativos(MovimientoInventario.objects).filter(
                 material=mat,
                 almacen=inv.almacen,
                 tipo='ENTRADA',
@@ -1337,11 +1430,7 @@ def entrada_inventario(request):
     perfil = getattr(request.user, 'perfilusuario', None)
     rol = perfil.rol if perfil else 'UNIDAD_SOLICITANTE'
     
-    if rol in ['ADMINISTRADOR', 'ADMIN_ALMACENES']:
-        almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
-    else:
-        almacenes = perfil.almacenes_autorizados.filter(is_active=True).order_by('nombre')
-
+    almacenes = perfil.get_almacenes_operables()
     proveedores = Proveedor.objects.filter(is_active=True).order_by('razon_social')
     materiales = Material.objects.filter(is_active=True).order_by('nombre')
     unidades_org = UnidadOrganizacional.objects.filter(is_active=True).order_by('nombre')
@@ -1411,6 +1500,10 @@ def entrada_inventario(request):
 
         try:
             with transaction.atomic():
+                # SIGAL: bloqueo común por almacén antes de modificar inventario.
+                from inventario.bloqueos import bloquear_almacen
+                bloquear_almacen(almacen.pk)
+
                 nota = NotaIngreso.objects.create(
                     nro_nota=nro_nota,
                     proveedor=proveedor,
@@ -1791,6 +1884,14 @@ def crear_unidad_medida_ajax(request):
 @login_required
 @rol_requerido(['ALMACENERO', 'ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def establecer_saldo_inicial(request, id):
+    # SIGAL: BLOQUEO TEMPORAL DE SALDO INICIAL HEREDADO
+    if request.method == 'POST':
+        messages.error(
+            request,
+            'El registro de saldo inicial antiguo está deshabilitado. '
+            'Utilice el procedimiento de inventario por almacén.'
+        )
+        return redirect('inventario')
     material = get_object_or_404(Material, id=id)
 
     if MovimientoInventario.objects.filter(material=material, referencia='STOCK INICIAL').exists():
@@ -1898,9 +1999,9 @@ def lotes_list(request):
 
     # 2. Base de consulta limitada estrictamente a los almacenes del usuario
     if es_admin:
-        lotes_query = MovimientoInventario.objects.filter(tipo='ENTRADA', saldo_disponible_lote__gt=0)
+        lotes_query = lotes_peps_operativos(MovimientoInventario.objects).filter(tipo='ENTRADA', saldo_disponible_lote__gt=0)
     else:
-        lotes_query = MovimientoInventario.objects.filter(
+        lotes_query = lotes_peps_operativos(MovimientoInventario.objects).filter(
             tipo='ENTRADA',
             saldo_disponible_lote__gt=0,
             almacen__in=almacenes_disponibles
@@ -1927,6 +2028,16 @@ def lotes_list(request):
             Q(material__codigo__icontains=query_busqueda) |
             Q(referencia__icontains=query_busqueda)
         )
+
+    # Valor remanente calculado por lote PEPS, sin modificar la BD.
+    from django.db.models import F, DecimalField, ExpressionWrapper
+
+    lotes_query = lotes_query.annotate(
+        valor_disponible_lote=ExpressionWrapper(
+            F('saldo_disponible_lote') * F('costo_unitario'),
+            output_field=DecimalField(max_digits=18, decimal_places=2)
+        )
+    )
 
     lotes_query = lotes_query.select_related('material', 'almacen', 'usuario').order_by('fecha', 'id')
     paginator = Paginator(lotes_query, 15)
@@ -2835,6 +2946,10 @@ def reporte_dgcf_r106(request):
 @login_required
 @rol_requerido(['ADMINISTRADOR', 'ADMIN_ALMACENES'])
 def cierre_conciliacion_view(request):
+    # CIERRE_SIGAL_BLOQUEADO_TEMPORALMENTE
+    if request.method == 'POST':
+        messages.error(request, 'Cierre anual temporalmente deshabilitado por seguridad PEPS.')
+        return redirect('cierre_conciliacion')
     perfil = request.user.perfilusuario
     almacenes = Almacen.objects.filter(is_active=True).order_by('nombre')
     
