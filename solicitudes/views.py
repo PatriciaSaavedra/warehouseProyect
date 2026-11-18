@@ -1630,7 +1630,18 @@ def entregar_solicitud(request, id):
     # =========================================================
     try:
         with transaction.atomic():
+            # SIGAL: bloqueo del almacén antes de bloquear solicitud e inventario.
+            from inventario.bloqueos import bloquear_almacen
+            bloquear_almacen(almacen_origen.pk)
+
             solicitud_lock = Solicitud.objects.select_for_update().get(id=id)
+
+            # SIGAL: comprobar que el almacén no cambió antes del bloqueo.
+            if solicitud_lock.almacen_origen_id != almacen_origen.pk:
+                raise ValidationError(
+                    "El almacén de origen de la solicitud cambió durante "
+                    "el despacho. Actualice la página e intente nuevamente."
+                )
             if not puede_operar_almacen(
                 request.user, solicitud_lock.almacen_origen
             ):

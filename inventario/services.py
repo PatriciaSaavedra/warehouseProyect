@@ -1,3 +1,5 @@
+from inventario.conciliacion_peps import lotes_peps_operativos
+from inventario.historico_models import MovimientoHistoricoPendiente
 from datetime import date, timedelta
 from decimal import Decimal
 from django.db import transaction
@@ -6,9 +8,9 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import (
-    Material, 
-    MovimientoInventario, 
-    InventarioAlmacen, 
+    Material,
+    MovimientoInventario,
+    InventarioAlmacen,
     Almacen,
     AsignacionEntradaUnidad,
     AsignacionMaterialUnidad
@@ -21,7 +23,7 @@ from .models import (
 def calcular_desglose_peps(material, almacen, cantidad_solicitada):
     """
     Simula en tiempo real cómo se cubrirá el pedido según PEPS sin alterar la BD.
-    Permite visualizar en pantalla exactamente qué lotes se consumirán, 
+    Permite visualizar en pantalla exactamente qué lotes se consumirán,
     sus cantidades y sus precios unitarios (ej. 2 de 30 Bs. y 1 de 45 Bs. = 105 Bs.).
     """
     if not material or not almacen or cantidad_solicitada <= 0:
@@ -35,10 +37,11 @@ def calcular_desglose_peps(material, almacen, cantidad_solicitada):
         }
 
     # Lotes de entrada con saldo físico en estantería ordenados por FIFO (fecha e id ascendente)
-    lotes_disponibles = MovimientoInventario.objects.filter(
+
+    lotes_disponibles = lotes_peps_operativos(MovimientoInventario.objects).filter(
         material=material,
         almacen=almacen,
-        tipo='ENTRADA',
+        tipo__in=['ENTRADA', 'AJUSTE_ENTRADA'],
         saldo_disponible_lote__gt=0
     ).order_by('fecha', 'id')
 
@@ -112,6 +115,9 @@ def registrar_salida_valorada_peps(
         )
 
     with transaction.atomic():
+        # SIGAL: bloqueo común del almacén antes de bloquear inventario y lotes.
+        from inventario.bloqueos import bloquear_almacen
+        bloquear_almacen(almacen.pk)
 
         # =========================================================
         # 1. BLOQUEAR INVENTARIO DEL ALMACÉN
@@ -188,6 +194,20 @@ def registrar_salida_valorada_peps(
                 f"solicitado: {cantidad_salida})."
             )
 
+        if not descontar_reserva:
+            disponible_no_reservado = (
+                inventario_almacen.stock_fisico
+                - inventario_almacen.stock_reservado
+            )
+
+            if cantidad_salida > disponible_no_reservado:
+                raise ValidationError(
+                    "La salida supera las existencias no reservadas "
+                    f"del almacén {almacen.nombre}. "
+                    f"Disponible: {disponible_no_reservado}; "
+                    f"solicitado: {cantidad_salida}."
+                )
+
         if descontar_reserva:
             if inventario_almacen.stock_reservado < cantidad_salida:
                 raise ValidationError(
@@ -200,13 +220,14 @@ def registrar_salida_valorada_peps(
         # 4. OBTENER LOTES DISPONIBLES SEGÚN PEPS
         # =========================================================
 
+
         lotes_disponibles = (
-            MovimientoInventario.objects
+            lotes_peps_operativos(MovimientoInventario.objects)
             .select_for_update()
             .filter(
                 material=material,
                 almacen=almacen,
-                tipo='ENTRADA',
+                tipo__in=['ENTRADA', 'AJUSTE_ENTRADA'],
                 saldo_disponible_lote__gt=0
             )
             .order_by('fecha', 'id')
@@ -408,7 +429,7 @@ def validar_operacion_almacen(usuario, almacen):
             )
     else:
         raise ValidationError("Tu usuario no tiene un perfil de roles asignado en el sistema.")
-    
+
     return True
 
 
@@ -426,14 +447,14 @@ def obtener_alertas_tempranas(usuario=None):
 
     # 1. ALERTAS DE VENCIMIENTO REALES POR LOTE EN ESTANTERÍA
     lotes_vencidos = MovimientoInventario.objects.filter(
-        tipo='ENTRADA',
+        tipo__in=['ENTRADA', 'AJUSTE_ENTRADA'],
         saldo_disponible_lote__gt=0,
         fecha_vencimiento__isnull=False,
         fecha_vencimiento__lt=hoy
     ).select_related('material', 'almacen', 'material__unidad_medida_fk').order_by('fecha_vencimiento')
 
     lotes_por_vencer = MovimientoInventario.objects.filter(
-        tipo='ENTRADA',
+        tipo__in=['ENTRADA', 'AJUSTE_ENTRADA'],
         saldo_disponible_lote__gt=0,
         fecha_vencimiento__isnull=False,
         fecha_vencimiento__gte=hoy,

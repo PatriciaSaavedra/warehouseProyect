@@ -76,9 +76,20 @@
                                 Solicitante
                             </span>
                         </div>
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8df9af] dark:text-[#eec14b] truncate mt-0.5" title="{{ request.user.perfilusuario.unidad.nombre }}">
-                            {{ request.user.perfilusuario.unidad.sigla|default:request.user.perfilusuario.unidad.nombre|default:"Oficina Solicitante"|truncatechars:20 }}
-                        </span>
+                        {% with unidad=request.user.perfilusuario.unidad %}
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-[#8df9af] dark:text-[#eec14b] truncate mt-0.5"
+                                title="{{ unidad.nombre|default:'Oficina Solicitante' }}">
+                                {% if unidad %}
+                                    {% if unidad.sigla %}
+                                        {{ unidad.sigla|truncatechars:20 }}
+                                    {% else %}
+                                        {{ unidad.nombre|truncatechars:20 }}
+                                    {% endif %}
+                                {% else %}
+                                    Oficina Solicitante
+                                {% endif %}
+                            </span>
+                        {% endwith %}
                     {% endif %}
 
                     <span class="text-[9px] font-mono tracking-widest uppercase text-white/50 dark:text-[#889488] mt-0.5">
@@ -353,24 +364,34 @@
 
             <!-- ADSCRIPCIÓN: SECRETARÍA Y UNIDAD -->
             {% with perfil=request.user.perfilusuario %}
-            {% with sec=perfil.secretaria|default:perfil.unidad.secretaria uni=perfil.unidad %}
-            {% if sec or uni %}
-            <div class="mt-2 pt-2 border-t border-white/10 dark:border-white/5 text-[10px] space-y-1 text-white/70 dark:text-[#889488]">
-                {% if sec %}
-                <div class="flex items-center gap-1.5 truncate" title="Secretaría: {{ sec.nombre }}">
-                    <span class="material-symbols-outlined text-[13px] text-[#ffdf98] dark:text-[#71dc95] shrink-0">corporate_fare</span>
-                    <span class="truncate">{{ sec.nombre }}</span>
-                </div>
-                {% endif %}
-                {% if uni %}
-                <div class="flex items-center gap-1.5 truncate" title="Unidad: {{ uni.nombre }}">
-                    <span class="material-symbols-outlined text-[13px] text-[#8df9af] dark:text-[#eec14b] shrink-0">account_tree</span>
-                    <span class="truncate font-semibold text-white/90 dark:text-[#bdcabd]">{{ uni.nombre }}</span>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
-            {% endwith %}
+                {% with uni=perfil.unidad %}
+                    {% if perfil.secretaria or uni %}
+                        <div class="mt-2 pt-2 border-t border-white/10 dark:border-white/5 text-[10px] space-y-1 text-white/70 dark:text-[#889488]">
+
+                            {% if perfil.secretaria %}
+                                <div class="flex items-center gap-1.5 truncate" title="Secretaría: {{ perfil.secretaria.nombre }}">
+                                    <span class="material-symbols-outlined text-[13px] text-[#ffdf98] dark:text-[#71dc95] shrink-0">corporate_fare</span>
+                                    <span class="truncate">{{ perfil.secretaria.nombre }}</span>
+                                </div>
+                            {% elif uni %}
+                                {% if uni.secretaria %}
+                                    <div class="flex items-center gap-1.5 truncate" title="Secretaría: {{ uni.secretaria.nombre }}">
+                                        <span class="material-symbols-outlined text-[13px] text-[#ffdf98] dark:text-[#71dc95] shrink-0">corporate_fare</span>
+                                        <span class="truncate">{{ uni.secretaria.nombre }}</span>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+
+                            {% if uni %}
+                                <div class="flex items-center gap-1.5 truncate" title="Unidad: {{ uni.nombre }}">
+                                    <span class="material-symbols-outlined text-[13px] text-[#8df9af] dark:text-[#eec14b] shrink-0">account_tree</span>
+                                    <span class="truncate font-semibold text-white/90 dark:text-[#bdcabd]">{{ uni.nombre }}</span>
+                                </div>
+                            {% endif %}
+
+                        </div>
+                    {% endif %}
+                {% endwith %}
             {% endwith %}
         </div>
 

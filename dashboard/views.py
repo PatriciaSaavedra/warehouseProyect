@@ -1,3 +1,4 @@
+from inventario.conciliacion_peps import lotes_peps_operativos
 from decimal import Decimal
 from datetime import date, timedelta
 from django.shortcuts import render
@@ -150,7 +151,7 @@ def dashboard_view(request):
         materiales_bajos_count = len(materiales_criticos) + len(materiales_reorden)
         # 3. Alertas de Lotes Perecederos (< 30 días o vencidos)
         fecha_umbral = hoy + timedelta(days=30)
-        lotes_activos = movimientos_base.filter(
+        lotes_activos = lotes_peps_operativos(movimientos_base).filter(
             tipo='ENTRADA',
             saldo_disponible_lote__gt=0,
             fecha_vencimiento__isnull=False
